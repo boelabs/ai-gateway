@@ -108,7 +108,7 @@ jobs:
       # than to reason about.
       fail-fast: false
       matrix:
-        name: [gateway, dashboard, docs]
+        name: [api, dashboard, docs]
         arch: [amd64, arm64]
         include:
           - name: api
