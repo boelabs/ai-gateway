@@ -2,7 +2,7 @@
 	"name": "ai-gateway",
 	"version": "0.0.0",
 	"private": true,
-	"description": "Boelabs AI Gateway — the gateway service, its docs site, and shared packages.",
+	"description": "Boelabs AI Gateway — the gateway service, its dashboard, its docs, and shared packages.",
 	"license": "MIT",
 	"author": "Boelabs",
 	"type": "module",

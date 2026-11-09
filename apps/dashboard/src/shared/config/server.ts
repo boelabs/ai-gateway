@@ -39,9 +39,8 @@ export function gatewayUrl(path = ""): string {
 }
 
 /**
- * Where this deployment's documentation site is, or `null` when it has none: the sidebar's
- * Documentation link and the command palette's Help group appear only with it. Each operator hosts
- * the docs image themselves, so there is no address to fall back to. Read on every call, as above.
+ * Where operators read the documentation, or `null` when unset: the sidebar's Documentation link
+ * and the command palette's Help group appear only with it. Read on every call, as above.
  */
 export function docsUrl(): string | null {
 	const raw = process.env.DOCS_URL?.trim();

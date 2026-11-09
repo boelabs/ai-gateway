@@ -1,0 +1,30 @@
+---
+title: "Anthropic"
+description: "Configura deployments de Anthropic y conoce sus capacidades y restricciones."
+---
+## Configurar un deployment [#configura-a-deployment]
+
+Envía este cuerpo a `POST /admin/deployments` con credencial de operador. Reemplaza las credenciales de ejemplo y elige un modelo disponible para su cuenta de proveedor. Consulta [Crear deployments](/docs/creating-deployments) para conocer los campos de configuración compartidos.
+
+```json
+{ "publicModel": "claude", "adapterKey": "anthropic", "upstreamModel": "claude-sonnet-5", "credentials": { "apiKey": "sk-ant-..." } }
+```
+
+## Comportamiento y restricciones [#behavior-and-limitations]
+
+- **Credenciales**: `apiKey`. `version` (el header `anthropic-version`) tiene como valor predeterminado `2023-06-01` y rara vez es necesario anularlo.
+- **transport predeterminado**: Messages API para texto.
+- **reasoning**: ya sea `anthropic_adaptive` (el modelo elige su propia profundidad; la solicitud solo lleva una etiqueta `output_config.effort`) o `anthropic_budget` (`thinking: { budget_tokens }`, con un presupuesto predeterminado del lado del proveedor por nivel canonical si el catálogo no anula it) — ver [Reasoning](/docs/reasoning). Los modelos que exponen tanto `xhigh` como `max` los conservan como niveles distintos; Modelos como Opus/Sonnet 4.6 declaran `max` sin inventar soporte para `xhigh`.
+- **El pensamiento firmado viaja de ida y vuelta en `/v1/responses`.** Cuando la solicitud incluye `reasoning.encrypted_content`, el contenido de cada turno (pensamiento, texto y llamadas de herramienta, en orden) se sella en un elemento `reasoning` que los clientes estándar reenvían, y la siguiente solicitud devuelve el turno exactamente como Claude lo devolvió. En `/v1/messages` los bloques siguen siendo nativos, en el orden de Claude. Consulta [Estado específico del proveedor](/docs/provider-specific-fields#anthropic-thinking-blocks-message-bound).
+- Claude Opus 5 permite el pensamiento adaptativo en sentido upstream cuando se omite `thinking`. El adapter envía `thinking: { "type": "disabled" }` cuando el reasoning canonical se resuelve en `none`, preservando la semántica off independiente del proveedor del gateway.
+- `claude-opus-5-fast` y `claude-opus-4-8-fast` son alias de gateway para el modo rápido de vista previa de investigación de Anthropic. El adapter selecciona el modelo base, envía `speed: "fast"` y agrega el header beta requerido. Aún se requiere acceso a la cuenta antrópica.
+- Las solicitudes nativas `/v1/messages` se transmiten con una traducción mínima; las solicitudes `/v1/chat/completions` y `/v1/responses` se procesan en la misma maquinaria canonical de reasoning/herramienta/formato que cualquier otro proveedor.
+- **La caché de prompts es automática en `/v1/chat/completions` y `/v1/responses`.** El adapter envía el `cache_control: { "type": "ephemeral" }` de nivel superior de Anthropic (TTL de 5 minutos), así que los prefijos repetidos se cachean como en OpenAI y Gemini y se reportan en `cached_tokens`. Para controlar la caché tú mismo, usa `/v1/messages`: esas solicitudes se envían exactamente con el `cache_control` que escribas, o sin ninguno.
+- Los modelos que declaran `capabilities.strictTools: true` conservan el indicador de herramienta nativo de nivel superior `strict: true` de Anthropic. El `output_config.format` nativo se adhiere al esquema y el gateway lo trata como una salida estructurada estricta.
+- Anthropic compila los esquemas de herramientas estrictas y los formatos de respuesta `json_schema` a partir de un subconjunto de JSON Schema y rechaza restricciones fuera de él (`maxItems`, `minLength`, `minimum`, …) que el modo estricto de OpenAI sí acepta. En las solicitudes `/v1/chat/completions` y `/v1/responses`, el adapter conserva las palabras clave admitidas y mueve el resto a la `description` del campo, como hacen los SDK de Anthropic; los clientes siguen validando contra su esquema original. Las herramientas nativas de `/v1/messages` se envían tal como llegan.
+- Catálogo: `src/adapters/anthropic/catalog.json`.
+
+## Próximos pasos [#next-steps]
+
+- [Messages](/docs/messages) — el contrato nativo compatible con Anthropic.
+- [Reasoning](/docs/reasoning) — `anthropic_adaptive` / `anthropic_budget` en detalle.

@@ -30,10 +30,6 @@
 **/.gemini
 **/.scratch
 
-# Docs source is not needed; Bun only needs its workspace manifest.
-apps/docs/**
-!apps/docs/package.json
-
 # Development-only gateway files.
 **/tests
 **/*.test.ts

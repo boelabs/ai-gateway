@@ -73,6 +73,7 @@
 		"sharp": "0.35.5",
 		"unpdf": "2.1.0",
 		"ws": "8.22.0",
+		"yaml": "2.9.1",
 		"zod": "4.6.7"
 	},
 	"devDependencies": {
@@ -82,7 +83,6 @@
 		"@types/ws": "8.18.2",
 		"drizzle-kit": "0.31.11",
 		"typescript": "7.0.2",
-		"yaml": "2.9.1",
 		"zod-openapi": "6.0.2"
 	},
 	"engines": {

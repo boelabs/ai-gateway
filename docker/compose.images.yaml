@@ -5,9 +5,7 @@
 #   cp .env.example .env   # then fill it in
 #   docker compose -f compose.images.yaml up -d
 #
-# Use docker-compose.yml instead when you want to build from a checkout of this repository. The
-# documentation site is not here: it shares nothing with the gateway, so it lives in
-# compose.docs.yaml.
+# Use docker-compose.yml instead when you want to build from a checkout of this repository.
 #
 # There is no migration service: the gateway applies pending migrations at boot, behind an advisory
 # lock, so every replica can do it and only one does.
@@ -86,7 +84,7 @@ services:
       # The only address it needs. The browser never talks to the gateway directly, so the
       # gateway needs no public domain of its own.
       GATEWAY_URL: ${GATEWAY_URL:-http://gateway:4000}
-      # Optional: the documentation site's public address, linked from the sidebar.
+      # Optional: where operators read the documentation, linked from the sidebar.
       DOCS_URL: ${DOCS_URL:-}
     expose:
       - "3001"

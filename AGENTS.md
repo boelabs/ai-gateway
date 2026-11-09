@@ -38,7 +38,7 @@ Every request is translated through one canonical core and routed to a provider 
 providers' public catalogs; `GET /v1/models/{model}/deployments` requires auth, because
 per-deployment weights, limits, and live metrics are operator detail. None of the three ever expose
 deployment labels, credentials, database ids, or upstream model ids.
-See [Model discovery](apps/docs/content/docs/(api)/(inference-api)/models-discovery.mdx).
+See [Model discovery](docs/(api)/(inference-api)/models-discovery.mdx).
 
 Monorepo — Turborepo on Bun workspaces:
 
@@ -56,8 +56,8 @@ routes. See `apps/dashboard/src/shared/api/relay.ts`.
 Keep it that way. Adding a browser-to-gateway call means CORS on the gateway, a cross-site cookie
 policy that has to agree with it, and a gateway that must be public — three things this repository
 does not currently have.
-- `apps/docs` — documentation site (Next.js App Router + [Fumadocs](https://fumadocs.dev), MDX),
-  prerendered at build time. Package `@boelabs/docs`. Built and served on Bun.
+- `docs/` — the documentation, MDX in English and Spanish. No site of its own: the gateway serves it
+  as `GET /docs/export.json` and boelabs.com renders it (see [Documentation](#documentation)).
 - `packages/tsconfig` — shared strict TypeScript config (`@boelabs/tsconfig`).
 - `docker/` — every Compose file and the stack's `.env.example`, with [its own README](docker/README.md).
 
@@ -167,18 +167,20 @@ bun test --preload ./tests/support/unitSetup.ts src/router/strategies.test.ts
   Update them with layout changes. Audit keeps its server pagination and visible result count,
   including one-page results and empty pages with an offset that can be navigated back from.
 
-### Documentation export
+### Documentation
 
-`apps/docs` serves `GET /docs/export.json`, which boelabs.com reads to render these docs at
-`boelabs.com/docs/ai-gateway`. The self-hosted docs site stays as it is. Contract v1, shared by
-every Boelabs product — change it only together with boelabs.com:
+The docs live in `docs/` (English `name.mdx`, Spanish `name.es.mdx`, navigation in `meta.json` and
+`meta.es.json`; a `(group)` folder never appears in a path). This repository publishes no docs site:
+the gateway serves `GET /docs/export.json` (unauthenticated, cacheable, ETag) and boelabs.com renders
+it at `boelabs.com/docs/ai-gateway`. Contract v1, shared by every Boelabs product — change it only
+together with boelabs.com:
 
 ```json
 {
   "schema": 1, "product": "ai-gateway", "generatedAt": "<ISO>", "apiVersion": null,
   "defaultLocale": "en", "locales": ["en", "es"],
   "openapi": "<raw URL of apps/api/openapi.yaml on main>",
-  "assetsBase": "<DOCS_SITE_URL origin, else the request origin>",
+  "assetsBase": "<raw URL of docs/ on main>",
   "meta": [{ "dir": "(docs)/(get-started)", "locale": "en", "data": {} }],
   "pages": [{ "path": "quickstart", "locale": "es", "file": "(docs)/(get-started)/quickstart.es.mdx",
               "frontmatter": { "title": "…", "description": "…" }, "mdx": "<body, no frontmatter>" }]
@@ -186,14 +188,15 @@ every Boelabs product — change it only together with boelabs.com:
 ```
 
 `path` is the public slug (route groups dropped, `index` is `""`); `dir` keeps the real folder. One
-entry per page and language; `draft: true` pages are left out; Spanish `/es/docs/…` links are
-rewritten to `/docs/…`. Builder: `apps/docs/src/lib/export.ts`.
+entry per page and language; `draft: true` pages are left out; the MDX is the file as written.
+Builder: `apps/api/src/docs/export.ts`.
 
 **A new or edited page uses only components boelabs.com supports:** `<Callout type? title?>`,
 `<Tabs items>` with `<Tab value>`, `<Steps>` with `<Step>`, `<Cards>` with `<Card title href>`, and
 fenced code blocks that name a language (`text` when nothing else fits). No `import`/`export` in
-MDX, internal links as `/docs/<path>`. Anything else needs boelabs.com support first.
-`apps/docs/tests/export.test.ts` enforces all of it.
+MDX. Internal links are `/docs/<path>` in both languages (boelabs.com localizes them) and must reach
+an existing page and heading. Anything else needs boelabs.com support first. The tests in
+`apps/api/src/docs/` enforce all of it, plus translation pairs and `meta.json` coverage.
 
 ## 5. Architecture — keep the layering intact
 
@@ -206,7 +209,7 @@ endpoints/  → HTTP handlers (+ endpoints/runtime/ for shared per-request plumb
 
 Adapters translate **to/from** the canonical format and must **never leak provider-specific fields
 into `core`**. The canonical vocabulary is fixed — see the
-[glossary](apps/docs/content/docs/(api)/(reference)/glossary.mdx).
+[glossary](docs/(api)/(reference)/glossary.mdx).
 
 Chat request path: endpoint → canonical request → `router/` picks a deployment (strategy, cooldowns,
 fallbacks; per-deployment latency/throughput state in `router/state.ts`) → `gateway/` executes
@@ -230,7 +233,7 @@ bun run --filter @boelabs/ai-gateway-api db:migrate    # applies pending
   versions live for a while. So a rename or a drop is three changes, not one — add the new column
   and write to both, then ship the code that reads it, then drop the old one in a later migration.
   A migration that breaks N−1 is an outage, not a schema change. See
-  [Rollouts](apps/docs/content/docs/(docs)/(operate)/rollouts.mdx).
+  [Rollouts](docs/(docs)/(operate)/rollouts.mdx).
 - Historical migrations contain hand-tuned DDL and stay immutable even after a later migration
   removes the structure; snapshots describe the schema at each point in time.
 - `pgEnum`s must be **`export const`** or drizzle-kit won't emit their `CREATE TYPE`.
@@ -241,7 +244,7 @@ bun run --filter @boelabs/ai-gateway-api db:migrate    # applies pending
 A new provider touches **four** files: the adapter `index.ts`, its `catalog.json`,
 `PROVIDER_REGISTRATIONS` in `src/adapters/index.ts`, and the list in `scripts/validate-catalog.ts`
 (forget the last and CI never validates the new catalog). Step by step:
-[model catalog → Adding catalog entries](apps/docs/content/docs/(docs)/(providers)/model-catalog.mdx#adding-catalog-entries).
+[model catalog → Adding catalog entries](docs/(docs)/(providers)/model-catalog.mdx#adding-catalog-entries).
 
 Catalog entries are **deliberately minimal**: only `operations` and `pricing` (what the runtime
 consumes) plus `deprecated`, `notes`, and `needsHumanReview`. The loader rejects unknown fields — do
@@ -332,7 +335,7 @@ Fix cooldown reset on success
 ### Releases
 
 A release is a `v<semver>` tag on a commit of `main` whose CI passed, and it is **the only thing
-that deploys production**. It publishes all three images — gateway, dashboard, docs — at **the same
+that deploys production**. It publishes both images — gateway and dashboard — at **the same
 version**, even when only one of them changed. That is deliberate: the dashboard's API client is
 generated from the gateway's `openapi.yaml`, so independent version numbers would create a
 compatibility matrix somebody has to maintain, and republishing an unchanged image costs nothing.
@@ -343,7 +346,7 @@ verifies the tag and builds the images; a stable tag then runs
 registry tag that every Coolify resource runs, deploys, and moves it back if the deployment fails. A
 prerelease tag (`v1.2.3-rc.1`) publishes images only. Rolling back is running *Deploy production*
 with an earlier version. See
-[Rollouts](apps/docs/content/docs/(docs)/(operate)/rollouts.mdx#releasing-and-deploying-from-ci).
+[Rollouts](docs/(docs)/(operate)/rollouts.mdx#releasing-and-deploying-from-ci).
 
 CI publishes `sha-<commit>` and `main` for commits of `main` only — the registry is public, and a
 feature branch has no business leaving a package behind. Every other branch still builds the images,
@@ -444,7 +447,7 @@ files stay out of git except the committed `.env.example` templates.
 
 - **Bun's TLS rejects self-signed Postgres/Redis certificates** (e.g. databases exposed on a raw
   Coolify/Dokploy port). Use a private network without TLS, or a public-CA certificate.
-  See [Troubleshooting](apps/docs/content/docs/(docs)/(operate)/troubleshooting.mdx).
+  See [Troubleshooting](docs/(docs)/(operate)/troubleshooting.mdx).
 - **Background jobs run in-process**, not via cron: operation retention/reconciliation,
   `response_states` GC, extension reloads, and video polling/asset GC.
 - **Integration tests** (`tests/integration/*.integration.test.ts`) need a real Postgres + Redis and

@@ -2,12 +2,11 @@
 	"$schema": "https://turbo.build/schema.json",
 	"ui": "stream",
 	"globalEnv": ["NODE_ENV"],
-	"globalDependencies": ["packages/tsconfig/*.json"],
+	"globalDependencies": ["packages/tsconfig/*.json", "docs/**"],
 	"tasks": {
 		"build": {
 			"dependsOn": ["^build"],
-			"outputs": ["dist/**", ".astro/**", ".source/**"],
-			"env": ["DOCS_SITE_URL"]
+			"outputs": ["dist/**", ".astro/**"]
 		},
 		"typecheck": {
 			"dependsOn": ["^build"]

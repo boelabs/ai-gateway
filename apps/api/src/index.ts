@@ -31,6 +31,7 @@ import { embeddingsHandler } from "./endpoints/embeddings.ts";
 import { chatCompletionsHandler } from "./endpoints/chat.ts";
 import { transcriptionsHandler } from "./endpoints/audio.ts";
 import { messagesHandler } from "./endpoints/messages.ts";
+import { docsExportHandler } from "./endpoints/docs.ts";
 import { getRequestId } from "./http/requestContext.ts";
 import { rerankHandler } from "./endpoints/rerank.ts";
 import { authMiddleware } from "./auth/middleware.ts";
@@ -307,6 +308,9 @@ app.get("/health/ready", readiness);
 // Public model discovery. Intentionally unauthenticated, like public provider model catalogs.
 app.get("/v1/models", listModelsHandler);
 app.get("/v1/models/*", modelsWildcardHandler);
+
+// The documentation source for boelabs.com/docs. Unauthenticated: it is the public repository's text.
+app.get("/docs/export.json", docsExportHandler);
 
 // Dashboard capability probe. Unauthenticated and content-free: it only says whether human
 // authentication exists on this deployment, which the login form reveals anyway. It lives under
