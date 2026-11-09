@@ -25,6 +25,21 @@ async function serialize(): Promise<Serialized> {
 	return { body, etag };
 }
 
+/**
+ * `If-None-Match` uses the weak comparison (RFC 9110 §13.1.2): a `W/` prefix is ignored, and the
+ * header may list several tags or be `*`. A CDN that compresses the body, as Cloudflare does, hands
+ * the client a weakened copy of the tag, so an exact string match would never answer 304.
+ */
+export function etagMatches(header: string | undefined, etag: string): boolean {
+	if (!header) {
+		return false;
+	}
+	const opaque = (tag: string) => tag.trim().replace(/^W\//u, "");
+	return header
+		.split(",")
+		.some((tag) => tag.trim() === "*" || opaque(tag) === opaque(etag));
+}
+
 const CACHE_CONTROL =
 	"public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
 
@@ -37,7 +52,7 @@ export async function docsExportHandler(c: Context): Promise<Response> {
 
 	c.header("cache-control", CACHE_CONTROL);
 	c.header("etag", etag);
-	if (c.req.header("if-none-match") === etag) {
+	if (etagMatches(c.req.header("if-none-match"), etag)) {
 		return c.body(null, 304);
 	}
 	c.header("content-type", "application/json; charset=utf-8");

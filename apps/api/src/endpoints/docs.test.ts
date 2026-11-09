@@ -1,4 +1,4 @@
-import { docsExportHandler } from "./docs.ts";
+import { docsExportHandler, etagMatches } from "./docs.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Hono } from "hono";
@@ -21,4 +21,22 @@ test("GET /docs/export.json serves cacheable JSON and answers 304 to its ETag", 
 	});
 	assert.equal(again.status, 304);
 	assert.equal(await again.text(), "");
+});
+
+test("If-None-Match matches weakly, across lists, and on *", async () => {
+	const etag = '"abc"';
+	assert.ok(etagMatches('"abc"', etag));
+	assert.ok(etagMatches('W/"abc"', etag));
+	assert.ok(etagMatches('"other", W/"abc"', etag));
+	assert.ok(etagMatches("*", etag));
+	assert.ok(!etagMatches('"abd"', etag));
+	assert.ok(!etagMatches(undefined, etag));
+
+	// What a client sends after Cloudflare compressed the response and weakened the tag.
+	const first = await app.request("/docs/export.json");
+	const weakened = `W/${first.headers.get("etag") ?? ""}`;
+	const again = await app.request("/docs/export.json", {
+		headers: { "if-none-match": weakened },
+	});
+	assert.equal(again.status, 304);
 });
