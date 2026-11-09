@@ -11,9 +11,9 @@
 
 A backend-only, provider-agnostic artificial intelligence gateway — built and operated by [Boelabs](https://boelabs.com).
 
-[Documentation](apps/docs/content/docs/(docs)/index.mdx) ·
-[Quickstart](apps/docs/content/docs/(docs)/(get-started)/quickstart.mdx) ·
-[Architecture](apps/docs/content/docs/(docs)/(get-started)/architecture.mdx) ·
+[Documentation](docs/(docs)/index.mdx) ·
+[Quickstart](docs/(docs)/(get-started)/quickstart.mdx) ·
+[Architecture](docs/(docs)/(get-started)/architecture.mdx) ·
 [OpenAPI](apps/api/openapi.yaml)
 
 </div>
@@ -73,7 +73,7 @@ adapters/    upstream provider protocols (one directory per provider)
 endpoints/   HTTP handlers and shared per-request plumbing
 ```
 
-Details, in order of execution: [Architecture](apps/docs/content/docs/(docs)/(get-started)/architecture.mdx).
+Details, in order of execution: [Architecture](docs/(docs)/(get-started)/architecture.mdx).
 
 ## Repository
 
@@ -83,7 +83,7 @@ directly, so there is no build step.
 ```
 apps/api      the AI Gateway service (@boelabs/ai-gateway-api)
 apps/dashboard    optional operator dashboard (@boelabs/dashboard, Next.js App Router)
-apps/docs         documentation site (@boelabs/docs, Next.js App Router + Fumadocs)
+docs              documentation (MDX), served by the gateway for boelabs.com
 packages/tsconfig shared strict TypeScript config (@boelabs/tsconfig)
 ```
 
@@ -101,14 +101,14 @@ bun run --filter @boelabs/ai-gateway-api dev
 
 Set `MASTER_KEY`, `ENCRYPTION_KEYRING`, and `ACTIVE_ENCRYPTION_KEY_ID` in `.env` — the gateway
 refuses to start without them. Generate each keyring value with `openssl rand -hex 32`. Everything
-else ships with production-ready defaults ([environment reference](apps/docs/content/docs/(api)/(reference)/reference-environment.mdx)).
+else ships with production-ready defaults ([environment reference](docs/(api)/(reference)/reference-environment.mdx)).
 
 ```bash
 curl http://localhost:4000/health/live     # liveness (no dependencies)
 curl http://localhost:4000/health/ready    # readiness (Postgres, Redis, extensions)
 ```
 
-From here, the [Quickstart guide](apps/docs/content/docs/(docs)/(get-started)/quickstart.mdx) goes from clone to a first
+From here, the [Quickstart guide](docs/(docs)/(get-started)/quickstart.mdx) goes from clone to a first
 completion: create a deployment through the Admin API, then call `/v1/chat/completions`.
 
 ### Workspace commands
@@ -134,23 +134,22 @@ docker compose -f compose.images.yaml up -d
 ```
 
 Every Compose file lives in [`docker/`](docker/), with a README covering the rest: running only
-Postgres and Redis, publishing the docs site on its own, and what a rolling update needs.
+Postgres and Redis, and what a rolling update needs.
 
 | Image | |
 |---|---|
 | `ghcr.io/boelabs/ai-gateway-api` | the API |
 | `ghcr.io/boelabs/ai-gateway-dashboard` | the operator UI, on its own domain |
-| `ghcr.io/boelabs/ai-gateway-docs` | this documentation |
 
 The gateway and the dashboard are two independent products with one setting between them:
 `GATEWAY_URL` on the dashboard. The browser never leaves the dashboard's own origin — its server
 fetches everything — so there is no CORS anywhere and the gateway need not be public at all.
 Neither image contains configuration, so one tag is promoted between environments rather than
 rebuilt. See
-[Operator dashboard → Serving it](apps/docs/content/docs/(docs)/(operate)/dashboard.mdx).
+[Operator dashboard → Serving it](docs/(docs)/(operate)/dashboard.mdx).
 
 To build from a checkout instead, `docker/compose.yaml` is the production/PaaS base — Postgres,
-Redis, a one-off migration job, the gateway, the dashboard and the docs site, without publishing
+Redis, a one-off migration job, the gateway and the dashboard, without publishing
 host ports. Merge `docker/compose.local.yaml` for a local single-host run with loopback ports and
 development-only secrets.
 
@@ -161,20 +160,18 @@ docker compose -f docker/compose.yaml -f docker/compose.local.yaml up -d
 ```
 
 Platform guides and the production runbook:
-[Deployment](apps/docs/content/docs/(docs)/(deploy)/deployment.mdx) ·
-[Operations](apps/docs/content/docs/(docs)/(operate)/operations.mdx) ·
-[Production checklist](apps/docs/content/docs/(docs)/(operate)/production-checklist.mdx).
+[Deployment](docs/(docs)/(deploy)/deployment.mdx) ·
+[Operations](docs/(docs)/(operate)/operations.mdx) ·
+[Production checklist](docs/(docs)/(operate)/production-checklist.mdx).
 
 ## Documentation
 
-Everything beyond this page is authored in MDX under
-[`apps/docs/content/docs`](apps/docs/content/docs) and rendered by a Next.js + Fumadocs site
-(`bun run --filter @boelabs/docs dev`). Start at the
-[Overview](apps/docs/content/docs/(docs)/index.mdx), which maps the full set: API contracts, provider
+Everything beyond this page is authored in MDX under [`docs`](docs), in English and Spanish. The
+gateway serves it as `GET /docs/export.json` and [boelabs.com](https://boelabs.com) renders it.
+Start at the [Overview](docs/(docs)/index.mdx), which maps the full set: API contracts, provider
 setup, routing, virtual keys, extensions, security, and troubleshooting. The machine-readable spec
-is [`apps/api/openapi.yaml`](apps/api/openapi.yaml). Development, builds, and the production
-file server all run on Bun. See [Documentation development](apps/docs/content/docs/(docs)/(extend)/documentation.mdx)
-for preview commands, page conventions, and deployment.
+is [`apps/api/openapi.yaml`](apps/api/openapi.yaml). See
+[Documentation development](docs/(docs)/(extend)/documentation.mdx) for page conventions and checks.
 
 ## Contributing
 

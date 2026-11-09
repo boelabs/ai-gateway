@@ -82,7 +82,12 @@ export function buildOpenApiDocument() {
 			},
 		],
 		security: [{ bearerAuth: [] }],
-		tags: [{ name: "Inference" }, { name: "Admin" }, { name: "Health" }],
+		tags: [
+			{ name: "Inference" },
+			{ name: "Admin" },
+			{ name: "Health" },
+			{ name: "Docs" },
+		],
 		components: {
 			securitySchemes: {
 				bearerAuth: {
@@ -946,6 +951,19 @@ export function buildOpenApiDocument() {
 					responses: {
 						"204": { description: "No Content" },
 						"404": errorResponse,
+					},
+				},
+			},
+			"/docs/export.json": {
+				get: {
+					tags: ["Docs"],
+					summary: "The documentation source, for boelabs.com/docs",
+					description:
+						"Unauthenticated. Every navigation file and every page per language, with its public path, frontmatter and MDX body, in the export contract shared by Boelabs products (schema 1). Cacheable; answers 304 to a matching If-None-Match.",
+					security: [],
+					responses: {
+						"200": { description: "The documentation export" },
+						"304": { description: "Unchanged since the given ETag" },
 					},
 				},
 			},

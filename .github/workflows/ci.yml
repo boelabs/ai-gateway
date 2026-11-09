@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Which of the three apps this commit can possibly have changed.
+  # Which of the two apps this commit can possibly have changed.
   #
   # The filter is deliberately generous. "The gateway changed" is not only `apps/api/**`: a bump
   # in `bun.lock`, a patch, a shared tsconfig or a root script changes what lands in its image just
@@ -31,7 +31,6 @@ jobs:
     outputs:
       gateway: ${{ steps.filter.outputs.gateway }}
       dashboard: ${{ steps.filter.outputs.dashboard }}
-      docs: ${{ steps.filter.outputs.docs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,7 +48,6 @@ jobs:
             {
               echo "gateway=true"
               echo "dashboard=true"
-              echo "docs=true"
             } >> "$GITHUB_OUTPUT"
           }
 
@@ -65,13 +63,13 @@ jobs:
           echo "Changed files:"
           echo "$files" | sed 's/^/  /'
 
-          # Anything shared rebuilds all three: the lockfile and the patches decide what is installed
+          # Anything shared rebuilds both: the lockfile and the patches decide what is installed
           # into every image, the workspace packages are linked into them, and a change to this
           # workflow changes how they are built.
           #
           # Every app's package.json counts as shared, including the other apps'. The install is a
-          # workspace install: the gateway's Dockerfile copies apps/docs/package.json to resolve it,
-          # so a manifest belonging to one app can change another's image.
+          # workspace install: the gateway's Dockerfile resolves it from every manifest, so a
+          # manifest belonging to one app can change another's image.
           if echo "$files" | grep -qE '^(packages/|patches/|scripts/|bun\.lock$|package\.json$|turbo\.json$|tsconfig\.json$|biome\.jsonc?$|\.dockerignore$|\.github/workflows/|apps/[^/]+/package\.json$)'; then
             echo "::notice::A shared path changed; treating every app as changed."
             everything
@@ -79,14 +77,13 @@ jobs:
           fi
 
           changed() { echo "$files" | grep -qE "$1"; }
-          gateway=false;   changed '^apps/api/'   && gateway=true
+          # docs/ ships inside the gateway's image as /docs/export.json.
+          gateway=false;   changed '^(apps/api/|docs/)' && gateway=true
           dashboard=false; changed '^apps/dashboard/' && dashboard=true
-          docs=false;      changed '^apps/docs/'      && docs=true
 
           {
             echo "gateway=$gateway"
             echo "dashboard=$dashboard"
-            echo "docs=$docs"
           } >> "$GITHUB_OUTPUT"
 
   quality:
@@ -101,7 +98,6 @@ jobs:
         run: |
           docker compose -f compose.yaml config --quiet
           docker compose -f compose.yaml -f compose.local.yaml config --quiet
-          docker compose -f compose.docs.yaml config --quiet
           # The pull-based files people actually paste into Coolify or Portainer. Their required
           # variables are supplied here so a missing one fails CI rather than a deployment.
           POSTGRES_PASSWORD=ci docker compose -f compose.images.yaml config --quiet
@@ -304,26 +300,3 @@ jobs:
           # Only one writer: main. Concurrent pull requests exporting to one scope race on it, and
           # the losing export fails a job whose builds all succeeded. Pull requests only read.
           cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=ci-dashboard' || '' }}
-
-      - name: Build docs image
-        if: needs.changes.outputs.docs == 'true'
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: apps/docs/Dockerfile
-          platforms: ${{ env.PLATFORMS }}
-          # Always re-resolve the base image: a stale local oven/bun hides a broken upstream bump.
-          pull: true
-          push: ${{ steps.tags.outputs.publish == 'true' }}
-          load: ${{ steps.tags.outputs.publish != 'true' }}
-          tags: |
-            ${{ steps.tags.outputs.registry }}/ai-gateway-docs:${{ steps.tags.outputs.sha }}
-            ${{ steps.tags.outputs.registry }}/ai-gateway-docs:${{ steps.tags.outputs.branch }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.tags.outputs.branch }}
-          cache-from: type=gha,scope=ci-docs
-          # Only one writer: main. Concurrent pull requests exporting to one scope race on it, and
-          # the losing export fails a job whose builds all succeeded. Pull requests only read.
-          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=ci-docs' || '' }}

@@ -10,10 +10,9 @@ anywhere.
 | `compose.images.yaml` | the same stack, from published images | operators who want one stack |
 | `compose.local.yaml` | overlay: binds host ports on loopback | local development |
 | `compose.data.yaml` | Postgres and Redis alone | the split topology, below |
-| `compose.docs.yaml` | the documentation site alone | anyone who wants it published |
 
-The docs site is deliberately on its own: it has no database, no cache, no network and no variables
-in common with the gateway, so putting it in the stack only meant remembering to delete it.
+There is no documentation image: the docs are published at boelabs.com from the gateway's
+`/docs/export.json`.
 
 ## Run it
 
@@ -38,9 +37,9 @@ stateful half here:
 docker compose -f compose.data.yaml up -d
 ```
 
-The gateway, dashboard and docs then run from `ghcr.io/<owner>/ai-gateway-{api,dashboard,docs}` and
+The gateway and dashboard then run from `ghcr.io/<owner>/ai-gateway-{api,dashboard}` and
 reach Postgres and Redis over the shared network. What that buys, what it costs, and the settings it
-needs are in [Rollouts](../apps/docs/content/docs/(docs)/(operate)/rollouts.mdx).
+needs are in [Rollouts](../docs/(docs)/(operate)/rollouts.mdx).
 
 ## Two things worth knowing
 

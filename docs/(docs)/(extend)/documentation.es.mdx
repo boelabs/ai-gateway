@@ -1,0 +1,86 @@
+---
+title: Desarrollo de la documentación
+description: Escribe, traduce y valida las páginas que boelabs.com publica para AI Gateway.
+---
+
+La documentación es MDX en la carpeta `docs/` de este repositorio, en inglés y español. No hay un
+sitio de documentación que ejecutar ni desplegar: el gateway sirve cada página en
+`/docs/export.json` y boelabs.com la publica con sus propios componentes y estilos. Una página que
+llega a `main` se publica con la siguiente versión.
+
+## Escribe una página [#write-a-page]
+
+Las páginas se encuentran en `docs/`, debajo de una de las dos **raíces del selector**: el menú
+desplegable en la parte superior de la barra lateral:
+
+| Raíz | Contiene |
+|---|---|
+| `(docs)` | Introducción, deployment, routing, acceso, proveedores, operación, ampliación |
+| `(api)` | El formato de conexión, cada endpoint y cada valor que lee el gateway |
+
+Dentro de una raíz, cada carpeta `(group)` se muestra debajo de un encabezado de sección visible
+usando `"---Section title---"` y `"...(group)"` en el `meta.json` de la raíz. Agrega un archivo MDX
+con un `title` descriptivo y un `description` corto en el frontmatter YAML, y luego incluye su
+nombre en el `meta.json` de esa carpeta. Markdown estándar es suficiente para la mayoría de las
+páginas.
+
+**Una carpeta entre paréntesis nunca aparece en la URL**: es un grupo de rutas, por lo que
+`(docs)/(routing)/routing.mdx` se sirve en `/docs/routing`. Eso permite reorganizar la navegación
+sin romper un solo enlace.
+
+Dos cosas que debes saber al agregar una sección, ambas verificadas por una prueba:
+
+- cada archivo `.mdx` y cada `(group)` anidado debe aparecer en el `meta.json` de su carpeta, y no
+  puede aparecer nada que no exista;
+- una raíz necesita al menos una página directamente dentro de ella, que es a la que enlaza el
+  selector.
+
+Utiliza una página por tarea o área de referencia. Comienza con su propósito y requisitos previos,
+explica los pasos en el orden de ejecución y termina con la verificación o los siguientes pasos.
+Mantén las credenciales como marcadores de posición y distingue los nombres de los public models de
+los IDs de los modelos del proveedor.
+
+## Traducir una página [#translate-a-page]
+
+Añade la traducción española junto a cada página con el nombre `name.es.mdx`, y utiliza
+`meta.es.json` para los textos de navegación. Ambos idiomas enlazan a otras páginas como
+`/docs/<path>`; boelabs.com agrega el idioma a la dirección.
+
+Traduce los párrafos, títulos, descripciones y textos de navegación. Conserva en inglés los ejemplos
+de código, campos de API, comandos, nombres de archivo y términos técnicos. Mantén los IDs de los
+encabezados ingleses mediante el sufijo `[#original-id]` para conservar la sección al cambiar de
+idioma. Conserva las URLs externas.
+
+En los textos, prefiere "inteligencia artificial" en español y "artificial intelligence" en inglés.
+Usa "IA" o "AI" solo cuando la abreviatura sea necesaria y conserva los nombres oficiales de
+productos, como Vercel AI SDK.
+
+## Componentes [#components]
+
+Las páginas solo usan los componentes que admite boelabs.com: `Callout` (`type`, `title`), `Tabs`
+(`items`) con `Tab` (`value`), `Steps` con `Step`, `Cards` con `Card` (`title`, `href`) y bloques de
+código que indiquen su lenguaje (`text` cuando ninguno encaja). Las páginas MDX nunca usan `import`
+ni `export`.
+
+Utiliza tarjetas para los puntos de entrada, pasos para procedimientos, pestañas para ejemplos
+alternativos y callouts para restricciones que afecten a la siguiente acción del lector. Cada página
+debe tener un propósito concreto. Enlaza a las referencias compartidas para evitar duplicaciones.
+
+## Exportación de la documentación [#docs-export]
+
+`GET /docs/export.json` no requiere autenticación y se puede almacenar en caché. Incluye cada
+`meta.json` y, por idioma, el `path` público de cada página, su `file`, su frontmatter y su cuerpo
+MDX tal como está escrito. Las páginas con `draft: true` se excluyen. El contrato está en
+`AGENTS.md`.
+
+## Validar los cambios [#validate]
+
+```bash
+bun run check
+bun run typecheck
+bun run test
+```
+
+Las pruebas exigen una traducción de cada página, la misma navegación en ambos idiomas, ejemplos y
+enlaces equivalentes y solo los componentes admitidos. Cada enlace interno debe llevar a una página y
+un encabezado existentes.

@@ -13,7 +13,7 @@ This is a [Turborepo](https://turborepo.com) on [Bun](https://bun.sh) workspaces
 
 - `apps/api` — the AI Gateway service (runs on Bun).
 - `apps/dashboard` — the optional operator dashboard (Next.js App Router, runs on Bun).
-- `apps/docs` — the documentation site (Next.js App Router + Fumadocs, MDX), built and served on Bun.
+- `docs` — the documentation (MDX, English and Spanish), served by the gateway for boelabs.com.
 - `packages/tsconfig` — shared TypeScript configuration.
 
 Dependencies, tasks, and both runtimes are Bun (with Turbo orchestrating the workspace). Bun runs
@@ -50,7 +50,7 @@ Run the full local gate from the repo root. CI runs the same checks and will blo
 
 ```bash
 bun run check        # Biome format + lint (whole repo)
-bun run typecheck    # turbo: TypeScript across the gateway, the dashboard and the docs
+bun run typecheck    # turbo: TypeScript across the gateway and the dashboard
 bun run test         # turbo: unit tests across packages
 ```
 
@@ -73,7 +73,7 @@ bun run --filter @boelabs/ai-gateway-api test:integration
   `apps/api/src/contracts`, the provider-agnostic hub in `apps/api/src/core`, upstream
   protocols in `apps/api/src/adapters`, and HTTP handlers in `apps/api/src/endpoints`.
   Adapters translate to/from the canonical format — they never leak provider-specific fields into
-  `core`. See the [glossary](apps/docs/content/docs/(api)/(reference)/glossary.mdx) for the canonical vocabulary.
+  `core`. See the [glossary](docs/(api)/(reference)/glossary.mdx) for the canonical vocabulary.
 - **Tests:** colocate unit tests next to the code as `*.test.ts`. Unit tests must not hit the network
   (`apps/api/tests/support/noRealFetch.ts` enforces this). Integration tests live under
   `apps/api/tests/integration`.
@@ -95,9 +95,9 @@ touches **four** files:
 4. `scripts/validate-catalog.ts` — add the catalog to the validated list, **or CI won't check it**.
 
 The catalog shape and a full step-by-step (including adding just a model to an existing provider) are
-in the [model catalog guide](apps/docs/content/docs/(docs)/(providers)/model-catalog.mdx#adding-catalog-entries). Use
+in the [model catalog guide](docs/(docs)/(providers)/model-catalog.mdx#adding-catalog-entries). Use
 `POST /admin/deployments/resolve` to verify the effective capabilities and transports before wiring
-tests. See the [deployments guide](apps/docs/content/docs/(docs)/(deploy)/creating-deployments.mdx).
+tests. See the [deployments guide](docs/(docs)/(deploy)/creating-deployments.mdx).
 
 ## Commit messages
 

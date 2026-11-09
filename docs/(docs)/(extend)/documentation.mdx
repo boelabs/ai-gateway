@@ -1,0 +1,82 @@
+---
+title: Documentation development
+description: Write, translate, and check the pages boelabs.com publishes for AI Gateway.
+---
+
+The documentation is MDX in this repository's `docs/` folder, in English and Spanish. There is no
+documentation site to run or deploy: the gateway serves every page as `/docs/export.json`, and
+boelabs.com renders it with its own components and styles. A page merged to `main` is published
+with the next release.
+
+## Write a page
+
+Pages live in `docs/`, under one of two **switcher roots** — the dropdown at the top of the
+sidebar:
+
+| Root | Holds |
+|---|---|
+| `(docs)` | Getting started, deploying, routing, access, providers, operating, extending |
+| `(api)` | The wire format, every endpoint, and every value the gateway reads |
+
+Inside a root, each `(group)` folder is extracted below a visible section heading using
+`"---Section title---"` and `"...(group)"` in the root `meta.json`. Add an MDX file with a
+descriptive `title` and a short `description` in YAML frontmatter, then list its filename in that
+folder's `meta.json`. Standard Markdown is enough for most pages.
+
+**A parenthesised folder never appears in the URL** — it is a route group — so
+`(docs)/(routing)/routing.mdx` is served at `/docs/routing`. That is what lets the navigation be
+reorganised without breaking a single link.
+
+Two things to know when adding a section, both of which a test enforces:
+
+- every `.mdx` file and every nested `(group)` must be listed in its folder's `meta.json`, and
+  nothing may be listed that is not there;
+- a root needs at least one page directly inside it, which the switcher links to.
+
+Use one page per task or reference area. Start with its purpose and prerequisites, explain steps
+in execution order, and finish with verification or relevant next steps. Keep credentials as
+placeholders and distinguish public model names from upstream model IDs.
+
+## Translate a page
+
+Add Spanish content beside each page as `name.es.mdx`, with a matching `meta.es.json` for
+navigation labels. Both languages link to other pages as `/docs/<path>`; boelabs.com adds the
+language to the address.
+
+Translate the prose, page titles, descriptions, and navigation. Keep code examples, API fields,
+commands, filenames, and technical terms in English. Keep the English heading IDs with the
+`[#original-id]` suffix so links to a section survive a language switch. Leave external URLs
+unchanged.
+
+In prose, prefer "artificial intelligence" in English and "inteligencia artificial" in Spanish.
+Use "AI" or "IA" only when an abbreviation is necessary, and preserve official product names
+such as Vercel AI SDK.
+
+## Components
+
+Pages use only the components boelabs.com supports: `Callout` (`type`, `title`), `Tabs`
+(`items`) with `Tab` (`value`), `Steps` with `Step`, `Cards` with `Card` (`title`, `href`), and
+code blocks that name a language (`text` when nothing else fits). MDX pages never use `import` or
+`export`.
+
+Use cards for entry points, steps for procedures, tabs for alternative examples, and callouts for
+constraints that affect the reader's next action. Keep one purpose per page and link to shared
+reference material instead of duplicating it.
+
+## Docs export
+
+`GET /docs/export.json` is unauthenticated and cacheable. It lists each `meta.json` and, per
+language, each page's public `path`, its `file`, its frontmatter, and its MDX body as written.
+Pages with `draft: true` are left out. The contract is in `AGENTS.md`.
+
+## Validate
+
+```bash
+bun run check
+bun run typecheck
+bun run test
+```
+
+The tests require a translated sibling for every page, the same navigation in both languages,
+matching code examples and links, and only the supported components. Every internal link must
+reach an existing page and heading.

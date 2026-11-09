@@ -12,7 +12,7 @@
 #   COOLIFY_URL        repository variable, e.g. https://coolify.example.com
 #   COOLIFY_TOKEN      `production` environment secret, a Coolify API token with `deploy` and `read`
 #   COOLIFY_RESOURCES  `production` environment variable, JSON:
-#                      {"gateway": "<uuid>", "dashboard": "<uuid>", "docs": "<uuid>"}
+#                      {"gateway": "<uuid>", "dashboard": "<uuid>"}
 name: Deploy production
 
 on:
@@ -50,7 +50,7 @@ jobs:
       REGISTRY: ghcr.io/${{ github.repository_owner }}
       COOLIFY_URL: ${{ vars.COOLIFY_URL }}
       RESOURCES: ${{ vars.COOLIFY_RESOURCES }}
-      APPS: api dashboard docs
+      APPS: api dashboard
     steps:
       # Everything up to "Point production at the release" only reads, so a missing setting or an
       # unpublished version fails before production changes.
@@ -65,8 +65,8 @@ jobs:
           fi
           [ -n "${COOLIFY_URL:-}" ] || { echo "::error::The COOLIFY_URL variable is missing."; exit 1; }
           [ -n "${COOLIFY_TOKEN:-}" ] || { echo "::error::The COOLIFY_TOKEN secret is missing from the production environment."; exit 1; }
-          if ! printf '%s' "${RESOURCES:-}" | jq -e 'type == "object" and ([.gateway, .dashboard, .docs] | all(type == "string" and length > 0))' >/dev/null 2>&1; then
-            echo "::error::COOLIFY_RESOURCES must map gateway, dashboard and docs to Coolify UUIDs."
+          if ! printf '%s' "${RESOURCES:-}" | jq -e 'type == "object" and ([.gateway, .dashboard] | all(type == "string" and length > 0))' >/dev/null 2>&1; then
+            echo "::error::COOLIFY_RESOURCES must map gateway and dashboard to Coolify UUIDs."
             exit 1
           fi
 
@@ -117,12 +117,10 @@ jobs:
         env:
           API: ${{ steps.digests.outputs.api_target }}
           DASHBOARD: ${{ steps.digests.outputs.dashboard_target }}
-          DOCS: ${{ steps.digests.outputs.docs_target }}
         run: |
           set -euo pipefail
           docker buildx imagetools create -t "$REGISTRY/ai-gateway-api:production" "$REGISTRY/ai-gateway-api@$API"
           docker buildx imagetools create -t "$REGISTRY/ai-gateway-dashboard:production" "$REGISTRY/ai-gateway-dashboard@$DASHBOARD"
-          docker buildx imagetools create -t "$REGISTRY/ai-gateway-docs:production" "$REGISTRY/ai-gateway-docs@$DOCS"
 
       - name: Deploy and wait for Coolify
         id: rollout
@@ -155,16 +153,14 @@ jobs:
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
           API: ${{ steps.digests.outputs.api_previous }}
           DASHBOARD: ${{ steps.digests.outputs.dashboard_previous }}
-          DOCS: ${{ steps.digests.outputs.docs_previous }}
         run: |
           set -euo pipefail
-          if [ -z "$API" ] || [ -z "$DASHBOARD" ] || [ -z "$DOCS" ]; then
+          if [ -z "$API" ] || [ -z "$DASHBOARD" ]; then
             echo "::error::Production served no earlier release, so there is nothing to return to. Fix forward or point the Coolify resources at another tag."
             exit 1
           fi
           docker buildx imagetools create -t "$REGISTRY/ai-gateway-api:production" "$REGISTRY/ai-gateway-api@$API"
           docker buildx imagetools create -t "$REGISTRY/ai-gateway-dashboard:production" "$REGISTRY/ai-gateway-dashboard@$DASHBOARD"
-          docker buildx imagetools create -t "$REGISTRY/ai-gateway-docs:production" "$REGISTRY/ai-gateway-docs@$DOCS"
           # The release's deployments may still be running; Coolify refuses a new one until they end.
           bash "$GITHUB_WORKSPACE/.github/scripts/coolify-rollout.sh" --settle
           bash "$GITHUB_WORKSPACE/.github/scripts/coolify-rollout.sh"

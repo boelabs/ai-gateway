@@ -17,7 +17,6 @@ ENV NODE_ENV=production
 # Copy only the manifests + lockfile first so this layer caches until dependencies change.
 COPY package.json bun.lock ./
 COPY apps/api/package.json ./apps/api/package.json
-COPY apps/docs/package.json ./apps/docs/package.json
 COPY packages/tsconfig/package.json ./packages/tsconfig/package.json
 RUN bun install --frozen-lockfile --production --filter @boelabs/ai-gateway-api
 
@@ -36,6 +35,8 @@ COPY --chown=bun:bun --from=deps /app/packages /app/packages
 # Application source (run directly by Bun; no build artifacts).
 COPY --chown=bun:bun apps/api/package.json ./package.json
 COPY --chown=bun:bun apps/api/src ./src
+# The documentation, served as /docs/export.json for boelabs.com (src/docs/export.ts reads it here).
+COPY --chown=bun:bun docs /app/docs
 
 # The runtime materializes extension modules into ./.extensions-cache (kept inside the package so the
 # modules' `#extensions/sdk.ts` import resolves). WORKDIR is created as root, so the non-root `bun`

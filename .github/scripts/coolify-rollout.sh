@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Asks Coolify to deploy the gateway, the dashboard and the docs, and waits until each deployment
-# ends. Exits non-zero unless all three finish. Used by deploy-production.yml, for a release and for
+# Asks Coolify to deploy the gateway and the dashboard, and waits until each deployment
+# ends. Exits non-zero unless both finish. Used by deploy-production.yml, for a release and for
 # the return to what was serving.
 #
 # Reads COOLIFY_URL, COOLIFY_TOKEN (permissions `deploy` and `read`) and RESOURCES, the JSON map of
@@ -67,8 +67,8 @@ if [ "${1:-}" = "--settle" ]; then
 	exit
 fi
 
-uuids=$(printf '%s' "$RESOURCES" | jq -r '[.gateway, .dashboard, .docs] | unique | join(",")')
-expected=$(printf '%s' "$RESOURCES" | jq '[.gateway, .dashboard, .docs] | unique | length')
+uuids=$(printf '%s' "$RESOURCES" | jq -r '[.gateway, .dashboard] | unique | join(",")')
+expected=$(printf '%s' "$RESOURCES" | jq '[.gateway, .dashboard] | unique | length')
 
 # One request for all three. `force=false`: the images are already built, Coolify only pulls.
 call POST "/deploy?uuid=${uuids}&force=false"

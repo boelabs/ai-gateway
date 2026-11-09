@@ -5,7 +5,7 @@ import { createContext, use } from "react";
 import { NAV_ROW } from "./navigation.ts";
 
 /**
- * This deployment's documentation site (`DOCS_URL`), or `null` without one. A promise, like the
+ * Where operators read the documentation (`DOCS_URL`), or `null` without it. A promise, like the
  * identity: the layout reads the environment per request without awaiting it, so the shell stays
  * prerendered and only what shows the link waits for it.
  */
@@ -29,7 +29,7 @@ export function useDocsUrl(): string | null {
 
 /**
  * The sidebar foot's *Documentation*, Billete's: it leaves the dashboard, so it opens in a new tab
- * with a quiet ↗. Nothing at all when the deployment has no docs site.
+ * with a quiet ↗. Nothing at all without `DOCS_URL`.
  */
 export function DocsLink({ onNavigate }: { onNavigate?: () => void }) {
 	const href = useDocsUrl();

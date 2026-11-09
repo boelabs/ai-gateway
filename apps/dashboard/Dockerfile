@@ -18,14 +18,13 @@
 #   GATEWAY_URL   where the gateway is, e.g. http://gateway:4000. Only this container needs
 #                 to reach it; the browser never leaves this app's own origin.
 # Optional at RUN time:
-#   DOCS_URL      the documentation site's public address, linked from the sidebar.
+#   DOCS_URL      where operators read the documentation, linked from the sidebar.
 
 # ---- deps: full install (the build needs devDependencies) ----
 FROM oven/bun:1.4 AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY apps/dashboard/package.json ./apps/dashboard/package.json
-COPY apps/docs/package.json ./apps/docs/package.json
 COPY apps/api/package.json ./apps/api/package.json
 COPY packages/tsconfig/package.json ./packages/tsconfig/package.json
 RUN bun install --frozen-lockfile --filter @boelabs/dashboard
