@@ -6,7 +6,7 @@ description: Escribe, traduce, previsualiza y valida las páginas de este sitio.
 La documentación utiliza Next.js App Router y [Fumadocs](https://fumadocs.dev), con Bun como runtime. Las páginas se
 prerenderizan desde los archivos MDX del repositorio. Los índices de búsqueda se generan por idioma
 en `/api/search/en` y `/api/search/es`; las consultas se resuelven en el navegador. Solo
-`/sitemap.xml` lee el dominio del entorno en runtime. El sitio está disponible en inglés y español.
+`/sitemap.xml` y `/docs/export.json` leen el dominio del entorno en runtime. El sitio está disponible en inglés y español.
 
 ## Vista previa de cambios [#preview-changes]
 
@@ -70,6 +70,19 @@ Las pruebas exigen una traducción de cada página y comprueban navegación, eje
 build valida ambos idiomas, el idioma del documento HTML, los anchors y los índices estáticos.
 Los textos de navegación y búsqueda se definen en `src/lib/i18n.ts`.
 
+## Exportación de la documentación [#docs-export]
+
+`GET /docs/export.json` entrega el código fuente de cada página a boelabs.com, que publica esta
+documentación con sus propios componentes y estilos. Incluye cada `meta.json` y, por idioma, el
+`path` público de cada página, su `file`, su frontmatter y su cuerpo MDX. Las páginas con
+`draft: true` se excluyen, y los enlaces en español se reescriben de `/es/docs` a `/docs`. El
+contrato está en `AGENTS.md`.
+
+Las páginas solo usan los componentes que admite boelabs.com: `Callout` (`type`, `title`), `Tabs`
+(`items`) con `Tab` (`value`), `Steps` con `Step`, `Cards` con `Card` (`title`, `href`) y bloques
+de código que indiquen su lenguaje. Las páginas MDX nunca usan `import` ni `export`. Una prueba
+verifica las tres reglas.
+
 ## Validar los cambios [#validate]
 
 ```bash
@@ -92,10 +105,11 @@ docker run --rm -p 3000:3000 ai-gateway-docs
 
 No requiere configuración: la misma imagen se ejecuta en cualquier lugar y no se requiere ninguna base de datos, instancia de Redis, clave de proveedor o archivo de entorno de gateway para entregar la documentación.
 
-Configura `DOCS_SITE_URL` como origen público para publicar un mapa del sitio en `/sitemap.xml`:
+Configura `DOCS_SITE_URL` como origen público para publicar un mapa del sitio en `/sitemap.xml` y
+definir `assetsBase` en `/docs/export.json`:
 
 ```bash
 docker run --rm -p 3000:3000 -e DOCS_SITE_URL=https://docs.example.com ai-gateway-docs
 ```
 
-Se lee en runtime, no se integra, por lo que una imagen puede servir para staging y la producción. Sin él, el sitio funciona exactamente igual y no se genera ningún mapa del sitio.
+Se lee en runtime, no se integra, por lo que una imagen puede servir para staging y la producción. Sin él, el sitio funciona exactamente igual, no se genera ningún mapa del sitio y la exportación toma el origen de la solicitud.

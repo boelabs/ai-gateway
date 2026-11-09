@@ -167,6 +167,34 @@ bun test --preload ./tests/support/unitSetup.ts src/router/strategies.test.ts
   Update them with layout changes. Audit keeps its server pagination and visible result count,
   including one-page results and empty pages with an offset that can be navigated back from.
 
+### Documentation export
+
+`apps/docs` serves `GET /docs/export.json`, which boelabs.com reads to render these docs at
+`boelabs.com/docs/ai-gateway`. The self-hosted docs site stays as it is. Contract v1, shared by
+every Boelabs product — change it only together with boelabs.com:
+
+```json
+{
+  "schema": 1, "product": "ai-gateway", "generatedAt": "<ISO>", "apiVersion": null,
+  "defaultLocale": "en", "locales": ["en", "es"],
+  "openapi": "<raw URL of apps/api/openapi.yaml on main>",
+  "assetsBase": "<DOCS_SITE_URL origin, else the request origin>",
+  "meta": [{ "dir": "(docs)/(get-started)", "locale": "en", "data": {} }],
+  "pages": [{ "path": "quickstart", "locale": "es", "file": "(docs)/(get-started)/quickstart.es.mdx",
+              "frontmatter": { "title": "…", "description": "…" }, "mdx": "<body, no frontmatter>" }]
+}
+```
+
+`path` is the public slug (route groups dropped, `index` is `""`); `dir` keeps the real folder. One
+entry per page and language; `draft: true` pages are left out; Spanish `/es/docs/…` links are
+rewritten to `/docs/…`. Builder: `apps/docs/src/lib/export.ts`.
+
+**A new or edited page uses only components boelabs.com supports:** `<Callout type? title?>`,
+`<Tabs items>` with `<Tab value>`, `<Steps>` with `<Step>`, `<Cards>` with `<Card title href>`, and
+fenced code blocks that name a language (`text` when nothing else fits). No `import`/`export` in
+MDX, internal links as `/docs/<path>`. Anything else needs boelabs.com support first.
+`apps/docs/tests/export.test.ts` enforces all of it.
+
 ## 5. Architecture — keep the layering intact
 
 ```

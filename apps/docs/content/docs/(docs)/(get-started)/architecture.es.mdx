@@ -6,7 +6,7 @@ Este recorrido describe una solicitud de texto a través de `/v1/chat/completion
 
 ## Orden de ejecución [#execution-order]
 
-```
+```text
 1.  requestContextMiddleware   — assigns/echoes x-request-id (before anything else, so every log line
                                  and every error response can carry it)
 2.  logger()                   — structured request/response log line
