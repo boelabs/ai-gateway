@@ -6,7 +6,7 @@ description: Write, preview, test, and deploy the documentation site with Bun.
 The documentation is a Next.js App Router site using [Fumadocs](https://fumadocs.dev), built and
 served on Bun. Every page is prerendered from MDX in this repository, so the running server only
 hands out what the build produced, including a search index per language at `/api/search/en` and `/api/search/es`. Queries run in
-the browser. Only `/sitemap.xml` reads the deployment origin at runtime. The site supports English and Spanish.
+the browser. Only `/sitemap.xml` and `/docs/export.json` read the deployment origin at runtime. The site supports English and Spanish.
 
 ## Preview changes
 
@@ -83,6 +83,18 @@ The language tests require a translated sibling for every page and check navigat
 and links. The build verifies both language trees, document languages, anchors, and static search
 indexes. Navigation and search labels live in `src/lib/i18n.ts`.
 
+## Docs export
+
+`GET /docs/export.json` hands the source of every page to boelabs.com, which renders this
+documentation with its own components and styles. It lists each `meta.json` and, per language,
+each page's public `path`, its `file`, its frontmatter, and its MDX body. Pages with `draft: true`
+are left out, and Spanish links are rewritten from `/es/docs` to `/docs`. The contract is in
+`AGENTS.md`.
+
+Pages use only the components boelabs.com supports: `Callout` (`type`, `title`), `Tabs` (`items`)
+with `Tab` (`value`), `Steps` with `Step`, `Cards` with `Card` (`title`, `href`), and code blocks
+that name a language. MDX pages never use `import` or `export`. A test enforces all three rules.
+
 ## Validate
 
 ```bash
@@ -109,11 +121,12 @@ docker run --rm -p 3000:3000 ai-gateway-docs
 It carries no configuration: the same image runs anywhere, and no database, Redis instance,
 provider key, or gateway environment file is required to serve the documentation.
 
-Set `DOCS_SITE_URL` to the public origin to publish a sitemap at `/sitemap.xml`:
+Set `DOCS_SITE_URL` to the public origin to publish a sitemap at `/sitemap.xml` and to set `assetsBase`
+in `/docs/export.json`:
 
 ```bash
 docker run --rm -p 3000:3000 -e DOCS_SITE_URL=https://docs.example.com ai-gateway-docs
 ```
 
 It is read at run time, not baked in, so one image can serve staging and production. Without it the
-site works exactly the same and no sitemap is generated.
+site works exactly the same, no sitemap is generated, and the export takes its origin from the request.

@@ -9,7 +9,7 @@ share the same runtime helpers where applicable, with operation-specific validat
 
 ## Execution order
 
-```
+```text
 1.  requestContextMiddleware   — assigns/echoes x-request-id (before anything else, so every log line
                                  and every error response can carry it)
 2.  logger()                   — structured request/response log line

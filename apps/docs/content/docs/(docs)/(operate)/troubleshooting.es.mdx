@@ -86,7 +86,7 @@ Un problema **posible**, no garantizado: es posible que lo encuentre o no según
 
 **Síntoma.** El gateway (o `db:migrate`) no logra llegar a Postgres o Redis cuando la conexión usa TLS con un **certificado autofirmado**; por lo general, una base de datos o un cache expuesto por Coolify, Dokploy o una configuración de Docker realizada manualmente a través de un puerto público. Cuando sucede, el stack TLS de Bun informa:
 
-```
+```text
 error:1000009a:SSL routines:OPENSSL_internal:HANDSHAKE_FAILURE_ON_CLIENT_HELLO
 (ERR_SSL_HANDSHAKE_FAILURE_ON_CLIENT_HELLO)
 ```

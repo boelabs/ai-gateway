@@ -108,7 +108,7 @@ the TLS endpoint. Worth knowing about because it is easy to misdiagnose.
 TLS with a **self-signed certificate** — most often a database or cache exposed by Coolify, Dokploy, or
 a hand-rolled Docker setup over a public port. When it happens, Bun's TLS stack reports:
 
-```
+```text
 error:1000009a:SSL routines:OPENSSL_internal:HANDSHAKE_FAILURE_ON_CLIENT_HELLO
 (ERR_SSL_HANDSHAKE_FAILURE_ON_CLIENT_HELLO)
 ```

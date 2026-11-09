@@ -64,7 +64,7 @@ Un `401` significa que todo el camino funcionó: el dashboard llegó al gateway 
 
 La persona se autentifica; el dashboard lleva la respuesta:
 
-```
+```text
 1.  operator types a username and password at dash.example.com
 2.  browser    ──POST /api/auth/session──►  dashboard
 3.  dashboard  ──POST /auth/session─────►  gateway        (passes them on, keeps nothing)
