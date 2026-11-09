@@ -76,6 +76,7 @@ Entonces `release.yml`:
 1. Comprueba que la etiqueta sea semver, que apunte a un commit de `main` y que el CI de `main` haya pasado en ese commit; si la etiqueta se subió justo después de un merge, lo espera.
 2. Construye y publica las dos imágenes para amd64 y arm64.
 3. Con una etiqueta estable, llama a `deploy-production.yml`. Una prerelease (`v1.2.3-rc.1`) se detiene tras las imágenes.
+4. Cuando producción ya sirve la release, le pide a boelabs.com que vuelva a leer esta documentación con el secreto del repositorio `DOCS_REVALIDATE_SECRET`. Sin el secreto, o si la llamada falla, deja un aviso y la release termina bien igualmente.
 
 `deploy-production.yml` corre en el entorno `production` de GitHub, de uno en uno y sin cancelarse a medias. Apunta la etiqueta `production` de cada imagen a la release, le pide a Coolify desplegar los dos recursos y espera a que termine cada deployment. Si uno falla, devuelve `production` a las imágenes que servía antes y las despliega. Cuando la release ya sirve, publica la GitHub Release con notas generadas.
 

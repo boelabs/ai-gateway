@@ -344,8 +344,9 @@ Merges accumulate on `main` until someone tags it. [`release.yml`](.github/workf
 verifies the tag and builds the images; a stable tag then runs
 [`deploy-production.yml`](.github/workflows/deploy-production.yml), which moves the `production`
 registry tag that every Coolify resource runs, deploys, and moves it back if the deployment fails. A
-prerelease tag (`v1.2.3-rc.1`) publishes images only. Rolling back is running *Deploy production*
-with an earlier version. See
+prerelease tag (`v1.2.3-rc.1`) publishes images only. After a successful deploy, `release.yml` asks
+boelabs.com to refetch the docs (`DOCS_REVALIDATE_SECRET`; best effort, never fails the release).
+Rolling back is running *Deploy production* with an earlier version. See
 [Rollouts](docs/(docs)/(operate)/rollouts.mdx#releasing-and-deploying-from-ci).
 
 CI publishes `sha-<commit>` and `main` for commits of `main` only — the registry is public, and a

@@ -255,3 +255,38 @@ jobs:
     with:
       version: ${{ github.ref_name }}
     secrets: inherit
+
+  # boelabs.com renders these docs from the gateway's /docs/export.json and caches them for up to an
+  # hour; once the release serves, this tells it to refetch now. Best effort: the release is already
+  # live, so a missing secret or a failed call only warns.
+  revalidate-docs:
+    name: Refresh docs on boelabs.com
+    needs: [deploy]
+    if: needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Ask boelabs.com to revalidate
+        env:
+          SECRET: ${{ secrets.DOCS_REVALIDATE_SECRET }}
+        run: |
+          set -uo pipefail
+          if [ -z "${SECRET:-}" ]; then
+            echo "::warning::DOCS_REVALIDATE_SECRET is not set; boelabs.com refreshes the docs when its cache expires."
+            exit 0
+          fi
+          status=000
+          for attempt in 1 2 3; do
+            status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10               -X POST https://boelabs.com/api/docs/revalidate               -H "Authorization: Bearer $SECRET"               -H "Content-Type: application/json"               -d '{"product":"ai-gateway"}') || status=000
+            if [ "$status" = 200 ]; then
+              echo "boelabs.com revalidated the ai-gateway docs."
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $status"
+            # A 4xx (wrong secret, unknown product) will not change on a retry.
+            case "$status" in 4*) break ;; esac
+            if [ "$attempt" -lt 3 ]; then sleep 10; fi
+          done
+          echo "::warning::boelabs.com did not revalidate the docs (HTTP $status); they refresh when its cache expires."
+          exit 0
