@@ -121,6 +121,9 @@ git push origin v1.2.3
 2. Builds and publishes the two images for amd64 and arm64.
 3. For a stable tag, calls `deploy-production.yml`. A prerelease (`v1.2.3-rc.1`) stops after the
    images.
+4. Once production serves the release, asks boelabs.com to refetch these docs with the
+   `DOCS_REVALIDATE_SECRET` repository secret. Without the secret, or if the call fails, it warns and
+   the release still succeeds.
 
 `deploy-production.yml` runs in the `production` GitHub environment, one at a time and never
 cancelled halfway. It points the `production` tag of each image at the release, asks Coolify to
