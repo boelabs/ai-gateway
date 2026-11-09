@@ -1,0 +1,177 @@
+---
+title: "Virtual keys"
+description: "Client credentials with model scopes, budgets, and rate limits."
+---
+
+A **virtual key** is the credential your clients send. Unlike the master key — a single static
+operator secret — virtual keys live in the database, each with its own model scope, budget, and
+RPM/TPM limits. Issue one per app, tenant, or environment, and revoke or re-scope it without touching
+anything else.
+
+All key management is on the admin API and requires the **master key**:
+
+```
+Authorization: Bearer $MASTER_KEY
+```
+
+<Callout>
+
+A key authenticates by its SHA-256 hash. Its plaintext `sk-…` value is also kept, encrypted with the
+keyring, so an operator can [copy it again](#copy-a-key-again) — unless the key is
+[private](#private-keys), in which case creation is the only time it is ever returned.
+
+</Callout>
+
+## Create a key
+
+```bash
+curl -X POST $BASE/admin/keys \
+  -H "Authorization: Bearer $MASTER_KEY" -H "content-type: application/json" -d '{
+    "name": "frontend-prod",
+    "allowedModels": ["general", "image-default"],
+    "maxBudgetCents": 50000,
+    "budgetReset": "monthly",
+    "rpm": 600,
+    "tpm": 200000
+  }'
+```
+
+The response includes the plaintext key:
+
+```json
+{
+  "data": {
+    "id": "…",
+    "name": "frontend-prod",
+    "keyPrefix": "sk-abcdefg",
+    "key": "sk-…",
+    "allowedModels": ["general", "image-default"],
+    "maxBudgetCents": 50000,
+    "budgetReset": "monthly",
+    "rpm": 600,
+    "tpm": 200000,
+    "spendCents": "0",
+    "enabled": true,
+    "private": false,
+    "copyable": true
+  }
+}
+```
+
+## Fields
+
+| Field | Default | Meaning |
+|---|---|---|
+| `name` | required | Human label; also searchable via `?q=`. |
+| `allowedModels` | `[]` (all) | Public models this key may call. `[]` or omitted grants access to **every** model. |
+| `maxBudgetCents` | `null` (none) | Spend cap in USD cents over the current budget window. |
+| `budgetReset` | `null` | `hourly`, `daily`, `weekly`, or `monthly`. When the window rolls over, `spendCents` resets. |
+| `rpm` | `null` (none) | Max requests per minute. |
+| `tpm` | `null` (none) | Max tokens per minute. |
+| `expiresAt` | `null` (never) | ISO timestamp after which the key is rejected. |
+| `private` | `false` | `true` never stores the plaintext: it is returned once, at creation. See [Private keys](#private-keys). |
+
+`null` always means "no limit". Limits and budget are enforced on the hot path in Redis and mirrored
+to Postgres for durable accounting.
+
+## Scopes
+
+`allowedModels` is checked against the request's **public model** name. A key calling a model outside
+its scope gets `403` with code `model_not_allowed`. An empty array is an explicit "all models" — use
+it only for trusted operator tooling, not for client-facing keys.
+
+## Budgets and limits
+
+- **Budget:** before upstream execution, the gateway atomically reserves a conservative maximum cost
+  from catalog [pricing](/docs/model-catalog) or the deployment override. Settlement replaces the
+  reservation with exact provider-reported usage. A budget-limited key cannot use a deployment whose
+  pricing is unknown, because a hard cap would otherwise be impossible to guarantee.
+- **RPM/TPM:** RPM admission and conservative TPM reservations are atomic in Redis across replicas.
+  Exact tokens reconcile at settlement; exceeding either returns `429` with code `rate_limit_exceeded`.
+  Rerank search units contribute to spend and budgets but never synthesize tokens for TPM; RPM still
+  counts each rerank request.
+- **Headers:** when a key carries any limit, responses include the matching
+  `x-ratelimit-limit-*` / `x-ratelimit-remaining-*` / `x-ratelimit-reset-*` headers (requests, tokens,
+  and budget-cents), so clients can back off before being throttled.
+
+## Manage keys
+
+```bash
+# List (filter + paginate)
+GET /admin/keys?limit=50&offset=0&enabled=true&publicModel=general&q=frontend
+
+# Update scope, limits, or budget (same fields; send null to clear a limit)
+PATCH /admin/keys/:id   { "rpm": 1200, "allowedModels": ["general"] }
+
+# Re-enable or disable without deleting
+PATCH /admin/keys/:id   { "enabled": false }
+
+# Reset accumulated spend now (e.g. after a billing dispute)
+PATCH /admin/keys/:id   { "resetSpend": true }
+
+# Permanently delete
+DELETE /admin/keys/:id
+```
+
+Reads never return the key hash or the plaintext value — only `keyPrefix`, which is enough to
+identify a key in logs and dashboards, plus `private` and `copyable`.
+
+## Copy a key again
+
+```bash
+GET /admin/keys/:id/secret      →  { "data": { "key": "sk-…" } }
+```
+
+The one route that returns a key after creation. It requires `keys:write` — a copied key is as good
+as a written one — answers with `Cache-Control: no-store`, and **every call is written to the
+[audit trail](/docs/reference-admin-api#audit-trail)**, refusals included. `copyable` on the key says
+whether it will succeed:
+
+| Answer | Meaning |
+|---|---|
+| `200` | The plaintext key. |
+| `409 virtual_key_private` | The key is private: nothing is stored. |
+| `409 virtual_key_secret_unreadable` | It was encrypted with a key the keyring no longer has. The key still works. |
+| `403 virtual_key_secret_sealed` | The deployment runs with `VIRTUAL_KEY_SECRET_ACCESS=sealed`. |
+
+The decrypted value is checked against the hash the key authenticates with, so what you copy is
+always the key that works today. The dashboard copies straight to the clipboard and never renders
+the secret on the page.
+
+## Private keys
+
+A key created with `"private": true` keeps nothing but its hash: the plaintext is in the create
+response and nowhere else. Use it for credentials that must never be recoverable from the gateway,
+such as a long-lived deploy key.
+
+```bash
+# Erase a key's stored secret. One way: the plaintext no longer exists anywhere.
+PATCH /admin/keys/:id   { "private": true }
+```
+
+`{"private": false}` is rejected: only [rotating](#rotation-and-leaks) can make a private key
+copyable, because only a new secret can be stored. Keys issued before keys could be copied are
+private.
+
+To stop copying everywhere at once, set `VIRTUAL_KEY_SECRET_ACCESS=sealed` and restart: no
+credential can copy a key, the master key included. Stored secrets stay encrypted at rest, so
+reopening access needs no new keys. Sealing is an access policy; a key that must never be stored is
+created private.
+
+## Rotation and leaks
+
+Virtual keys are independent of `MASTER_KEY`, so rotating the master key does **not** invalidate them.
+
+```bash
+# New secret, same key: id, scope, limits, spend and logs stay.
+POST /admin/keys/:id/rotate                         # keeps the key as private as it was
+POST /admin/keys/:id/rotate   { "private": false }  # and stores the new secret for copying
+```
+
+The response carries the new plaintext key like a create does. The old secret stops authenticating
+immediately, on every replica, and realtime client secrets minted from it stop with it — so update
+clients right after rotating, or issue a second key and move them over first when downtime matters.
+
+If a key leaks, rotate it — or `PATCH … {"enabled": false}` to cut access while you investigate — and
+audit `gateway_operations` and structured admin-access logs. For master-key and provider-credential leaks, see
+[Operations → Secrets](/docs/operations).

@@ -1,0 +1,91 @@
+{
+	"name": "@boelabs/ai-gateway-api",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Provider-agnostic AI gateway with an exact OpenAI-compatible contract. Backend only.",
+	"keywords": [
+		"ai",
+		"gateway",
+		"openai",
+		"anthropic",
+		"gemini",
+		"llm",
+		"router"
+	],
+	"homepage": "https://github.com/boelabs/ai-gateway#readme",
+	"bugs": {
+		"url": "https://github.com/boelabs/ai-gateway/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/boelabs/ai-gateway.git",
+		"directory": "apps/api"
+	},
+	"license": "MIT",
+	"author": "Boelabs",
+	"type": "module",
+	"imports": {
+		"#test-support/*": "./tests/support/*",
+		"#*": "./src/*"
+	},
+	"scripts": {
+		"catalog:guard": "bun scripts/catalog-guard.ts",
+		"catalog:sync": "bun scripts/catalog-sync.ts",
+		"catalog:sync:openrouter": "bun scripts/openrouter-catalog-sync.ts --mode report",
+		"catalog:sync:openrouter:verify": "bun scripts/openrouter-catalog-sync.ts --mode verify",
+		"catalog:sync:openrouter:write": "bun scripts/openrouter-catalog-sync.ts --mode write",
+		"catalog:sync:vercel": "bun scripts/vercel-catalog-sync.ts --mode report",
+		"catalog:sync:vercel:verify": "bun scripts/vercel-catalog-sync.ts --mode verify",
+		"catalog:sync:vercel:write": "bun scripts/vercel-catalog-sync.ts --mode write",
+		"catalog:sync:verify": "bun scripts/catalog-sync.ts --mode verify",
+		"catalog:validate": "bun scripts/validate-catalog.ts",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "bun src/db/migrate.ts",
+		"db:studio": "drizzle-kit studio",
+		"dev": "bun --watch src/index.ts",
+		"encryption:rotate": "bun run scripts/rotate-encryption.ts",
+		"openapi:generate": "bun scripts/openapi-generate.ts",
+		"start": "bun src/index.ts",
+		"test": "bun run test:unit",
+		"test:all": "bun run test:unit && bun run test:integration",
+		"test:integration": "bun scripts/run-integration.ts",
+		"test:unit": "bun test --preload ./tests/support/unitSetup.ts src tests/support",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@aws-sdk/client-s3": "3.1161.0",
+		"@aws-sdk/lib-storage": "3.1161.0",
+		"@boelabs/postgres": "1.0.0",
+		"@hono/node-server": "2.1.6",
+		"@opentelemetry/api": "1.10.0",
+		"@opentelemetry/exporter-metrics-otlp-http": "0.300.0",
+		"@opentelemetry/exporter-trace-otlp-http": "0.300.0",
+		"@opentelemetry/instrumentation-http": "0.300.0",
+		"@opentelemetry/resources": "3.0.0",
+		"@opentelemetry/sdk-metrics": "3.0.0",
+		"@opentelemetry/sdk-node": "0.300.0",
+		"@t3-oss/env-core": "0.13.11",
+		"busboy": "1.6.0",
+		"drizzle-orm": "0.45.4",
+		"hono": "4.13.16",
+		"ioredis": "6.0.0",
+		"postgres": "npm:@boelabs/postgres@1.0.0",
+		"sharp": "0.35.5",
+		"unpdf": "2.1.0",
+		"ws": "8.22.0",
+		"zod": "4.6.7"
+	},
+	"devDependencies": {
+		"@boelabs/tsconfig": "workspace:*",
+		"@types/busboy": "1.5.5",
+		"@types/node": "26.6.6",
+		"@types/ws": "8.18.2",
+		"drizzle-kit": "0.31.11",
+		"typescript": "7.0.2",
+		"yaml": "2.9.1",
+		"zod-openapi": "6.0.2"
+	},
+	"engines": {
+		"bun": ">=1.4"
+	}
+}

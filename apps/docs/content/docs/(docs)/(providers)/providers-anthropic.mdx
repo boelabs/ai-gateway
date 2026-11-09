@@ -1,0 +1,60 @@
+---
+title: "Anthropic"
+description: "Configure anthropic deployments and understand provider-specific behavior."
+---
+
+## Configure a deployment
+
+Send this body to `POST /admin/deployments` with an operator credential. Replace the example
+credentials and choose a model available to your provider account. See
+[Creating deployments](/docs/creating-deployments) for the shared configuration fields.
+
+```json
+{ "publicModel": "claude", "adapterKey": "anthropic", "upstreamModel": "claude-sonnet-5", "credentials": { "apiKey": "sk-ant-..." } }
+```
+
+## Behavior and limitations
+
+- **Credentials**: `apiKey`. `version` (the `anthropic-version` header) defaults to `2023-06-01` and
+  rarely needs overriding.
+- **Default transport**: Messages API for text.
+- **Reasoning**: either `anthropic_adaptive` (the model picks its own depth; the request only carries an
+  `output_config.effort` label) or `anthropic_budget` (`thinking: { budget_tokens }`, with a
+  provider-side default budget per canonical level if the catalog doesn't override it) — see
+  [Reasoning](/docs/reasoning). Models that expose both `xhigh` and `max` preserve them as distinct
+  tiers; models such as Opus/Sonnet 4.6 declare `max` without inventing `xhigh` support.
+- **Signed thinking round-trips on `/v1/responses`.** When the request includes
+  `reasoning.encrypted_content`, each turn's content (thinking, text and tool calls, in order) is
+  sealed into a `reasoning` item that standard clients replay, and the next request sends the turn
+  back exactly as Claude returned it. On `/v1/messages` the blocks stay native, in Claude's order.
+  See
+  [Provider-specific fields](/docs/provider-specific-fields#anthropic-thinking-blocks-message-bound).
+- Claude Opus 5 enables adaptive thinking upstream when `thinking` is omitted. The adapter sends
+  `thinking: { "type": "disabled" }` when canonical reasoning resolves to `none`, preserving the
+  gateway's provider-independent off semantics.
+- `claude-opus-5-fast` and `claude-opus-4-8-fast` are gateway aliases for Anthropic's research-preview
+  fast mode. The adapter selects the base model, sends `speed: "fast"`, and adds the required beta
+  header. Anthropic account access is still required.
+- Native `/v1/messages` requests pass through with minimal translation; `/v1/chat/completions` and
+  `/v1/responses` requests are rendered onto the same canonical reasoning/tool/format machinery as
+  every other provider.
+- **Prompt caching is automatic on `/v1/chat/completions` and `/v1/responses`.** The adapter sends
+  Anthropic's top-level `cache_control: { "type": "ephemeral" }` (5-minute TTL), so repeated prefixes
+  are cached as they are on OpenAI and Gemini and reported in `cached_tokens`. To control caching
+  yourself, use `/v1/messages`: those requests are sent with exactly the `cache_control` you write,
+  or none.
+- Models that declare `capabilities.strictTools: true` preserve Anthropic's native top-level
+  `strict: true` tool flag. Native `output_config.format` is schema-adherent and is treated as strict
+  structured output by the gateway.
+- Anthropic compiles strict tool schemas and `json_schema` response formats from a subset of JSON
+  Schema and rejects constraints outside it (`maxItems`, `minLength`, `minimum`, …) that OpenAI's
+  strict mode accepts. For `/v1/chat/completions` and `/v1/responses` requests the adapter keeps
+  the supported keywords and moves the rest into the field's `description`, as Anthropic's SDKs do;
+  clients keep validating against their original schema. Native `/v1/messages` tools are sent as
+  written.
+- Catalog: `src/adapters/anthropic/catalog.json`.
+
+## Next steps
+
+- [Messages](/docs/messages) — the native Anthropic-compatible contract.
+- [Reasoning](/docs/reasoning) — `anthropic_adaptive` / `anthropic_budget` in detail.

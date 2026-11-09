@@ -1,0 +1,23 @@
+{
+	"title": "Documentation",
+	"description": "Connect an application, configure providers, and operate AI Gateway.",
+	"root": true,
+	"pages": [
+		"index",
+		"---Get started---",
+		"...(get-started)",
+		"---Models---",
+		"...(providers)",
+		"---Routing and resilience---",
+		"...(routing)",
+		"---Access and costs---",
+		"...(access)",
+		"---Deploy---",
+		"...(deploy)",
+		"---Operate---",
+		"...(operate)",
+		"---Extend and contribute---",
+		"...(extend)"
+	],
+	"icon": "BookOpen"
+}

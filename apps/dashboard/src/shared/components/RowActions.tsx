@@ -1,0 +1,102 @@
+"use client";
+
+import { Ellipsis as IconDots } from "lucide-react";
+import { Button } from "#/components/ui/button";
+import type { ReactNode } from "react";
+
+import {
+	MenuPositioner,
+	MenuSeparator,
+	MenuTrigger,
+	MenuPortal,
+	MenuPopup,
+	MenuRoot,
+	MenuItem,
+} from "#/components/ui/menu";
+
+export interface RowAction {
+	label: string;
+	onSelect: () => void;
+	icon?: ReactNode;
+	disabled?: boolean;
+	/** Destructive and irreversible: set apart below a rule, and coloured. */
+	danger?: boolean;
+}
+
+/**
+ * What can be done to one row, behind one button.
+ *
+ * A table earns its shape from its data, and a row of four ghost buttons — two of them words, two
+ * of them icons, each a different width — is a second table competing with the first. Collapsing
+ * them puts every row's trailing edge in the same place, and lets an action be named rather than
+ * left to a pictogram nobody hovers.
+ *
+ * The trigger keeps a stable width whether a row has one action or five, so the column does not
+ * jitter as rows change.
+ */
+export function RowActions({
+	actions,
+	label,
+}: {
+	actions: RowAction[];
+	/** What this menu acts on, for the operator who cannot see the row it sits in. */
+	label: string;
+}) {
+	if (actions.length === 0) {
+		return null;
+	}
+	// Shown and disabled rather than hidden: "delete" missing from your own row reads as a bug,
+	// while "delete" greyed out reads as the rule it is.
+	const safe = actions.filter((action) => !action.danger);
+	const destructive = actions.filter((action) => action.danger);
+
+	return (
+		<MenuRoot>
+			<MenuTrigger
+				aria-label={label}
+				render={
+					<Button
+						className="ml-auto text-muted-foreground"
+						mode="icon"
+						size="sm"
+						variant="ghost"
+					/>
+				}
+				title="Actions"
+			>
+				<IconDots aria-hidden className="size-4" />
+			</MenuTrigger>
+			<MenuPortal>
+				<MenuPositioner align="end" side="bottom" sideOffset={6}>
+					<MenuPopup className="w-48">
+						{safe.map((action) => (
+							<MenuItem
+								className="flex items-center gap-2"
+								disabled={action.disabled ?? false}
+								key={action.label}
+								onClick={action.onSelect}
+							>
+								{action.icon}
+								{action.label}
+							</MenuItem>
+						))}
+						{destructive.length > 0 && safe.length > 0 ? (
+							<MenuSeparator />
+						) : null}
+						{destructive.map((action) => (
+							<MenuItem
+								className="flex items-center gap-2 text-danger"
+								disabled={action.disabled ?? false}
+								key={action.label}
+								onClick={action.onSelect}
+							>
+								{action.icon}
+								{action.label}
+							</MenuItem>
+						))}
+					</MenuPopup>
+				</MenuPositioner>
+			</MenuPortal>
+		</MenuRoot>
+	);
+}

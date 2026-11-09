@@ -1,0 +1,1081 @@
+import { EXECUTION_POLICY_MAX_TOTAL_MS } from "#core/executionPolicy.ts";
+import { keySecretAccessIsOpen, revealKeySecret } from "./keySecrets.ts";
+import { invalidateRouterSettingsCache } from "#router/settings.ts";
+import { auditRevealMiddleware, auditMiddleware } from "./audit.ts";
+import { Hono, type MiddlewareHandler, type Context } from "hono";
+import { invalidateVirtualKey } from "#auth/virtualKeyCache.ts";
+import { idempotencyMiddleware } from "#http/idempotency.ts";
+import { clearVirtualKeyBudget } from "#ratelimit/index.ts";
+import { configureFallback } from "#fallbacks/service.ts";
+import { aggregateMetrics } from "#db/repos/metrics.ts";
+import { getRequestId } from "#http/requestContext.ts";
+import { probeArtifact } from "#extensions/source.ts";
+import { type AppEnv, actorOf } from "#auth/types.ts";
+import { listAuditPage } from "#db/repos/audit.ts";
+import { metricsQuery } from "./metricsSchema.ts";
+import { ok, paginated } from "#http/respond.ts";
+import { platformAdminApp } from "./platform.ts";
+import { GatewayError } from "#core/errors.ts";
+import { dashboardUsersApp } from "./users.ts";
+import { writtenRow } from "#db/returning.ts";
+import { parseJsonBody } from "#http/body.ts";
+import { env } from "#config/env.ts";
+import { z } from "zod/v4";
+
+import {
+	listArtifactVersionsForKey,
+	activateArtifactVersion,
+	listArtifactSummaries,
+	insertActiveArtifact,
+	bumpRegistryVersion,
+	deleteArtifactKey,
+	getInstanceById,
+	updateInstance,
+	deleteInstance,
+	insertInstance,
+	listInstances,
+} from "#db/repos/extensions.ts";
+
+import {
+	resetVirtualKeySpend,
+	listVirtualKeysPage,
+	type VirtualKeyRow,
+	getVirtualKeyById,
+	createVirtualKey,
+	deleteVirtualKey,
+	rotateVirtualKey,
+	updateVirtualKey,
+} from "#db/repos/virtualKeys.ts";
+
+import {
+	aggregateOperationUsage,
+	type OperationFilter,
+	getOperationDetail,
+	listOperationsPage,
+	operationSummary,
+} from "#db/repos/operations.ts";
+
+import {
+	deleteFallbackPolicy,
+	listFallbackPolicies,
+	updateRouterSettings,
+	routerSettingsView,
+	getRouterSettings,
+} from "#db/repos/router.ts";
+
+import {
+	operationPersistenceStatus,
+	payloadAccessIsOpen,
+	getPayloadSample,
+} from "#logging/operations.ts";
+
+import {
+	resetExtensionInstance,
+	reloadExtensions,
+	extensionStatus,
+} from "#extensions/runtime.ts";
+
+import {
+	requirePermission,
+	requireOperator,
+	authMiddleware,
+	getAuth,
+} from "#auth/middleware.ts";
+
+import {
+	updateDashboardSettings,
+	getDashboardSettings,
+} from "#db/repos/dashboardSettings.ts";
+
+import {
+	advanceResponseCacheEpoch,
+	invalidateResponseCache,
+} from "#cache/responseCache.ts";
+
+import {
+	createKeySchema,
+	rotateKeySchema,
+	updateKeySchema,
+} from "./keySchemas.ts";
+
+/**
+ * A virtual key as the admin API shows it: never the hash, never the secret.
+ *
+ * `private` is what the key is; `copyable` is the question a client actually has — can it be copied
+ * right now — answered here rather than left to infer from a gateway-wide setting.
+ */
+function publicKey(row: VirtualKeyRow) {
+	const { keyHash: _hash, hasSecret, ...rest } = row;
+	return {
+		...rest,
+		private: !hasSecret,
+		copyable: hasSecret && keySecretAccessIsOpen(),
+	};
+}
+
+/** The key an `:id` route names, or a 404 — a malformed id too, which Postgres would reject as a 500. */
+async function requireKey(id: string): Promise<VirtualKeyRow> {
+	const row = z.uuid().safeParse(id).success
+		? await getVirtualKeyById(id)
+		: undefined;
+	if (!row) {
+		throw new GatewayError({
+			class: "not_found",
+			message: `Virtual key "${id}" does not exist`,
+		});
+	}
+	return row;
+}
+
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 200;
+
+function parseBoolQuery(value: string | undefined): boolean | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	const normalized = value.trim().toLowerCase();
+	if (["true", "1", "yes"].includes(normalized)) {
+		return true;
+	}
+	if (["false", "0", "no"].includes(normalized)) {
+		return false;
+	}
+	throw new GatewayError({
+		class: "bad_request",
+		message: `Invalid boolean query value "${value}"`,
+	});
+}
+
+function parseNonNegativeNumber(value: string | undefined): number | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed < 0) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: `Invalid non-negative number query value "${value}"`,
+		});
+	}
+	return parsed;
+}
+
+function parseDateQuery(
+	c: import("hono").Context,
+	name: string,
+): Date | undefined {
+	const raw = c.req.query(name);
+	if (raw === undefined) {
+		return undefined;
+	}
+	const d = new Date(raw);
+	if (Number.isNaN(d.getTime())) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: `Invalid date for "${name}": ${raw}`,
+			param: name,
+		});
+	}
+	return d;
+}
+
+/** Builds the common gateway operation filter from the query string. */
+function parseLogFilter(c: import("hono").Context): OperationFilter {
+	const cacheHit = parseBoolQuery(c.req.query("cacheHit"));
+	const degraded = parseBoolQuery(c.req.query("degraded"));
+	const active = parseBoolQuery(c.req.query("active"));
+	const terminalVerified = parseBoolQuery(c.req.query("terminalVerified"));
+	const minDurationMs = parseNonNegativeNumber(c.req.query("minDurationMs"));
+	const maxDurationMs = parseNonNegativeNumber(c.req.query("maxDurationMs"));
+	const start = parseDateQuery(c, "start");
+	const end = parseDateQuery(c, "end");
+	const outcome = c.req.query("outcome");
+	const validOutcomes = [
+		"success",
+		"incomplete",
+		"blocked",
+		"error",
+		"cancelled",
+		"abandoned",
+		"unknown",
+	] as const;
+	if (
+		outcome !== undefined &&
+		!validOutcomes.includes(outcome as (typeof validOutcomes)[number])
+	) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: `Invalid outcome "${outcome}"`,
+			code: "invalid_log_outcome",
+		});
+	}
+	return {
+		...queryPatch(c, "virtualKeyId"),
+		...queryPatch(c, "actor"),
+		...queryPatch(c, "publicModel"),
+		...queryPatch(c, "deploymentId"),
+		...queryPatch(c, "adapterKey"),
+		...queryPatch(c, "callType"),
+		...(outcome
+			? {
+					outcome: outcome as NonNullable<OperationFilter["outcome"]>,
+				}
+			: {}),
+		...queryPatch(c, "requestId"),
+		...(cacheHit === undefined ? {} : { cacheHit }),
+		...(degraded === undefined ? {} : { degraded }),
+		...(active === undefined ? {} : { active }),
+		...(terminalVerified === undefined ? {} : { terminalVerified }),
+		...queryPatch(c, "failureKind"),
+		...queryPatch(c, "failurePhase"),
+		...queryPatch(c, "failureOwner"),
+		...(minDurationMs === undefined ? {} : { minDurationMs }),
+		...(maxDurationMs === undefined ? {} : { maxDurationMs }),
+		...(start ? { start } : {}),
+		...(end ? { end } : {}),
+	};
+}
+
+function parsePage(c: import("hono").Context): {
+	limit: number;
+	offset: number;
+} {
+	const rawLimit = Number(c.req.query("limit") ?? DEFAULT_LIMIT);
+	const rawOffset = Number(c.req.query("offset") ?? 0);
+	const limit =
+		Number.isFinite(rawLimit) && rawLimit > 0
+			? Math.min(Math.trunc(rawLimit), MAX_LIMIT)
+			: DEFAULT_LIMIT;
+	const offset =
+		Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.trunc(rawOffset) : 0;
+	return { limit, offset };
+}
+
+/** Reads are viewer-visible for a resource; writes need the corresponding :write permission. */
+function methodPermission(
+	resource: "deployments" | "keys" | "settings",
+): MiddlewareHandler<AppEnv> {
+	const read = requirePermission(`${resource}:read`);
+	const write = requirePermission(`${resource}:write`);
+	return (c, next) =>
+		(c.req.method === "GET" || c.req.method === "HEAD" ? read : write)(c, next);
+}
+
+/**
+ * A query parameter as a one-key patch, or nothing at all.
+ *
+ * Spreading the result is what keeps an absent parameter out of the filter entirely, rather than
+ * present and undefined — which `exactOptionalPropertyTypes` treats as a different thing.
+ */
+function queryPatch<K extends string>(
+	c: Context<AppEnv>,
+	name: K,
+): Partial<Record<K, string>> {
+	const value = c.req.query(name);
+	return value ? ({ [name]: value } as Record<K, string>) : {};
+}
+
+export const adminApp = new Hono<AppEnv>();
+
+// Every /admin route requires an operator identity: the master key or a dashboard session.
+adminApp.use("*", authMiddleware(), requireOperator(), auditMiddleware());
+
+/**
+ * After the identity is resolved, because an idempotency key is scoped to the actor that sent it, and
+ * before the permission gates, so a replay is answered by the same rules that answered the original.
+ */
+adminApp.use("*", idempotencyMiddleware());
+
+/**
+ * Per-group permissions. The master key satisfies every one of them; a session must carry the
+ * permission its role grants (see auth/roles.ts). Registered before the routes so Hono applies them
+ * as middleware rather than as handlers.
+ */
+adminApp.use("/deployments/*", methodPermission("deployments"));
+adminApp.use("/deployments", methodPermission("deployments"));
+adminApp.use("/keys/*", methodPermission("keys"));
+adminApp.use("/keys", methodPermission("keys"));
+// A copied key is as good as a written one, so reading it takes what writing takes. It is audited,
+// refusals included, which is why the audit is mounted ahead of the gate.
+adminApp.use(
+	"/keys/:id/secret",
+	auditRevealMiddleware(),
+	requirePermission("keys:write"),
+);
+adminApp.use("/logs/:id/payload", requirePermission("payloads:read"));
+adminApp.use("/logs/*", requirePermission("logs:read"));
+adminApp.use("/logs", requirePermission("logs:read"));
+adminApp.use("/audit", requirePermission("audit:read"));
+adminApp.use("/usage", requirePermission("usage:read"));
+adminApp.use("/observability/*", requirePermission("usage:read"));
+adminApp.use("/operations", requirePermission("deployments:read"));
+adminApp.use("/router-settings", methodPermission("settings"));
+// Owner-only: session lifetime and lockout decide how long a stolen cookie is worth stealing.
+adminApp.use("/dashboard-settings", requirePermission("users:manage"));
+adminApp.use("/fallbacks/*", methodPermission("settings"));
+adminApp.use("/fallbacks", methodPermission("settings"));
+adminApp.use("/cache", requirePermission("settings:write"));
+adminApp.use("/extensions/*", requirePermission("extensions:manage"));
+adminApp.use("/extensions", requirePermission("extensions:manage"));
+adminApp.route("/users", dashboardUsersApp);
+adminApp.use("*", async (c, next) => {
+	const mutatesConfiguration = ["POST", "PUT", "PATCH", "DELETE"].includes(
+		c.req.method,
+	);
+	const managesCacheDirectly = c.req.path === "/admin/cache";
+	if (mutatesConfiguration && !managesCacheDirectly) {
+		await advanceResponseCacheEpoch();
+	}
+	await next();
+	if (
+		mutatesConfiguration &&
+		!managesCacheDirectly &&
+		c.res.status >= 200 &&
+		c.res.status < 400
+	) {
+		await advanceResponseCacheEpoch();
+	}
+});
+// Model CRUD (with inline CatalogEntry for custom models) and adapter introspection.
+adminApp.route("/", platformAdminApp);
+
+/* --------------------------------------------------------- virtual keys */
+
+adminApp.get("/keys", async (c) => {
+	const { limit, offset } = parsePage(c);
+	const enabled = parseBoolQuery(c.req.query("enabled"));
+	const publicModel = c.req.query("publicModel");
+	const q = c.req.query("q");
+	const { rows, total } = await listVirtualKeysPage({
+		limit,
+		offset,
+		...(enabled === undefined ? {} : { enabled }),
+		...(publicModel ? { publicModel } : {}),
+		...(q ? { q } : {}),
+	});
+	return paginated(c, rows.map(publicKey), {
+		limit,
+		offset,
+		total,
+		nextOffset: offset + limit < total ? offset + limit : null,
+	});
+});
+
+adminApp.post("/keys", async (c) => {
+	const input = await parseJsonBody(c, createKeySchema);
+	const { row, rawKey } = await createVirtualKey({
+		name: input.name,
+		createdBy: actorOf(getAuth(c)),
+		...(input.allowedModels === undefined
+			? {}
+			: { allowedModels: input.allowedModels }),
+		...(input.maxBudgetCents === undefined
+			? {}
+			: { maxBudgetCents: input.maxBudgetCents }),
+		...(input.budgetReset === undefined
+			? {}
+			: { budgetReset: input.budgetReset }),
+		...(input.tpm === undefined ? {} : { tpm: input.tpm }),
+		...(input.rpm === undefined ? {} : { rpm: input.rpm }),
+		...(input.expiresAt !== undefined && input.expiresAt !== null
+			? { expiresAt: new Date(input.expiresAt) }
+			: {}),
+		...(input.private === undefined ? {} : { private: input.private }),
+	});
+	// The plaintext rides in this response; afterwards only GET /keys/:id/secret reveals it.
+	return ok(c, { ...publicKey(row), key: rawKey }, 201);
+});
+
+adminApp.get("/keys/:id", async (c) =>
+	ok(c, publicKey(await requireKey(c.req.param("id")))),
+);
+
+adminApp.get("/keys/:id/secret", async (c) => {
+	const id = c.req.param("id");
+	// Nothing between here and the operator may keep a copy: not a proxy, not the browser.
+	c.header("Cache-Control", "no-store");
+	const read = z.uuid().safeParse(id).success
+		? await revealKeySecret(id)
+		: ({ outcome: "not_found" } as const);
+	// The admin error handler republishes `message` to the operator, so each branch carries its whole
+	// explanation; a separate publicMessage would be dropped.
+	switch (read.outcome) {
+		case "revealed":
+			return ok(c, { key: read.key });
+		case "sealed":
+			throw new GatewayError({
+				class: "permission",
+				message:
+					"Copying keys is sealed on this gateway (VIRTUAL_KEY_SECRET_ACCESS=sealed). Stored keys stay encrypted at rest; no credential can copy one until the deployment opens access.",
+				code: "virtual_key_secret_sealed",
+			});
+		case "not_found":
+			throw new GatewayError({
+				class: "not_found",
+				message: `Virtual key "${id}" does not exist`,
+			});
+		case "private":
+			throw new GatewayError({
+				class: "bad_request",
+				status: 409,
+				message: `Virtual key "${id}" is private: its secret was shown once and never stored. Rotate it to issue a new one.`,
+				code: "virtual_key_private",
+			});
+		case "unreadable":
+			throw new GatewayError({
+				class: "not_found",
+				status: 409,
+				message: `The stored secret of virtual key "${id}" cannot be read with this gateway's keyring. The key still works; rotate it to store a new one.`,
+				code: "virtual_key_secret_unreadable",
+			});
+		default:
+			return read satisfies never;
+	}
+});
+
+adminApp.post("/keys/:id/rotate", async (c) => {
+	const existing = await requireKey(c.req.param("id"));
+	// The body is optional: a bare POST keeps the key exactly as private as it was.
+	const input =
+		c.req.raw.body === null || c.req.header("content-length") === "0"
+			? {}
+			: await parseJsonBody(c, rotateKeySchema);
+	const rotated = await rotateVirtualKey(
+		existing.id,
+		input.private === undefined ? {} : { private: input.private },
+	);
+	if (!rotated) {
+		throw new GatewayError({
+			class: "not_found",
+			message: `Virtual key "${existing.id}" does not exist`,
+		});
+	}
+	// The old key stops authenticating now, not when its cache entry would have expired. Realtime
+	// client secrets minted from it are bound to its hash, so they stop with it.
+	await invalidateVirtualKey(rotated.previousHash);
+	return ok(c, { ...publicKey(rotated.row), key: rotated.rawKey });
+});
+
+adminApp.patch("/keys/:id", async (c) => {
+	const existing = await requireKey(c.req.param("id"));
+	const input = await parseJsonBody(c, updateKeySchema);
+	let row = await updateVirtualKey(existing.id, {
+		...(input.name === undefined ? {} : { name: input.name }),
+		...(input.allowedModels === undefined
+			? {}
+			: { allowedModels: input.allowedModels }),
+		...(input.maxBudgetCents === undefined
+			? {}
+			: { maxBudgetCents: input.maxBudgetCents }),
+		...(input.budgetReset === undefined
+			? {}
+			: { budgetReset: input.budgetReset }),
+		...(input.tpm === undefined ? {} : { tpm: input.tpm }),
+		...(input.rpm === undefined ? {} : { rpm: input.rpm }),
+		...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+		...(input.expiresAt === undefined
+			? {}
+			: {
+					expiresAt:
+						input.expiresAt === null ? null : new Date(input.expiresAt),
+				}),
+		...(input.private ? { private: true } : {}),
+	});
+	await invalidateVirtualKey(existing.keyHash);
+	if (input.resetSpend) {
+		await resetVirtualKeySpend(
+			existing.id,
+			row?.budgetReset ?? existing.budgetReset,
+		);
+		await clearVirtualKeyBudget(existing.id);
+		row = await getVirtualKeyById(existing.id);
+	}
+	return ok(c, publicKey(writtenRow(row, "virtual key update")));
+});
+
+adminApp.delete("/keys/:id", async (c) => {
+	const row = await getVirtualKeyById(c.req.param("id"));
+	if (row) {
+		await deleteVirtualKey(row.id);
+		await invalidateVirtualKey(row.keyHash);
+	}
+	return c.body(null, 204);
+});
+
+/* --------------------------------------------------------------- cache */
+
+adminApp.delete("/cache", async (c) => {
+	const callType = c.req.query("callType");
+	const namespace = c.req.query("namespace");
+	const deleted = await invalidateResponseCache({
+		...(callType === undefined ? {} : { callType }),
+		...(namespace === undefined ? {} : { namespace }),
+	});
+	return ok(c, { deleted });
+});
+
+/* ----------------------------------------------------------- extensions */
+
+const EXTENSION_KEY = /^[a-z0-9]+$/u;
+const INSTANCE_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/u;
+
+const uploadArtifactSchema = z.object({
+	key: z.string().regex(EXTENSION_KEY, "key must match ^[a-z0-9]+$"),
+	code: z.string().min(1),
+});
+
+const activateArtifactSchema = z.object({ version: z.int().positive() });
+
+const createInstanceSchema = z.object({
+	id: z.string().regex(INSTANCE_ID),
+	definition: z.string().regex(EXTENSION_KEY),
+	enabled: z.boolean().optional(),
+	critical: z.boolean().nullable().optional(),
+	priority: z.int().optional(),
+	match: z.record(z.string(), z.unknown()).optional(),
+	config: z.unknown().optional(),
+});
+
+const updateInstanceSchema = z.object({
+	definition: z.string().regex(EXTENSION_KEY).optional(),
+	enabled: z.boolean().optional(),
+	critical: z.boolean().nullable().optional(),
+	priority: z.int().optional(),
+	match: z.record(z.string(), z.unknown()).optional(),
+	config: z.unknown().optional(),
+});
+
+/** Bumps the registry (so other replicas reload) and reloads this process immediately. */
+async function refreshExtensions(): Promise<void> {
+	await bumpRegistryVersion();
+	await reloadExtensions();
+}
+
+// Live runtime status of THIS process (loaded definitions, instances, breaker state).
+adminApp.get("/extensions", (c) => ok(c, extensionStatus()));
+
+/* ---- artifacts (versioned extension code) ---- */
+
+adminApp.get("/extensions/artifacts", async (c) =>
+	ok(c, await listArtifactSummaries()),
+);
+
+adminApp.get("/extensions/artifacts/:key/versions", async (c) =>
+	ok(c, await listArtifactVersionsForKey(c.req.param("key"))),
+);
+
+adminApp.post("/extensions/artifacts", async (c) => {
+	const input = await parseJsonBody(c, uploadArtifactSchema);
+	const size = Buffer.byteLength(input.code, "utf8");
+	if (size > env.EXTENSIONS_MAX_CODE_BYTES) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: `Extension code is ${size} bytes; limit is ${env.EXTENSIONS_MAX_CODE_BYTES}`,
+		});
+	}
+	let probe: Awaited<ReturnType<typeof probeArtifact>>;
+	try {
+		probe = await probeArtifact(input.key, input.code);
+	} catch (err) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: `Invalid extension module: ${err instanceof Error ? err.message : String(err)}`,
+			cause: err,
+		});
+	}
+	const summary = await insertActiveArtifact({
+		key: input.key,
+		code: input.code,
+		contentHash: probe.contentHash,
+		sizeBytes: probe.sizeBytes,
+		uploadedBy: actorOf(getAuth(c)),
+	});
+	await refreshExtensions();
+	return ok(c, summary, 201);
+});
+
+adminApp.post("/extensions/artifacts/:key/activate", async (c) => {
+	const key = c.req.param("key");
+	const { version } = await parseJsonBody(c, activateArtifactSchema);
+	const activated = await activateArtifactVersion(key, version);
+	if (!activated) {
+		throw new GatewayError({
+			class: "not_found",
+			message: `Extension artifact "${key}" v${version} does not exist`,
+		});
+	}
+	await refreshExtensions();
+	return ok(c, await listArtifactVersionsForKey(key));
+});
+
+adminApp.delete("/extensions/artifacts/:key", async (c) => {
+	const removed = await deleteArtifactKey(c.req.param("key"));
+	if (removed > 0) {
+		await refreshExtensions();
+	}
+	return c.body(null, 204);
+});
+
+/* ---- instances (definition bindings) ---- */
+
+adminApp.get("/extensions/instances", async (c) =>
+	ok(c, await listInstances()),
+);
+
+adminApp.post("/extensions/instances", async (c) => {
+	const input = await parseJsonBody(c, createInstanceSchema);
+	if (await getInstanceById(input.id)) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: `Extension instance "${input.id}" already exists`,
+		});
+	}
+	const row = await insertInstance({
+		id: input.id,
+		definitionKey: input.definition,
+		...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+		...(input.critical === undefined ? {} : { critical: input.critical }),
+		...(input.priority === undefined ? {} : { priority: input.priority }),
+		...(input.match === undefined ? {} : { match: input.match }),
+		...(input.config === undefined ? {} : { config: input.config }),
+	});
+	await refreshExtensions();
+	return ok(c, row, 201);
+});
+
+adminApp.patch("/extensions/instances/:id", async (c) => {
+	const id = c.req.param("id");
+	if (!(await getInstanceById(id))) {
+		throw new GatewayError({
+			class: "not_found",
+			message: `Extension instance "${id}" does not exist`,
+		});
+	}
+	const input = await parseJsonBody(c, updateInstanceSchema);
+	const row = await updateInstance(id, {
+		...(input.definition === undefined
+			? {}
+			: { definitionKey: input.definition }),
+		...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+		...(input.critical === undefined ? {} : { critical: input.critical }),
+		...(input.priority === undefined ? {} : { priority: input.priority }),
+		...(input.match === undefined ? {} : { match: input.match }),
+		...(input.config === undefined ? {} : { config: input.config }),
+	});
+	await refreshExtensions();
+	return ok(c, writtenRow(row, "extension instance update"));
+});
+
+adminApp.delete("/extensions/instances/:id", async (c) => {
+	const deleted = await deleteInstance(c.req.param("id"));
+	if (deleted) {
+		await refreshExtensions();
+	}
+	return c.body(null, 204);
+});
+
+// Clears a circuit-breaker trip and re-activates the instance for this process.
+adminApp.post("/extensions/:id/reset", (c) => {
+	const id = c.req.param("id");
+	const result = resetExtensionInstance(id);
+	if (!result.found) {
+		throw new GatewayError({
+			class: "not_found",
+			message: `Extension instance "${id}" does not exist`,
+		});
+	}
+	if (!result.reset) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: `Extension instance "${id}" cannot be reset: ${result.reason ?? "not eligible"}`,
+		});
+	}
+	return ok(c, extensionStatus());
+});
+
+/* --------------------------------------------------------- audit trail */
+
+/**
+ * The trail has been written since the audit middleware was added; this is the first way to read it.
+ * Both tables are append-only and there is deliberately no write route: an audit record an operator
+ * can edit is not an audit record.
+ */
+adminApp.get("/audit", async (c) => {
+	const { limit, offset } = parsePage(c);
+	const kind = c.req.query("kind");
+	if (kind !== undefined && kind !== "admin" && kind !== "payload_access") {
+		throw new GatewayError({
+			class: "bad_request",
+			message: `Invalid audit kind "${kind}". Allowed: admin, payload_access`,
+			param: "kind",
+		});
+	}
+	const start = parseDateQuery(c, "start");
+	const end = parseDateQuery(c, "end");
+	const { rows, total } = await listAuditPage({
+		limit,
+		offset,
+		...(kind ? { kind } : {}),
+		...queryPatch(c, "actor"),
+		...queryPatch(c, "action"),
+		...queryPatch(c, "targetType"),
+		...(start ? { start } : {}),
+		...(end ? { end } : {}),
+	});
+	return paginated(c, rows, {
+		limit,
+		offset,
+		total,
+		nextOffset: offset + limit < total ? offset + limit : null,
+	});
+});
+
+/* --------------------------------------------------------- logs / usage */
+
+const USAGE_GROUP_BY = [
+	"public_model",
+	"virtual_key",
+	"actor",
+	"hour",
+	"day",
+	"none",
+] as const;
+type OperationUsageGroupBy = (typeof USAGE_GROUP_BY)[number];
+
+adminApp.get("/logs", async (c) => {
+	const { limit, offset } = parsePage(c);
+	const filter = parseLogFilter(c);
+	const { rows, total } = await listOperationsPage({
+		limit,
+		offset,
+		...filter,
+	});
+	return paginated(c, rows, {
+		limit,
+		offset,
+		total,
+		nextOffset: offset + limit < total ? offset + limit : null,
+	});
+});
+
+adminApp.get("/logs/:id/payload", async (c) => {
+	const id = c.req.param("id");
+	const read = await getPayloadSample(id, {
+		requestId: getRequestId(c),
+		actor: actorOf(getAuth(c)),
+	});
+	// The admin error handler republishes `message` to the operator, so each branch carries its whole
+	// explanation; a separate publicMessage would be dropped.
+	switch (read.outcome) {
+		case "revealed":
+			return ok(c, read.payload);
+		case "sealed":
+			// A 403 no role can lift: the gateway reads no payload for any credential until
+			// OBSERVABILITY_PAYLOAD_ACCESS is changed and the process restarted.
+			throw new GatewayError({
+				class: "permission",
+				message:
+					"Retained payloads are sealed on this gateway (OBSERVABILITY_PAYLOAD_ACCESS=sealed). Samples are still captured and encrypted at rest; no credential can read one until the deployment opens access.",
+				code: "payload_access_sealed",
+			});
+		case "unreadable":
+			// A sample outlives the key that sealed it: after a keyring rotation that retired the
+			// active id, or when a database is carried between environments. That is an ordinary
+			// operational state, not a crash, and the operator needs to be told which of the two they
+			// are looking at rather than receiving an unhandled 500.
+			throw new GatewayError({
+				class: "not_found",
+				status: 409,
+				message: `Payload sample for operation "${id}" was encrypted with a key this gateway no longer has. Its metadata is still readable.`,
+				code: "payload_sample_unreadable",
+			});
+		default:
+			throw new GatewayError({
+				class: "not_found",
+				message: "No retained payload sample exists for this operation",
+				code: "payload_sample_not_found",
+			});
+	}
+});
+
+adminApp.get("/logs/:id", async (c) => {
+	const detail = await getOperationDetail(c.req.param("id"));
+	if (detail === null) {
+		throw new GatewayError({
+			class: "not_found",
+			message: "Gateway operation not found",
+			code: "operation_not_found",
+		});
+	}
+	// `readable` is the question the caller actually has - is there a payload I can open right now -
+	// and it is answered here rather than left to the client to infer from a gateway-wide setting.
+	const access = payloadAccessIsOpen() ? "open" : "sealed";
+	return ok(c, {
+		...detail,
+		payload: {
+			...detail.payload,
+			access,
+			readable: detail.payload.retained && access === "open",
+		},
+	});
+});
+
+const SUMMARY_WINDOWS: Record<string, number> = {
+	"5m": 5 * 60_000,
+	"1h": 60 * 60_000,
+	"24h": 24 * 60 * 60_000,
+};
+const SUMMARY_MAX_RANGE_MS = 31 * 86_400_000;
+
+/**
+ * The window to summarize: either a trailing shortcut (`window`) or an explicit `start`/`end`.
+ *
+ * The shortcuts stay because "how is the gateway doing right now" is the question this endpoint was
+ * built for, and a poller should not have to compute timestamps to ask it. An explicit range is what
+ * a dashboard needs to show a day, a week, or a closed yesterday — capped at the same 31 days as
+ * /observability/metrics, since both read the same operation rows.
+ */
+function summaryWindow(c: Context<AppEnv>): { since: Date; until?: Date } {
+	const start = c.req.query("start");
+	const end = c.req.query("end");
+	if (start === undefined && end === undefined) {
+		const raw = c.req.query("window") ?? "1h";
+		const duration = SUMMARY_WINDOWS[raw];
+		if (duration === undefined) {
+			throw new GatewayError({
+				class: "bad_request",
+				message:
+					'window must be one of "5m", "1h", or "24h" — or pass an explicit start and end',
+				code: "invalid_observability_window",
+			});
+		}
+		return { since: new Date(Date.now() - duration) };
+	}
+	const since = start === undefined ? Number.NaN : Date.parse(start);
+	const until = end === undefined ? Date.now() : Date.parse(end);
+	if (!(Number.isFinite(since) && Number.isFinite(until))) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: "start and end must be ISO-8601 timestamps",
+			code: "invalid_observability_window",
+		});
+	}
+	if (until <= since || until - since > SUMMARY_MAX_RANGE_MS) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: "Choose an increasing time range of at most 31 days",
+			code: "invalid_observability_window",
+		});
+	}
+	return { since: new Date(since), until: new Date(until) };
+}
+
+adminApp.get("/observability/summary", async (c) => {
+	const { since, until } = summaryWindow(c);
+	const summary = await operationSummary(since, until);
+	const persistence = operationPersistenceStatus();
+	const requests = Number(summary.totals.requests);
+	const rate = (value: number) => (requests > 0 ? value / requests : 0);
+	return ok(c, {
+		...summary,
+		persistence,
+		alerts: {
+			unverifiedTerminal: Number(summary.totals.unverifiedTerminalOutcomes) > 0,
+			abandonedOrPersistenceLoss:
+				Number(summary.totals.abandoned) > 0 ||
+				persistence.failureTotal > 0 ||
+				persistence.dropTotal > 0,
+			stalls: requests >= 20 && rate(Number(summary.totals.stalls)) > 0.02,
+			degraded: requests > 0 && rate(Number(summary.totals.degraded)) > 0.05,
+			firstOutputP95: Number(summary.totals.p95FirstOutputMs ?? 0) > 25_000,
+			protocolErrors:
+				requests > 0 && rate(Number(summary.totals.protocolErrors)) > 0.01,
+			clientCancellation:
+				requests > 0 && rate(Number(summary.totals.cancelled)) > 0.05,
+		},
+	});
+});
+
+adminApp.get("/observability/metrics", async (c) => {
+	const parsed = metricsQuery.safeParse(c.req.query());
+	if (!parsed.success) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: parsed.error.issues[0]?.message ?? "Invalid metrics query",
+			code: "invalid_metrics_query",
+		});
+	}
+	return ok(c, await aggregateMetrics(parsed.data));
+});
+
+adminApp.get("/usage", async (c) => {
+	const groupByRaw = c.req.query("groupBy") ?? "none";
+	if (!USAGE_GROUP_BY.includes(groupByRaw as OperationUsageGroupBy)) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: `Invalid groupBy "${groupByRaw}". Allowed: ${USAGE_GROUP_BY.join(", ")}`,
+			param: "groupBy",
+		});
+	}
+	const rows = await aggregateOperationUsage({
+		groupBy: groupByRaw as OperationUsageGroupBy,
+		...parseLogFilter(c),
+	});
+	return ok(c, rows);
+});
+
+/* --------------------------------------------------------- router settings */
+
+const executionPolicySchema = z
+	.object({
+		responseMs: z.int().positive().max(EXECUTION_POLICY_MAX_TOTAL_MS),
+		idleMs: z.int().positive().max(EXECUTION_POLICY_MAX_TOTAL_MS).nullable(),
+		totalMs: z.int().positive().max(EXECUTION_POLICY_MAX_TOTAL_MS),
+		maxAttempts: z.int().min(1).max(20),
+	})
+	.strict()
+	.refine(
+		(policy) =>
+			policy.responseMs <= policy.totalMs &&
+			(policy.idleMs === null || policy.idleMs <= policy.totalMs),
+		{ message: "responseMs and idleMs must not exceed totalMs" },
+	);
+
+const routerSettingsSchema = z
+	.object({
+		executionPolicies: z.record(
+			z.enum([
+				"chat",
+				"images.generations",
+				"images.edits",
+				"videos.generations",
+				"audio.transcriptions",
+				"realtime.transcription",
+				"realtime.conversation",
+				"embeddings",
+				"rerank",
+			]),
+			z.object({
+				json: executionPolicySchema,
+				stream: executionPolicySchema,
+			}),
+		),
+		routingStrategy: z.enum([
+			"simple-shuffle",
+			"least-busy",
+			"usage-based-tpm",
+			"usage-based-rpm",
+			"latency-based",
+			"throughput-based",
+			"price-based",
+			"health-aware",
+		]),
+		unsupportedParameterStrategy: z.enum(["drop", "error", "allow"]),
+		allowedFails: z.int().min(0),
+		/** Per-error-class override of `allowedFails`, keyed by the gateway's canonical error class. */
+		// partialRecord, not record: a record keyed by an enum is EXHAUSTIVE in Zod 4, so `record` here
+		// demanded a budget for all nine classes and rejected every realistic patch.
+		allowedFailsByClass: z.partialRecord(
+			z.enum([
+				"bad_request",
+				"auth",
+				"permission",
+				"not_found",
+				"rate_limit",
+				"context_window",
+				"content_policy",
+				"timeout",
+				"server",
+			]),
+			z.int().min(0),
+		),
+		failureRatePercent: z.number().gt(0).max(1),
+		minWindowRequests: z.int().min(1),
+		protectLastDeployment: z.boolean(),
+		cooldownSeconds: z.int().min(0),
+		failureWindowSeconds: z.int().min(1),
+		maxCooldownSeconds: z.int().min(1),
+		halfOpenProbeSeconds: z.int().min(1),
+		configurationCooldownSeconds: z.int().min(1),
+		throttleCooldownSeconds: z.int().min(1),
+		retryAfterSeconds: z.int().min(0),
+	})
+	.partial()
+	.strict();
+
+adminApp.get("/router-settings", async (c) => {
+	const settings = await getRouterSettings();
+	return ok(c, settings ? routerSettingsView(settings) : null);
+});
+
+adminApp.put("/router-settings", async (c) => {
+	const patch = await parseJsonBody(c, routerSettingsSchema);
+	const updated = await updateRouterSettings(patch);
+	invalidateRouterSettingsCache();
+	return ok(c, routerSettingsView(updated));
+});
+
+/* ------------------------------------------------------ dashboard settings */
+
+/**
+ * Operator-session policy. Bounded here rather than only by the database checks so a mistake comes
+ * back as a validation error naming the field, not as a constraint violation.
+ */
+const dashboardSettingsSchema = z
+	.object({
+		sessionTtlMinutes: z.coerce.number().int().min(5).max(43_200),
+		sessionIdleMinutes: z.coerce.number().int().min(1).max(43_200),
+		loginMaxAttempts: z.coerce.number().int().min(1).max(100),
+		loginLockoutMinutes: z.coerce.number().int().min(1).max(1440),
+	})
+	.partial()
+	.refine((patch) => Object.keys(patch).length > 0, "No settings to update");
+
+adminApp.get("/dashboard-settings", async (c) =>
+	ok(c, await getDashboardSettings()),
+);
+
+adminApp.put("/dashboard-settings", async (c) => {
+	const patch = await parseJsonBody(c, dashboardSettingsSchema);
+	return ok(c, await updateDashboardSettings(patch));
+});
+
+/* --------------------------------------------------------------- fallbacks */
+
+const fallbackSchema = z.object({
+	primaryModel: z.string().min(1),
+	fallbackModels: z.array(z.string().min(1)).min(1).max(5),
+	reason: z.enum(["general", "context_window", "content_policy"]).optional(),
+});
+
+adminApp.get("/fallbacks", async (c) => ok(c, await listFallbackPolicies()));
+
+adminApp.put("/fallbacks", async (c) => {
+	const input = await parseJsonBody(c, fallbackSchema);
+	return ok(
+		c,
+		await configureFallback({
+			primaryModel: input.primaryModel,
+			fallbackModels: input.fallbackModels,
+			...(input.reason === undefined ? {} : { reason: input.reason }),
+		}),
+		201,
+	);
+});
+
+adminApp.delete("/fallbacks/:primaryModel/:reason", async (c) => {
+	const reason = c.req.param("reason");
+	if (
+		reason !== "general" &&
+		reason !== "context_window" &&
+		reason !== "content_policy"
+	) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: "Invalid fallback reason",
+		});
+	}
+	await deleteFallbackPolicy(c.req.param("primaryModel"), reason);
+	return c.body(null, 204);
+});

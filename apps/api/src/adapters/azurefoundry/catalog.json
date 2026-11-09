@@ -1,0 +1,615 @@
+{
+	"$schema": "../../../schemas/model-catalog.schema.json",
+	"schemaVersion": 1,
+	"provider": {
+		"id": "azurefoundry",
+		"adapterKey": "azurefoundry",
+		"name": "Azure AI Foundry",
+		"docs": [
+			"https://learn.microsoft.com/azure/ai-foundry/foundry-models/concepts/models"
+		]
+	},
+	"models": {
+		"Cohere-command-a-plus-05-2026": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"reasoning": {
+						"kind": "fixed",
+						"levels": ["high"]
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 64000
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 80,
+				"outputCentsPerMTokens": 320
+			},
+			"deprecated": true,
+			"notes": "Microsoft retired Cohere-command-a-plus-05-2026 (preview) in Foundry on 2026-10-16; the replacements are Hugging Face collection models for managed compute, not serverless."
+		},
+		"Cohere-command-a": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 131072,
+					"maxOutputTokens": 8182
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 250,
+				"outputCentsPerMTokens": 1000
+			},
+			"deprecated": true,
+			"notes": "Microsoft lists Cohere-command-a for retirement on 2027-02-15 in its model retirement schedule, with no replacement listed."
+		},
+		"DeepSeek-V4-Pro": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "high", "max"]
+					},
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 384000
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 174,
+				"outputCentsPerMTokens": 348,
+				"cacheReadCentsPerMTokens": 14.5
+			}
+		},
+		"DeepSeek-V4.1-Flash": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "high", "max"]
+					},
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 384000
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 30,
+				"outputCentsPerMTokens": 120,
+				"cacheReadCentsPerMTokens": 0.6
+			}
+		},
+		"DeepSeek-V4-Flash": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "high", "max"]
+					},
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 384000
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 19,
+				"outputCentsPerMTokens": 51,
+				"cacheReadCentsPerMTokens": 2.8
+			}
+		},
+		"DeepSeek-V4-Flash-0731": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "high", "max"]
+					},
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 384000
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 44,
+				"outputCentsPerMTokens": 132,
+				"cacheReadCentsPerMTokens": 1.4
+			},
+			"deprecated": true,
+			"notes": "Microsoft lists DeepSeek-V4-Flash-0731 for retirement on 2026-12-03 in its model retirement schedule, with no replacement listed."
+		},
+		"DeepSeek-V3.2-Speciale": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 128000
+				}
+			}
+		},
+		"DeepSeek-V3.2": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 128000
+				}
+			}
+		},
+		"DeepSeek-V3.1": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 131072,
+					"maxOutputTokens": 131072
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 123,
+				"outputCentsPerMTokens": 494
+			},
+			"deprecated": true,
+			"notes": "Microsoft retired DeepSeek-V3.1 in Foundry on 2026-07-13 (replacement: DeepSeek-V4-Flash)."
+		},
+		"DeepSeek-R1-0528": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 163840,
+					"maxOutputTokens": 163840
+				}
+			},
+			"deprecated": true,
+			"notes": "Microsoft retired DeepSeek-R1-0528 in Foundry on 2026-07-13 (replacement: DeepSeek-V4-Pro)."
+		},
+		"DeepSeek-V3-0324": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 131072,
+					"maxOutputTokens": 131072
+				}
+			},
+			"deprecated": true,
+			"notes": "Microsoft retired DeepSeek-V3-0324 in Foundry on 2026-07-13 (replacement: DeepSeek-V4-Flash)."
+		},
+		"DeepSeek-R1": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 163840,
+					"maxOutputTokens": 163840
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 135,
+				"outputCentsPerMTokens": 540
+			},
+			"deprecated": true,
+			"notes": "Microsoft retired DeepSeek-R1 in Foundry on 2026-08-13 (replacement: DeepSeek-V4-Pro)."
+		},
+		"Llama-4-Maverick-17B-128E-Instruct-FP8": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 1000000
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 25,
+				"outputCentsPerMTokens": 100
+			},
+			"deprecated": true,
+			"notes": "Microsoft lists Llama-4-Maverick-17B-128E-Instruct-FP8 for retirement on 2026-11-19 in its partner models table, with no replacement listed."
+		},
+		"Llama-3.3-70B-Instruct": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 8192
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 71,
+				"outputCentsPerMTokens": 71
+			},
+			"deprecated": true,
+			"notes": "Microsoft lists Llama-3.3-70B-Instruct for retirement on 2027-01-31 in its model retirement schedule, with no replacement listed."
+		},
+		"Mistral-Large-3": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": false
+					}
+				}
+			}
+		},
+		"mistral-medium-3-5": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 128000
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 150,
+				"outputCentsPerMTokens": 750
+			}
+		},
+		"Kimi-K3.1-Pro": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"reasoning": {
+						"kind": "fixed",
+						"levels": ["high"]
+					},
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 262144
+				}
+			},
+			"notes": "Unpriced: the Azure Retail Prices API has no Kimi-K3.1-Pro meter yet."
+		},
+		"Kimi-K2.7-Code": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"reasoning": {
+						"kind": "fixed",
+						"levels": ["high"]
+					},
+					"maxInputTokens": 262144,
+					"maxOutputTokens": 262144
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 95,
+				"outputCentsPerMTokens": 400,
+				"cacheReadCentsPerMTokens": 19
+			}
+		},
+		"Kimi-K2.6": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"reasoning": {
+						"kind": "fixed",
+						"levels": ["high"]
+					},
+					"maxInputTokens": 262144,
+					"maxOutputTokens": 262144
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 95,
+				"outputCentsPerMTokens": 400,
+				"cacheReadCentsPerMTokens": 16
+			}
+		},
+		"Kimi-K2.5": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"reasoning": {
+						"kind": "fixed",
+						"levels": ["high"]
+					},
+					"maxInputTokens": 262144,
+					"maxOutputTokens": 262144
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 60,
+				"outputCentsPerMTokens": 300,
+				"cacheReadCentsPerMTokens": 10
+			},
+			"deprecated": true,
+			"notes": "Microsoft lists Kimi-K2.5 for retirement on 2027-01-26 in its model retirement schedule, with no replacement listed."
+		},
+		"grok-4.7": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high", "xhigh"]
+					},
+					"maxInputTokens": 500000,
+					"maxOutputTokens": 500000,
+					"parameters": {
+						"presence_penalty": false,
+						"frequency_penalty": false,
+						"stop": false
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 600,
+				"cacheReadCentsPerMTokens": 50,
+				"tiers": [
+					{
+						"aboveInputTokens": 199999,
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 1200,
+						"cacheReadCentsPerMTokens": 100
+					}
+				]
+			}
+		},
+		"grok-4.6": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high", "xhigh"]
+					},
+					"maxInputTokens": 200000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"presence_penalty": false,
+						"frequency_penalty": false,
+						"stop": false
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 600,
+				"cacheReadCentsPerMTokens": 50,
+				"tiers": [
+					{
+						"aboveInputTokens": 199999,
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 1200,
+						"cacheReadCentsPerMTokens": 100
+					}
+				]
+			}
+		},
+		"grok-4.3": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 200000,
+					"maxOutputTokens": 8192
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 125,
+				"outputCentsPerMTokens": 250,
+				"cacheReadCentsPerMTokens": 20,
+				"tiers": [
+					{
+						"aboveInputTokens": 199999,
+						"inputCentsPerMTokens": 250,
+						"outputCentsPerMTokens": 500,
+						"cacheReadCentsPerMTokens": 40
+					}
+				]
+			}
+		},
+		"grok-4-20-reasoning": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 262000,
+					"maxOutputTokens": 8192
+				}
+			}
+		},
+		"grok-4-20-non-reasoning": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 262000,
+					"maxOutputTokens": 8192
+				}
+			}
+		},
+		"grok-4.1-fast-reasoning": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 128000
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 20,
+				"outputCentsPerMTokens": 50
+			}
+		},
+		"grok-4.1-fast-non-reasoning": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 128000
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 20,
+				"outputCentsPerMTokens": 50
+			}
+		},
+		"grok-4": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 262000,
+					"maxOutputTokens": 8192
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 300,
+				"outputCentsPerMTokens": 1500
+			},
+			"deprecated": true,
+			"notes": "Microsoft lists grok-4 for retirement on 2027-01-31 in its model retirement schedule, with no replacement listed."
+		},
+		"grok-code-fast-1": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 256000,
+					"maxOutputTokens": 8192
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 20,
+				"outputCentsPerMTokens": 150
+			},
+			"deprecated": true,
+			"notes": "Microsoft lists grok-code-fast-1 for retirement on 2027-01-31 in its model retirement schedule, with no replacement listed."
+		}
+	}
+}

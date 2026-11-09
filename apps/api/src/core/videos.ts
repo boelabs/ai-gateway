@@ -1,0 +1,286 @@
+import type { Quality, QualityLevel } from "./quality.ts";
+import type { Usage } from "./usage.ts";
+
+export type VideoStatus = "queued" | "in_progress" | "completed" | "failed";
+export type VideoAssetVariant = "video" | "thumbnail" | "spritesheet";
+/** The canonical ladder (see ./quality.ts), shared with image generation. */
+export type VideoQuality = Quality;
+
+export const VIDEO_TASKS = [
+	"text_to_video",
+	"image_to_video",
+	"reference_to_video",
+	"edit",
+	"extend",
+] as const;
+export type VideoTask = (typeof VIDEO_TASKS)[number];
+
+export const VIDEO_ASPECT_RATIOS = [
+	"16:9",
+	"9:16",
+	"1:1",
+	"4:3",
+	"3:4",
+	"3:2",
+	"2:3",
+	"21:9",
+	"9:21",
+] as const;
+export type VideoAspectRatio = (typeof VIDEO_ASPECT_RATIOS)[number];
+
+export const VIDEO_RESOLUTIONS = [
+	"360p",
+	"480p",
+	"720p",
+	"1080p",
+	"1K",
+	"2K",
+	"4K",
+] as const;
+export type VideoResolution = (typeof VIDEO_RESOLUTIONS)[number];
+
+export type VideoUrlReferenceType = "image_url" | "audio_url" | "video_url";
+
+export interface VideoUrlReference {
+	type: VideoUrlReferenceType;
+	url: string;
+}
+
+export interface VideoFileReference {
+	type: "file_id";
+	fileId: string;
+}
+
+export type VideoInputReference = VideoUrlReference | VideoFileReference;
+
+export interface VideoFrameImage {
+	frame: "first" | "last";
+	url: string;
+}
+
+export interface CanonicalVideoRequest {
+	model: string;
+	prompt: string;
+	/** Explicit generation intent when a model exposes multiple video workflows. */
+	task?: VideoTask;
+	/** Guiding assets. Image references are broadly supported; audio/video only by some providers. */
+	inputReferences?: VideoInputReference[];
+	/** First/last frame images for providers that support frame conditioning. */
+	frameImages?: VideoFrameImage[];
+	/** Duration as a seconds string ("8"). Fed by either `seconds` or `duration` on the wire. */
+	seconds?: string;
+	/** Exact pixel dimensions, WIDTHxHEIGHT. Interchangeable with aspectRatio + resolution. */
+	size?: string;
+	aspectRatio?: VideoAspectRatio;
+	resolution?: VideoResolution;
+	seed?: number;
+	generateAudio?: boolean;
+	quality?: VideoQuality;
+	/** Gateway-side attribution only. Never forwarded upstream. */
+	user?: string;
+	extraBody?: Record<string, unknown>;
+}
+
+export interface VideoSizeMapping {
+	/** Native exact size when the provider accepts WIDTHxHEIGHT. */
+	size?: string;
+	/** Native aspect-ratio value, e.g. 16:9. */
+	aspectRatio?: string;
+	/** Native resolution value, e.g. 720p or 1080p. */
+	resolution?: string;
+	/** Output tokens the provider bills per second of video at this size; bounds budget reservations. */
+	outputTokensPerSecond?: number;
+}
+
+export interface VideoModelProfile {
+	maxPromptChars?: number;
+	/** Explicit video workflows accepted by this model. Omission means `task` is unsupported. */
+	tasks?: VideoTask[];
+	/** Accepted public durations, represented as seconds strings. */
+	durations?: string[];
+	/** The rungs this model exposes. Absent means it has no quality knob at all. */
+	qualities?: QualityLevel[];
+	sizes?: Record<string, VideoSizeMapping>;
+	supportsImageUrl?: boolean;
+	supportsAudioUrl?: boolean;
+	supportsVideoUrl?: boolean;
+	supportsFileId?: boolean;
+	supportsFrameImages?: boolean;
+	supportsSeed?: boolean;
+	supportsGenerateAudio?: boolean;
+	maxInputReferences?: number;
+	/** Variants the provider/gateway can serve without fabricating assets. */
+	contentVariants?: VideoAssetVariant[];
+	/** How often the gateway should poll an unfinished job for this model. */
+	pollIntervalSeconds?: number;
+}
+
+/** The provider-facing dimensions resolved from `size` or `aspectRatio`/`resolution` via the profile. */
+export interface ResolvedVideoSize {
+	/** Exact WIDTHxHEIGHT for providers that take pixel dimensions. */
+	size?: string;
+	aspectRatio?: string;
+	resolution?: string;
+}
+
+/**
+ * Resolves the requested dimensions against the profile's size table. `size` keys the table
+ * directly; `aspectRatio`/`resolution` reverse-match a table entry so exact-size providers still
+ * get WIDTHxHEIGHT. Returns undefined when nothing was requested.
+ */
+export function resolveVideoSize(
+	req: Pick<CanonicalVideoRequest, "size" | "aspectRatio" | "resolution">,
+	profile: VideoModelProfile | undefined,
+): ResolvedVideoSize | undefined {
+	if (req.size) {
+		const mapping = profile?.sizes?.[req.size];
+		return {
+			size: mapping?.size ?? req.size,
+			...(mapping?.aspectRatio ? { aspectRatio: mapping.aspectRatio } : {}),
+			...(mapping?.resolution ? { resolution: mapping.resolution } : {}),
+		};
+	}
+	if (!(req.aspectRatio || req.resolution)) {
+		return undefined;
+	}
+	const requestedResolution = req.resolution?.toLowerCase();
+	const match = Object.entries(profile?.sizes ?? {}).find(
+		([, candidate]) =>
+			(!req.aspectRatio || candidate.aspectRatio === req.aspectRatio) &&
+			(!requestedResolution ||
+				candidate.resolution?.toLowerCase() === requestedResolution),
+	);
+	if (!match) {
+		return {
+			...(req.aspectRatio ? { aspectRatio: req.aspectRatio } : {}),
+			...(req.resolution ? { resolution: req.resolution } : {}),
+		};
+	}
+	const [key, mapping] = match;
+	const aspectRatio = req.aspectRatio ?? mapping.aspectRatio;
+	const resolution = mapping.resolution ?? req.resolution;
+	return {
+		size: mapping.size ?? key,
+		...(aspectRatio === undefined ? {} : { aspectRatio }),
+		...(resolution === undefined ? {} : { resolution }),
+	};
+}
+
+/**
+ * Conservative upper bound of video output tokens for a request or job, from the profile's
+ * `outputTokensPerSecond`. An unspecified size uses the densest size; unspecified seconds use the
+ * longest duration the profile lists. `undefined` when the profile declares no rates.
+ */
+export function videoOutputTokenBound(
+	profile: VideoModelProfile | undefined,
+	request: { seconds?: string | null; size?: string | null },
+): number | undefined {
+	const rates = Object.entries(profile?.sizes ?? {}).flatMap(
+		([key, mapping]) =>
+			mapping.outputTokensPerSecond === undefined
+				? []
+				: [{ key, mapping, rate: mapping.outputTokensPerSecond }],
+	);
+	if (rates.length === 0) {
+		return undefined;
+	}
+	const requested = request.size
+		? rates.find(
+				({ key, mapping }) =>
+					key === request.size || mapping.size === request.size,
+			)
+		: undefined;
+	const rate = requested?.rate ?? Math.max(...rates.map((entry) => entry.rate));
+	const listed = (profile?.durations ?? [])
+		.map(Number)
+		.filter((value) => Number.isFinite(value) && value > 0);
+	const requestedSeconds = Number(request.seconds);
+	let seconds: number | undefined;
+	if (Number.isFinite(requestedSeconds) && requestedSeconds > 0) {
+		seconds = requestedSeconds;
+	} else if (listed.length > 0) {
+		seconds = Math.max(...listed);
+	}
+	return seconds === undefined ? undefined : Math.ceil(seconds * rate);
+}
+
+export interface CanonicalVideoProviderJob {
+	upstreamJobId: string;
+	upstreamGenerationId?: string;
+	upstreamPollingUrl?: string;
+	status: VideoStatus;
+	progress?: number;
+	error?: {
+		code?: string | null;
+		message: string;
+	};
+	usage?: Record<string, unknown>;
+	/** Canonical usage the adapter derived from the provider's raw `usage`, when it can bill by tokens. */
+	coreUsage?: Usage;
+	providerState?: Record<string, unknown>;
+}
+
+export interface CanonicalVideoContent {
+	body: ReadableStream<Uint8Array>;
+	contentType: string;
+	contentLength?: number;
+}
+
+export interface CanonicalVideoObject {
+	id: string;
+	model: string;
+	status: VideoStatus;
+	progress: number;
+	prompt: string;
+	seconds?: string;
+	size?: string;
+	quality?: VideoQuality;
+	createdAt: Date;
+	completedAt?: Date | null;
+	expiresAt?: Date | null;
+	error?: {
+		code?: string | null;
+		message: string;
+	} | null;
+	remixedFromVideoId?: string | null;
+}
+
+const DATA_URL_REDACTION_THRESHOLD = 1024;
+
+function redactedDataUrl(value: string): string {
+	const header = value.slice(0, value.indexOf(",") + 1);
+	return `${header}[redacted ${value.length - header.length} chars]`;
+}
+
+/**
+ * Replaces large base64 data URLs (reference images can be tens of MB) before the request body
+ * is persisted to video_jobs.request or operation metadata.
+ */
+export function sanitizeVideoRequestBody(value: unknown, depth = 0): unknown {
+	if (typeof value === "string") {
+		return value.startsWith("data:") &&
+			value.length > DATA_URL_REDACTION_THRESHOLD
+			? redactedDataUrl(value)
+			: value;
+	}
+	if (depth >= 6 || value === null || typeof value !== "object") {
+		return value;
+	}
+	if (Array.isArray(value)) {
+		return value.map((item) => sanitizeVideoRequestBody(item, depth + 1));
+	}
+	return Object.fromEntries(
+		Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+			key,
+			sanitizeVideoRequestBody(item, depth + 1),
+		]),
+	);
+}
+
+export function videoUsageToCore(
+	_usage: Record<string, unknown> | undefined,
+): Usage | null {
+	// Video providers report cost/media units in provider-specific forms. Keep them in video_jobs
+	// metadata until the billing subsystem grows first-class media units.
+	return null;
+}

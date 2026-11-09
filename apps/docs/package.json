@@ -1,0 +1,38 @@
+{
+	"name": "@boelabs/docs",
+	"version": "0.0.0",
+	"private": true,
+	"description": "AI Gateway documentation site (Next.js App Router, Fumadocs).",
+	"type": "module",
+	"imports": {
+		"#/*": "./src/*"
+	},
+	"scripts": {
+		"build": "next build && bun scripts/check-links.ts",
+		"dev": "bun scripts/dev.ts",
+		"postinstall": "fumadocs-mdx",
+		"start": "bun scripts/start.ts",
+		"test": "bun test tests",
+		"typecheck": "next typegen && tsc --noEmit"
+	},
+	"dependencies": {
+		"fumadocs-core": "16.17.9",
+		"fumadocs-mdx": "15.4.10",
+		"fumadocs-ui": "16.17.9",
+		"lucide-react": "1.65.0",
+		"next": "16.4.5",
+		"react": "19.3.1",
+		"react-dom": "19.3.1",
+		"tailwindcss": "4.3.3",
+		"zod": "4.6.7"
+	},
+	"devDependencies": {
+		"@tailwindcss/postcss": "4.3.3",
+		"@types/mdx": "2.0.14",
+		"@types/node": "26.6.6",
+		"@types/react": "19.3.0",
+		"@types/react-dom": "19.3.0",
+		"bun-types": "1.4.4",
+		"typescript": "7.0.2"
+	}
+}

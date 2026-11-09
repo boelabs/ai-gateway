@@ -1,0 +1,171 @@
+# Serves one released version in production. The only workflow that changes production.
+#
+# Every Coolify resource runs the registry tag `production`, which nothing but this workflow moves:
+# it points the tag at the release's images, asks Coolify to pull them, waits for the deployments,
+# and puts the tag back on what was serving if any of that fails. A Coolify redeploy or restart
+# therefore never picks up an untested `main`.
+#
+# release.yml calls it after a stable `v*` tag publishes its images. Run it by hand with an earlier
+# version to roll back, or with the current one to redeploy. The database is not touched: the
+# gateway migrates on boot, and every migration works with the release before it (AGENTS.md §6).
+#
+#   COOLIFY_URL        repository variable, e.g. https://coolify.example.com
+#   COOLIFY_TOKEN      `production` environment secret, a Coolify API token with `deploy` and `read`
+#   COOLIFY_RESOURCES  `production` environment variable, JSON:
+#                      {"gateway": "<uuid>", "dashboard": "<uuid>", "docs": "<uuid>"}
+name: Deploy production
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Released version to serve, e.g. v1.2.3
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Released version to serve, e.g. v1.2.3 (an earlier one rolls back)
+        required: true
+        type: string
+
+permissions:
+  # Publishes the GitHub Release once the version serves.
+  contents: write
+  # Moves the `production` tag.
+  packages: write
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    # One production change at a time, never cancelled halfway.
+    concurrency:
+      group: production-deployment
+      cancel-in-progress: false
+    env:
+      VERSION: ${{ inputs.version }}
+      REGISTRY: ghcr.io/${{ github.repository_owner }}
+      COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+      RESOURCES: ${{ vars.COOLIFY_RESOURCES }}
+      APPS: api dashboard docs
+    steps:
+      # Everything up to "Point production at the release" only reads, so a missing setting or an
+      # unpublished version fails before production changes.
+      - name: Require a stable version and the production settings
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$VERSION' is not a stable release tag such as v1.2.3."
+            exit 1
+          fi
+          [ -n "${COOLIFY_URL:-}" ] || { echo "::error::The COOLIFY_URL variable is missing."; exit 1; }
+          [ -n "${COOLIFY_TOKEN:-}" ] || { echo "::error::The COOLIFY_TOKEN secret is missing from the production environment."; exit 1; }
+          if ! printf '%s' "${RESOURCES:-}" | jq -e 'type == "object" and ([.gateway, .dashboard, .docs] | all(type == "string" and length > 0))' >/dev/null 2>&1; then
+            echo "::error::COOLIFY_RESOURCES must map gateway, dashboard and docs to Coolify UUIDs."
+            exit 1
+          fi
+
+      # The rollout script only. The default ref is the tag for a release and main for a manual run,
+      # so a rollback uses today's script, not the one of the release it returns to.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Digests, not tags: the release is pinned, and what was serving can be restored exactly even
+      # after the tag moves.
+      - name: Resolve the release and what production serves
+        id: digests
+        run: |
+          set -euo pipefail
+          # Empty when the tag does not exist, as `production` before the first release.
+          digest() {
+            docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' 2>/dev/null | jq -r '.digest // empty' || true
+          }
+          for app in $APPS; do
+            image="$REGISTRY/ai-gateway-$app"
+            target=$(digest "$image:${VERSION#v}")
+            if [ -z "$target" ]; then
+              echo "::error::$image:${VERSION#v} does not exist; release.yml publishes it from the $VERSION tag."
+              exit 1
+            fi
+            previous=$(digest "$image:production")
+            echo "$app: $target (serving: ${previous:-nothing yet})"
+            {
+              echo "${app}_target=$target"
+              echo "${app}_previous=$previous"
+            } >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Point production at the release
+        id: promote
+        env:
+          API: ${{ steps.digests.outputs.api_target }}
+          DASHBOARD: ${{ steps.digests.outputs.dashboard_target }}
+          DOCS: ${{ steps.digests.outputs.docs_target }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create -t "$REGISTRY/ai-gateway-api:production" "$REGISTRY/ai-gateway-api@$API"
+          docker buildx imagetools create -t "$REGISTRY/ai-gateway-dashboard:production" "$REGISTRY/ai-gateway-dashboard@$DASHBOARD"
+          docker buildx imagetools create -t "$REGISTRY/ai-gateway-docs:production" "$REGISTRY/ai-gateway-docs@$DOCS"
+
+      - name: Deploy and wait for Coolify
+        id: rollout
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        working-directory: ${{ runner.temp }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/coolify-rollout.sh"
+
+      - name: Publish the release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "$VERSION already has release notes."
+          else
+            gh release create "$VERSION" --verify-tag --generate-notes --title "AI Gateway $VERSION"
+          fi
+
+      # Once the tag may have moved: a release that never came up must not stay on `production`,
+      # where Coolify's next restart would pull it again.
+      - name: Return to what was serving
+        # Not when only the release notes failed: the version is serving by then.
+        if: >-
+          failure() && steps.promote.outcome != 'skipped' &&
+          (steps.promote.outcome != 'success' || steps.rollout.outcome != 'success')
+        working-directory: ${{ runner.temp }}
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          API: ${{ steps.digests.outputs.api_previous }}
+          DASHBOARD: ${{ steps.digests.outputs.dashboard_previous }}
+          DOCS: ${{ steps.digests.outputs.docs_previous }}
+        run: |
+          set -euo pipefail
+          if [ -z "$API" ] || [ -z "$DASHBOARD" ] || [ -z "$DOCS" ]; then
+            echo "::error::Production served no earlier release, so there is nothing to return to. Fix forward or point the Coolify resources at another tag."
+            exit 1
+          fi
+          docker buildx imagetools create -t "$REGISTRY/ai-gateway-api:production" "$REGISTRY/ai-gateway-api@$API"
+          docker buildx imagetools create -t "$REGISTRY/ai-gateway-dashboard:production" "$REGISTRY/ai-gateway-dashboard@$DASHBOARD"
+          docker buildx imagetools create -t "$REGISTRY/ai-gateway-docs:production" "$REGISTRY/ai-gateway-docs@$DOCS"
+          # The release's deployments may still be running; Coolify refuses a new one until they end.
+          bash "$GITHUB_WORKSPACE/.github/scripts/coolify-rollout.sh" --settle
+          bash "$GITHUB_WORKSPACE/.github/scripts/coolify-rollout.sh"
+          echo "::warning::$VERSION did not come up; production is back on the images it served before."

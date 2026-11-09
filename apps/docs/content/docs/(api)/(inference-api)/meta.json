@@ -1,0 +1,24 @@
+{
+	"title": "Inference API",
+	"pages": [
+		"---Text generation---",
+		"chat-completions",
+		"responses",
+		"messages",
+		"---Media---",
+		"images",
+		"videos",
+		"audio-transcriptions",
+		"realtime-transcription",
+		"realtime-conversations",
+		"---Search and vectors---",
+		"embeddings",
+		"reranking",
+		"---Shared behavior---",
+		"models-discovery",
+		"file-inputs",
+		"streaming",
+		"provider-specific-fields",
+		"headers"
+	]
+}

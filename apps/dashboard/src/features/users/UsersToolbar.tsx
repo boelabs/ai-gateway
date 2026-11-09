@@ -1,0 +1,177 @@
+"use client";
+
+import { type Role, ROLE_LABELS, ROLE_SUMMARY, ROLES } from "./common.ts";
+import { useIdempotencyKey } from "#/shared/lib/useIdempotencyKey.ts";
+import { SearchField } from "#/shared/components/SearchField.tsx";
+import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
+import { ListToolbar } from "#/shared/components/ListToolbar.tsx";
+import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
+import { Select, SelectItem } from "#/components/ui/select";
+import { useMutation } from "#/shared/lib/mutation.ts";
+import type { UsersFilters } from "./filters.ts";
+import { ErrorNote } from "#/components/ui/page";
+import { createUserAction } from "./actions.ts";
+import { Button } from "#/components/ui/button";
+import { Plus as IconPlus } from "lucide-react";
+import { Input } from "#/components/ui/input";
+import { Form } from "#/components/ui/form";
+import { useState } from "react";
+
+import {
+	DialogHeader,
+	DialogFooter,
+	DialogTitle,
+	DialogBody,
+	Dialog,
+	Modal,
+} from "#/components/ui/modal";
+
+/**
+ * Above the list: its search, on the toolbar's right like every list's. `loading` draws it as a
+ * ghost for the page's fallback.
+ */
+export function UsersToolbar({
+	filters,
+	loading = false,
+}: {
+	filters: UsersFilters;
+	loading?: boolean;
+}) {
+	const { filter } = useSearchWriter(filters);
+	const search = (
+		<SearchField
+			label="Search users"
+			onSearch={(value) => filter({ q: value })}
+			placeholder="Username"
+			value={filters.q ?? ""}
+		/>
+	);
+	return loading ? (
+		<div aria-hidden="true" inert>
+			<ListToolbar
+				controls={
+					<GhostSkeleton className="min-w-0 flex-1 @min-[40rem]:flex-none">
+						{search}
+					</GhostSkeleton>
+				}
+			/>
+		</div>
+	) : (
+		<ListToolbar controls={search} />
+	);
+}
+
+/**
+ * The page header's primary action, with the short dialog it opens. The dialog lives here rather
+ * than in a shared provider: creating an operator needs nothing from the table it will appear in.
+ */
+export function NewUserButton() {
+	const [creating, setCreating] = useState(false);
+	return (
+		<>
+			<Button onClick={() => setCreating(true)}>
+				<IconPlus aria-hidden className="size-4" />
+				New user
+			</Button>
+			<CreateUserDialog isOpen={creating} onClose={() => setCreating(false)} />
+		</>
+	);
+}
+
+function CreateUserDialog({
+	isOpen,
+	onClose,
+}: {
+	isOpen: boolean;
+	onClose: () => void;
+}) {
+	const { pending, run } = useMutation();
+	const created = useIdempotencyKey();
+	const [role, setRole] = useState<Role | null>(null);
+	const [error, setError] = useState<string | null>(null);
+
+	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		setError(null);
+		if (!role) {
+			setError("Choose a role.");
+			return;
+		}
+		const form = new FormData(event.currentTarget);
+		const username = String(form.get("username"));
+		const result = await run(
+			() =>
+				createUserAction(
+					{
+						username,
+						password: String(form.get("password")),
+						role,
+						mustChangePassword: true,
+					},
+					created.key(),
+				),
+			{
+				success: `${username} created`,
+				failure: "The operator could not be created.",
+			},
+		);
+		if (!result.ok) {
+			setError(result.message);
+			return;
+		}
+		created.rotate();
+		onClose();
+	}
+
+	return (
+		<Modal isOpen={isOpen} onOpenChange={(open) => !open && onClose()}>
+			<Dialog aria-label="New operator" layout="sectioned">
+				<DialogHeader>
+					<DialogTitle>New operator</DialogTitle>
+				</DialogHeader>
+				<Form className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit}>
+					<DialogBody>
+						<Input
+							autoFocus
+							description="Letters, digits, dot, dash or underscore. 3–64 characters."
+							label="Username"
+							name="username"
+							required
+						/>
+						<Input
+							description="At least 12 characters. They must change it on first sign in."
+							label="Temporary password"
+							name="password"
+							required
+							type="password"
+						/>
+						<Select
+							description={role ? ROLE_SUMMARY[role] : undefined}
+							label="Role"
+							name="role"
+							onValueChange={(key) => setRole(key as Role)}
+							placeholder="Choose a role"
+							required
+							value={role}
+						>
+							{ROLES.map((value) => (
+								<SelectItem key={value} value={value}>
+									{ROLE_LABELS[value]}
+								</SelectItem>
+							))}
+						</Select>
+						{error ? <ErrorNote>{error}</ErrorNote> : null}
+					</DialogBody>
+					<DialogFooter>
+						<Button onClick={onClose} type="button" variant="secondary">
+							Cancel
+						</Button>
+						<Button disabled={pending} type="submit">
+							{pending ? "Creating…" : "Create user"}
+						</Button>
+					</DialogFooter>
+				</Form>
+			</Dialog>
+		</Modal>
+	);
+}

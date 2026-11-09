@@ -1,0 +1,137 @@
+import { DrawerIndent, DrawerPopup, DrawerProvider } from "./drawer";
+import { dialogPopupStyles, overlayBackdropStyles } from "./dialog";
+import { ToastProvider, ToastRoot, ToastViewport } from "./toast";
+import { overlayFadeStyles, popupStyles } from "./appearance";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, test } from "node:test";
+import assert from "node:assert/strict";
+import { buttonStyles } from "./button";
+import { Slider } from "./slider";
+
+describe("component motion and keyboard focus", () => {
+	test("buttons retain keyboard focus without press movement in every variant and size", () => {
+		/**
+		 * Read off `buttonStyles` rather than written out again here. A hand-kept list only ever
+		 * agrees with the component until someone adds a variant — and the point of this test is
+		 * that EVERY variant obeys the rule, which a stale list quietly stops checking.
+		 */
+		const { variant: variants, size: sizes } = buttonStyles.variants;
+		for (const variant of Object.keys(variants) as Array<
+			keyof typeof variants
+		>) {
+			for (const size of Object.keys(sizes) as Array<keyof typeof sizes>) {
+				for (const mode of ["default", "icon"] as const) {
+					const styles = buttonStyles({ variant, size, mode });
+					assert.match(styles, /\btransition-shadow\b/u);
+					assert.doesNotMatch(
+						styles,
+						/animate-|duration-|scale|translate|transform/u,
+					);
+					assert.match(styles, /hover:/u);
+					assert.match(styles, /focus-visible:ring-2/u);
+				}
+			}
+		}
+	});
+
+	test("shared overlays fade and dialogs animate with reduced motion support", () => {
+		for (const styles of [
+			overlayFadeStyles,
+			popupStyles,
+			overlayBackdropStyles,
+		]) {
+			assert.match(styles, /transition-opacity/u);
+			assert.match(styles, /duration-200/u);
+			assert.match(styles, /ease-out/u);
+			assert.ok(styles.includes("data-starting-style:opacity-0"));
+			assert.ok(styles.includes("data-ending-style:opacity-0"));
+			assert.ok(styles.includes("motion-reduce:transition-none"));
+			assert.doesNotMatch(styles, /scale|translate|transform/u);
+		}
+		assert.match(dialogPopupStyles, /data-starting-style:opacity-0/u);
+		assert.match(dialogPopupStyles, /motion-reduce:transition-none/u);
+	});
+
+	test("toast motion fades while retaining swipe movement and transition overrides", () => {
+		const html = renderToStaticMarkup(
+			<ToastProvider>
+				<ToastViewport>
+					<ToastRoot toast={{ id: "motion", title: "Saved" }}>Saved</ToastRoot>
+				</ToastViewport>
+			</ToastProvider>,
+		);
+		assert.match(html, /duration-200 ease-out/u);
+		assert.ok(html.includes("data-starting-style:opacity-0"));
+		assert.ok(html.includes("data-ending-style:opacity-0"));
+		assert.ok(html.includes("data-swiping:transition-none"));
+		assert.match(html, /--toast-swipe-movement-x/u);
+		assert.match(html, /--toast-swipe-movement-y/u);
+		assert.doesNotMatch(html, /scale|(?:starting|ending)-style:-?translate/u);
+	});
+
+	test("drawers preserve directional swipes without scaling page content", () => {
+		const popup = DrawerPopup({});
+		const classes = popup.props.className;
+		assert.equal(typeof classes, "string");
+		assert.match(classes, /duration-200 ease-out/u);
+		assert.ok(classes.includes("transition-[transform,translate,opacity]"));
+		assert.ok(classes.includes("data-swiping:transition-none"));
+		assert.doesNotMatch(classes, /scale/u);
+		for (const direction of ["up", "down", "left", "right"] as const) {
+			const axis = direction === "up" || direction === "down" ? "y" : "x";
+			const sign = direction === "up" || direction === "left" ? "-" : "";
+			for (const phase of ["starting", "ending"]) {
+				assert.ok(
+					classes.includes(
+						`data-[swipe-direction=${direction}]:data-${phase}-style:${sign}translate-${axis}-full`,
+					),
+				);
+			}
+			const style = popup.props.style({ swipeDirection: direction });
+			assert.match(style.transform, /--drawer-swipe-movement-x/u);
+			assert.match(style.transform, /--drawer-swipe-movement-y/u);
+			if (direction === "down") {
+				assert.match(style.transform, /--drawer-snap-point-offset/u);
+			} else {
+				assert.doesNotMatch(style.transform, /--drawer-snap-point-offset/u);
+			}
+		}
+		const indent = renderToStaticMarkup(
+			<DrawerProvider>
+				<DrawerIndent>Page content</DrawerIndent>
+			</DrawerProvider>,
+		);
+		assert.match(indent, /Page content/u);
+		assert.doesNotMatch(indent, /scale|transform|origin-top/u);
+	});
+
+	test("slider thumbs show the focus ring when their range inputs receive keyboard focus", () => {
+		const html = renderToStaticMarkup(
+			<Slider.Root defaultValue={[25, 75]}>
+				<Slider.Control>
+					<Slider.Track>
+						<Slider.Indicator />
+					</Slider.Track>
+					<Slider.Thumb aria-label="Minimum" index={0} />
+					<Slider.Thumb aria-label="Maximum" index={1} />
+				</Slider.Control>
+			</Slider.Root>,
+		);
+		const thumbs = [
+			...html.matchAll(
+				/<div[^>]*class="[^"]*has-\[input:focus-visible\][^"]*"[^>]*><input[^>]*type="range"[^>]*>/gu,
+			),
+		];
+		assert.equal(thumbs.length, 2);
+		for (const [thumb] of thumbs) {
+			for (const utility of [
+				"ring-2",
+				"ring-focus",
+				"ring-offset-2",
+				"ring-offset-surface",
+			]) {
+				assert.ok(thumb.includes(`has-[input:focus-visible]:${utility}`));
+			}
+		}
+	});
+});

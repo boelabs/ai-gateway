@@ -1,0 +1,1243 @@
+import { messagesRequestToCanonical } from "#contracts/anthropic/messagesRender.ts";
+import { messagesRequestSchema } from "#contracts/anthropic/messages.ts";
+import { responsesRequestSchema } from "#contracts/openai/responses.ts";
+import { jsonBody, must, streamOf } from "#test-support/adapters.ts";
+import { observeChatStream } from "#gateway/streamLifecycle.ts";
+import { adapterDiagnostics } from "#adapters/diagnostics.ts";
+import type { AdapterContext } from "#adapters/types.ts";
+import { GatewayError } from "#core/errors.ts";
+import { anthropicAdapter } from "./index.ts";
+import type { Usage } from "#core/usage.ts";
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import {
+	canonicalToResponsesResponse,
+	responsesRequestToCanonical,
+} from "#contracts/openai/responsesRender.ts";
+
+import type {
+	CanonicalChatStreamChunk,
+	CanonicalChatRequest,
+} from "#core/canonical.ts";
+
+import {
+	toCanonicalChatRequest,
+	chatRequestSchema,
+} from "#contracts/openai/chat.ts";
+
+const ctx: AdapterContext = {
+	upstreamModel: "claude-sonnet-4-5",
+	credentials: { apiKey: "sk-ant-test" },
+	meta: {
+		maxOutputTokens: 2048,
+		capabilities: {
+			tools: true,
+			strictTools: true,
+			vision: true,
+			reasoning: false,
+			structuredOutputs: true,
+		},
+	},
+	transport: "messages",
+	requestId: "t",
+};
+
+test("Anthropic preserves optional thinking usage from initial and terminal events", async () => {
+	for (const [initial, final, expected] of [
+		[undefined, undefined, undefined],
+		[4, undefined, 4],
+		[4, 6, 6],
+		[4, 0, 0],
+	] as const) {
+		const details = (count: number | undefined) =>
+			count === undefined
+				? {}
+				: { output_tokens_details: { thinking_tokens: count } };
+		const events = [
+			{
+				type: "message_start",
+				message: {
+					id: "msg_test",
+					model: "model",
+					usage: { input_tokens: 3, output_tokens: 0, ...details(initial) },
+				},
+			},
+			{
+				type: "message_delta",
+				delta: { stop_reason: "end_turn" },
+				usage: { output_tokens: 8, ...details(final) },
+			},
+			{ type: "message_stop" },
+		];
+		const body = new Response(
+			events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""),
+		).body!;
+		let usage: Usage | undefined;
+		for await (const chunk of must(anthropicAdapter, "chat").parseStream(
+			body,
+			ctx,
+		)) {
+			if (chunk.usage) {
+				({ usage } = chunk);
+			}
+		}
+		assert.ok(usage);
+		assert.equal(usage.reasoningTokens, expected);
+		assert.equal(usage.totalTokens, 11);
+	}
+});
+
+const adaptiveCtx: AdapterContext = {
+	...ctx,
+	upstreamModel: "claude-opus-4-8",
+	meta: {
+		maxOutputTokens: 2048,
+		capabilities: {
+			tools: true,
+			vision: true,
+			reasoning: true,
+			structuredOutputs: true,
+		},
+		reasoning: {
+			kind: "anthropic_adaptive",
+			levels: ["none", "low", "medium", "high", "xhigh", "max"],
+		},
+	},
+};
+
+const budgetCtx: AdapterContext = {
+	...ctx,
+	meta: {
+		maxOutputTokens: 2048,
+		capabilities: {
+			tools: true,
+			vision: true,
+			reasoning: true,
+			structuredOutputs: true,
+		},
+		reasoning: {
+			kind: "anthropic_budget",
+			levels: ["none", "low", "medium", "high"],
+			budgets: { low: 2048, medium: 8192, high: 16_000 },
+		},
+	},
+};
+
+const req: CanonicalChatRequest = {
+	callType: "chat",
+	model: "claude",
+	messages: [
+		{ role: "system", content: "Be concise." },
+		{ role: "user", content: "Hello" },
+	],
+	stream: false,
+	maxTokens: 128,
+};
+
+test("anthropic.buildRequest: messages transport, auth headers and system split", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(req, ctx);
+	assert.equal(built.method, "POST");
+	assert.equal(built.url, "https://api.anthropic.com/v1/messages");
+	assert.equal(built.headers["x-api-key"], "sk-ant-test");
+	assert.equal(built.headers["anthropic-version"], "2023-06-01");
+	const body = jsonBody(built);
+	assert.equal(body.model, "claude-sonnet-4-5");
+	assert.equal(body.max_tokens, 128);
+	assert.equal(body.system, "Be concise.");
+	assert.deepEqual(body.messages, [{ role: "user", content: "Hello" }]);
+});
+
+test("anthropic.buildRequest: emits native strict tool schemas", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			tools: [
+				{
+					name: "lookup",
+					strict: true,
+					parameters: {
+						type: "object",
+						properties: { id: { type: "string" } },
+						required: ["id"],
+						additionalProperties: false,
+					},
+				},
+			],
+		},
+		ctx,
+	);
+	assert.equal(jsonBody(built).tools[0].strict, true);
+});
+
+const constrainedSchema = {
+	type: "object",
+	properties: {
+		ids: {
+			type: "array",
+			minItems: 1,
+			maxItems: 5,
+			items: { type: "string", maxLength: 12 },
+		},
+	},
+	required: ["ids"],
+	additionalProperties: false,
+};
+
+test("anthropic.buildRequest: strict tools drop schema keywords Anthropic rejects", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			tools: [{ name: "lookup", strict: true, parameters: constrainedSchema }],
+		},
+		ctx,
+	);
+	const [tool] = jsonBody(built).tools;
+	assert.equal(tool.strict, true);
+	assert.deepEqual(tool.input_schema, {
+		type: "object",
+		properties: {
+			ids: {
+				type: "array",
+				minItems: 1,
+				items: { type: "string", description: "{maxLength: 12}" },
+				description: "{maxItems: 5}",
+			},
+		},
+		required: ["ids"],
+		additionalProperties: false,
+	});
+});
+
+test("anthropic.buildRequest: non-strict tools keep their schema intact", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			tools: [
+				{ name: "lookup", parameters: constrainedSchema },
+				{ name: "search", strict: false, parameters: constrainedSchema },
+			],
+		},
+		ctx,
+	);
+	const [lookup, search] = jsonBody(built).tools;
+	assert.deepEqual(lookup, { name: "lookup", input_schema: constrainedSchema });
+	assert.deepEqual(search, {
+		name: "search",
+		input_schema: constrainedSchema,
+		strict: false,
+	});
+});
+
+test("anthropic.buildRequest: a strict Responses function tool reaches Anthropic without maxItems", () => {
+	const canonical = responsesRequestToCanonical(
+		responsesRequestSchema.parse({
+			model: "claude",
+			input: "pick some ids",
+			tools: [
+				{
+					type: "function",
+					name: "lookup",
+					strict: true,
+					parameters: constrainedSchema,
+				},
+			],
+		}),
+	);
+	const [tool] = jsonBody(
+		must(anthropicAdapter, "chat").buildRequest(canonical, ctx),
+	).tools;
+	assert.equal(tool.strict, true);
+	assert.equal(tool.input_schema.properties.ids.maxItems, undefined);
+	assert.equal(tool.input_schema.properties.ids.minItems, 1);
+});
+
+test("anthropic.buildRequest: native /v1/messages tools pass through untouched", () => {
+	const rawTools = [
+		{ name: "lookup", strict: true, input_schema: constrainedSchema },
+		{ type: "web_search_20260209", name: "web_search" },
+	];
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			tools: [{ name: "lookup", strict: true, parameters: constrainedSchema }],
+			messagesTransport: { rawTools },
+		},
+		ctx,
+	);
+	assert.deepEqual(jsonBody(built).tools, rawTools);
+});
+
+test("anthropic token count preserves input fields and removes generation controls", () => {
+	const handler = anthropicAdapter.messageTokenCount;
+	assert.ok(handler);
+	const built = handler.buildRequest(
+		{
+			canonical: req,
+			rawBody: {
+				model: "claude",
+				messages: [{ role: "user", content: "Hello" }],
+				system: "Be concise.",
+				tools: [{ name: "lookup", input_schema: { type: "object" } }],
+				cache_control: { type: "ephemeral" },
+				temperature: 0.5,
+				extra_body: { beta_flag: true },
+			},
+		},
+		ctx,
+	);
+	assert.equal(built.url, "https://api.anthropic.com/v1/messages/count_tokens");
+	assert.equal(built.headers["x-api-key"], "sk-ant-test");
+	assert.deepEqual(jsonBody(built), {
+		model: "claude-sonnet-4-5",
+		messages: [{ role: "user", content: "Hello" }],
+		system: "Be concise.",
+		tools: [{ name: "lookup", input_schema: { type: "object" } }],
+		cache_control: { type: "ephemeral" },
+		beta_flag: true,
+	});
+	assert.deepEqual(handler.parseResponse({ input_tokens: 17 }, ctx), {
+		inputTokens: 17,
+	});
+});
+
+test("anthropic.buildRequest: omits empty assistant messages", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			messages: [
+				{ role: "user", content: "First" },
+				{ role: "assistant", content: null },
+				{ role: "user", content: "Second" },
+			],
+		},
+		ctx,
+	);
+	const body = jsonBody(built);
+
+	assert.deepEqual(body.messages, [
+		{ role: "user", content: "First" },
+		{ role: "user", content: "Second" },
+	]);
+	assert.equal(
+		body.messages.every(
+			(message: { content: unknown }) =>
+				message.content !== "" &&
+				(!Array.isArray(message.content) || message.content.length > 0),
+		),
+		true,
+	);
+});
+
+test("anthropic.buildRequest: cache_control is emitted in system (array), content, and tools", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			callType: "chat",
+			model: "claude",
+			stream: false,
+			maxTokens: 128,
+			messages: [
+				{
+					role: "system",
+					content: [
+						{
+							type: "text",
+							text: "Big preamble",
+							cacheControl: { type: "ephemeral" },
+						},
+					],
+				},
+				{
+					role: "user",
+					content: [
+						{ type: "text", text: "Hi", cacheControl: { type: "ephemeral" } },
+					],
+				},
+			],
+			tools: [
+				{
+					name: "lookup",
+					parameters: { type: "object" },
+					cacheControl: { type: "ephemeral" },
+				},
+			],
+		},
+		ctx,
+	);
+	const body = jsonBody(built);
+	// system with cache_control -> array of blocks (not string).
+	assert.deepEqual(body.system, [
+		{
+			type: "text",
+			text: "Big preamble",
+			cache_control: { type: "ephemeral" },
+		},
+	]);
+	assert.deepEqual(body.messages[0].content, [
+		{ type: "text", text: "Hi", cache_control: { type: "ephemeral" } },
+	]);
+	assert.deepEqual(body.tools[0].cache_control, { type: "ephemeral" });
+});
+
+test("anthropic.buildRequest: Responses and Chat Completions requests enable automatic caching", () => {
+	const responses = responsesRequestToCanonical(
+		responsesRequestSchema.parse({
+			model: "claude",
+			instructions: "Be concise.",
+			input: "Hello",
+		}),
+	);
+	const chat = toCanonicalChatRequest(
+		chatRequestSchema.parse({
+			model: "claude",
+			messages: [{ role: "user", content: "Hello" }],
+		}),
+	);
+	for (const canonical of [responses, chat]) {
+		const body = jsonBody(
+			must(anthropicAdapter, "chat").buildRequest(canonical, ctx),
+		);
+		assert.deepEqual(body.cache_control, { type: "ephemeral" });
+	}
+});
+
+test("anthropic.buildRequest: native /v1/messages requests keep their own cache placement", () => {
+	const marker = { type: "ephemeral", ttl: "1h" };
+	for (const cacheControl of [undefined, marker]) {
+		const canonical = messagesRequestToCanonical(
+			messagesRequestSchema.parse({
+				model: "claude",
+				max_tokens: 20,
+				...(cacheControl === undefined ? {} : { cache_control: cacheControl }),
+				messages: [{ role: "user", content: "Hello" }],
+			}),
+		);
+		const body = jsonBody(
+			must(anthropicAdapter, "chat").buildRequest(canonical, ctx),
+		);
+		assert.deepEqual(body.cache_control, cacheControl);
+	}
+});
+
+test("anthropic.buildRequest: explicit breakpoints suppress automatic caching", () => {
+	const marker = { type: "ephemeral" };
+	const requests: CanonicalChatRequest[] = [
+		{
+			...req,
+			messages: [
+				{
+					role: "user",
+					content: [{ type: "text", text: "Hi", cacheControl: marker }],
+				},
+			],
+		},
+		{
+			...req,
+			messages: [
+				{ role: "user", content: "Hi" },
+				{
+					role: "assistant",
+					content: null,
+					toolCalls: [
+						{
+							id: "call_1",
+							name: "lookup",
+							arguments: "{}",
+							cacheControl: marker,
+						},
+					],
+				},
+			],
+		},
+		{
+			...req,
+			tools: [
+				{
+					name: "lookup",
+					parameters: { type: "object" },
+					cacheControl: marker,
+				},
+			],
+		},
+	];
+	for (const canonical of requests) {
+		const body = jsonBody(
+			must(anthropicAdapter, "chat").buildRequest(canonical, ctx),
+		);
+		assert.equal(body.cache_control, undefined);
+	}
+});
+
+test("anthropic usage reaches the Responses API with OpenAI input semantics", () => {
+	const parsed = must(anthropicAdapter, "chat").parseResponse(
+		{
+			id: "msg_1",
+			model: "claude-sonnet-4-5",
+			stop_reason: "end_turn",
+			content: [{ type: "text", text: "Hi" }],
+			usage: {
+				input_tokens: 10,
+				output_tokens: 5,
+				cache_read_input_tokens: 1200,
+				cache_creation_input_tokens: 300,
+			},
+		},
+		ctx,
+	);
+	const response = canonicalToResponsesResponse(parsed, {
+		req: responsesRequestSchema.parse({ model: "claude", input: "Hello" }),
+		publicModel: "claude",
+		reasoningEffort: null,
+	});
+	const usage = response.usage as Record<string, any>;
+	// input_tokens includes cached reads and writes, as OpenAI reports it.
+	assert.equal(usage.input_tokens, 1510);
+	assert.equal(usage.input_tokens_details.cached_tokens, 1200);
+	assert.equal(usage.input_tokens_details.cache_write_tokens, 300);
+	assert.equal(usage.total_tokens, 1515);
+});
+
+test("anthropic.buildRequest: system without cache_control still flattens to string", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			callType: "chat",
+			model: "claude",
+			stream: false,
+			maxTokens: 128,
+			messages: [
+				{ role: "system", content: [{ type: "text", text: "Be concise." }] },
+				{ role: "user", content: "Hello" },
+			],
+		},
+		ctx,
+	);
+	const body = jsonBody(built);
+	assert.equal(body.system, "Be concise.");
+});
+
+test("anthropic.buildRequest: emits native PDF document sources", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			messages: [
+				{
+					role: "user",
+					content: [
+						{
+							type: "file",
+							fileUrl: "https://assets.example/document.pdf",
+						},
+						{
+							type: "file",
+							fileData: "data:application/pdf;base64,AAAA",
+							cacheControl: { type: "ephemeral" },
+						},
+					],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.deepEqual(jsonBody(built).messages[0].content, [
+		{
+			type: "document",
+			source: {
+				type: "url",
+				url: "https://assets.example/document.pdf",
+			},
+		},
+		{
+			type: "document",
+			source: {
+				type: "base64",
+				media_type: "application/pdf",
+				data: "AAAA",
+			},
+			cache_control: { type: "ephemeral" },
+		},
+	]);
+});
+
+test("anthropic.buildRequest: provider file references enable the Files API beta", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			messages: [
+				{
+					role: "user",
+					content: [{ type: "file", fileId: "file-123" }],
+				},
+			],
+		},
+		ctx,
+	);
+	assert.equal(built.headers["anthropic-beta"], "files-api-2025-04-14");
+	assert.deepEqual(jsonBody(built).messages[0].content, [
+		{
+			type: "document",
+			source: { type: "file", file_id: "file-123" },
+		},
+	]);
+
+	const withExistingBeta = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			messages: [
+				{
+					role: "user",
+					content: [{ type: "file", fileId: "file-123" }],
+				},
+			],
+		},
+		{
+			...ctx,
+			credentials: {
+				apiKey: "test-key",
+				headers: { "Anthropic-Beta": "feature-2026-01-01" },
+			},
+		},
+	);
+	assert.equal(
+		withExistingBeta.headers["Anthropic-Beta"],
+		"feature-2026-01-01,files-api-2025-04-14",
+	);
+});
+
+test("anthropic.buildRequest: adaptive reasoning keeps xhigh and max distinct", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{ ...req, reasoning: { effort: "xhigh" }, extraBody: { top_k: 40 } },
+		adaptiveCtx,
+	);
+	const body = jsonBody(built);
+	assert.deepEqual(body.thinking, { type: "adaptive", display: "summarized" });
+	assert.deepEqual(body.output_config, { effort: "xhigh" });
+	assert.equal(body.top_k, 40);
+
+	const maximum = must(anthropicAdapter, "chat").buildRequest(
+		{ ...req, reasoning: { effort: "max" } },
+		adaptiveCtx,
+	);
+	assert.deepEqual(jsonBody(maximum).output_config, { effort: "max" });
+});
+
+test("anthropic.buildRequest: fast aliases select the native model and required beta", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{ ...req, reasoning: { effort: "max" } },
+		{ ...adaptiveCtx, upstreamModel: "claude-opus-5-fast" },
+	);
+	const body = jsonBody(built);
+	assert.equal(body.model, "claude-opus-5");
+	assert.equal(body.speed, "fast");
+	assert.deepEqual(body.thinking, { type: "adaptive", display: "summarized" });
+	assert.deepEqual(body.output_config, { effort: "max" });
+	assert.equal(built.headers["anthropic-beta"], "fast-mode-2026-02-01");
+
+	const opus55 = must(anthropicAdapter, "chat").buildRequest(req, {
+		...adaptiveCtx,
+		upstreamModel: "claude-opus-5-5-fast",
+	});
+	assert.equal(jsonBody(opus55).model, "claude-opus-5-5");
+	assert.equal(jsonBody(opus55).speed, "fast");
+});
+
+test("anthropic.buildRequest: structured output merges with output_config.effort", () => {
+	const schema = {
+		type: "object",
+		properties: { answer: { type: "string" } },
+		required: ["answer"],
+	};
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			reasoning: { effort: "high" },
+			responseFormat: { type: "json_schema", schema },
+		},
+		adaptiveCtx,
+	);
+	assert.deepEqual(jsonBody(built).output_config, {
+		effort: "high",
+		format: {
+			type: "json_schema",
+			schema: { ...schema, additionalProperties: false },
+		},
+	});
+});
+
+test("anthropic.buildRequest: structured output drops constraints Anthropic cannot compile", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			responseFormat: {
+				type: "json_schema",
+				strict: true,
+				schema: {
+					type: "object",
+					properties: {
+						items: { type: "array", maxItems: 3, items: { type: "string" } },
+					},
+					required: ["items"],
+					additionalProperties: false,
+				},
+			},
+		},
+		ctx,
+	);
+	assert.deepEqual(jsonBody(built).output_config.format.schema, {
+		type: "object",
+		properties: {
+			items: {
+				type: "array",
+				items: { type: "string" },
+				description: "{maxItems: 3}",
+			},
+		},
+		required: ["items"],
+		additionalProperties: false,
+	});
+});
+
+test("anthropic.buildRequest: json_object uses an open object schema", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{ ...req, responseFormat: { type: "json_object" } },
+		ctx,
+	);
+	assert.deepEqual(jsonBody(built).output_config, {
+		format: { type: "json_schema", schema: { type: "object" } },
+	});
+});
+
+test("anthropic.buildRequest: omitted effort explicitly disables optional adaptive reasoning", () => {
+	// Opus 5 reasons when `thinking` is omitted, so canonical `none` must use Anthropic's literal switch.
+	const built = must(anthropicAdapter, "chat").buildRequest(req, adaptiveCtx);
+	const body = jsonBody(built);
+	assert.deepEqual(body.thinking, { type: "disabled" });
+	assert.equal(body.output_config, undefined);
+});
+
+test("anthropic.buildRequest: omitted effort on MANDATORY reasoner -> lowest level + summarized", () => {
+	const forcedCtx: AdapterContext = {
+		...adaptiveCtx,
+		meta: {
+			...adaptiveCtx.meta,
+			reasoning: {
+				kind: "anthropic_adaptive",
+				levels: ["low", "medium", "high", "xhigh"],
+			},
+		},
+	};
+	const body = JSON.parse(
+		must(anthropicAdapter, "chat").buildRequest(req, forcedCtx).body!,
+	);
+	assert.deepEqual(body.thinking, { type: "adaptive", display: "summarized" });
+	assert.deepEqual(body.output_config, { effort: "low" });
+});
+
+test("anthropic.buildRequest: legacy budget uses thinking.enabled and none uses disabled", () => {
+	const high = must(anthropicAdapter, "chat").buildRequest(
+		{ ...req, reasoning: { effort: "high" } },
+		budgetCtx,
+	);
+	assert.deepEqual(jsonBody(high).thinking, {
+		type: "enabled",
+		budget_tokens: 16_000,
+		display: "summarized",
+	});
+
+	const none = must(anthropicAdapter, "chat").buildRequest(
+		{ ...req, reasoning: { effort: "none" } },
+		budgetCtx,
+	);
+	assert.deepEqual(jsonBody(none).thinking, { type: "disabled" });
+});
+
+test("anthropic.buildRequest: summary none uses omitted display", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{ ...req, reasoning: { effort: "high", summary: "none" } },
+		adaptiveCtx,
+	);
+	assert.deepEqual(jsonBody(built).thinking, {
+		type: "adaptive",
+		display: "omitted",
+	});
+});
+
+test("anthropic.buildRequest: extraBody does not overwrite managed fields", () => {
+	assert.throws(
+		() =>
+			must(anthropicAdapter, "chat").buildRequest(
+				{ ...req, extraBody: { output_config: { effort: "low" } } },
+				adaptiveCtx,
+			),
+		/extra_body.output_config/u,
+	);
+});
+
+test("anthropic.parseResponse: text and tool_use blocks become canonical output", () => {
+	const raw = {
+		id: "msg_1",
+		model: "claude-sonnet-4-5",
+		stop_reason: "tool_use",
+		content: [
+			{ type: "text", text: "Let me check." },
+			{ type: "thinking", thinking: "I should inspect the tool." },
+			{
+				type: "tool_use",
+				id: "toolu_1",
+				name: "lookup",
+				input: { q: "hello" },
+			},
+		],
+		usage: {
+			input_tokens: 10,
+			output_tokens: 5,
+			output_tokens_details: { thinking_tokens: 2 },
+			cache_read_input_tokens: 2,
+			cache_creation_input_tokens: 3,
+		},
+	};
+	const parsed = must(anthropicAdapter, "chat").parseResponse(raw, ctx);
+	assert.equal(parsed.choices[0]!.message.content, "Let me check.");
+	assert.equal(
+		parsed.choices[0]!.message.reasoning,
+		"I should inspect the tool.",
+	);
+	assert.equal(parsed.choices[0]!.finishReason, "tool_calls");
+	assert.equal(
+		parsed.choices[0]!.message.toolCalls?.[0]?.arguments,
+		'{"q":"hello"}',
+	);
+	// Anthropic input buckets are disjoint: promptTokens = 10 + 2 (read) + 3 (write) = 15.
+	assert.equal(parsed.usage.promptTokens, 15);
+	assert.equal(parsed.usage.totalTokens, 20);
+	assert.equal(parsed.usage.reasoningTokens, 2);
+	assert.equal(parsed.usage.cacheReadTokens, 2);
+	assert.equal(parsed.usage.cacheWriteTokens, 3);
+});
+
+test("anthropic.mapError: oversized prompt -> context_window; generic 400 -> bad_request", () => {
+	const tooLong = must(anthropicAdapter, "chat").mapError(
+		{
+			status: 400,
+			body: {
+				error: {
+					type: "invalid_request_error",
+					message: "prompt is too long: 250000 tokens > 200000 maximum",
+				},
+			},
+		},
+		ctx,
+	);
+	assert.equal(tooLong.class, "context_window");
+
+	const generic = must(anthropicAdapter, "chat").mapError(
+		{
+			status: 400,
+			body: {
+				error: {
+					type: "invalid_request_error",
+					message: "messages: at least one message is required",
+				},
+			},
+		},
+		ctx,
+	);
+	assert.equal(generic.class, "bad_request");
+});
+
+test("anthropic.parseStream: text and tool JSON deltas stream as canonical chunks", async () => {
+	const sse =
+		`event: message_start\ndata: {"type":"message_start","message":{"id":"msg_1","model":"claude","usage":{"input_tokens":3,"output_tokens":1},"content":[]}}\n\n` +
+		`event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Hmm"}}\n\n` +
+		`event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}\n\n` +
+		`event: content_block_start\ndata: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_1","name":"lookup","input":{}}}\n\n` +
+		`event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"q\\":"}}\n\n` +
+		`event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":8}}\n\n` +
+		`event: message_stop\ndata: {"type":"message_stop"}\n\n`;
+	const chunks: CanonicalChatStreamChunk[] = [];
+	for await (const chunk of must(anthropicAdapter, "chat").parseStream(
+		streamOf(sse),
+		ctx,
+	)) {
+		chunks.push(chunk);
+	}
+	assert.equal(chunks[0]!.choices[0]!.delta.role, "assistant");
+	assert.equal(chunks[1]!.choices[0]!.delta.reasoning, "Hmm");
+	assert.equal(chunks[2]!.choices[0]!.delta.content, "Hi");
+	assert.equal(chunks[3]!.choices[0]!.delta.toolCalls?.[0]?.name, "lookup");
+	assert.equal(chunks[3]!.choices[0]!.delta.toolCalls?.[0]?.index, 0);
+	assert.equal(chunks[4]!.choices[0]!.delta.toolCalls?.[0]?.arguments, '{"q":');
+	assert.equal(chunks[4]!.choices[0]!.delta.toolCalls?.[0]?.index, 0);
+	assert.equal(chunks[5]!.choices[0]!.finishReason, "tool_calls");
+	assert.equal(chunks[5]!.usage?.totalTokens, 11);
+});
+
+test("anthropic thinking state: signed and redacted blocks survive parse and replay", () => {
+	const parsed = must(anthropicAdapter, "chat").parseResponse(
+		{
+			id: "msg_1",
+			model: "claude",
+			stop_reason: "tool_use",
+			content: [
+				{ type: "thinking", thinking: "plan", signature: "sig-1" },
+				{ type: "redacted_thinking", data: "opaque-1" },
+				{ type: "tool_use", id: "toolu_1", name: "lookup", input: {} },
+			],
+			usage: { input_tokens: 2, output_tokens: 3 },
+		},
+		ctx,
+	);
+	const { message } = parsed.choices[0]!;
+	assert.deepEqual(message.providerFields, {
+		anthropic: {
+			thinking_blocks: [
+				{ type: "thinking", thinking: "plan", signature: "sig-1" },
+				{ type: "redacted_thinking", data: "opaque-1" },
+			],
+			content_blocks: [
+				{ type: "thinking", thinking: "plan", signature: "sig-1" },
+				{ type: "redacted_thinking", data: "opaque-1" },
+				{ type: "tool_use", id: "toolu_1", name: "lookup", input: {} },
+			],
+		},
+	});
+	const replay = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			messages: [
+				{
+					role: "assistant",
+					content: null,
+					providerFields: message.providerFields!,
+					toolCalls: message.toolCalls!,
+				},
+				{ role: "tool", toolCallId: "toolu_1", content: "ok" },
+			],
+		},
+		ctx,
+	);
+	const body = jsonBody(replay);
+	assert.deepEqual(body.messages[0].content.slice(0, 2), [
+		{ type: "thinking", thinking: "plan", signature: "sig-1" },
+		{ type: "redacted_thinking", data: "opaque-1" },
+	]);
+});
+
+test("anthropic.buildRequest: mid-conversation developer messages keep system stable and turns apart", () => {
+	const thinking = (n: number) => ({
+		anthropic: {
+			content_blocks: [
+				{ type: "thinking", thinking: `plan-${n}`, signature: `sig-${n}` },
+				{ type: "text", text: `answer-${n}` },
+			],
+		},
+	});
+	const body = jsonBody(
+		must(anthropicAdapter, "chat").buildRequest(
+			{
+				...req,
+				messages: [
+					{ role: "developer", content: "Base rules." },
+					{ role: "user", content: "one" },
+					{
+						role: "assistant",
+						content: "answer-1",
+						providerFields: thinking(1),
+					},
+					{ role: "developer", content: "Context update." },
+					{
+						role: "assistant",
+						content: "answer-2",
+						providerFields: thinking(2),
+					},
+					{ role: "user", content: "two" },
+				],
+			},
+			ctx,
+		),
+	);
+	assert.equal(body.system, "Base rules.");
+	assert.deepEqual(
+		body.messages.map((m: { role: string }) => m.role),
+		["user", "assistant", "user", "assistant", "user"],
+	);
+	assert.deepEqual(
+		body.messages[1].content,
+		thinking(1).anthropic.content_blocks,
+	);
+	assert.deepEqual(body.messages[2].content, [
+		{
+			type: "text",
+			text: "<developer_message>\nContext update.\n</developer_message>",
+		},
+	]);
+	assert.deepEqual(
+		body.messages[3].content,
+		thinking(2).anthropic.content_blocks,
+	);
+});
+
+test("anthropic.buildRequest: mid-conversation developer message waits for pending tool results", () => {
+	const body = jsonBody(
+		must(anthropicAdapter, "chat").buildRequest(
+			{
+				...req,
+				messages: [
+					{ role: "user", content: "go" },
+					{
+						role: "assistant",
+						content: null,
+						toolCalls: [{ id: "toolu_1", name: "lookup", arguments: "{}" }],
+					},
+					{ role: "developer", content: "Note." },
+					{ role: "tool", toolCallId: "toolu_1", content: "ok" },
+				],
+			},
+			ctx,
+		),
+	);
+	assert.deepEqual(
+		body.messages.map((m: { role: string }) => m.role),
+		["user", "assistant", "user", "user"],
+	);
+	assert.equal(body.messages[2].content[0].type, "tool_result");
+	assert.match(body.messages[3].content[0].text, /Note\./u);
+	assert.equal(body.system, undefined);
+});
+
+test("anthropic.buildRequest: top_k and metadata use their native fields", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			topK: 40,
+			messagesTransport: { metadata: { user_id: "user-1" } },
+		},
+		ctx,
+	);
+	const body = jsonBody(built);
+	assert.equal(body.top_k, 40);
+	assert.deepEqual(body.metadata, { user_id: "user-1" });
+});
+
+test("anthropic.buildRequest: preserves native tools and structured error results", () => {
+	const rawTools = [
+		{ type: "web_search_20250305", name: "web_search", max_uses: 2 },
+	];
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			messages: [
+				{
+					role: "tool",
+					toolCallId: "toolu_1",
+					toolResultError: true,
+					content: [
+						{ type: "text", text: "failed" },
+						{ type: "image", url: "data:image/png;base64,AAAA" },
+					],
+				},
+			],
+			tools: [{ name: "web_search" }],
+			messagesTransport: { rawTools },
+		},
+		ctx,
+	);
+	const body = jsonBody(built);
+
+	assert.deepEqual(body.tools, rawTools);
+	assert.deepEqual(body.messages[0].content[0], {
+		type: "tool_result",
+		tool_use_id: "toolu_1",
+		is_error: true,
+		content: [
+			{ type: "text", text: "failed" },
+			{
+				type: "image",
+				source: { type: "base64", media_type: "image/png", data: "AAAA" },
+			},
+		],
+	});
+});
+
+test("anthropic.parseStream: signature deltas become replayable message state", async () => {
+	const sse =
+		`event: message_start\ndata: {"type":"message_start","message":{"id":"msg_1","model":"claude","usage":{"input_tokens":1},"content":[]}}\n\n` +
+		`event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}\n\n` +
+		`event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"plan"}}\n\n` +
+		`event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"sig-1"}}\n\n` +
+		`event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n` +
+		`event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}\n\n`;
+	const fields: unknown[] = [];
+	for await (const chunk of must(anthropicAdapter, "chat").parseStream(
+		streamOf(sse),
+		ctx,
+	)) {
+		const value = chunk.choices[0]?.delta.providerFields;
+		if (value !== undefined) {
+			fields.push(value);
+		}
+	}
+	assert.deepEqual(fields.at(-1), {
+		anthropic: {
+			thinking_blocks: [
+				{ type: "thinking", thinking: "plan", signature: "sig-1" },
+			],
+		},
+	});
+});
+
+test("anthropic.parseResponse: context-window stop maps to length", () => {
+	const parsed = must(anthropicAdapter, "chat").parseResponse(
+		{
+			id: "msg_1",
+			model: "claude",
+			stop_reason: "model_context_window_exceeded",
+			content: [{ type: "text", text: "partial" }],
+			usage: { input_tokens: 1, output_tokens: 1 },
+		},
+		ctx,
+	);
+	assert.equal(parsed.choices[0]?.finishReason, "length");
+});
+
+test("anthropic.parseResponse: explicit max_tokens outranks partial tool calls", () => {
+	const parsed = must(anthropicAdapter, "chat").parseResponse(
+		{
+			id: "msg_1",
+			model: "claude",
+			stop_reason: "max_tokens",
+			content: [{ type: "tool_use", id: "toolu_1", name: "lookup", input: {} }],
+			usage: { input_tokens: 1, output_tokens: 1 },
+		},
+		ctx,
+	);
+	assert.equal(parsed.choices[0]?.finishReason, "length");
+});
+
+test("anthropic preserves matched stop sequences in responses and streams", async () => {
+	const parsed = must(anthropicAdapter, "chat").parseResponse(
+		{
+			id: "msg_1",
+			model: "claude",
+			stop_reason: "stop_sequence",
+			stop_sequence: "<END>",
+			content: [{ type: "text", text: "done" }],
+			usage: { input_tokens: 1, output_tokens: 1 },
+		},
+		ctx,
+	);
+	assert.equal(parsed.choices[0]?.stopSequence, "<END>");
+
+	const sse =
+		`event: message_start\ndata: {"type":"message_start","message":{"id":"msg_1","model":"claude","usage":{"input_tokens":1},"content":[]}}\n\n` +
+		`event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"stop_sequence","stop_sequence":"<END>"},"usage":{"output_tokens":1}}\n\n` +
+		`event: message_stop\ndata: {"type":"message_stop"}\n\n`;
+	const chunks: CanonicalChatStreamChunk[] = [];
+	for await (const chunk of must(anthropicAdapter, "chat").parseStream(
+		streamOf(sse),
+		ctx,
+	)) {
+		chunks.push(chunk);
+	}
+	assert.equal(chunks.at(-1)?.choices[0]?.stopSequence, "<END>");
+});
+
+test("anthropic.parseResponse: new stop reasons preserve valid output and diagnostics", () => {
+	const parsed = must(anthropicAdapter, "chat").parseResponse(
+		{
+			id: "msg_1",
+			model: "claude",
+			stop_reason: "pause_turn",
+			content: [{ type: "text", text: "partial" }],
+			usage: { input_tokens: 1, output_tokens: 1 },
+		},
+		ctx,
+	);
+	assert.equal(parsed.choices[0]?.finishReason, "stop");
+	assert.equal(
+		adapterDiagnostics(parsed)?.originalTerminalReason,
+		"pause_turn",
+	);
+});
+
+async function observeAnthropic(sse: string) {
+	const local: AdapterContext = { ...ctx, diagnostics: {} };
+	const observed = observeChatStream(
+		must(anthropicAdapter, "chat").parseStream(streamOf(sse), local),
+		local.diagnostics,
+	);
+	const chunks: CanonicalChatStreamChunk[] = [];
+	for await (const chunk of observed.items) {
+		chunks.push(chunk);
+	}
+	return { chunks, observation: observed.observation };
+}
+
+const start = `event: message_start\ndata: {"type":"message_start","message":{"id":"msg_1","model":"claude","usage":{"input_tokens":3,"output_tokens":1},"content":[]}}\n\n`;
+const text = `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}\n\n`;
+const stop = `event: message_stop\ndata: {"type":"message_stop"}\n\n`;
+
+test("anthropic.parseStream: tolerates what the SDK tolerates", async () => {
+	// A repeated message_delta keeps the last one, like the SDK.
+	const repeated = await observeAnthropic(
+		start +
+			text +
+			`event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"output_tokens":4}}\n\n` +
+			`event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}\n\n` +
+			stop,
+	);
+	assert.equal(repeated.observation.terminal?.reason, "stop");
+	assert.equal(repeated.observation.transportTerminator, "semantic_event");
+
+	// message_stop without a stop_reason: the message ended, the reason is read from the output.
+	const unexplained = await observeAnthropic(start + text + stop);
+	assert.equal(unexplained.observation.terminal?.outcome, "completed");
+	assert.deepEqual(unexplained.observation.diagnostics?.metadata?.anomalies, [
+		"missing_finish_reason",
+	]);
+
+	// The connection dropped after the stop_reason but before message_stop: the answer is whole.
+	const unstopped = await observeAnthropic(
+		start +
+			text +
+			`event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}\n\n`,
+	);
+	assert.equal(unstopped.observation.terminal?.reason, "stop");
+});
+
+test("anthropic.parseStream: a stream cut mid-answer is still a failure", async () => {
+	await assert.rejects(
+		() => observeAnthropic(start + text),
+		(error: unknown) =>
+			GatewayError.is(error) && error.code === "upstream_stream_truncated",
+	);
+});
+
+test("anthropic.buildRequest: consecutive assistant messages are one turn", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			messages: [
+				{ role: "user", content: "find x" },
+				{ role: "assistant", content: "Searching." },
+				{
+					role: "assistant",
+					content: null,
+					toolCalls: [
+						{ id: "toolu_1", name: "search", arguments: '{"q":"x"}' },
+					],
+				},
+				{ role: "tool", toolCallId: "toolu_1", content: "found" },
+			],
+		},
+		ctx,
+	);
+	assert.deepEqual(jsonBody(built).messages.slice(1, 2), [
+		{
+			role: "assistant",
+			content: [
+				{ type: "text", text: "Searching." },
+				{ type: "tool_use", id: "toolu_1", name: "search", input: { q: "x" } },
+			],
+		},
+	]);
+});

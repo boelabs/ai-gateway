@@ -1,0 +1,94 @@
+import { api, unwrap } from "#/shared/api/client.ts";
+
+import type {
+	CreatedVirtualKey,
+	CreateKeyInput,
+	RotateKeyInput,
+	UpdateKeyInput,
+	VirtualKey,
+} from "./common.ts";
+
+export async function listKeys(params?: {
+	limit?: number;
+	offset?: number;
+	q?: string;
+	enabled?: boolean;
+}) {
+	return unwrap(await api.GET("/admin/keys", { params: { query: params } }));
+}
+
+/** One key, for its own page, never its secret; `null` when no key has that id. */
+export async function getKey(id: string): Promise<VirtualKey | null> {
+	const result = await api.GET("/admin/keys/{id}", {
+		params: { path: { id } },
+	});
+	if (result.response.status === 404) {
+		return null;
+	}
+	return unwrap(result).data;
+}
+
+/**
+ * The plaintext key of a key that is not private. Every call is audited by the gateway, so this is
+ * only ever fetched for the click that asked to copy it — never to render a page.
+ */
+export async function getKeySecret(id: string): Promise<string> {
+	return unwrap(
+		await api.GET("/admin/keys/{id}/secret", {
+			params: { path: { id } },
+			cache: "no-store",
+		}),
+	).data.key;
+}
+
+/** A new secret for the same key; the old one stops working at once. */
+export async function rotateKey(
+	id: string,
+	body: RotateKeyInput,
+): Promise<CreatedVirtualKey> {
+	return unwrap(
+		await api.POST("/admin/keys/{id}/rotate", {
+			params: { path: { id } },
+			body,
+		}),
+	).data;
+}
+
+/**
+ * The plaintext key always comes back here, and for a private key only here.
+ *
+ * `idempotencyKey` is what makes a retry safe: without it, a create that timed out after the gateway
+ * had already issued the key leaves an operator with a second key they never wanted and a secret they
+ * never saw.
+ */
+export async function createKey(
+	body: CreateKeyInput,
+	idempotencyKey?: string,
+): Promise<CreatedVirtualKey> {
+	return unwrap(
+		await api.POST("/admin/keys", {
+			body,
+			...(idempotencyKey
+				? { headers: { "Idempotency-Key": idempotencyKey } }
+				: {}),
+		}),
+	).data;
+}
+
+export async function updateKey(
+	id: string,
+	body: UpdateKeyInput,
+): Promise<VirtualKey> {
+	return unwrap(
+		await api.PATCH("/admin/keys/{id}", { params: { path: { id } }, body }),
+	).data;
+}
+
+export async function deleteKey(id: string): Promise<void> {
+	const result = await api.DELETE("/admin/keys/{id}", {
+		params: { path: { id } },
+	});
+	if (result.error !== undefined) {
+		unwrap(result);
+	}
+}

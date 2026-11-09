@@ -1,0 +1,138 @@
+import { resolve } from "node:path";
+
+/**
+ * Every internal link in the built site resolves, and every `#anchor` exists on the page it points at.
+ *
+ * This runs on the **prerendered HTML**, not on the MDX, which is the only way to catch the two
+ * things that actually break: a link to a page that was renamed, and an anchor that no longer
+ * matches a heading — because the heading ids are generated during the build, not written by hand.
+ *
+ * Next writes one HTML file per prerendered route under `.next/server/app`. Everything else the page
+ * references is either in `public/` or under `/_next/`, which the build hashes and guarantees.
+ */
+const app = resolve(import.meta.dir, "../.next/server/app");
+const publicDir = resolve(import.meta.dir, "../public");
+
+/** `.next/server/app/docs/quickstart.html` -> `/docs/quickstart`; `index.html` -> `/`. */
+function routeOf(entry: string): string {
+	const path = entry.replaceAll("\\", "/").replace(/\.html$/u, "");
+	return path === "index" ? "/" : `/${path}`;
+}
+
+const pages = new Map<
+	string,
+	{ ids: Set<string>; links: string[]; language: string | null }
+>();
+for await (const entry of new Bun.Glob("**/*.html").scan(app)) {
+	const page = {
+		ids: new Set<string>(),
+		links: [] as string[],
+		language: null as string | null,
+	};
+	await new HTMLRewriter()
+		.on("html", {
+			element(element) {
+				page.language = element.getAttribute("lang");
+			},
+		})
+		.on("[id]", {
+			element(element) {
+				const id = element.getAttribute("id");
+				if (id) {
+					page.ids.add(id);
+				}
+			},
+		})
+		.on("a[href], img[src], script[src], link[href]", {
+			element(element) {
+				const target =
+					element.getAttribute("href") ?? element.getAttribute("src");
+				if (target) {
+					page.links.push(target);
+				}
+			},
+		})
+		.transform(new Response(Bun.file(resolve(app, entry))))
+		.text();
+	pages.set(routeOf(entry), page);
+}
+
+const assets = new Set<string>();
+for await (const entry of new Bun.Glob("**/*").scan(publicDir)) {
+	assets.add(`/${entry.replaceAll("\\", "/")}`);
+}
+
+/**
+ * Prerendered route handlers land beside the pages as `<route>.body` — which is what every metadata
+ * file convention (`icon.svg`, `apple-icon.png`, `manifest.webmanifest`) becomes once it is
+ * generated rather than served from `public/`. They are real addresses, so a `<link>` to one
+ * resolves; counting them also means a page referencing a route that failed to build still fails
+ * here, which is the point of checking the output rather than the source.
+ */
+for await (const entry of new Bun.Glob("**/*.body").scan(app)) {
+	assets.add(`/${entry.replaceAll("\\", "/").replace(/\.body$/u, "")}`);
+}
+
+const failures = new Set<string>();
+const origin = "https://docs.example.com";
+for (const [route, page] of pages) {
+	for (const link of page.links) {
+		const target = new URL(link, origin + route);
+		if (target.origin !== origin) {
+			continue;
+		}
+		const path = decodeURIComponent(target.pathname).replace(/\/$/u, "") || "/";
+		// Hashed build output: the bundler emitted the filename, so it exists by construction.
+		if (path.startsWith("/_next/")) {
+			continue;
+		}
+
+		const destination = pages.get(path);
+		if (!(destination || assets.has(path))) {
+			failures.add(`${route} -> ${link} (no such page or asset)`);
+		} else if (
+			destination &&
+			target.hash &&
+			!destination.ids.has(decodeURIComponent(target.hash.slice(1)))
+		) {
+			failures.add(`${route} -> ${link} (no such heading)`);
+		}
+	}
+}
+
+if (!pages.has("/")) {
+	failures.add("Missing landing page");
+}
+if (!pages.has("/docs")) {
+	failures.add("Missing documentation overview");
+}
+for (const route of ["/es", "/es/docs"]) {
+	if (!pages.has(route)) {
+		failures.add(`Missing localized page: ${route}`);
+	}
+}
+for (const [route, page] of pages) {
+	const spanish = route === "/es" || route.startsWith("/es/");
+	// Next also emits internal error shells that do not use either locale layout.
+	if (!route.startsWith("/_") && page.language !== (spanish ? "es" : "en")) {
+		failures.add(`${route}: incorrect document language`);
+	}
+	if (
+		(route === "/docs" || route.startsWith("/docs/")) &&
+		!pages.has(`/es${route}`)
+	) {
+		failures.add(`${route}: missing prerendered translation`);
+	}
+}
+for (const locale of ["en", "es"]) {
+	if (!assets.has(`/api/search/${locale}`)) {
+		failures.add(`Missing static search index: ${locale}`);
+	}
+}
+if (failures.size) {
+	console.error([...failures].join("\n"));
+	process.exit(1);
+}
+console.info(
+	`Checked ${pages.size} pages: all internal links and anchors resolve.`,
+);

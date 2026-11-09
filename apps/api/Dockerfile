@@ -1,0 +1,65 @@
+# syntax=docker/dockerfile:1
+#
+# Monorepo image for the AI Gateway service. The BUILD CONTEXT is the repo ROOT (it needs the
+# workspace manifests and lockfile), so build from the root with:
+#
+#   docker build -f apps/api/Dockerfile -t ai-gateway-api .
+#
+# Both the dependency install and the service runtime are Bun (fast, deterministic). Bun runs
+# TypeScript directly, so there is no compile step. NOTE: Bun's TLS client can fail against self-signed
+# Postgres/Redis certificates (e.g. Coolify): connect to those over a private network without TLS, or
+# via a managed provider with a public-CA certificate. See the docs "Known errors" section.
+
+# ---- deps: production dependencies only, with Bun ----
+FROM oven/bun:1.4 AS deps
+WORKDIR /app
+ENV NODE_ENV=production
+# Copy only the manifests + lockfile first so this layer caches until dependencies change.
+COPY package.json bun.lock ./
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/docs/package.json ./apps/docs/package.json
+COPY packages/tsconfig/package.json ./packages/tsconfig/package.json
+RUN bun install --frozen-lockfile --production --filter @boelabs/ai-gateway-api
+
+# ---- runtime: Bun ----
+FROM oven/bun:1.4 AS runtime
+WORKDIR /app/apps/api
+ENV NODE_ENV=production \
+    PORT=4000
+
+# Workspace node_modules (Bun's isolated install places deps in the app dir; the root holds shared
+# tooling links) plus the linked shared packages.
+COPY --chown=bun:bun --from=deps /app/node_modules /app/node_modules
+COPY --chown=bun:bun --from=deps /app/apps/api/node_modules ./node_modules
+COPY --chown=bun:bun --from=deps /app/packages /app/packages
+
+# Application source (run directly by Bun; no build artifacts).
+COPY --chown=bun:bun apps/api/package.json ./package.json
+COPY --chown=bun:bun apps/api/src ./src
+
+# The runtime materializes extension modules into ./.extensions-cache (kept inside the package so the
+# modules' `#extensions/sdk.ts` import resolves). WORKDIR is created as root, so the non-root `bun`
+# user cannot write there by default — give it ownership of the workdir and pre-create the cache dir.
+RUN mkdir -p ./.extensions-cache && chown bun:bun . ./.extensions-cache
+
+# curl, for the platform's health check rather than ours.
+#
+# The HEALTHCHECK below needs no tools — it runs `bun`, which is obviously present. But a PaaS that
+# defines its own check (Coolify, Dokploy) executes `curl` or `wget` INSIDE this container and fails
+# with "curl: not found" on an image that has neither, which reads as an unhealthy app and rolls the
+# deployment back. Debian's bun image ships no HTTP client at all, so one is installed here.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+USER bun
+EXPOSE 4000
+
+# Container-level healthcheck hits LIVENESS, not readiness: a Docker healthcheck failure can trigger
+# a restart, and restarting will not bring Postgres/Redis back — so it must not depend on them.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD bun -e "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+# Migrations run at boot, behind an advisory lock so replicas serialise (MIGRATE_ON_BOOT=false to
+# turn that off). `bun src/db/migrate.ts` in this image still applies them as a one-off.
+CMD ["bun", "src/index.ts"]

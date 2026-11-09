@@ -1,0 +1,262 @@
+# Publishes the three images to GitHub Container Registry and, for a stable version, deploys them.
+#
+# This is what makes "deploy AI Gateway" a `docker pull` rather than a checkout and a build. Coolify,
+# Dokploy, Portainer and plain Compose all take an image reference; none of them should have to
+# clone this repository to run it.
+#
+# A `v1.2.3` tag is the only thing that changes production: merges to main are batched until someone
+# tags one. The tag must point at a commit of main whose CI passed. A prerelease (`v1.2.3-rc.1`)
+# publishes images and stops there. A manual run publishes an extra tag such as `edge` and never
+# deploys.
+name: Release images
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to publish (e.g. v1.2.3 or edge)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  # Required to push to ghcr.io as the built-in GITHUB_TOKEN; no registry secret to manage.
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Before anything is built: a release is a commit main already validated, never a branch, and
+  # never a commit whose checks failed or were cancelled by a later merge.
+  verify:
+    name: Verify the tagged commit
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      checks: read
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      # The jobs main's ruleset requires, by name.
+      REQUIRED_CHECKS: '["Lint, typecheck & unit tests", "Integration tests", "Build container images"]'
+    steps:
+      - name: Require a semver tag
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$TAG' is not a release tag such as v1.2.3 or v1.2.3-rc.1."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require a commit of main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$TAG points at $GITHUB_SHA, which is not on main. Tag a commit of main."
+            exit 1
+          fi
+
+      # A tag pushed right after a merge waits for main's CI on that commit rather than failing.
+      - name: Require main's CI to have passed
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 50 * 60))
+          while :; do
+            runs=$(gh api "repos/$GH_REPO/commits/$GITHUB_SHA/check-runs?per_page=100" --jq '.check_runs')
+            # The newest run of each required check.
+            summary=$(jq -c --argjson required "$REQUIRED_CHECKS" '
+              [ $required[] as $name
+                | [ .[] | select(.name == $name) ] | sort_by(.started_at) | last
+                | { name: $name, status: (.status // "missing"), conclusion: (.conclusion // "") } ]
+            ' <<< "$runs")
+            echo "$summary" | jq -r '.[] | "  \(.name): \(.status) \(.conclusion)"'
+            if jq -e 'all(.status == "completed" and .conclusion == "success")' <<< "$summary" >/dev/null; then
+              exit 0
+            fi
+            if jq -e 'any(.status == "completed" and .conclusion != "success")' <<< "$summary" >/dev/null; then
+              echo "::error::main's CI did not pass on $GITHUB_SHA. Tag a commit whose checks are green (a merge right after it may have cancelled them)."
+              exit 1
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::main's CI on $GITHUB_SHA did not finish in time."
+              exit 1
+            fi
+            sleep 30
+          done
+
+  # Each architecture builds on a runner of its own: arm64 used to be emulated with QEMU, which made
+  # the Next.js images take 10-13 minutes. Every build pushes by digest only; `publish` then names
+  # the pair with the release tags, so a tag never points at a single-architecture image.
+  build:
+    name: ${{ matrix.name }} (${{ matrix.arch }})
+    needs: [verify]
+    # A manual run skips the verification; a tag must pass it.
+    if: ${{ !cancelled() && needs.verify.result != 'failure' }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # One failing image must not cancel the others: a half-published release is easier to finish
+      # than to reason about.
+      fail-fast: false
+      matrix:
+        name: [gateway, dashboard, docs]
+        arch: [amd64, arm64]
+        include:
+          - name: api
+            dockerfile: apps/api/Dockerfile
+            image: ai-gateway-api
+          - name: dashboard
+            dockerfile: apps/dashboard/Dockerfile
+            image: ai-gateway-dashboard
+          - name: docs
+            dockerfile: apps/docs/Dockerfile
+            image: ai-gateway-docs
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Labels only; the tags are applied once both architectures exist.
+      - name: Derive labels
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
+          # Per image and architecture, shared with later releases; a rebuild of an unchanged layer
+          # costs nothing.
+          cache-from: type=gha,scope=${{ matrix.name }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}-${{ matrix.arch }}
+
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: digest-${{ matrix.name }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: ${{ matrix.name }}
+    needs: [verify, build]
+    # An image whose two builds succeeded is published even when another image failed.
+    if: ${{ !cancelled() && needs.verify.result != 'failure' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            image: ai-gateway-api
+          - name: dashboard
+            image: ai-gateway-dashboard
+          - name: docs
+            image: ai-gateway-docs
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-${{ matrix.name }}-*
+          merge-multiple: true
+
+      # Both architectures or nothing: a tag that resolves to amd64 alone would break every arm64
+      # host that pulls it.
+      - name: Require both architectures
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          count=$(find . -type f | wc -l)
+          if [ "$count" -ne 2 ]; then
+            echo "::error::Expected 2 digests for ${{ matrix.name }}, found $count; not publishing it."
+            exit 1
+          fi
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          # `latest` follows the newest semver release only — never a prerelease, and never a
+          # manual `edge` build.
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
+
+      - name: Create the multi-architecture manifest
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          tags=$(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          # shellcheck disable=SC2046,SC2086
+          docker buildx imagetools create $tags $(printf "$IMAGE@sha256:%s " *)
+
+      - name: Inspect
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: docker buildx imagetools inspect "$IMAGE:$VERSION"
+
+  # Only when all three images published, and only for a stable tag. The `production` environment
+  # and its approval rules apply inside the called workflow.
+  deploy:
+    name: Production
+    needs: [publish]
+    if: github.event_name == 'push' && !contains(github.ref_name, '-')
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/workflows/deploy-production.yml
+    with:
+      version: ${{ github.ref_name }}
+    secrets: inherit

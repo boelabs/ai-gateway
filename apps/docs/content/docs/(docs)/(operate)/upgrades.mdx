@@ -1,0 +1,64 @@
+---
+title: "Upgrades"
+description: "How to roll out a new version safely: migrations, breaking changes, and rollback."
+---
+
+## Pulling a new image
+
+The gateway applies pending migrations itself, at boot, before it starts listening. Pulling a new
+image is the whole upgrade — there is no migration step to sequence and nothing to remember,
+wherever you run it.
+
+Every replica does this behind a Postgres advisory lock, so a rollout to several of them serialises
+instead of racing, and the ones that lose the race find nothing pending. A migration that fails is
+fatal: the process exits rather than serve against a schema it does not understand, which leaves a
+rolling update on the previous version.
+
+Set `MIGRATE_ON_BOOT=false` if your deployment would rather own the step, and run
+`bun src/db/migrate.ts` in the gateway image yourself. Do not put that in a platform's
+"pre-deployment" hook — those usually run in the *outgoing* container, which is the old image and
+does not contain the new migration files.
+
+## Migrations are forward-only
+
+There is no `db:migrate:down`. Migrations in `src/db/migrations/` are never edited after being applied —
+a fix ships as a new migration, never a rewrite of an old one. This means:
+
+- **Rolling back the gateway image does not roll back the schema.** If a migration shipped with the
+  version you're rolling back from, the old code needs to still tolerate the new columns/enums (additive
+  changes are the norm specifically so this holds).
+- If a migration must be undone, that's a new forward migration that reverses it — plan for it the same
+  way you'd plan any other schema change, not as an emergency `DOWN`.
+
+## Before upgrading in production
+
+The adapter surface and the admin API can still change in breaking ways. Before rolling a new image
+into production:
+
+1. Check whether any admin API request or response shape you depend on changed. The OpenAPI spec
+   (`apps/api/openapi.yaml`) is the source of truth — diff it against the version you are
+   upgrading from if you have automation built against it.
+2. If the upgrade adds a router setting or a catalog field with a new default, decide explicitly
+   whether that default is what you want rather than inheriting it silently — see
+   [Routing](/docs/routing) and [Parameter policy](/docs/parameter-policy).
+3. Take a database backup. Migrations are forward-only; a backup is the only way back from one that
+   changes data semantics.
+
+## Rolling back an image
+
+Redeploying a previous image is safe only while the migrations applied since then remain compatible
+with it — a migration that dropped or rewrote data is not reversed by changing the image tag. Restore
+a pre-upgrade backup or ship a new forward migration instead.
+
+## Rolling out without dropping requests
+
+Everything above is about *what* changes. [Rollouts](/docs/rollouts) is about *how* the running
+process is replaced: the drain sequence on `SIGTERM`, the grace period your platform has to allow
+for it, and why a migration has to stay compatible with the version it is replacing while both are
+briefly live.
+
+## Next steps
+
+- [Rollouts](/docs/rollouts) — replacing a running gateway without dropping requests.
+- [Operations](/docs/operations) — the day-to-day runbook.
+- [Production checklist](/docs/production-checklist) — pre-launch verification.

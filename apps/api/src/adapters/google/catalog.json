@@ -1,0 +1,3548 @@
+{
+	"$schema": "../../../schemas/model-catalog.schema.json",
+	"schemaVersion": 1,
+	"provider": {
+		"id": "googleaistudio",
+		"adapterKey": "googleaistudio",
+		"name": "Google AI Studio",
+		"docs": [
+			"https://ai.google.dev/gemini-api/docs/models",
+			"https://ai.google.dev/gemini-api/docs/pricing",
+			"https://ai.google.dev/gemini-api/docs/thinking",
+			"https://ai.google.dev/gemini-api/docs/transcribe",
+			"https://ai.google.dev/gemini-api/docs/live-api/live-transcribe",
+			"https://ai.google.dev/api/live",
+			"https://ai.google.dev/gemini-api/docs/live-api/capabilities",
+			"https://ai.google.dev/gemini-api/docs/live-api/tools",
+			"https://ai.google.dev/gemini-api/docs/live-api/session-management",
+			"https://ai.google.dev/gemini-api/docs/live-api/live-translate"
+		]
+	},
+	"models": {
+		"gemini-omni-1.2-flash": {
+			"operations": {
+				"video.generate": {
+					"transport": "interactions",
+					"maxPromptChars": 32000,
+					"tasks": [
+						"text_to_video",
+						"image_to_video",
+						"reference_to_video",
+						"edit",
+						"extend"
+					],
+					"durations": ["3", "4", "5", "6", "7", "8", "9", "10"],
+					"supportsImageUrl": true,
+					"supportsVideoUrl": true,
+					"supportsFrameImages": true,
+					"maxInputReferences": 6,
+					"contentVariants": ["video"],
+					"pollIntervalSeconds": 10,
+					"sizes": {
+						"640x360": {
+							"aspectRatio": "16:9",
+							"resolution": "360p",
+							"outputTokensPerSecond": 1931
+						},
+						"360x640": {
+							"aspectRatio": "9:16",
+							"resolution": "360p",
+							"outputTokensPerSecond": 1931
+						},
+						"1280x720": {
+							"aspectRatio": "16:9",
+							"resolution": "720p",
+							"outputTokensPerSecond": 5792
+						},
+						"720x1280": {
+							"aspectRatio": "9:16",
+							"resolution": "720p",
+							"outputTokensPerSecond": 5792
+						}
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 150,
+				"outputCentsPerMTokens": 900,
+				"videoOutputCentsPerMTokens": 1200
+			},
+			"notes": "Output is limited to inline-safe 360p and 720p because this integration does not use the Files API. Video output is billed by token (360p 1,931 and 720p 5,792 tokens per second); usage is settled when the job reaches a terminal state."
+		},
+		"gemini-omni-1.1-flash": {
+			"operations": {
+				"video.generate": {
+					"transport": "interactions",
+					"maxPromptChars": 32000,
+					"tasks": [
+						"text_to_video",
+						"image_to_video",
+						"reference_to_video",
+						"edit",
+						"extend"
+					],
+					"durations": ["3", "4", "5", "6", "7", "8", "9", "10"],
+					"supportsImageUrl": true,
+					"supportsVideoUrl": true,
+					"supportsFrameImages": true,
+					"maxInputReferences": 6,
+					"contentVariants": ["video"],
+					"pollIntervalSeconds": 10,
+					"sizes": {
+						"640x360": {
+							"aspectRatio": "16:9",
+							"resolution": "360p",
+							"outputTokensPerSecond": 1931
+						},
+						"360x640": {
+							"aspectRatio": "9:16",
+							"resolution": "360p",
+							"outputTokensPerSecond": 1931
+						},
+						"1280x720": {
+							"aspectRatio": "16:9",
+							"resolution": "720p",
+							"outputTokensPerSecond": 5792
+						},
+						"720x1280": {
+							"aspectRatio": "9:16",
+							"resolution": "720p",
+							"outputTokensPerSecond": 5792
+						}
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 150,
+				"outputCentsPerMTokens": 900,
+				"videoOutputCentsPerMTokens": 1750
+			},
+			"notes": "Output is limited to inline-safe 360p and 720p because this integration does not use the Files API. Video output is billed by token (360p 1,931 and 720p 5,792 tokens per second); usage is settled when the job reaches a terminal state. Google announced on 2026-11-05 that requests to gemini-omni-1.1-flash are routed to gemini-omni-1.2-flash from 2026-12-03 (replacement: gemini-omni-1.2-flash).",
+			"deprecated": true
+		},
+		"veo-3.1-generate-preview": {
+			"operations": {
+				"video.generate": {
+					"maxPromptChars": 32000,
+					"durations": ["4", "6", "8"],
+					"supportsImageUrl": true,
+					"contentVariants": ["video"],
+					"pollIntervalSeconds": 10,
+					"sizes": {
+						"1280x720": {
+							"aspectRatio": "16:9",
+							"resolution": "720p"
+						},
+						"720x1280": {
+							"aspectRatio": "9:16",
+							"resolution": "720p"
+						},
+						"1920x1080": {
+							"aspectRatio": "16:9",
+							"resolution": "1080p"
+						},
+						"1080x1920": {
+							"aspectRatio": "9:16",
+							"resolution": "1080p"
+						},
+						"3840x2160": {
+							"aspectRatio": "16:9",
+							"resolution": "4k"
+						},
+						"2160x3840": {
+							"aspectRatio": "9:16",
+							"resolution": "4k"
+						}
+					},
+					"supportsFrameImages": true,
+					"supportsSeed": true,
+					"supportsVideoUrl": true,
+					"maxInputReferences": 3
+				}
+			},
+			"deprecated": true,
+			"notes": "Google's deprecations page schedules veo-3.1-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.1-flash."
+		},
+		"veo-3.1-fast-generate-preview": {
+			"operations": {
+				"video.generate": {
+					"maxPromptChars": 32000,
+					"durations": ["4", "6", "8"],
+					"supportsImageUrl": true,
+					"contentVariants": ["video"],
+					"pollIntervalSeconds": 10,
+					"sizes": {
+						"1280x720": {
+							"aspectRatio": "16:9",
+							"resolution": "720p"
+						},
+						"720x1280": {
+							"aspectRatio": "9:16",
+							"resolution": "720p"
+						},
+						"1920x1080": {
+							"aspectRatio": "16:9",
+							"resolution": "1080p"
+						},
+						"1080x1920": {
+							"aspectRatio": "9:16",
+							"resolution": "1080p"
+						},
+						"3840x2160": {
+							"aspectRatio": "16:9",
+							"resolution": "4k"
+						},
+						"2160x3840": {
+							"aspectRatio": "9:16",
+							"resolution": "4k"
+						}
+					},
+					"supportsFrameImages": true,
+					"supportsSeed": true,
+					"supportsVideoUrl": true,
+					"maxInputReferences": 3
+				}
+			},
+			"deprecated": true,
+			"notes": "Google's deprecations page schedules veo-3.1-fast-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.1-flash."
+		},
+		"veo-3.1-lite-generate-preview": {
+			"operations": {
+				"video.generate": {
+					"maxPromptChars": 32000,
+					"durations": ["4", "6", "8"],
+					"supportsImageUrl": true,
+					"contentVariants": ["video"],
+					"pollIntervalSeconds": 10,
+					"sizes": {
+						"1280x720": {
+							"aspectRatio": "16:9",
+							"resolution": "720p"
+						},
+						"720x1280": {
+							"aspectRatio": "9:16",
+							"resolution": "720p"
+						},
+						"1920x1080": {
+							"aspectRatio": "16:9",
+							"resolution": "1080p"
+						},
+						"1080x1920": {
+							"aspectRatio": "9:16",
+							"resolution": "1080p"
+						}
+					},
+					"supportsFrameImages": true,
+					"supportsSeed": true,
+					"maxInputReferences": 1
+				}
+			},
+			"deprecated": true,
+			"notes": "Google's deprecations page schedules veo-3.1-lite-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.1-flash."
+		},
+		"gemini-3.5-transcribe": {
+			"operations": {
+				"audio.transcribe": {
+					"responseFormats": [
+						"json",
+						"text",
+						"verbose_json",
+						"diarized_json",
+						"srt",
+						"vtt"
+					],
+					"supportsTimestampGranularities": true,
+					"timestampGranularities": ["word"],
+					"supportsKeywords": true,
+					"maxKeywords": 1000,
+					"supportsLanguageHints": true,
+					"modes": ["verbatim", "smart"],
+					"incompatibleFeatures": [
+						["keywords", "timestamps"],
+						["keywords", "diarization"],
+						["smart_mode", "timestamps"],
+						["smart_mode", "diarization"]
+					],
+					"maxFileBytes": 26214400
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 1200
+			},
+			"notes": "Interactions API. Audio up to 1 hour, 30 minutes with diarization or word timestamps (srt, vtt and diarized_json request word timestamps); Google enforces the duration. Diarization attributes up to 8 speakers."
+		},
+		"gemini-3.5-transcribe-live": {
+			"operations": {
+				"audio.transcribe.realtime": {
+					"supportsKeywords": true,
+					"maxKeywords": 1000,
+					"supportsLanguageHints": true,
+					"modes": ["verbatim", "smart"],
+					"turnDetection": ["server_vad", "manual"],
+					"maxUpstreamSessionSeconds": 600
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 350,
+				"outputCentsPerMTokens": 2100
+			},
+			"notes": "Live API (BidiGenerateContent). Gemini ends a session after 10 minutes; the gateway reconnects behind one public session. No diarization or word timestamps live. Gemini reports no usage for transcription sessions; the gateway estimates it from audio duration and transcript length."
+		},
+		"gemini-embedding-2": {
+			"operations": {
+				"embedding.create": {
+					"dimensions": 3072,
+					"supportsDimensions": true,
+					"minDimensions": 128,
+					"maxDimensions": 3072,
+					"encodingFormats": ["float"],
+					"maxInputTokens": 8192,
+					"supportsTokenInput": false
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 20,
+				"outputCentsPerMTokens": 0
+			},
+			"notes": "Upstream model is multimodal, but the gateway's OpenAI-compatible embeddings contract currently maps text inputs only."
+		},
+		"gemini-embedding-001": {
+			"operations": {
+				"embedding.create": {
+					"dimensions": 3072,
+					"supportsDimensions": true,
+					"minDimensions": 128,
+					"maxDimensions": 3072,
+					"encodingFormats": ["float"],
+					"maxInputTokens": 2048,
+					"supportsTokenInput": false
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 15,
+				"outputCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-embedding-001; it shuts down on 2028-05-14 (replacement: gemini-embedding-2)."
+		},
+		"gemini-nano-banana-2.1": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"qualityMappings": {
+						"low": {
+							"thinkingLevel": "minimal"
+						},
+						"high": {
+							"thinkingLevel": "high"
+						}
+					},
+					"sizes": {
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"2048x2048": {
+							"aspectRatio": "1:1",
+							"imageSize": "2K"
+						},
+						"4096x4096": {
+							"aspectRatio": "1:1",
+							"imageSize": "4K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"512x2048": {
+							"aspectRatio": "1:4",
+							"imageSize": "1K"
+						},
+						"1024x4096": {
+							"aspectRatio": "1:4",
+							"imageSize": "2K"
+						},
+						"2048x8192": {
+							"aspectRatio": "1:4",
+							"imageSize": "4K"
+						},
+						"384x3072": {
+							"aspectRatio": "1:8",
+							"imageSize": "1K"
+						},
+						"768x6144": {
+							"aspectRatio": "1:8",
+							"imageSize": "2K"
+						},
+						"1536x12288": {
+							"aspectRatio": "1:8",
+							"imageSize": "4K"
+						},
+						"1696x2528": {
+							"aspectRatio": "2:3",
+							"imageSize": "2K"
+						},
+						"3392x5056": {
+							"aspectRatio": "2:3",
+							"imageSize": "4K"
+						},
+						"2528x1696": {
+							"aspectRatio": "3:2",
+							"imageSize": "2K"
+						},
+						"5056x3392": {
+							"aspectRatio": "3:2",
+							"imageSize": "4K"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1792x2400": {
+							"aspectRatio": "3:4",
+							"imageSize": "2K"
+						},
+						"3584x4800": {
+							"aspectRatio": "3:4",
+							"imageSize": "4K"
+						},
+						"2048x512": {
+							"aspectRatio": "4:1",
+							"imageSize": "1K"
+						},
+						"4096x1024": {
+							"aspectRatio": "4:1",
+							"imageSize": "2K"
+						},
+						"8192x2048": {
+							"aspectRatio": "4:1",
+							"imageSize": "4K"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"2400x1792": {
+							"aspectRatio": "4:3",
+							"imageSize": "2K"
+						},
+						"4800x3584": {
+							"aspectRatio": "4:3",
+							"imageSize": "4K"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1856x2304": {
+							"aspectRatio": "4:5",
+							"imageSize": "2K"
+						},
+						"3712x4608": {
+							"aspectRatio": "4:5",
+							"imageSize": "4K"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"2304x1856": {
+							"aspectRatio": "5:4",
+							"imageSize": "2K"
+						},
+						"4608x3712": {
+							"aspectRatio": "5:4",
+							"imageSize": "4K"
+						},
+						"3072x384": {
+							"aspectRatio": "8:1",
+							"imageSize": "1K"
+						},
+						"6144x768": {
+							"aspectRatio": "8:1",
+							"imageSize": "2K"
+						},
+						"12288x1536": {
+							"aspectRatio": "8:1",
+							"imageSize": "4K"
+						},
+						"1536x2752": {
+							"aspectRatio": "9:16",
+							"imageSize": "2K"
+						},
+						"3072x5504": {
+							"aspectRatio": "9:16",
+							"imageSize": "4K"
+						},
+						"2752x1536": {
+							"aspectRatio": "16:9",
+							"imageSize": "2K"
+						},
+						"5504x3072": {
+							"aspectRatio": "16:9",
+							"imageSize": "4K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						},
+						"3168x1344": {
+							"aspectRatio": "21:9",
+							"imageSize": "2K"
+						},
+						"6336x2688": {
+							"aspectRatio": "21:9",
+							"imageSize": "4K"
+						}
+					}
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"qualityMappings": {
+						"low": {
+							"thinkingLevel": "minimal"
+						},
+						"high": {
+							"thinkingLevel": "high"
+						}
+					},
+					"sizes": {
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"2048x2048": {
+							"aspectRatio": "1:1",
+							"imageSize": "2K"
+						},
+						"4096x4096": {
+							"aspectRatio": "1:1",
+							"imageSize": "4K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"512x2048": {
+							"aspectRatio": "1:4",
+							"imageSize": "1K"
+						},
+						"1024x4096": {
+							"aspectRatio": "1:4",
+							"imageSize": "2K"
+						},
+						"2048x8192": {
+							"aspectRatio": "1:4",
+							"imageSize": "4K"
+						},
+						"384x3072": {
+							"aspectRatio": "1:8",
+							"imageSize": "1K"
+						},
+						"768x6144": {
+							"aspectRatio": "1:8",
+							"imageSize": "2K"
+						},
+						"1536x12288": {
+							"aspectRatio": "1:8",
+							"imageSize": "4K"
+						},
+						"1696x2528": {
+							"aspectRatio": "2:3",
+							"imageSize": "2K"
+						},
+						"3392x5056": {
+							"aspectRatio": "2:3",
+							"imageSize": "4K"
+						},
+						"2528x1696": {
+							"aspectRatio": "3:2",
+							"imageSize": "2K"
+						},
+						"5056x3392": {
+							"aspectRatio": "3:2",
+							"imageSize": "4K"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1792x2400": {
+							"aspectRatio": "3:4",
+							"imageSize": "2K"
+						},
+						"3584x4800": {
+							"aspectRatio": "3:4",
+							"imageSize": "4K"
+						},
+						"2048x512": {
+							"aspectRatio": "4:1",
+							"imageSize": "1K"
+						},
+						"4096x1024": {
+							"aspectRatio": "4:1",
+							"imageSize": "2K"
+						},
+						"8192x2048": {
+							"aspectRatio": "4:1",
+							"imageSize": "4K"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"2400x1792": {
+							"aspectRatio": "4:3",
+							"imageSize": "2K"
+						},
+						"4800x3584": {
+							"aspectRatio": "4:3",
+							"imageSize": "4K"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1856x2304": {
+							"aspectRatio": "4:5",
+							"imageSize": "2K"
+						},
+						"3712x4608": {
+							"aspectRatio": "4:5",
+							"imageSize": "4K"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"2304x1856": {
+							"aspectRatio": "5:4",
+							"imageSize": "2K"
+						},
+						"4608x3712": {
+							"aspectRatio": "5:4",
+							"imageSize": "4K"
+						},
+						"3072x384": {
+							"aspectRatio": "8:1",
+							"imageSize": "1K"
+						},
+						"6144x768": {
+							"aspectRatio": "8:1",
+							"imageSize": "2K"
+						},
+						"12288x1536": {
+							"aspectRatio": "8:1",
+							"imageSize": "4K"
+						},
+						"1536x2752": {
+							"aspectRatio": "9:16",
+							"imageSize": "2K"
+						},
+						"3072x5504": {
+							"aspectRatio": "9:16",
+							"imageSize": "4K"
+						},
+						"2752x1536": {
+							"aspectRatio": "16:9",
+							"imageSize": "2K"
+						},
+						"5504x3072": {
+							"aspectRatio": "16:9",
+							"imageSize": "4K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						},
+						"3168x1344": {
+							"aspectRatio": "21:9",
+							"imageSize": "2K"
+						},
+						"6336x2688": {
+							"aspectRatio": "21:9",
+							"imageSize": "4K"
+						}
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 150,
+				"outputCentsPerMTokens": 750,
+				"imageOutputCentsPerMTokens": 3000
+			},
+			"notes": "Sizes follow Google's Nano Banana 2.1 aspect-ratio table (no 512px tier). Output is priced at the text/thinking rate ($7.50/1M) like its siblings; Google bills image output tokens at $30/1M (1K = 1,120 tokens, ~$0.0336/image), which token pricing cannot express. Caching is not supported. Google's medium thinking level (the model default) has no quality rung."
+		},
+		"gemini-3.1-flash-image": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"qualityMappings": {
+						"low": {
+							"thinkingLevel": "minimal"
+						},
+						"high": {
+							"thinkingLevel": "high"
+						}
+					},
+					"sizes": {
+						"512x512": {
+							"aspectRatio": "1:1",
+							"imageSize": "512"
+						},
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"2048x2048": {
+							"aspectRatio": "1:1",
+							"imageSize": "2K"
+						},
+						"4096x4096": {
+							"aspectRatio": "1:1",
+							"imageSize": "4K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"256x1024": {
+							"aspectRatio": "1:4",
+							"imageSize": "512"
+						},
+						"512x2048": {
+							"aspectRatio": "1:4",
+							"imageSize": "1K"
+						},
+						"1024x4096": {
+							"aspectRatio": "1:4",
+							"imageSize": "2K"
+						},
+						"2048x8192": {
+							"aspectRatio": "1:4",
+							"imageSize": "4K"
+						},
+						"192x1536": {
+							"aspectRatio": "1:8",
+							"imageSize": "512"
+						},
+						"384x3072": {
+							"aspectRatio": "1:8",
+							"imageSize": "1K"
+						},
+						"768x6144": {
+							"aspectRatio": "1:8",
+							"imageSize": "2K"
+						},
+						"1536x12288": {
+							"aspectRatio": "1:8",
+							"imageSize": "4K"
+						},
+						"424x632": {
+							"aspectRatio": "2:3",
+							"imageSize": "512"
+						},
+						"1696x2528": {
+							"aspectRatio": "2:3",
+							"imageSize": "2K"
+						},
+						"3392x5056": {
+							"aspectRatio": "2:3",
+							"imageSize": "4K"
+						},
+						"632x424": {
+							"aspectRatio": "3:2",
+							"imageSize": "512"
+						},
+						"2528x1696": {
+							"aspectRatio": "3:2",
+							"imageSize": "2K"
+						},
+						"5056x3392": {
+							"aspectRatio": "3:2",
+							"imageSize": "4K"
+						},
+						"448x600": {
+							"aspectRatio": "3:4",
+							"imageSize": "512"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1792x2400": {
+							"aspectRatio": "3:4",
+							"imageSize": "2K"
+						},
+						"3584x4800": {
+							"aspectRatio": "3:4",
+							"imageSize": "4K"
+						},
+						"1024x256": {
+							"aspectRatio": "4:1",
+							"imageSize": "512"
+						},
+						"2048x512": {
+							"aspectRatio": "4:1",
+							"imageSize": "1K"
+						},
+						"4096x1024": {
+							"aspectRatio": "4:1",
+							"imageSize": "2K"
+						},
+						"8192x2048": {
+							"aspectRatio": "4:1",
+							"imageSize": "4K"
+						},
+						"600x448": {
+							"aspectRatio": "4:3",
+							"imageSize": "512"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"2400x1792": {
+							"aspectRatio": "4:3",
+							"imageSize": "2K"
+						},
+						"4800x3584": {
+							"aspectRatio": "4:3",
+							"imageSize": "4K"
+						},
+						"464x576": {
+							"aspectRatio": "4:5",
+							"imageSize": "512"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1856x2304": {
+							"aspectRatio": "4:5",
+							"imageSize": "2K"
+						},
+						"3712x4608": {
+							"aspectRatio": "4:5",
+							"imageSize": "4K"
+						},
+						"576x464": {
+							"aspectRatio": "5:4",
+							"imageSize": "512"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"2304x1856": {
+							"aspectRatio": "5:4",
+							"imageSize": "2K"
+						},
+						"4608x3712": {
+							"aspectRatio": "5:4",
+							"imageSize": "4K"
+						},
+						"1536x192": {
+							"aspectRatio": "8:1",
+							"imageSize": "512"
+						},
+						"3072x384": {
+							"aspectRatio": "8:1",
+							"imageSize": "1K"
+						},
+						"6144x768": {
+							"aspectRatio": "8:1",
+							"imageSize": "2K"
+						},
+						"12288x1536": {
+							"aspectRatio": "8:1",
+							"imageSize": "4K"
+						},
+						"384x688": {
+							"aspectRatio": "9:16",
+							"imageSize": "512"
+						},
+						"1536x2752": {
+							"aspectRatio": "9:16",
+							"imageSize": "2K"
+						},
+						"3072x5504": {
+							"aspectRatio": "9:16",
+							"imageSize": "4K"
+						},
+						"688x384": {
+							"aspectRatio": "16:9",
+							"imageSize": "512"
+						},
+						"2752x1536": {
+							"aspectRatio": "16:9",
+							"imageSize": "2K"
+						},
+						"5504x3072": {
+							"aspectRatio": "16:9",
+							"imageSize": "4K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						},
+						"3168x1344": {
+							"aspectRatio": "21:9",
+							"imageSize": "2K"
+						},
+						"6336x2688": {
+							"aspectRatio": "21:9",
+							"imageSize": "4K"
+						}
+					}
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"qualityMappings": {
+						"low": {
+							"thinkingLevel": "minimal"
+						},
+						"high": {
+							"thinkingLevel": "high"
+						}
+					},
+					"sizes": {
+						"512x512": {
+							"aspectRatio": "1:1",
+							"imageSize": "512"
+						},
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"2048x2048": {
+							"aspectRatio": "1:1",
+							"imageSize": "2K"
+						},
+						"4096x4096": {
+							"aspectRatio": "1:1",
+							"imageSize": "4K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"256x1024": {
+							"aspectRatio": "1:4",
+							"imageSize": "512"
+						},
+						"512x2048": {
+							"aspectRatio": "1:4",
+							"imageSize": "1K"
+						},
+						"1024x4096": {
+							"aspectRatio": "1:4",
+							"imageSize": "2K"
+						},
+						"2048x8192": {
+							"aspectRatio": "1:4",
+							"imageSize": "4K"
+						},
+						"192x1536": {
+							"aspectRatio": "1:8",
+							"imageSize": "512"
+						},
+						"384x3072": {
+							"aspectRatio": "1:8",
+							"imageSize": "1K"
+						},
+						"768x6144": {
+							"aspectRatio": "1:8",
+							"imageSize": "2K"
+						},
+						"1536x12288": {
+							"aspectRatio": "1:8",
+							"imageSize": "4K"
+						},
+						"424x632": {
+							"aspectRatio": "2:3",
+							"imageSize": "512"
+						},
+						"1696x2528": {
+							"aspectRatio": "2:3",
+							"imageSize": "2K"
+						},
+						"3392x5056": {
+							"aspectRatio": "2:3",
+							"imageSize": "4K"
+						},
+						"632x424": {
+							"aspectRatio": "3:2",
+							"imageSize": "512"
+						},
+						"2528x1696": {
+							"aspectRatio": "3:2",
+							"imageSize": "2K"
+						},
+						"5056x3392": {
+							"aspectRatio": "3:2",
+							"imageSize": "4K"
+						},
+						"448x600": {
+							"aspectRatio": "3:4",
+							"imageSize": "512"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1792x2400": {
+							"aspectRatio": "3:4",
+							"imageSize": "2K"
+						},
+						"3584x4800": {
+							"aspectRatio": "3:4",
+							"imageSize": "4K"
+						},
+						"1024x256": {
+							"aspectRatio": "4:1",
+							"imageSize": "512"
+						},
+						"2048x512": {
+							"aspectRatio": "4:1",
+							"imageSize": "1K"
+						},
+						"4096x1024": {
+							"aspectRatio": "4:1",
+							"imageSize": "2K"
+						},
+						"8192x2048": {
+							"aspectRatio": "4:1",
+							"imageSize": "4K"
+						},
+						"600x448": {
+							"aspectRatio": "4:3",
+							"imageSize": "512"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"2400x1792": {
+							"aspectRatio": "4:3",
+							"imageSize": "2K"
+						},
+						"4800x3584": {
+							"aspectRatio": "4:3",
+							"imageSize": "4K"
+						},
+						"464x576": {
+							"aspectRatio": "4:5",
+							"imageSize": "512"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1856x2304": {
+							"aspectRatio": "4:5",
+							"imageSize": "2K"
+						},
+						"3712x4608": {
+							"aspectRatio": "4:5",
+							"imageSize": "4K"
+						},
+						"576x464": {
+							"aspectRatio": "5:4",
+							"imageSize": "512"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"2304x1856": {
+							"aspectRatio": "5:4",
+							"imageSize": "2K"
+						},
+						"4608x3712": {
+							"aspectRatio": "5:4",
+							"imageSize": "4K"
+						},
+						"1536x192": {
+							"aspectRatio": "8:1",
+							"imageSize": "512"
+						},
+						"3072x384": {
+							"aspectRatio": "8:1",
+							"imageSize": "1K"
+						},
+						"6144x768": {
+							"aspectRatio": "8:1",
+							"imageSize": "2K"
+						},
+						"12288x1536": {
+							"aspectRatio": "8:1",
+							"imageSize": "4K"
+						},
+						"384x688": {
+							"aspectRatio": "9:16",
+							"imageSize": "512"
+						},
+						"1536x2752": {
+							"aspectRatio": "9:16",
+							"imageSize": "2K"
+						},
+						"3072x5504": {
+							"aspectRatio": "9:16",
+							"imageSize": "4K"
+						},
+						"688x384": {
+							"aspectRatio": "16:9",
+							"imageSize": "512"
+						},
+						"2752x1536": {
+							"aspectRatio": "16:9",
+							"imageSize": "2K"
+						},
+						"5504x3072": {
+							"aspectRatio": "16:9",
+							"imageSize": "4K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						},
+						"3168x1344": {
+							"aspectRatio": "21:9",
+							"imageSize": "2K"
+						},
+						"6336x2688": {
+							"aspectRatio": "21:9",
+							"imageSize": "4K"
+						}
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 50,
+				"outputCentsPerMTokens": 300,
+				"cacheReadCentsPerMTokens": 5,
+				"imageOutputCentsPerMTokens": 6000
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-3.1-flash-image on 2026-10-06 with no shutdown date announced; replacement gemini-nano-banana-2.1. Sizes follow Google's published aspect-ratio table. The 21:9 / 512px cell is omitted: the documented 792x168 is not a 21:9 frame, so it is left out rather than guessed."
+		},
+		"gemini-3.1-flash-lite-image": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						}
+					},
+					"qualityMappings": {
+						"low": {
+							"thinkingLevel": "minimal"
+						},
+						"high": {
+							"thinkingLevel": "high"
+						}
+					}
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						}
+					},
+					"qualityMappings": {
+						"low": {
+							"thinkingLevel": "minimal"
+						},
+						"high": {
+							"thinkingLevel": "high"
+						}
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 25,
+				"outputCentsPerMTokens": 150,
+				"cacheReadCentsPerMTokens": 3,
+				"imageOutputCentsPerMTokens": 3000
+			}
+		},
+		"gemini-3-pro-image": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"2048x2048": {
+							"aspectRatio": "1:1",
+							"imageSize": "2K"
+						},
+						"4096x4096": {
+							"aspectRatio": "1:1",
+							"imageSize": "4K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1696x2528": {
+							"aspectRatio": "2:3",
+							"imageSize": "2K"
+						},
+						"3392x5056": {
+							"aspectRatio": "2:3",
+							"imageSize": "4K"
+						},
+						"2528x1696": {
+							"aspectRatio": "3:2",
+							"imageSize": "2K"
+						},
+						"5056x3392": {
+							"aspectRatio": "3:2",
+							"imageSize": "4K"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1792x2400": {
+							"aspectRatio": "3:4",
+							"imageSize": "2K"
+						},
+						"3584x4800": {
+							"aspectRatio": "3:4",
+							"imageSize": "4K"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"2400x1792": {
+							"aspectRatio": "4:3",
+							"imageSize": "2K"
+						},
+						"4800x3584": {
+							"aspectRatio": "4:3",
+							"imageSize": "4K"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1856x2304": {
+							"aspectRatio": "4:5",
+							"imageSize": "2K"
+						},
+						"3712x4608": {
+							"aspectRatio": "4:5",
+							"imageSize": "4K"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"2304x1856": {
+							"aspectRatio": "5:4",
+							"imageSize": "2K"
+						},
+						"4608x3712": {
+							"aspectRatio": "5:4",
+							"imageSize": "4K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"1536x2752": {
+							"aspectRatio": "9:16",
+							"imageSize": "2K"
+						},
+						"3072x5504": {
+							"aspectRatio": "9:16",
+							"imageSize": "4K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"2752x1536": {
+							"aspectRatio": "16:9",
+							"imageSize": "2K"
+						},
+						"5504x3072": {
+							"aspectRatio": "16:9",
+							"imageSize": "4K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						},
+						"3168x1344": {
+							"aspectRatio": "21:9",
+							"imageSize": "2K"
+						},
+						"6336x2688": {
+							"aspectRatio": "21:9",
+							"imageSize": "4K"
+						}
+					}
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"2048x2048": {
+							"aspectRatio": "1:1",
+							"imageSize": "2K"
+						},
+						"4096x4096": {
+							"aspectRatio": "1:1",
+							"imageSize": "4K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1696x2528": {
+							"aspectRatio": "2:3",
+							"imageSize": "2K"
+						},
+						"3392x5056": {
+							"aspectRatio": "2:3",
+							"imageSize": "4K"
+						},
+						"2528x1696": {
+							"aspectRatio": "3:2",
+							"imageSize": "2K"
+						},
+						"5056x3392": {
+							"aspectRatio": "3:2",
+							"imageSize": "4K"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1792x2400": {
+							"aspectRatio": "3:4",
+							"imageSize": "2K"
+						},
+						"3584x4800": {
+							"aspectRatio": "3:4",
+							"imageSize": "4K"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"2400x1792": {
+							"aspectRatio": "4:3",
+							"imageSize": "2K"
+						},
+						"4800x3584": {
+							"aspectRatio": "4:3",
+							"imageSize": "4K"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1856x2304": {
+							"aspectRatio": "4:5",
+							"imageSize": "2K"
+						},
+						"3712x4608": {
+							"aspectRatio": "4:5",
+							"imageSize": "4K"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"2304x1856": {
+							"aspectRatio": "5:4",
+							"imageSize": "2K"
+						},
+						"4608x3712": {
+							"aspectRatio": "5:4",
+							"imageSize": "4K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"1536x2752": {
+							"aspectRatio": "9:16",
+							"imageSize": "2K"
+						},
+						"3072x5504": {
+							"aspectRatio": "9:16",
+							"imageSize": "4K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"2752x1536": {
+							"aspectRatio": "16:9",
+							"imageSize": "2K"
+						},
+						"5504x3072": {
+							"aspectRatio": "16:9",
+							"imageSize": "4K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						},
+						"3168x1344": {
+							"aspectRatio": "21:9",
+							"imageSize": "2K"
+						},
+						"6336x2688": {
+							"aspectRatio": "21:9",
+							"imageSize": "4K"
+						}
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 1200,
+				"cacheReadCentsPerMTokens": 20,
+				"cacheWriteCentsPerMTokens": 37.5,
+				"imageOutputCentsPerMTokens": 12000
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-3-pro-image; no shutdown date is published yet (replacement: gemini-nano-banana-2.1)."
+		},
+		"gemini-2.5-flash-image": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 3,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {
+							"aspectRatio": "1:1"
+						},
+						"832x1248": {
+							"aspectRatio": "2:3"
+						},
+						"1248x832": {
+							"aspectRatio": "3:2"
+						},
+						"864x1184": {
+							"aspectRatio": "3:4"
+						},
+						"1184x864": {
+							"aspectRatio": "4:3"
+						},
+						"896x1152": {
+							"aspectRatio": "4:5"
+						},
+						"1152x896": {
+							"aspectRatio": "5:4"
+						},
+						"768x1344": {
+							"aspectRatio": "9:16"
+						},
+						"1344x768": {
+							"aspectRatio": "16:9"
+						},
+						"1536x672": {
+							"aspectRatio": "21:9"
+						}
+					}
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 3,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {
+							"aspectRatio": "1:1"
+						},
+						"832x1248": {
+							"aspectRatio": "2:3"
+						},
+						"1248x832": {
+							"aspectRatio": "3:2"
+						},
+						"864x1184": {
+							"aspectRatio": "3:4"
+						},
+						"1184x864": {
+							"aspectRatio": "4:3"
+						},
+						"896x1152": {
+							"aspectRatio": "4:5"
+						},
+						"1152x896": {
+							"aspectRatio": "5:4"
+						},
+						"768x1344": {
+							"aspectRatio": "9:16"
+						},
+						"1344x768": {
+							"aspectRatio": "16:9"
+						},
+						"1536x672": {
+							"aspectRatio": "21:9"
+						}
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 30,
+				"outputCentsPerMTokens": 250,
+				"cacheReadCentsPerMTokens": 3,
+				"cacheWriteCentsPerMTokens": 4.166667,
+				"imageOutputCentsPerMTokens": 3000
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-2.5-flash-image; its deprecations page lists shutdown on 2027-03-15 (the pricing page says 2026-10-02); replacement gemini-3.1-flash-lite-image."
+		},
+		"gemini-4-argon": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"parameters": {
+						"max_tokens": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["low", "medium", "high"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 10
+			},
+			"notes": "Introductory pricing through 2026-11-30. From 2026-12-01 Google publishes $4.00 input / $20.00 output / $0.20 cached input per 1M tokens: update before then. Implicit caching only (no explicit cache or storage price). Non-streaming generateContent caps output at 32,768 tokens (a higher max_output_tokens without a continuation token returns 400); streaming caps at 65,536. Long decode up to 1,048,576 needs continuation hops the adapter does not run. temperature/top_p/top_k are ignored by Gemini 4."
+		},
+		"gemini-3.1-pro-preview": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 1200,
+				"cacheReadCentsPerMTokens": 20,
+				"tiers": [
+					{
+						"aboveInputTokens": 200000,
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 1800,
+						"cacheReadCentsPerMTokens": 40
+					}
+				],
+				"cacheWriteCentsPerMTokens": 18.75
+			}
+		},
+		"gemini-3.1-pro-preview-customtools": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["low", "medium", "high"]
+					},
+					"parameters": {
+						"reasoning": true,
+						"include_reasoning": true,
+						"max_tokens": true,
+						"temperature": true,
+						"top_p": true,
+						"seed": true,
+						"response_format": true,
+						"tools": true,
+						"tool_choice": true,
+						"structured_outputs": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 1200,
+				"cacheReadCentsPerMTokens": 20,
+				"tiers": [
+					{
+						"aboveInputTokens": 200000,
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 1800,
+						"cacheReadCentsPerMTokens": 40
+					}
+				],
+				"cacheWriteCentsPerMTokens": 37.5
+			}
+		},
+		"gemini-3.6-flash": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["minimal", "low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 75,
+				"outputCentsPerMTokens": 375,
+				"cacheReadCentsPerMTokens": 7.5,
+				"cacheWriteCentsPerMTokens": 2.083333
+			}
+		},
+		"gemini-3.7-flash": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 75,
+				"outputCentsPerMTokens": 375,
+				"cacheReadCentsPerMTokens": 7.5,
+				"cacheWriteCentsPerMTokens": 2.083333
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-3.7-flash on 2026-10-08; API requests to it are automatically routed to gemini-3.8-flash (replacement)."
+		},
+		"gemini-3.5-flash": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["minimal", "low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 150,
+				"outputCentsPerMTokens": 900,
+				"cacheReadCentsPerMTokens": 15,
+				"cacheWriteCentsPerMTokens": 4.166667
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-3.5-flash on 2026-10-08; API requests to it are automatically routed to gemini-3.6-flash (replacement)."
+		},
+		"gemini-3.5-flash-lite": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["minimal", "low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 30,
+				"outputCentsPerMTokens": 250,
+				"cacheReadCentsPerMTokens": 3,
+				"cacheWriteCentsPerMTokens": 4.166667
+			}
+		},
+		"gemini-3-flash-preview": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["minimal", "low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 50,
+				"outputCentsPerMTokens": 300,
+				"cacheReadCentsPerMTokens": 5,
+				"cacheWriteCentsPerMTokens": 4.166667
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-3-flash-preview; no shutdown date is published yet (replacement: gemini-3.6-flash)."
+		},
+		"gemini-3.1-flash-lite": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["minimal", "low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 25,
+				"outputCentsPerMTokens": 150,
+				"cacheReadCentsPerMTokens": 2.5,
+				"cacheWriteCentsPerMTokens": 4.166667
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-3.1-flash-lite; it shuts down on 2027-05-07 (replacement: gemini-3.5-flash-lite)."
+		},
+		"gemini-2.5-pro": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"reasoning": {
+						"kind": "gemini_budget",
+						"levels": ["minimal", "low", "medium", "high", "xhigh"],
+						"budgets": {
+							"minimal": 128,
+							"low": 2048,
+							"medium": 8192,
+							"high": 16384,
+							"xhigh": 32768
+						}
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 125,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 12.5,
+				"tiers": [
+					{
+						"aboveInputTokens": 200000,
+						"inputCentsPerMTokens": 250,
+						"outputCentsPerMTokens": 1500,
+						"cacheReadCentsPerMTokens": 25
+					}
+				],
+				"cacheWriteCentsPerMTokens": 37.5
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-2.5-pro on 2026-11-02; from 2026-12-01 requests route to gemini-3.8-flash and bill at its rates (replacement: gemini-3.8-flash)."
+		},
+		"gemini-2.5-flash": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"reasoning": {
+						"kind": "gemini_budget",
+						"levels": ["none", "minimal", "low", "medium", "high", "xhigh"],
+						"budgets": {
+							"minimal": 512,
+							"low": 1024,
+							"medium": 4096,
+							"high": 8192,
+							"xhigh": 24576
+						}
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 30,
+				"outputCentsPerMTokens": 250,
+				"cacheReadCentsPerMTokens": 3,
+				"cacheWriteCentsPerMTokens": 8.333333
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-2.5-flash on 2026-11-02; from 2026-12-01 requests route to gemini-3.5-flash-lite and bill at its rates (replacement: gemini-3.5-flash-lite)."
+		},
+		"gemini-2.5-flash-lite": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"reasoning": {
+						"kind": "gemini_budget",
+						"levels": ["none", "minimal", "low", "medium", "high", "xhigh"],
+						"budgets": {
+							"minimal": 512,
+							"low": 1024,
+							"medium": 4096,
+							"high": 8192,
+							"xhigh": 24576
+						}
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 10,
+				"outputCentsPerMTokens": 40,
+				"cacheReadCentsPerMTokens": 1,
+				"cacheWriteCentsPerMTokens": 8.333333
+			}
+		},
+		"gemma-4-26b-a4b-it": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 262144,
+					"maxOutputTokens": 262144,
+					"parameters": {
+						"frequency_penalty": true,
+						"include_reasoning": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"reasoning": true,
+						"repetition_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_k": true,
+						"top_logprobs": true,
+						"top_p": true,
+						"logit_bias": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 0,
+				"outputCentsPerMTokens": 0,
+				"cacheReadCentsPerMTokens": 0
+			}
+		},
+		"gemini-3.1-flash-lite-preview": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 25,
+				"outputCentsPerMTokens": 150,
+				"cacheReadCentsPerMTokens": 2.5,
+				"cacheWriteCentsPerMTokens": 4.166667
+			},
+			"deprecated": true,
+			"notes": "Shut down by Google on 2026-05-25 (deprecations page); replacement gemini-3.1-flash-lite."
+		},
+		"gemini-3.1-flash-image-preview": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 65536,
+					"maxOutputTokens": 32768,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"temperature": true,
+						"top_p": true,
+						"stop": true,
+						"structured_outputs": true,
+						"reasoning_effort": true
+					}
+				},
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"qualityMappings": {
+						"low": {
+							"thinkingLevel": "minimal"
+						},
+						"high": {
+							"thinkingLevel": "high"
+						}
+					},
+					"sizes": {
+						"512x512": {
+							"aspectRatio": "1:1",
+							"imageSize": "512"
+						},
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"2048x2048": {
+							"aspectRatio": "1:1",
+							"imageSize": "2K"
+						},
+						"4096x4096": {
+							"aspectRatio": "1:1",
+							"imageSize": "4K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"256x1024": {
+							"aspectRatio": "1:4",
+							"imageSize": "512"
+						},
+						"512x2048": {
+							"aspectRatio": "1:4",
+							"imageSize": "1K"
+						},
+						"1024x4096": {
+							"aspectRatio": "1:4",
+							"imageSize": "2K"
+						},
+						"2048x8192": {
+							"aspectRatio": "1:4",
+							"imageSize": "4K"
+						},
+						"192x1536": {
+							"aspectRatio": "1:8",
+							"imageSize": "512"
+						},
+						"384x3072": {
+							"aspectRatio": "1:8",
+							"imageSize": "1K"
+						},
+						"768x6144": {
+							"aspectRatio": "1:8",
+							"imageSize": "2K"
+						},
+						"1536x12288": {
+							"aspectRatio": "1:8",
+							"imageSize": "4K"
+						},
+						"424x632": {
+							"aspectRatio": "2:3",
+							"imageSize": "512"
+						},
+						"1696x2528": {
+							"aspectRatio": "2:3",
+							"imageSize": "2K"
+						},
+						"3392x5056": {
+							"aspectRatio": "2:3",
+							"imageSize": "4K"
+						},
+						"632x424": {
+							"aspectRatio": "3:2",
+							"imageSize": "512"
+						},
+						"2528x1696": {
+							"aspectRatio": "3:2",
+							"imageSize": "2K"
+						},
+						"5056x3392": {
+							"aspectRatio": "3:2",
+							"imageSize": "4K"
+						},
+						"448x600": {
+							"aspectRatio": "3:4",
+							"imageSize": "512"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1792x2400": {
+							"aspectRatio": "3:4",
+							"imageSize": "2K"
+						},
+						"3584x4800": {
+							"aspectRatio": "3:4",
+							"imageSize": "4K"
+						},
+						"1024x256": {
+							"aspectRatio": "4:1",
+							"imageSize": "512"
+						},
+						"2048x512": {
+							"aspectRatio": "4:1",
+							"imageSize": "1K"
+						},
+						"4096x1024": {
+							"aspectRatio": "4:1",
+							"imageSize": "2K"
+						},
+						"8192x2048": {
+							"aspectRatio": "4:1",
+							"imageSize": "4K"
+						},
+						"600x448": {
+							"aspectRatio": "4:3",
+							"imageSize": "512"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"2400x1792": {
+							"aspectRatio": "4:3",
+							"imageSize": "2K"
+						},
+						"4800x3584": {
+							"aspectRatio": "4:3",
+							"imageSize": "4K"
+						},
+						"464x576": {
+							"aspectRatio": "4:5",
+							"imageSize": "512"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1856x2304": {
+							"aspectRatio": "4:5",
+							"imageSize": "2K"
+						},
+						"3712x4608": {
+							"aspectRatio": "4:5",
+							"imageSize": "4K"
+						},
+						"576x464": {
+							"aspectRatio": "5:4",
+							"imageSize": "512"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"2304x1856": {
+							"aspectRatio": "5:4",
+							"imageSize": "2K"
+						},
+						"4608x3712": {
+							"aspectRatio": "5:4",
+							"imageSize": "4K"
+						},
+						"1536x192": {
+							"aspectRatio": "8:1",
+							"imageSize": "512"
+						},
+						"3072x384": {
+							"aspectRatio": "8:1",
+							"imageSize": "1K"
+						},
+						"6144x768": {
+							"aspectRatio": "8:1",
+							"imageSize": "2K"
+						},
+						"12288x1536": {
+							"aspectRatio": "8:1",
+							"imageSize": "4K"
+						},
+						"384x688": {
+							"aspectRatio": "9:16",
+							"imageSize": "512"
+						},
+						"1536x2752": {
+							"aspectRatio": "9:16",
+							"imageSize": "2K"
+						},
+						"3072x5504": {
+							"aspectRatio": "9:16",
+							"imageSize": "4K"
+						},
+						"688x384": {
+							"aspectRatio": "16:9",
+							"imageSize": "512"
+						},
+						"2752x1536": {
+							"aspectRatio": "16:9",
+							"imageSize": "2K"
+						},
+						"5504x3072": {
+							"aspectRatio": "16:9",
+							"imageSize": "4K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						},
+						"3168x1344": {
+							"aspectRatio": "21:9",
+							"imageSize": "2K"
+						},
+						"6336x2688": {
+							"aspectRatio": "21:9",
+							"imageSize": "4K"
+						}
+					}
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"qualityMappings": {
+						"low": {
+							"thinkingLevel": "minimal"
+						},
+						"high": {
+							"thinkingLevel": "high"
+						}
+					},
+					"sizes": {
+						"512x512": {
+							"aspectRatio": "1:1",
+							"imageSize": "512"
+						},
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"2048x2048": {
+							"aspectRatio": "1:1",
+							"imageSize": "2K"
+						},
+						"4096x4096": {
+							"aspectRatio": "1:1",
+							"imageSize": "4K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"256x1024": {
+							"aspectRatio": "1:4",
+							"imageSize": "512"
+						},
+						"512x2048": {
+							"aspectRatio": "1:4",
+							"imageSize": "1K"
+						},
+						"1024x4096": {
+							"aspectRatio": "1:4",
+							"imageSize": "2K"
+						},
+						"2048x8192": {
+							"aspectRatio": "1:4",
+							"imageSize": "4K"
+						},
+						"192x1536": {
+							"aspectRatio": "1:8",
+							"imageSize": "512"
+						},
+						"384x3072": {
+							"aspectRatio": "1:8",
+							"imageSize": "1K"
+						},
+						"768x6144": {
+							"aspectRatio": "1:8",
+							"imageSize": "2K"
+						},
+						"1536x12288": {
+							"aspectRatio": "1:8",
+							"imageSize": "4K"
+						},
+						"424x632": {
+							"aspectRatio": "2:3",
+							"imageSize": "512"
+						},
+						"1696x2528": {
+							"aspectRatio": "2:3",
+							"imageSize": "2K"
+						},
+						"3392x5056": {
+							"aspectRatio": "2:3",
+							"imageSize": "4K"
+						},
+						"632x424": {
+							"aspectRatio": "3:2",
+							"imageSize": "512"
+						},
+						"2528x1696": {
+							"aspectRatio": "3:2",
+							"imageSize": "2K"
+						},
+						"5056x3392": {
+							"aspectRatio": "3:2",
+							"imageSize": "4K"
+						},
+						"448x600": {
+							"aspectRatio": "3:4",
+							"imageSize": "512"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1792x2400": {
+							"aspectRatio": "3:4",
+							"imageSize": "2K"
+						},
+						"3584x4800": {
+							"aspectRatio": "3:4",
+							"imageSize": "4K"
+						},
+						"1024x256": {
+							"aspectRatio": "4:1",
+							"imageSize": "512"
+						},
+						"2048x512": {
+							"aspectRatio": "4:1",
+							"imageSize": "1K"
+						},
+						"4096x1024": {
+							"aspectRatio": "4:1",
+							"imageSize": "2K"
+						},
+						"8192x2048": {
+							"aspectRatio": "4:1",
+							"imageSize": "4K"
+						},
+						"600x448": {
+							"aspectRatio": "4:3",
+							"imageSize": "512"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"2400x1792": {
+							"aspectRatio": "4:3",
+							"imageSize": "2K"
+						},
+						"4800x3584": {
+							"aspectRatio": "4:3",
+							"imageSize": "4K"
+						},
+						"464x576": {
+							"aspectRatio": "4:5",
+							"imageSize": "512"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1856x2304": {
+							"aspectRatio": "4:5",
+							"imageSize": "2K"
+						},
+						"3712x4608": {
+							"aspectRatio": "4:5",
+							"imageSize": "4K"
+						},
+						"576x464": {
+							"aspectRatio": "5:4",
+							"imageSize": "512"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"2304x1856": {
+							"aspectRatio": "5:4",
+							"imageSize": "2K"
+						},
+						"4608x3712": {
+							"aspectRatio": "5:4",
+							"imageSize": "4K"
+						},
+						"1536x192": {
+							"aspectRatio": "8:1",
+							"imageSize": "512"
+						},
+						"3072x384": {
+							"aspectRatio": "8:1",
+							"imageSize": "1K"
+						},
+						"6144x768": {
+							"aspectRatio": "8:1",
+							"imageSize": "2K"
+						},
+						"12288x1536": {
+							"aspectRatio": "8:1",
+							"imageSize": "4K"
+						},
+						"384x688": {
+							"aspectRatio": "9:16",
+							"imageSize": "512"
+						},
+						"1536x2752": {
+							"aspectRatio": "9:16",
+							"imageSize": "2K"
+						},
+						"3072x5504": {
+							"aspectRatio": "9:16",
+							"imageSize": "4K"
+						},
+						"688x384": {
+							"aspectRatio": "16:9",
+							"imageSize": "512"
+						},
+						"2752x1536": {
+							"aspectRatio": "16:9",
+							"imageSize": "2K"
+						},
+						"5504x3072": {
+							"aspectRatio": "16:9",
+							"imageSize": "4K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						},
+						"3168x1344": {
+							"aspectRatio": "21:9",
+							"imageSize": "2K"
+						},
+						"6336x2688": {
+							"aspectRatio": "21:9",
+							"imageSize": "4K"
+						}
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 50,
+				"outputCentsPerMTokens": 300,
+				"cacheReadCentsPerMTokens": 5,
+				"imageOutputCentsPerMTokens": 6000
+			},
+			"deprecated": true,
+			"notes": "Shut down by Google on 2026-06-25 (deprecations page); replacement gemini-nano-banana-2.1."
+		},
+		"gemini-3-pro-image-preview": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 65536,
+					"maxOutputTokens": 32768,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"top_p": true
+					}
+				},
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"2048x2048": {
+							"aspectRatio": "1:1",
+							"imageSize": "2K"
+						},
+						"4096x4096": {
+							"aspectRatio": "1:1",
+							"imageSize": "4K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1696x2528": {
+							"aspectRatio": "2:3",
+							"imageSize": "2K"
+						},
+						"3392x5056": {
+							"aspectRatio": "2:3",
+							"imageSize": "4K"
+						},
+						"2528x1696": {
+							"aspectRatio": "3:2",
+							"imageSize": "2K"
+						},
+						"5056x3392": {
+							"aspectRatio": "3:2",
+							"imageSize": "4K"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1792x2400": {
+							"aspectRatio": "3:4",
+							"imageSize": "2K"
+						},
+						"3584x4800": {
+							"aspectRatio": "3:4",
+							"imageSize": "4K"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"2400x1792": {
+							"aspectRatio": "4:3",
+							"imageSize": "2K"
+						},
+						"4800x3584": {
+							"aspectRatio": "4:3",
+							"imageSize": "4K"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1856x2304": {
+							"aspectRatio": "4:5",
+							"imageSize": "2K"
+						},
+						"3712x4608": {
+							"aspectRatio": "4:5",
+							"imageSize": "4K"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"2304x1856": {
+							"aspectRatio": "5:4",
+							"imageSize": "2K"
+						},
+						"4608x3712": {
+							"aspectRatio": "5:4",
+							"imageSize": "4K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"1536x2752": {
+							"aspectRatio": "9:16",
+							"imageSize": "2K"
+						},
+						"3072x5504": {
+							"aspectRatio": "9:16",
+							"imageSize": "4K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"2752x1536": {
+							"aspectRatio": "16:9",
+							"imageSize": "2K"
+						},
+						"5504x3072": {
+							"aspectRatio": "16:9",
+							"imageSize": "4K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						},
+						"3168x1344": {
+							"aspectRatio": "21:9",
+							"imageSize": "2K"
+						},
+						"6336x2688": {
+							"aspectRatio": "21:9",
+							"imageSize": "4K"
+						}
+					}
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 14,
+					"maxImageBytes": 20000000,
+					"maxTotalInputBytes": 20000000,
+					"maxN": 1,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {
+							"aspectRatio": "1:1",
+							"imageSize": "1K"
+						},
+						"2048x2048": {
+							"aspectRatio": "1:1",
+							"imageSize": "2K"
+						},
+						"4096x4096": {
+							"aspectRatio": "1:1",
+							"imageSize": "4K"
+						},
+						"848x1264": {
+							"aspectRatio": "2:3",
+							"imageSize": "1K"
+						},
+						"1264x848": {
+							"aspectRatio": "3:2",
+							"imageSize": "1K"
+						},
+						"1696x2528": {
+							"aspectRatio": "2:3",
+							"imageSize": "2K"
+						},
+						"3392x5056": {
+							"aspectRatio": "2:3",
+							"imageSize": "4K"
+						},
+						"2528x1696": {
+							"aspectRatio": "3:2",
+							"imageSize": "2K"
+						},
+						"5056x3392": {
+							"aspectRatio": "3:2",
+							"imageSize": "4K"
+						},
+						"896x1200": {
+							"aspectRatio": "3:4",
+							"imageSize": "1K"
+						},
+						"1792x2400": {
+							"aspectRatio": "3:4",
+							"imageSize": "2K"
+						},
+						"3584x4800": {
+							"aspectRatio": "3:4",
+							"imageSize": "4K"
+						},
+						"1200x896": {
+							"aspectRatio": "4:3",
+							"imageSize": "1K"
+						},
+						"2400x1792": {
+							"aspectRatio": "4:3",
+							"imageSize": "2K"
+						},
+						"4800x3584": {
+							"aspectRatio": "4:3",
+							"imageSize": "4K"
+						},
+						"928x1152": {
+							"aspectRatio": "4:5",
+							"imageSize": "1K"
+						},
+						"1856x2304": {
+							"aspectRatio": "4:5",
+							"imageSize": "2K"
+						},
+						"3712x4608": {
+							"aspectRatio": "4:5",
+							"imageSize": "4K"
+						},
+						"1152x928": {
+							"aspectRatio": "5:4",
+							"imageSize": "1K"
+						},
+						"2304x1856": {
+							"aspectRatio": "5:4",
+							"imageSize": "2K"
+						},
+						"4608x3712": {
+							"aspectRatio": "5:4",
+							"imageSize": "4K"
+						},
+						"768x1376": {
+							"aspectRatio": "9:16",
+							"imageSize": "1K"
+						},
+						"1536x2752": {
+							"aspectRatio": "9:16",
+							"imageSize": "2K"
+						},
+						"3072x5504": {
+							"aspectRatio": "9:16",
+							"imageSize": "4K"
+						},
+						"1376x768": {
+							"aspectRatio": "16:9",
+							"imageSize": "1K"
+						},
+						"2752x1536": {
+							"aspectRatio": "16:9",
+							"imageSize": "2K"
+						},
+						"5504x3072": {
+							"aspectRatio": "16:9",
+							"imageSize": "4K"
+						},
+						"1584x672": {
+							"aspectRatio": "21:9",
+							"imageSize": "1K"
+						},
+						"3168x1344": {
+							"aspectRatio": "21:9",
+							"imageSize": "2K"
+						},
+						"6336x2688": {
+							"aspectRatio": "21:9",
+							"imageSize": "4K"
+						}
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 1200,
+				"cacheReadCentsPerMTokens": 20,
+				"cacheWriteCentsPerMTokens": 37.5,
+				"imageOutputCentsPerMTokens": 12000
+			},
+			"deprecated": true,
+			"notes": "Shut down by Google on 2026-06-25 (deprecations page); replacement gemini-3-pro-image."
+		},
+		"gemini-2.5-flash-lite-preview-09-2025": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65535,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 10,
+				"outputCentsPerMTokens": 40,
+				"cacheReadCentsPerMTokens": 1,
+				"cacheWriteCentsPerMTokens": 8.333333
+			},
+			"deprecated": true,
+			"notes": "Google shut down gemini-2.5-flash-lite-preview-09-2025 on 2026-03-31 (deprecations page); replacement gemini-3.1-flash-lite."
+		},
+		"gemini-2.5-pro-preview-05-06": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 125,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 12.5,
+				"cacheWriteCentsPerMTokens": 37.5,
+				"tiers": [
+					{
+						"aboveInputTokens": 200000,
+						"inputCentsPerMTokens": 250,
+						"outputCentsPerMTokens": 1500,
+						"cacheReadCentsPerMTokens": 25
+					}
+				]
+			},
+			"deprecated": true,
+			"notes": "Google redirected gemini-2.5-pro-preview-05-06 to gemini-2.5-pro on 2025-06-26 and shut it down on 2025-12-02 (deprecations page); replacement gemini-3.1-pro-preview."
+		},
+		"gemma-4-31b-it": {
+			"operations": {
+				"text.generate": {
+					"parameters": {
+						"max_tokens": true,
+						"temperature": true,
+						"stop": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"top_p": true,
+						"top_k": true,
+						"repetition_penalty": true,
+						"frequency_penalty": true,
+						"presence_penalty": true,
+						"seed": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"logprobs": true,
+						"top_logprobs": true,
+						"min_p": true,
+						"logit_bias": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true
+					},
+					"maxInputTokens": 262144
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 0,
+				"outputCentsPerMTokens": 0,
+				"cacheReadCentsPerMTokens": 0
+			},
+			"notes": "Reasoning control mechanism unconfirmed against the provider's docs; left unspecified rather than guessed."
+		},
+		"gemini-3.8-flash": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"parameters": {
+						"max_tokens": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["low", "medium", "high"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 75,
+				"outputCentsPerMTokens": 375,
+				"cacheReadCentsPerMTokens": 7.5,
+				"cacheWriteCentsPerMTokens": 2.083333
+			}
+		},
+		"gemini-3.8-live": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio"],
+					"voices": [
+						"Zephyr",
+						"Puck",
+						"Charon",
+						"Kore",
+						"Fenrir",
+						"Leda",
+						"Orus",
+						"Aoede",
+						"Callirrhoe",
+						"Autonoe",
+						"Enceladus",
+						"Iapetus",
+						"Umbriel",
+						"Algieba",
+						"Despina",
+						"Erinome",
+						"Algenib",
+						"Rasalgethi",
+						"Laomedeia",
+						"Achernar",
+						"Alnilam",
+						"Schedar",
+						"Gacrux",
+						"Pulcherrima",
+						"Achird",
+						"Zubenelgenubi",
+						"Vindemiatrix",
+						"Sadachbia",
+						"Sadaltager",
+						"Sulafat"
+					],
+					"supportsInstructions": true,
+					"supportsTools": true,
+					"supportsGoogleSearch": true,
+					"supportsTextInput": true,
+					"supportsImageInput": true,
+					"supportsInputTranscription": true,
+					"maxKeywords": 1000,
+					"turnDetection": ["server_vad", "semantic_vad", "manual"],
+					"supportsSessionResumption": true,
+					"supportsHistoryConfig": true,
+					"supportsContextCompression": true,
+					"maxUpstreamSessionSeconds": 600
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 75,
+				"outputCentsPerMTokens": 450,
+				"audioInputCentsPerMTokens": 300,
+				"audioOutputCentsPerMTokens": 1200,
+				"imageInputCentsPerMTokens": 100
+			},
+			"notes": "Live API (BidiGenerateContent), native audio. Answers in audio only; text sessions are served from the transcript of the spoken reply (billed as audio output). Function calls are declared BLOCKING to keep OpenAI's semantics. Reasoning is built in and not configurable. Proactive audio is always on. Gemini ends each connection after about 10 minutes; the gateway resumes the session on a new one."
+		},
+		"gemini-3.8-live-extended-thinking": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio"],
+					"voices": [
+						"Zephyr",
+						"Puck",
+						"Charon",
+						"Kore",
+						"Fenrir",
+						"Leda",
+						"Orus",
+						"Aoede",
+						"Callirrhoe",
+						"Autonoe",
+						"Enceladus",
+						"Iapetus",
+						"Umbriel",
+						"Algieba",
+						"Despina",
+						"Erinome",
+						"Algenib",
+						"Rasalgethi",
+						"Laomedeia",
+						"Achernar",
+						"Alnilam",
+						"Schedar",
+						"Gacrux",
+						"Pulcherrima",
+						"Achird",
+						"Zubenelgenubi",
+						"Vindemiatrix",
+						"Sadachbia",
+						"Sadaltager",
+						"Sulafat"
+					],
+					"supportsInstructions": true,
+					"supportsTools": true,
+					"supportsGoogleSearch": true,
+					"supportsTextInput": true,
+					"supportsImageInput": true,
+					"supportsInputTranscription": true,
+					"maxKeywords": 1000,
+					"turnDetection": ["server_vad", "semantic_vad", "manual"],
+					"supportsSessionResumption": true,
+					"supportsHistoryConfig": true,
+					"supportsContextCompression": true,
+					"maxUpstreamSessionSeconds": 600,
+					"functionCalling": "non_blocking",
+					"reasoningEfforts": ["low", "medium", "high"],
+					"defaultReasoningEffort": "low"
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 75,
+				"outputCentsPerMTokens": 450,
+				"audioInputCentsPerMTokens": 300,
+				"audioOutputCentsPerMTokens": 1200,
+				"imageInputCentsPerMTokens": 100
+			},
+			"notes": "Live API (BidiGenerateContent), native audio with extended reasoning. Function calls run NON_BLOCKING only: the model may keep talking while a call runs. It may speak filler turns while it reasons. Gemini requires a thinking level: without reasoning.effort the gateway sends low, OpenAI's default. Answers in audio only; text sessions are served from the transcript."
+		},
+		"gemini-3.1-flash-live-preview": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio"],
+					"voices": [
+						"Zephyr",
+						"Puck",
+						"Charon",
+						"Kore",
+						"Fenrir",
+						"Leda",
+						"Orus",
+						"Aoede",
+						"Callirrhoe",
+						"Autonoe",
+						"Enceladus",
+						"Iapetus",
+						"Umbriel",
+						"Algieba",
+						"Despina",
+						"Erinome",
+						"Algenib",
+						"Rasalgethi",
+						"Laomedeia",
+						"Achernar",
+						"Alnilam",
+						"Schedar",
+						"Gacrux",
+						"Pulcherrima",
+						"Achird",
+						"Zubenelgenubi",
+						"Vindemiatrix",
+						"Sadachbia",
+						"Sadaltager",
+						"Sulafat"
+					],
+					"supportsInstructions": true,
+					"supportsTools": true,
+					"supportsGoogleSearch": true,
+					"supportsTextInput": true,
+					"supportsImageInput": true,
+					"supportsInputTranscription": true,
+					"maxKeywords": 1000,
+					"turnDetection": ["server_vad", "semantic_vad", "manual"],
+					"supportsSessionResumption": true,
+					"supportsHistoryConfig": true,
+					"supportsContextCompression": true,
+					"maxUpstreamSessionSeconds": 600,
+					"reasoningEfforts": ["minimal", "low", "medium", "high"]
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 75,
+				"outputCentsPerMTokens": 450,
+				"audioInputCentsPerMTokens": 300,
+				"audioOutputCentsPerMTokens": 1200,
+				"imageInputCentsPerMTokens": 100
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-3.1-flash-live-preview; it shuts down no earlier than 2026-11-17 (replacement: gemini-3.8-live). Live API (BidiGenerateContent), native audio. Legacy: Google recommends gemini-3.8-live. Synchronous function calling only. Answers in audio only; text sessions are served from the transcript."
+		},
+		"gemini-2.5-flash-native-audio-preview-12-2025": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio"],
+					"voices": [
+						"Zephyr",
+						"Puck",
+						"Charon",
+						"Kore",
+						"Fenrir",
+						"Leda",
+						"Orus",
+						"Aoede",
+						"Callirrhoe",
+						"Autonoe",
+						"Enceladus",
+						"Iapetus",
+						"Umbriel",
+						"Algieba",
+						"Despina",
+						"Erinome",
+						"Algenib",
+						"Rasalgethi",
+						"Laomedeia",
+						"Achernar",
+						"Alnilam",
+						"Schedar",
+						"Gacrux",
+						"Pulcherrima",
+						"Achird",
+						"Zubenelgenubi",
+						"Vindemiatrix",
+						"Sadachbia",
+						"Sadaltager",
+						"Sulafat"
+					],
+					"supportsInstructions": true,
+					"supportsTools": true,
+					"supportsGoogleSearch": true,
+					"supportsTextInput": true,
+					"supportsImageInput": true,
+					"supportsInputTranscription": true,
+					"maxKeywords": 1000,
+					"turnDetection": ["server_vad", "semantic_vad", "manual"],
+					"supportsSessionResumption": true,
+					"supportsContextCompression": true,
+					"maxUpstreamSessionSeconds": 600
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 50,
+				"outputCentsPerMTokens": 200,
+				"audioInputCentsPerMTokens": 300,
+				"audioOutputCentsPerMTokens": 1200,
+				"imageInputCentsPerMTokens": 300
+			},
+			"deprecated": true,
+			"notes": "Google deprecated gemini-2.5-flash-native-audio-preview-12-2025; it shuts down no earlier than 2026-11-17 (replacement: gemini-3.8-live). Live API (BidiGenerateContent), native audio. Google limits 2.5 access to projects that already used it. Answers in audio only; text sessions are served from the transcript."
+		},
+		"gemini-3.5-live-translate-preview": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio"],
+					"supportsInputTranscription": true,
+					"turnDetection": ["server_vad"],
+					"maxUpstreamSessionSeconds": 600,
+					"translation": true
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 350,
+				"outputCentsPerMTokens": 2100
+			},
+			"notes": "Live API speech-to-speech translation into 70+ languages; requires session.translation.target_language (AI Gateway extension). Audio in, translated audio out; no instructions, tools or text input. The source language is detected. Each connection lasts about 10 minutes; the gateway reconnects without carrying context. Translation streams without turns; the gateway ends a response after 1.5 s without translated output."
+		}
+	}
+}

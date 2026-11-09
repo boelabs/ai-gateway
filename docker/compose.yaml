@@ -1,0 +1,114 @@
+# Production/PaaS base. Services stay on the private Compose network; use
+# compose.local.yaml explicitly when host port bindings are needed.
+#
+# There is no migration service: the gateway applies pending migrations at boot, behind an advisory
+# lock, so every replica can do it and only one does.
+#
+# Build contexts are the repository root, one level up from this file.
+# The project keeps its pre-rename name: volumes and container names derive from it, so renaming
+# it would start an existing stack on empty volumes.
+name: ai-gateway
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: gateway
+      POSTGRES_DB: ai_gateway
+    volumes:
+      # PG18 moved PGDATA to /var/lib/postgresql/18/docker; the volume is mounted
+      # on the parent /var/lib/postgresql (not /data as in 17 and earlier).
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d ai_gateway"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    image: ai-gateway-api:local
+    environment:
+      # Required at deployment; intentionally empty instead of falling back to known credentials.
+      # MASTER_KEY needs >= 32 chars. ENCRYPTION_KEYRING is a JSON id-to-64-hex-key object.
+      MASTER_KEY: ${MASTER_KEY:-}
+      ENCRYPTION_KEYRING: ${ENCRYPTION_KEYRING:-}
+      ACTIVE_ENCRYPTION_KEY_ID: ${ACTIVE_ENCRYPTION_KEY_ID:-}
+      DATABASE_URL: ${DATABASE_URL:-postgres://gateway:gateway@postgres:5432/ai_gateway}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      # Human (dashboard) authentication. Off unless DASH_ENABLED is true, in which case
+      # DASH_ROOT_USER is required; DASH_ROOT_PASSWORD falls back to MASTER_KEY when empty.
+      DASH_ENABLED: ${DASH_ENABLED:-false}
+      DASH_ROOT_USER: ${DASH_ROOT_USER:-}
+      DASH_ROOT_PASSWORD: ${DASH_ROOT_PASSWORD:-}
+      # Shutdown budget. The gateway stays unready-but-serving for DRAIN_DELAY_MS so the proxy can
+      # take it out of rotation, then gives in-flight requests SHUTDOWN_TIMEOUT_MS to finish.
+      DRAIN_DELAY_MS: ${DRAIN_DELAY_MS:-15000}
+      SHUTDOWN_TIMEOUT_MS: ${SHUTDOWN_TIMEOUT_MS:-120000}
+    expose:
+      - "4000"
+    # Must exceed DRAIN_DELAY_MS + SHUTDOWN_TIMEOUT_MS plus teardown, or Docker SIGKILLs the process
+    # mid-drain and the whole sequence is theatre. Raise all three together.
+    stop_grace_period: 180s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Operator dashboard. A separate product: its own image, its own port, and — in any real
+  # deployment — its own domain. Everything it needs from the gateway it fetches itself, so the
+  # browser only ever talks to this service.
+  #
+  # DASH_ENABLED is the gateway's variable: it gates /auth and /admin/users there. Compose reuses it
+  # as the single switch for the pair, so the container is not merely unreachable when the dashboard
+  # is not wanted — it is not running.
+  dashboard:
+    build:
+      context: ..
+      dockerfile: apps/dashboard/Dockerfile
+    image: ai-gateway-dashboard:local
+    environment:
+      # The only thing this container needs to know. The browser never talks to the gateway, so
+      # the gateway does not have to be reachable from outside this network.
+      GATEWAY_URL: ${GATEWAY_URL:-http://gateway:4000}
+      # Optional: the documentation site's public address, linked from the sidebar.
+      DOCS_URL: ${DOCS_URL:-}
+      DASH_ENABLED: ${DASH_ENABLED:-false}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        case "${DASH_ENABLED:-false}" in
+          1|true|yes|on|TRUE|True) exec bun server.js ;;
+          *) echo "DASH_ENABLED is not set; the dashboard will not start."; exit 0 ;;
+        esac
+    expose:
+      - "3001"
+    depends_on:
+      gateway:
+        condition: service_started
+    # The playground relays a live stream through this process; Next stops accepting connections on
+    # SIGTERM and waits for in-flight requests, so the grace period is what that wait is allowed to
+    # use.
+    stop_grace_period: 120s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:

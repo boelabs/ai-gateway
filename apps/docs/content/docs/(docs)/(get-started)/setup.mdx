@@ -1,0 +1,85 @@
+---
+title: "Setup"
+description: "Configure the gateway: requirements, environment, secrets, and choosing a database and Redis."
+---
+
+Configure the gateway process, secrets, and storage connections before deploying it.
+Use [Quickstart](/docs/quickstart) for a local example or [Deployment](/docs/deployment)
+to choose a hosting platform.
+
+## Requirements
+
+- **Bun 1.4+** — the gateway runtime (runs TypeScript directly; no build step) and the package
+  manager / task runner.
+- **Postgres 18+**
+- **Redis 8+**
+
+<Callout>
+
+AI Gateway runs on **Bun**, not Node. If you plan to reach a database or Redis over TLS with a
+**self-signed** certificate, read [Troubleshooting](/docs/troubleshooting) first — Bun's TLS may not
+accept those, and the fix is a configuration choice you make here.
+
+</Callout>
+
+## Environment
+
+Create `apps/api/.env` (copy `apps/api/.env.example`). The minimum:
+
+```bash
+PORT=4000
+NODE_ENV=production
+MASTER_KEY=replace-with-at-least-32-random-characters
+ENCRYPTION_KEYRING={"primary":"64_hex_chars_32_bytes"}
+ACTIVE_ENCRYPTION_KEY_ID=primary
+DATABASE_URL=postgres://user:pass@host:5432/ai_gateway
+REDIS_URL=redis://host:6379
+```
+
+The optional dashboard has a separate environment file:
+
+```bash
+# apps/dashboard/.env — copy apps/dashboard/.env.example
+GATEWAY_URL=http://localhost:4000
+```
+
+For optional settings, defaults, and limits, use the [Environment variables](/docs/reference-environment)
+reference. Review proxy trust, shutdown timeout, and observability settings for your deployment.
+
+## Secrets
+
+Store the root credential and encryption keyring in your secret manager — never in git or the image:
+
+| Secret | Purpose | Format |
+|---|---|---|
+| `MASTER_KEY` | Operator credential; full access to `/admin/*`. | Strong random string, at least 32 characters. |
+| `ENCRYPTION_KEYRING` | Encrypts credentials, extension source, compaction capsules, and forensic samples. | JSON key-id to 64-hex-key map. |
+| `ACTIVE_ENCRYPTION_KEY_ID` | Selects the key used for new envelopes. | An id present in the keyring. |
+
+```bash
+openssl rand -base64 48   # MASTER_KEY
+openssl rand -hex 32      # one ENCRYPTION_KEYRING value
+```
+
+Rotation procedures live in [Operations → Secrets](/docs/operations#secrets).
+
+## Database and Redis
+
+The gateway needs a Postgres 18+ database and a Redis 8+ instance. **How** you connect matters because
+of the Bun TLS constraint:
+
+- **Self-hosted on the same private network** (Compose / Coolify / Portainer / Dokploy): connect over
+  **plaintext** — `postgres://…` and `redis://…`. Safe by network isolation, and it sidesteps the
+  [self-signed TLS issue](/docs/troubleshooting). This is the default in every
+  [Deployment](/docs/deployment) recipe.
+- **Managed provider** (recommended for development, or when the database lives off-network): pick one
+  that presents a **public-CA** certificate, which Bun connects to cleanly.
+
+### Managed database and Redis
+
+Choose services that meet the required Postgres and Redis versions and present a certificate
+trusted by Bun. Use the provider's documented connection string and connect by hostname.
+Check version support, connection limits, and persistence before choosing a plan.
+
+Avoid exposing a database with a self-signed certificate on a public port. Use a private network
+or a certificate from a public CA; see [Troubleshooting](/docs/troubleshooting).

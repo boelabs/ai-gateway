@@ -1,0 +1,12 @@
+{
+	"title": "API reference",
+	"description": "The wire format, every endpoint, and every value the gateway reads.",
+	"root": true,
+	"pages": [
+		"api-overview",
+		"...(inference-api)",
+		"---Reference---",
+		"...(reference)"
+	],
+	"icon": "Braces"
+}

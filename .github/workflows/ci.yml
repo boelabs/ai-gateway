@@ -1,0 +1,329 @@
+name: CI
+
+# Pull requests and main. Nothing here deploys: production moves only when a `v*` tag is pushed (see
+# release.yml). A feature branch is checked by its pull request; pull requests run whatever their
+# base, so a PR stacked on another branch is checked too.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Keep PR checks separate from branch builds, even when a delayed PR event resolves to main.
+# Cancel superseded runs only within the same event and PR or ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Which of the three apps this commit can possibly have changed.
+  #
+  # The filter is deliberately generous. "The gateway changed" is not only `apps/api/**`: a bump
+  # in `bun.lock`, a patch, a shared tsconfig or a root script changes what lands in its image just
+  # as surely, and a filter that misses one leaves a broken image unbuilt until the release. When in
+  # doubt this job says everything changed, and when it cannot work out a base commit at all (a new
+  # branch, a force push) it says so too.
+  changes:
+    name: Detect changed apps
+    runs-on: ubuntu-latest
+    outputs:
+      gateway: ${{ steps.filter.outputs.gateway }}
+      dashboard: ${{ steps.filter.outputs.dashboard }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Both sides of the comparison have to be present locally.
+          fetch-depth: 0
+
+      - name: Compare against the base commit
+        id: filter
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+
+          everything() {
+            {
+              echo "gateway=true"
+              echo "dashboard=true"
+              echo "docs=true"
+            } >> "$GITHUB_OUTPUT"
+          }
+
+          # A new branch reports an all-zero `before`, and a force push can report a commit that is
+          # no longer reachable. Neither is a reason to skip a build.
+          if [ -z "${BASE_SHA:-}" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "::notice::No usable base commit; treating every app as changed."
+            everything
+            exit 0
+          fi
+
+          files=$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")
+          echo "Changed files:"
+          echo "$files" | sed 's/^/  /'
+
+          # Anything shared rebuilds all three: the lockfile and the patches decide what is installed
+          # into every image, the workspace packages are linked into them, and a change to this
+          # workflow changes how they are built.
+          #
+          # Every app's package.json counts as shared, including the other apps'. The install is a
+          # workspace install: the gateway's Dockerfile copies apps/docs/package.json to resolve it,
+          # so a manifest belonging to one app can change another's image.
+          if echo "$files" | grep -qE '^(packages/|patches/|scripts/|bun\.lock$|package\.json$|turbo\.json$|tsconfig\.json$|biome\.jsonc?$|\.dockerignore$|\.github/workflows/|apps/[^/]+/package\.json$)'; then
+            echo "::notice::A shared path changed; treating every app as changed."
+            everything
+            exit 0
+          fi
+
+          changed() { echo "$files" | grep -qE "$1"; }
+          gateway=false;   changed '^apps/api/'   && gateway=true
+          dashboard=false; changed '^apps/dashboard/' && dashboard=true
+          docs=false;      changed '^apps/docs/'      && docs=true
+
+          {
+            echo "gateway=$gateway"
+            echo "dashboard=$dashboard"
+            echo "docs=$docs"
+          } >> "$GITHUB_OUTPUT"
+
+  quality:
+    name: Lint, typecheck & unit tests
+    runs-on: ubuntu-latest
+    needs: [changes]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate Docker Compose
+        working-directory: docker
+        run: |
+          docker compose -f compose.yaml config --quiet
+          docker compose -f compose.yaml -f compose.local.yaml config --quiet
+          docker compose -f compose.docs.yaml config --quiet
+          # The pull-based files people actually paste into Coolify or Portainer. Their required
+          # variables are supplied here so a missing one fails CI rather than a deployment.
+          POSTGRES_PASSWORD=ci docker compose -f compose.images.yaml config --quiet
+          POSTGRES_PASSWORD=ci docker compose -f compose.data.yaml config --quiet
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.x"
+
+      - name: Install (frozen lockfile)
+        # Retry: npm's large native tarballs occasionally fail to download.
+        run: |
+          for i in 1 2 3; do
+            bun install --frozen-lockfile && exit 0
+            echo "::warning::bun install failed (attempt $i/3); retrying in 10s"
+            sleep 10
+          done
+          exit 1
+
+      - name: Format & lint (Biome)
+        run: bun run check
+
+      - name: Typecheck (turbo)
+        run: bun run typecheck
+
+      - name: Validate model catalog
+        run: bun run --filter @boelabs/ai-gateway-api catalog:validate
+
+      - name: Unit tests (turbo)
+        run: bun run test
+
+      - name: Audit dependencies (high and critical)
+        # Bun can emit the registry's gzip body verbatim; the wrapper decodes JSON and keeps
+        # the same high-severity threshold while failing closed on malformed/network responses.
+        run: bun run audit
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: [changes]
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: gateway
+          POSTGRES_PASSWORD: gateway
+          POSTGRES_DB: ai_gateway
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gateway -d ai_gateway"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      MASTER_KEY: ci-master-key-please-change-32chars
+      ENCRYPTION_KEYRING: '{"ci":"0000000000000000000000000000000000000000000000000000000000000000"}'
+      ACTIVE_ENCRYPTION_KEY_ID: ci
+      DATABASE_URL: postgres://gateway:gateway@localhost:5432/ai_gateway
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.x"
+
+      - name: Install (frozen lockfile)
+        # Retry: npm's large native tarballs occasionally fail to download.
+        run: |
+          for i in 1 2 3; do
+            bun install --frozen-lockfile && exit 0
+            echo "::warning::bun install failed (attempt $i/3); retrying in 10s"
+            sleep 10
+          done
+          exit 1
+
+      - name: Run migrations
+        run: bun run --filter @boelabs/ai-gateway-api db:migrate
+
+      - name: Integration tests
+        run: bun run --filter @boelabs/ai-gateway-api test:integration
+
+  containers:
+    name: Build container images
+    runs-on: ubuntu-latest
+    needs: [changes]
+    permissions:
+      contents: read
+      # Only used when this commit's images are actually published — see "Derive image tags".
+      # Every other build stays local, so a fork never needs it.
+      packages: write
+    env:
+      DOCKER_BUILDKIT: 1
+      # amd64 only: these are per-commit images for our own environments, and emulating arm64 here
+      # would triple the build for an architecture nothing deploys to. Releases stay multi-arch.
+      PLATFORMS: linux/amd64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Two tags per image, published for `main` only. `sha-<commit>` never moves; `main` moves, and
+      # is what an environment following main would pull. Neither is `latest` nor `production`:
+      # those belong to release.yml and deploy-production.yml. The registry is public, so a feature
+      # branch leaves no package behind, but it still BUILDS, so a broken Dockerfile fails on the
+      # pull request rather than after the merge.
+      - name: Derive image tags
+        id: tags
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          # A branch name is not a tag: slashes and anything outside [A-Za-z0-9._-] are illegal, and
+          # a tag may not start with a separator.
+          slug=$(printf '%s' "$REF_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g' | sed 's/^[.-]*//' | cut -c1-120)
+          [ -n "$slug" ] || slug=build
+
+          publish=false
+          if [ "$EVENT" = "push" ] && [ "$REF_NAME" = "main" ]; then
+            publish=true
+          else
+            echo "::notice::Building without publishing; only main publishes images."
+          fi
+
+          {
+            echo "sha=sha-${GITHUB_SHA}"
+            echo "branch=$slug"
+            echo "registry=ghcr.io/${{ github.repository_owner }}"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        if: steps.tags.outputs.publish == 'true'
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build API image
+        if: needs.changes.outputs.gateway == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          platforms: ${{ env.PLATFORMS }}
+          # Always re-resolve the base image: a stale local oven/bun hides a broken upstream bump.
+          pull: true
+          push: ${{ steps.tags.outputs.publish == 'true' }}
+          load: ${{ steps.tags.outputs.publish != 'true' }}
+          tags: |
+            ${{ steps.tags.outputs.registry }}/ai-gateway-api:${{ steps.tags.outputs.sha }}
+            ${{ steps.tags.outputs.registry }}/ai-gateway-api:${{ steps.tags.outputs.branch }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.tags.outputs.branch }}
+          cache-from: type=gha,scope=ci-gateway
+          # Only one writer: main. Concurrent pull requests exporting to one scope race on it, and
+          # the losing export fails a job whose builds all succeeded. Pull requests only read.
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=ci-gateway' || '' }}
+
+      # The dashboard ships in the same Compose stack; without this, an image that no longer
+      # builds would reach a deployment with CI still green.
+      - name: Build dashboard image
+        if: needs.changes.outputs.dashboard == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/dashboard/Dockerfile
+          platforms: ${{ env.PLATFORMS }}
+          # Always re-resolve the base image: a stale local oven/bun hides a broken upstream bump.
+          pull: true
+          push: ${{ steps.tags.outputs.publish == 'true' }}
+          load: ${{ steps.tags.outputs.publish != 'true' }}
+          tags: |
+            ${{ steps.tags.outputs.registry }}/ai-gateway-dashboard:${{ steps.tags.outputs.sha }}
+            ${{ steps.tags.outputs.registry }}/ai-gateway-dashboard:${{ steps.tags.outputs.branch }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.tags.outputs.branch }}
+          cache-from: type=gha,scope=ci-dashboard
+          # Only one writer: main. Concurrent pull requests exporting to one scope race on it, and
+          # the losing export fails a job whose builds all succeeded. Pull requests only read.
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=ci-dashboard' || '' }}
+
+      - name: Build docs image
+        if: needs.changes.outputs.docs == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/docs/Dockerfile
+          platforms: ${{ env.PLATFORMS }}
+          # Always re-resolve the base image: a stale local oven/bun hides a broken upstream bump.
+          pull: true
+          push: ${{ steps.tags.outputs.publish == 'true' }}
+          load: ${{ steps.tags.outputs.publish != 'true' }}
+          tags: |
+            ${{ steps.tags.outputs.registry }}/ai-gateway-docs:${{ steps.tags.outputs.sha }}
+            ${{ steps.tags.outputs.registry }}/ai-gateway-docs:${{ steps.tags.outputs.branch }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.tags.outputs.branch }}
+          cache-from: type=gha,scope=ci-docs
+          # Only one writer: main. Concurrent pull requests exporting to one scope race on it, and
+          # the losing export fails a job whose builds all succeeded. Pull requests only read.
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=ci-docs' || '' }}

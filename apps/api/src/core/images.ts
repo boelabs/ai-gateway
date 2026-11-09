@@ -1,0 +1,243 @@
+import type { Quality, QualityLevel } from "./quality.ts";
+import type { Usage } from "./usage.ts";
+
+export type ImageOperation = "generation" | "edit";
+export type ImageOutputFormat = "png" | "jpeg" | "webp";
+export type ImageBackground = "transparent" | "opaque" | "auto";
+/** The canonical ladder (see ./quality.ts). DALL·E's `standard`/`hd` are normalized away at the
+ * contract boundary and translated back per model via `qualityMappings`. */
+export type ImageQuality = Quality;
+type ImageResponseFormat = "b64_json";
+
+/** A file validated and stored temporarily during a multipart request. */
+export interface CanonicalImageInput {
+	path: string;
+	filename: string;
+	mimeType: "image/png" | "image/jpeg" | "image/webp";
+	sizeBytes: number;
+	width: number;
+	height: number;
+	hasAlpha?: boolean;
+}
+
+export interface CanonicalImageRequest {
+	operation: ImageOperation;
+	model: string;
+	prompt: string;
+	images?: CanonicalImageInput[];
+	mask?: CanonicalImageInput;
+	background?: ImageBackground;
+	inputFidelity?: "high" | "low";
+	moderation?: "low" | "auto";
+	n?: number;
+	outputCompression?: number;
+	outputFormat?: ImageOutputFormat;
+	partialImages?: number;
+	quality?: ImageQuality;
+	responseFormat?: ImageResponseFormat;
+	size?: string;
+	stream: boolean;
+	style?: "vivid" | "natural";
+	user?: string;
+	extraBody?: Record<string, unknown>;
+}
+
+export interface ImageUsage {
+	inputTokens: number;
+	outputTokens: number;
+	totalTokens: number;
+	inputImageTokens?: number;
+	inputTextTokens?: number;
+	outputImageTokens?: number;
+	outputTextTokens?: number;
+}
+
+/**
+ * An image endpoint's usage in canonical form. Output the upstream did not split by modality is
+ * counted as image output: the endpoint exists to produce images, and pricing a whole image at the
+ * text rate is the error that undercharges by an order of magnitude.
+ */
+export function imageUsageToCore(u: ImageUsage | undefined): Usage | null {
+	if (!u) {
+		return null;
+	}
+	const outputImageTokens =
+		u.outputImageTokens ??
+		(u.outputTextTokens === undefined
+			? u.outputTokens
+			: Math.max(0, u.outputTokens - u.outputTextTokens));
+	return {
+		promptTokens: u.inputTokens,
+		completionTokens: u.outputTokens,
+		totalTokens: u.totalTokens,
+		...(u.inputImageTokens === undefined
+			? {}
+			: { promptImageTokens: u.inputImageTokens }),
+		completionImageTokens: outputImageTokens,
+	};
+}
+
+export interface CanonicalImageData {
+	b64Json: string;
+	revisedPrompt?: string;
+	mimeType?: string;
+	width?: number;
+	height?: number;
+}
+
+export interface CanonicalImageResponse {
+	created: number;
+	data: CanonicalImageData[];
+	background?: ImageBackground;
+	outputFormat?: ImageOutputFormat;
+	quality?: ImageQuality;
+	size?: string;
+	usage?: ImageUsage;
+}
+
+export type CanonicalImageStreamEvent =
+	| {
+			kind: "partial";
+			operation: ImageOperation;
+			image: CanonicalImageData;
+			partialImageIndex: number;
+			createdAt: number;
+			background?: ImageBackground;
+			outputFormat?: ImageOutputFormat;
+			quality?: ImageQuality;
+			size?: string;
+	  }
+	| {
+			kind: "completed";
+			operation: ImageOperation;
+			image: CanonicalImageData;
+			createdAt: number;
+			background?: ImageBackground;
+			outputFormat?: ImageOutputFormat;
+			quality?: ImageQuality;
+			size?: string;
+			usage?: ImageUsage;
+	  };
+
+export interface ImageSizeMapping {
+	/** Native fields for image-config transports. */
+	aspectRatio?: string;
+	imageSize?: string;
+}
+
+/**
+ * Canonical constraints of an image model. Two sets of fields:
+ *  - **Client contract**: what the client can request; the gateway validates the request against this.
+ *  - **Gateway behavior**: how it operates internally. Optional, with safe defaults; the operator of a
+ *    custom model normally only declares the client contract.
+ */
+export interface ImageModelProfile {
+	// ── Client contract (request validation) ──
+	maxPromptChars?: number;
+	maxInputImages?: number;
+	maxImageBytes?: number;
+	maxTotalInputBytes?: number;
+	maxN?: number;
+	supportsMask?: boolean;
+	supportsInputFidelity?: boolean;
+	supportsModeration?: boolean;
+	supportsStyle?: boolean;
+	supportsTransparentBackground?: boolean;
+	outputFormats?: ImageOutputFormat[];
+	/** The rungs this model exposes. Absent means it has no quality knob at all. */
+	qualities?: QualityLevel[];
+	responseFormats?: ImageResponseFormat[];
+	/**
+	 * Exact accepted dimensions. The first entry is the model's default: `size: "auto"` (or an
+	 * omitted size) resolves to it when the model has no native auto (`autoSize` absent).
+	 */
+	sizes?: Record<string, ImageSizeMapping>;
+	/**
+	 * Declares native support for `size: "auto"` (the model picks the dimensions itself, e.g. from
+	 * the input images of an edit). An empty object means "send no size fields / forward the native
+	 * auto value"; set mapping fields when the provider needs an explicit native translation.
+	 */
+	autoSize?: ImageSizeMapping;
+	arbitrarySize?: {
+		divisibleBy: number;
+		minAspectRatio: number;
+		maxAspectRatio: number;
+		maxWidth: number;
+		maxHeight: number;
+		maxPixels?: number;
+	};
+
+	// ── Gateway behavior (internal; safe defaults if omitted) ──
+	/** The provider emits native streaming events; if not, the gateway synthesizes the final one. */
+	supportsNativeStreaming?: boolean;
+	/** false when the gateway must transcode the format/compression and not forward those fields. */
+	nativeOutputFormat?: boolean;
+	nativeOutputCompression?: boolean;
+	/**
+	 * false when the provider has no `response_format` field for this model and rejects it. The
+	 * gpt-image series always returns base64 and errors on the parameter; DALL·E defaults to URLs and
+	 * needs it. Absent means "send it", which is what every provider that has the field expects.
+	 */
+	nativeResponseFormat?: boolean;
+	/**
+	 * Native translation of each canonical rung, for models that do not speak the ladder: `quality` is
+	 * the value sent upstream in place of the rung (DALL·E's `standard`/`hd`), `thinkingLevel` the
+	 * Gemini image models' thinking control. Keyed by rung - `auto` never reaches an adapter.
+	 */
+	qualityMappings?: Partial<
+		Record<
+			QualityLevel,
+			{ quality?: string; thinkingLevel?: "minimal" | "low" | "high" }
+		>
+	>;
+}
+
+/** The provider-facing dimensions resolved from the requested `size` via the profile. */
+export interface ResolvedImageSize {
+	/** Exact WIDTHxHEIGHT, or the literal `auto` for models with native auto support. */
+	size?: string;
+	aspectRatio?: string;
+	imageSize?: string;
+}
+
+/**
+ * Resolves the requested `size` against the profile's size table. `auto` (and an omitted size,
+ * which is equivalent) resolves to the profile's `autoSize` mapping when the model supports auto
+ * natively, and falls back to the first `sizes` entry — the model's default — otherwise, so every
+ * image model accepts `size: "auto"` deterministically. Returns undefined when the profile
+ * declares nothing to send.
+ */
+export function resolveImageSize(
+	req: Pick<CanonicalImageRequest, "size">,
+	profile: ImageModelProfile | undefined,
+): ResolvedImageSize | undefined {
+	if (req.size && req.size !== "auto") {
+		const mapping = profile?.sizes?.[req.size];
+		return {
+			size: req.size,
+			...(mapping?.aspectRatio ? { aspectRatio: mapping.aspectRatio } : {}),
+			...(mapping?.imageSize ? { imageSize: mapping.imageSize } : {}),
+		};
+	}
+	if (profile?.autoSize) {
+		return {
+			size: "auto",
+			...(profile.autoSize.aspectRatio
+				? { aspectRatio: profile.autoSize.aspectRatio }
+				: {}),
+			...(profile.autoSize.imageSize
+				? { imageSize: profile.autoSize.imageSize }
+				: {}),
+		};
+	}
+	const [first] = Object.entries(profile?.sizes ?? {});
+	if (!first) {
+		return undefined;
+	}
+	const [size, mapping] = first;
+	return {
+		size,
+		...(mapping.aspectRatio ? { aspectRatio: mapping.aspectRatio } : {}),
+		...(mapping.imageSize ? { imageSize: mapping.imageSize } : {}),
+	};
+}

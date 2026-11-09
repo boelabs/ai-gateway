@@ -1,0 +1,83 @@
+---
+title: "Images"
+description: "POST /v1/images/generations and /v1/images/edits — the OpenAI Images contract."
+---
+
+Generate or edit images with a public model configured for the requested image operation.
+Supported sizes, quality levels, and output formats depend on the selected deployment.
+
+## Example request
+
+Set `GATEWAY` to the gateway origin and `API_KEY` to your virtual key. Replace the example
+public model with one from [Model discovery](/docs/models-discovery).
+
+```bash
+curl -X POST "$GATEWAY/v1/images/generations" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "model": "image-default", "prompt": "a red fox in snow", "size": "1024x1024", "n": 1 }'
+```
+
+`POST /v1/images/generations` is JSON; `POST /v1/images/edits` is multipart (image + optional `mask` +
+the same fields as form fields). Both accept JSON response or SSE (progressive partial images via
+`partial_images`).
+
+## Always `b64_json`
+
+Every image is returned as `b64_json` regardless of the requested `response_format` — URL image
+responses are **not part of the public contract**. `response_format` may be omitted or set to
+`b64_json` explicitly; anything else is rejected as unsupported by the model's profile.
+
+## Fields
+
+`prompt`, `size`, `quality`, `n`, `response_format`, `background`, `moderation`, `input_fidelity`,
+`output_format`, `output_compression`, `style`, `user`, `stream`, `partial_images`, and (edits only)
+`image`/`images` + `mask`. Which values are actually accepted for `size`/`quality`/`output_format` is
+per-model, declared in its catalog `image.generate`/`image.edit` profile — an unsupported `size` or
+`output_format` returns `400 unsupported_parameter` before any upstream call.
+
+`quality` is the exception: it rides one canonical ladder, `low` < `medium` < `high` < `xhigh` <
+`max`, and is reconciled with the chosen model rather than rejected outright. Under the default
+`drop` [parameter policy](/docs/parameter-policy#quality-on-image-and-video-generation) a rung the
+model does not declare snaps to the nearest declared one, in either direction and the lower one on a
+tie, so a request for `max` that falls back onto a model whose ladder stops at `high` degrades instead
+of failing, and `low` on a model that starts at `high` is raised to it. `standard` and `hd` are still
+accepted and normalized (`standard` → `medium`, `hd` → `high`); DALL·E still receives `hd` upstream.
+`auto` is not a rung — it is accepted everywhere and sends nothing, leaving the model's own default.
+The response's `quality` is the rung the provider reports, or, when it reports none, the rung the
+gateway sent after snapping; it is absent when nothing was sent.
+
+## `size: "auto"` works everywhere
+
+`size: "auto"` — and an omitted `size`, which is equivalent — is accepted for **every** image model.
+Models whose profile declares native auto support (`autoSize`, e.g. the `gpt-image-*` and
+`gemini-*-image` families) let the model pick the dimensions itself — for edits, Gemini matches the
+aspect ratio of the input images. Models without native auto resolve `auto` deterministically to the
+**first entry of the profile's `sizes` table**, which is the model's default size. The response `size`
+always reports the actual dimensions of the returned image, never the literal `auto`.
+
+## Output handling
+
+Every returned PNG, JPEG, and WebP is **re-encoded to strip upstream metadata** — no provider watermark
+or embedded identifying data survives to the client by default. If you need product/owner branding
+instead, add it via an operator-managed [runtime extension](/docs/extensions) hooking `onImageOutput`.
+
+## Gemini: quality maps to thinking
+
+For Gemini 3.1 Flash Image and Gemini 3.1 Flash Lite Image, the `quality` parameter doesn't map to a
+rendering quality tier the way it does for OpenAI — it maps to native **thinking level**. Both declare
+the rungs `low` (`thinkingLevel: minimal`) and `high` (`thinkingLevel: high`), so `medium` (equidistant) snaps
+to the lower `low` and `xhigh`/`max` snap to `high`. Gemini 3 Pro Image and Gemini 2.5 Flash Image expose no
+thinking control at all, so they declare no rungs and `quality` is simply not sent for them.
+See [Providers → Google AI Studio](/docs/providers-google).
+
+## Streaming
+
+`stream: true` with `partial_images: N` returns progressively refined images via SSE before the final
+one — see [Streaming](/docs/streaming).
+
+## Next steps
+
+- [Providers → Google AI Studio](/docs/providers-google) — the quality-to-thinking mapping in context.
+- [Extensions](/docs/extensions) — the `onImageOutput` hook, and the bundled watermark examples.
+- [Creating deployments](/docs/creating-deployments#2-image--catalog-model) — registering an image model.

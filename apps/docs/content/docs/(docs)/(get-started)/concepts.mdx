@@ -1,0 +1,67 @@
+---
+title: Core concepts
+description: Understand public models, deployments, and the path from your application to a provider.
+---
+
+An AI Gateway configuration connects the model names your application uses to the providers that
+serve them. Start with three concepts:
+
+| Concept | Purpose | Example |
+|---|---|---|
+| **Public Model** | The name your application sends in `model`. | `general` |
+| **Deployment** | One configured route to an upstream model, including credentials and limits. | `general` routed to OpenAI's `gpt-5.5` |
+| **Virtual Key** | An application credential with model access, rate limits, and a budget. | A key allowed to call only `general` |
+
+## Public models and deployment pools
+
+Deployments with the same `publicModel` form a **deployment pool**. You do not create a separate
+pool entity. Add another deployment with `publicModel: "general"` to give the router another
+candidate for that name.
+
+This lets you change upstream models or add providers without changing client code. The router
+selects an eligible deployment using its configured [strategy](/docs/routing), capabilities,
+limits, and health. [Fallback policies](/docs/fallbacks) can route to another public model when
+the original pool cannot serve the request.
+
+<Callout title="Check capabilities when mixing providers">
+
+Sharing a public name does not make providers interchangeable for every request. Each deployment
+must support the requested operation. Parameter support is governed by
+[parameter policy](/docs/parameter-policy).
+
+</Callout>
+
+## Endpoints, adapters, and transports
+
+A **Public Endpoint** defines the API your client uses, such as `/v1/chat/completions` or
+`/v1/messages`. An **Adapter** translates between AI Gateway's provider-independent representation
+and an upstream provider. A **Transport** is the upstream protocol the adapter uses.
+
+For example, a client can call Chat Completions while the OpenAI adapter sends the upstream
+request through Responses. The client-facing endpoint and upstream transport are separate choices.
+Transports are inferred per operation; use `transportOverrides` only when needed.
+
+## Request flow
+
+```text
+Application + virtual key + public model
+  → Public endpoint
+  → Canonical request
+  → Eligible deployment selected from the pool
+  → Adapter and upstream transport
+  → Provider
+  → Canonical response
+  → Response in the client's API format
+```
+
+**Canonical** is the representation shared by adapters and extension hooks. It keeps provider
+protocols out of routing, access control, and other common logic.
+
+For execution order, retries, caching, and quota accounting, see [Architecture](/docs/architecture).
+The [Glossary](/docs/glossary) defines the complete vocabulary used in code and API schemas.
+
+## Next steps
+
+- [Quickstart](/docs/quickstart): create a working local configuration.
+- [Your first deployment](/docs/first-deployment): validate and connect a provider on an existing gateway.
+- [Virtual keys](/docs/virtual-keys): scope access for each application.

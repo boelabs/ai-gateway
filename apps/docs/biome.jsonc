@@ -1,0 +1,13 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+	"root": false,
+	"extends": "//",
+
+	// Everything comes from the root biome.jsonc. This file exists only because the Tailwind
+	// stylesheet is per app and `tailwind` cannot go in a root override: without it Biome does
+	// not know the theme (`bg-surface`, `text-fg-muted`, …) and sorts those classes as unknown,
+	// first in the list, instead of in Tailwind's own order.
+	"tailwind": {
+		"stylesheet": "./src/app/global.css"
+	}
+}

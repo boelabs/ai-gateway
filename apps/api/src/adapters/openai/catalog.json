@@ -1,0 +1,3177 @@
+{
+	"$schema": "../../../schemas/model-catalog.schema.json",
+	"schemaVersion": 1,
+	"provider": {
+		"id": "openai",
+		"adapterKey": "openai",
+		"name": "OpenAI",
+		"docs": [
+			"https://developers.openai.com/api/docs/models",
+			"https://developers.openai.com/api/docs/pricing",
+			"https://developers.openai.com/api/docs/guides/realtime",
+			"https://developers.openai.com/api/reference/resources/realtime/client-events"
+		]
+	},
+	"models": {
+		"sora-2": {
+			"deprecated": true,
+			"operations": {
+				"video.generate": {
+					"maxPromptChars": 32000,
+					"durations": ["4", "8", "12"],
+					"supportsImageUrl": true,
+					"supportsFileId": true,
+					"contentVariants": ["video", "thumbnail", "spritesheet"],
+					"pollIntervalSeconds": 5,
+					"sizes": {
+						"720x1280": {
+							"size": "720x1280"
+						},
+						"1280x720": {
+							"size": "1280x720"
+						},
+						"1024x1792": {
+							"size": "1024x1792"
+						},
+						"1792x1024": {
+							"size": "1792x1024"
+						}
+					},
+					"maxInputReferences": 1
+				}
+			},
+			"notes": "OpenAI Videos/Sora 2 API compatibility profile. OpenAI docs currently mark this API deprecated with shutdown scheduled for 2026-09-24."
+		},
+		"sora-2-pro": {
+			"deprecated": true,
+			"operations": {
+				"video.generate": {
+					"maxPromptChars": 32000,
+					"durations": ["4", "8", "12"],
+					"supportsImageUrl": true,
+					"supportsFileId": true,
+					"contentVariants": ["video", "thumbnail", "spritesheet"],
+					"pollIntervalSeconds": 5,
+					"sizes": {
+						"720x1280": {
+							"size": "720x1280"
+						},
+						"1280x720": {
+							"size": "1280x720"
+						},
+						"1024x1792": {
+							"size": "1024x1792"
+						},
+						"1792x1024": {
+							"size": "1792x1024"
+						}
+					},
+					"maxInputReferences": 1
+				}
+			},
+			"notes": "OpenAI Videos/Sora 2 API compatibility profile. OpenAI docs currently mark this API deprecated with shutdown scheduled for 2026-09-24."
+		},
+		"text-embedding-3-large": {
+			"operations": {
+				"embedding.create": {
+					"dimensions": 3072,
+					"supportsDimensions": true,
+					"minDimensions": 1,
+					"maxDimensions": 3072,
+					"encodingFormats": ["float", "base64"],
+					"maxInputs": 2048,
+					"maxInputTokens": 8192,
+					"maxTotalTokens": 300000,
+					"supportsTokenInput": true
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 13,
+				"outputCentsPerMTokens": 0
+			}
+		},
+		"text-embedding-3-small": {
+			"operations": {
+				"embedding.create": {
+					"dimensions": 1536,
+					"supportsDimensions": true,
+					"minDimensions": 1,
+					"maxDimensions": 1536,
+					"encodingFormats": ["float", "base64"],
+					"maxInputs": 2048,
+					"maxInputTokens": 8192,
+					"maxTotalTokens": 300000,
+					"supportsTokenInput": true
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 2,
+				"outputCentsPerMTokens": 0
+			}
+		},
+		"text-embedding-ada-002": {
+			"operations": {
+				"embedding.create": {
+					"dimensions": 1536,
+					"supportsDimensions": false,
+					"encodingFormats": ["float", "base64"],
+					"maxInputs": 2048,
+					"maxInputTokens": 8192,
+					"maxTotalTokens": 300000,
+					"supportsTokenInput": true
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 10,
+				"outputCentsPerMTokens": 0
+			}
+		},
+		"gpt-image-2": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"arbitrarySize": {
+						"divisibleBy": 16,
+						"minAspectRatio": 0.3333333333333333,
+						"maxAspectRatio": 3,
+						"maxWidth": 3840,
+						"maxHeight": 3840,
+						"maxPixels": 8294400
+					},
+					"nativeResponseFormat": false
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"arbitrarySize": {
+						"divisibleBy": 16,
+						"minAspectRatio": 0.3333333333333333,
+						"maxAspectRatio": 3,
+						"maxWidth": 3840,
+						"maxHeight": 3840,
+						"maxPixels": 8294400
+					},
+					"nativeResponseFormat": false
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 500,
+				"outputCentsPerMTokens": 3000,
+				"cacheReadCentsPerMTokens": 125,
+				"imageInputCentsPerMTokens": 800,
+				"imageOutputCentsPerMTokens": 3000
+			}
+		},
+		"gpt-image-2.5-sunburst": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high", "xhigh", "max"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"arbitrarySize": {
+						"divisibleBy": 16,
+						"minAspectRatio": 0.3333333333333333,
+						"maxAspectRatio": 3,
+						"maxWidth": 3840,
+						"maxHeight": 3840,
+						"maxPixels": 8294400
+					},
+					"nativeResponseFormat": false
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high", "xhigh", "max"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"arbitrarySize": {
+						"divisibleBy": 16,
+						"minAspectRatio": 0.3333333333333333,
+						"maxAspectRatio": 3,
+						"maxWidth": 3840,
+						"maxHeight": 3840,
+						"maxPixels": 8294400
+					},
+					"nativeResponseFormat": false
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 500,
+				"outputCentsPerMTokens": 3000,
+				"cacheReadCentsPerMTokens": 125,
+				"imageInputCentsPerMTokens": 800,
+				"imageOutputCentsPerMTokens": 3000
+			}
+		},
+		"gpt-image-2.5-flare": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high", "xhigh", "max"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"arbitrarySize": {
+						"divisibleBy": 16,
+						"minAspectRatio": 0.3333333333333333,
+						"maxAspectRatio": 3,
+						"maxWidth": 3840,
+						"maxHeight": 3840,
+						"maxPixels": 8294400
+					},
+					"nativeResponseFormat": false
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high", "xhigh", "max"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"arbitrarySize": {
+						"divisibleBy": 16,
+						"minAspectRatio": 0.3333333333333333,
+						"maxAspectRatio": 3,
+						"maxWidth": 3840,
+						"maxHeight": 3840,
+						"maxPixels": 8294400
+					},
+					"nativeResponseFormat": false
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 500,
+				"outputCentsPerMTokens": 3000,
+				"cacheReadCentsPerMTokens": 125,
+				"imageInputCentsPerMTokens": 800,
+				"imageOutputCentsPerMTokens": 3000
+			}
+		},
+		"gpt-image-1.5": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"nativeResponseFormat": false
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"nativeResponseFormat": false
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 500,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 125,
+				"imageInputCentsPerMTokens": 800,
+				"imageOutputCentsPerMTokens": 3200
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-image-1.5; it shuts down on 2026-12-01 (replacement: gpt-image-2.5-sunburst or gpt-image-2.5-flare)."
+		},
+		"gpt-image-1": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"nativeResponseFormat": false
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"nativeResponseFormat": false
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 500,
+				"outputCentsPerMTokens": 4000,
+				"cacheReadCentsPerMTokens": 125,
+				"imageInputCentsPerMTokens": 1000,
+				"imageOutputCentsPerMTokens": 4000
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-image-1; it shuts down on 2026-10-23 (replacement: gpt-image-2.5-sunburst or gpt-image-2.5-flare)."
+		},
+		"gpt-image-1-mini": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": false,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"nativeResponseFormat": false
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": false,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"nativeResponseFormat": false
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 800,
+				"cacheReadCentsPerMTokens": 20,
+				"imageInputCentsPerMTokens": 250,
+				"imageOutputCentsPerMTokens": 800
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-image-1-mini; it shuts down on 2026-12-01 (replacement: gpt-image-2.5-sunburst or gpt-image-2.5-flare)."
+		},
+		"chatgpt-image-latest": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"nativeResponseFormat": false
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"nativeResponseFormat": false
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 500,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 125,
+				"imageInputCentsPerMTokens": 800,
+				"imageOutputCentsPerMTokens": 3200
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated chatgpt-image-latest; it shuts down on 2026-12-01 (replacement: gpt-image-2.5-sunburst or gpt-image-2.5-flare)."
+		},
+		"dall-e-2": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 1000,
+					"maxInputImages": 1,
+					"maxImageBytes": 4000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["medium"],
+					"responseFormats": ["b64_json"],
+					"sizes": {
+						"1024x1024": {},
+						"256x256": {},
+						"512x512": {}
+					},
+					"qualityMappings": {
+						"medium": {
+							"quality": "standard"
+						}
+					}
+				},
+				"image.edit": {
+					"maxPromptChars": 1000,
+					"maxInputImages": 1,
+					"maxImageBytes": 4000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["medium"],
+					"responseFormats": ["b64_json"],
+					"sizes": {
+						"1024x1024": {},
+						"256x256": {},
+						"512x512": {}
+					},
+					"qualityMappings": {
+						"medium": {
+							"quality": "standard"
+						}
+					}
+				}
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down dall-e-2 on 2026-05-12; replacement gpt-image-2."
+		},
+		"dall-e-3": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 4000,
+					"maxN": 1,
+					"supportsStyle": true,
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["medium", "high"],
+					"responseFormats": ["b64_json"],
+					"sizes": {
+						"1024x1024": {},
+						"1792x1024": {},
+						"1024x1792": {}
+					},
+					"qualityMappings": {
+						"medium": {
+							"quality": "standard"
+						},
+						"high": {
+							"quality": "hd"
+						}
+					}
+				}
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down dall-e-3 on 2026-05-12; replacement gpt-image-2."
+		},
+		"gpt-transcribe": {
+			"operations": {
+				"audio.transcribe": {
+					"responseFormats": ["json", "text"],
+					"supportsStreaming": true,
+					"supportsKeywords": true,
+					"supportsLanguageHints": true,
+					"maxFileBytes": 26214400
+				}
+			}
+		},
+		"gpt-4o-transcribe": {
+			"operations": {
+				"audio.transcribe": {
+					"responseFormats": ["json", "text"],
+					"supportsStreaming": true,
+					"maxFileBytes": 26214400
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 250,
+				"outputCentsPerMTokens": 1000
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4o-transcribe; it shuts down on 2027-02-26 (replacement: gpt-transcribe or gpt-live-transcribe)."
+		},
+		"gpt-4o-mini-transcribe": {
+			"operations": {
+				"audio.transcribe": {
+					"responseFormats": ["json", "text"],
+					"supportsStreaming": true,
+					"maxFileBytes": 26214400
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 125,
+				"outputCentsPerMTokens": 500
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4o-mini-transcribe; it shuts down on 2027-02-26 (replacement: gpt-transcribe or gpt-live-transcribe)."
+		},
+		"gpt-5.6": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh", "max"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"reasoning_effort": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 400,
+				"outputCentsPerMTokens": 2000,
+				"cacheReadCentsPerMTokens": 40,
+				"cacheWriteCentsPerMTokens": 500,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 800,
+						"outputCentsPerMTokens": 3000,
+						"cacheReadCentsPerMTokens": 80,
+						"cacheWriteCentsPerMTokens": 1000
+					}
+				]
+			}
+		},
+		"gpt-5.6-sol": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh", "max"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"reasoning_effort": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 400,
+				"outputCentsPerMTokens": 2000,
+				"cacheReadCentsPerMTokens": 40,
+				"cacheWriteCentsPerMTokens": 500,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 800,
+						"outputCentsPerMTokens": 3000,
+						"cacheReadCentsPerMTokens": 80,
+						"cacheWriteCentsPerMTokens": 1000
+					}
+				]
+			}
+		},
+		"gpt-5.6-terra": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh", "max"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"reasoning_effort": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 1200,
+				"cacheReadCentsPerMTokens": 20,
+				"cacheWriteCentsPerMTokens": 250,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 1800,
+						"cacheReadCentsPerMTokens": 40,
+						"cacheWriteCentsPerMTokens": 500
+					}
+				]
+			}
+		},
+		"gpt-5.6-luna": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh", "max"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"reasoning_effort": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 20,
+				"outputCentsPerMTokens": 120,
+				"cacheReadCentsPerMTokens": 2,
+				"cacheWriteCentsPerMTokens": 25,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 40,
+						"outputCentsPerMTokens": 180,
+						"cacheReadCentsPerMTokens": 4,
+						"cacheWriteCentsPerMTokens": 50
+					}
+				]
+			}
+		},
+		"gpt-5.5": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 500,
+				"outputCentsPerMTokens": 3000,
+				"cacheReadCentsPerMTokens": 50,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 1000,
+						"outputCentsPerMTokens": 4500,
+						"cacheReadCentsPerMTokens": 100
+					}
+				]
+			}
+		},
+		"gpt-5.5-pro": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["medium", "high", "xhigh"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 3000,
+				"outputCentsPerMTokens": 18000,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 6000,
+						"outputCentsPerMTokens": 27000
+					}
+				]
+			}
+		},
+		"gpt-5.4": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 250,
+				"outputCentsPerMTokens": 1500,
+				"cacheReadCentsPerMTokens": 25,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 500,
+						"outputCentsPerMTokens": 2250,
+						"cacheReadCentsPerMTokens": 50
+					}
+				]
+			}
+		},
+		"gpt-5.4-pro": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["medium", "high", "xhigh"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 3000,
+				"outputCentsPerMTokens": 18000,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 6000,
+						"outputCentsPerMTokens": 27000
+					}
+				]
+			}
+		},
+		"gpt-5.4-mini": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 75,
+				"outputCentsPerMTokens": 450,
+				"cacheReadCentsPerMTokens": 7.5
+			}
+		},
+		"gpt-5.4-nano": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 20,
+				"outputCentsPerMTokens": 125,
+				"cacheReadCentsPerMTokens": 2
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-5.4-nano; it shuts down on 2027-04-01 (replacement: gpt-6-luna)."
+		},
+		"gpt-5.3-codex": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high", "xhigh"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 175,
+				"outputCentsPerMTokens": 1400,
+				"cacheReadCentsPerMTokens": 17.5
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-5.3-codex; it shuts down on 2027-04-01 (replacement: gpt-6-sol)."
+		},
+		"gpt-5.2": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 175,
+				"outputCentsPerMTokens": 1400,
+				"cacheReadCentsPerMTokens": 17.5
+			}
+		},
+		"gpt-5.2-pro": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["medium", "high", "xhigh"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 2100,
+				"outputCentsPerMTokens": 16800
+			}
+		},
+		"gpt-5.1": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"max_completion_tokens": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 125,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 12.5
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-5.1; it shuts down on 2027-04-01 (replacement: gpt-6-sol)."
+		},
+		"gpt-5": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["minimal", "low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"max_completion_tokens": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					}
+				},
+				"image.generate": {
+					"responseFormats": ["b64_json"]
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 125,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 12.5,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-5; it shuts down on 2026-12-11 (replacement: gpt-5.6-sol)."
+		},
+		"gpt-5-mini": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["minimal", "low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 25,
+				"outputCentsPerMTokens": 200,
+				"cacheReadCentsPerMTokens": 2.5,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-5-mini; it shuts down on 2026-12-11 (replacement: gpt-5.6-terra)."
+		},
+		"gpt-5-nano": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["minimal", "low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 5,
+				"outputCentsPerMTokens": 40,
+				"cacheReadCentsPerMTokens": 0.5,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-5-nano; it shuts down on 2026-12-11 (replacement: gpt-5.6-luna)."
+		},
+		"gpt-5-pro": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 272000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 1500,
+				"outputCentsPerMTokens": 12000
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-5-pro; it shuts down on 2026-12-11 (replacement: gpt-5.6-sol with reasoning.mode: pro)."
+		},
+		"o3-pro": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 200000,
+					"maxOutputTokens": 100000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 2000,
+				"outputCentsPerMTokens": 8000
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated o3-pro; it shuts down on 2026-12-11 (replacement: gpt-5.6-sol with reasoning.mode: pro)."
+		},
+		"o3": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 200000,
+					"maxOutputTokens": 100000,
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high"]
+					},
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 800,
+				"cacheReadCentsPerMTokens": 50,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated o3; it shuts down on 2026-12-11 (replacement: gpt-5.6-sol)."
+		},
+		"gpt-4.1": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1047576,
+					"maxOutputTokens": 32768,
+					"parameters": {
+						"max_tokens": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 800,
+				"cacheReadCentsPerMTokens": 50,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4.1 (gpt-4.1-2025-04-14); it shuts down on 2027-01-14 (replacement: gpt-6-luna)."
+		},
+		"gpt-4.1-mini": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1047576,
+					"maxOutputTokens": 32768,
+					"parameters": {
+						"max_tokens": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 40,
+				"outputCentsPerMTokens": 160,
+				"cacheReadCentsPerMTokens": 10,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4.1-mini (gpt-4.1-mini-2025-04-14); it shuts down on 2027-01-14 (replacement: gpt-6-luna)."
+		},
+		"gpt-4o-mini": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true,
+						"web_search_options": true,
+						"prediction": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 15,
+				"outputCentsPerMTokens": 60,
+				"cacheReadCentsPerMTokens": 7.5,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4o-mini (gpt-4o-mini-2024-07-18); it shuts down on 2027-01-14 (replacement: gpt-6-luna)."
+		},
+		"chat-latest": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 500,
+				"outputCentsPerMTokens": 3000,
+				"cacheReadCentsPerMTokens": 50
+			}
+		},
+		"gpt-5.3-chat-latest": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"max_tokens": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 175,
+				"outputCentsPerMTokens": 1400,
+				"cacheReadCentsPerMTokens": 17.5
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-5.3-chat-latest on 2026-08-10; replacement gpt-5.6-sol."
+		},
+		"gpt-audio": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 250,
+				"outputCentsPerMTokens": 1000
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-audio; it shuts down on 2027-01-20 (replacement: gpt-audio-1.5)."
+		},
+		"gpt-audio-mini": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 60,
+				"outputCentsPerMTokens": 240
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-audio-mini; it shuts down on 2027-01-20 (replacement: gpt-audio-1.5)."
+		},
+		"gpt-5.2-codex": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"max_completion_tokens": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 175,
+				"outputCentsPerMTokens": 1400,
+				"cacheReadCentsPerMTokens": 17.5
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-5.2-codex on 2026-07-23; replacement gpt-5.6-sol."
+		},
+		"gpt-5.2-chat-latest": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 32000,
+					"parameters": {
+						"max_tokens": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"max_completion_tokens": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 175,
+				"outputCentsPerMTokens": 1400,
+				"cacheReadCentsPerMTokens": 17.5
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-5.2-chat-latest on 2026-08-10; replacement gpt-5.6-sol."
+		},
+		"gpt-5.1-codex-max": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"max_completion_tokens": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 125,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 12.5
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-5.1-codex-max on 2026-07-23; replacement gpt-5.6-sol."
+		},
+		"gpt-5.1-chat-latest": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"max_tokens": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 125,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 12.5
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-5.1-chat-latest on 2026-07-23; replacement gpt-5.6-sol."
+		},
+		"gpt-5.1-codex": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"max_completion_tokens": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 125,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 13
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-5.1-codex on 2026-07-23; replacement gpt-5.6-sol."
+		},
+		"gpt-5.1-codex-mini": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true,
+						"max_completion_tokens": true,
+						"reasoning_effort": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 25,
+				"outputCentsPerMTokens": 200,
+				"cacheReadCentsPerMTokens": 3
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-5.1-codex-mini on 2026-07-23; replacement gpt-5.6-terra."
+		},
+		"o3-deep-research": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 200000,
+					"maxOutputTokens": 100000,
+					"parameters": {
+						"frequency_penalty": true,
+						"include_reasoning": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 1000,
+				"outputCentsPerMTokens": 4000,
+				"cacheReadCentsPerMTokens": 250
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down o3-deep-research (o3-deep-research-2025-06-26) on 2026-07-23; replacement gpt-5.6-sol."
+		},
+		"o4-mini-deep-research": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 200000,
+					"maxOutputTokens": 100000,
+					"parameters": {
+						"frequency_penalty": true,
+						"include_reasoning": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 800,
+				"cacheReadCentsPerMTokens": 50
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down o4-mini-deep-research (o4-mini-deep-research-2025-06-26) on 2026-07-23; replacement gpt-5.6-sol."
+		},
+		"gpt-5-codex": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 400000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 125,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 13,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-5-codex on 2026-07-23; replacement gpt-5.6-sol."
+		},
+		"gpt-5-chat-latest": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"max_tokens": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"stop": true,
+						"tools": true,
+						"tool_choice": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 125,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 12.5
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-5-chat-latest on 2026-07-23; replacement gpt-5.6-sol."
+		},
+		"o4-mini": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 200000,
+					"maxOutputTokens": 100000,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 110,
+				"outputCentsPerMTokens": 440,
+				"cacheReadCentsPerMTokens": 27.5,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated o4-mini (o4-mini-2025-04-16); it shuts down on 2026-10-23 (replacement: gpt-5.6-terra)."
+		},
+		"gpt-4.1-nano": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 1047576,
+					"maxOutputTokens": 32768,
+					"parameters": {
+						"max_tokens": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_p": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 10,
+				"outputCentsPerMTokens": 40,
+				"cacheReadCentsPerMTokens": 2.5,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4.1-nano (gpt-4.1-nano-2025-04-14); it shuts down on 2026-10-23 (replacement: gpt-5.6-luna)."
+		},
+		"o1-pro": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 200000,
+					"maxOutputTokens": 100000,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 15000,
+				"outputCentsPerMTokens": 60000
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated o1-pro (o1-pro-2025-03-19); it shuts down on 2026-10-23 (replacement: gpt-5.6-sol with reasoning.mode pro)."
+		},
+		"gpt-4o-mini-search-preview": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"max_tokens": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"web_search_options": true,
+						"temperature": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 15,
+				"outputCentsPerMTokens": 60
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-4o-mini-search-preview-2025-03-11, the alias's only snapshot, on 2026-07-23; replacement gpt-5.6-terra."
+		},
+		"gpt-4o-search-preview": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"max_tokens": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"web_search_options": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 250,
+				"outputCentsPerMTokens": 1000
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-4o-search-preview-2025-03-11, the alias's only snapshot, on 2026-07-23; replacement gpt-5.6-terra."
+		},
+		"o3-mini": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 200000,
+					"maxOutputTokens": 100000,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 110,
+				"outputCentsPerMTokens": 440,
+				"cacheReadCentsPerMTokens": 55,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated o3-mini (o3-mini-2025-01-31); it shuts down on 2026-10-23 (replacement: gpt-5.6-sol)."
+		},
+		"o1": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 200000,
+					"maxOutputTokens": 100000,
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"response_format": true,
+						"seed": true,
+						"structured_outputs": true,
+						"tool_choice": true,
+						"tools": true,
+						"temperature": true,
+						"stop": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 1500,
+				"outputCentsPerMTokens": 6000,
+				"cacheReadCentsPerMTokens": 750,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated o1 (o1-2024-12-17); it shuts down on 2026-10-23 (replacement: gpt-5.6-sol)."
+		},
+		"gpt-4o-2024-11-20": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true,
+						"web_search_options": true,
+						"prediction": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 250,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 125
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4o-2024-11-20; it shuts down on 2027-01-14 (replacement: gpt-6-luna)."
+		},
+		"gpt-4o-2024-08-06": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true,
+						"web_search_options": true,
+						"prediction": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 250,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 125
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4o-2024-08-06; it shuts down on 2027-01-14 (replacement: gpt-6-luna)."
+		},
+		"gpt-4o-mini-2024-07-18": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true,
+						"web_search_options": true,
+						"prediction": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 15,
+				"outputCentsPerMTokens": 60,
+				"cacheReadCentsPerMTokens": 7.5
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4o-mini-2024-07-18; it shuts down on 2027-01-14 (replacement: gpt-6-luna)."
+		},
+		"gpt-4o-2024-05-13": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 4096,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true,
+						"web_search_options": true,
+						"prediction": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 500,
+				"outputCentsPerMTokens": 1500
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4o-2024-05-13; it shuts down on 2026-10-23 (replacement: gpt-5.6-sol)."
+		},
+		"gpt-4o": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true,
+						"web_search_options": true,
+						"prediction": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 250,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 125,
+				"cacheWriteCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4o (gpt-4o-2024-08-06 and gpt-4o-2024-11-20); it shuts down on 2027-01-14 (replacement: gpt-6-luna)."
+		},
+		"gpt-4-turbo": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 4096,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 1000,
+				"outputCentsPerMTokens": 3000
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4-turbo (gpt-4-turbo-2024-04-09); it shuts down on 2026-10-23 (replacement: gpt-5.6-sol)."
+		},
+		"gpt-4-turbo-preview": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 4096,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 1000,
+				"outputCentsPerMTokens": 3000
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-4-0125-preview, which gpt-4-turbo-preview points to, on 2026-03-26; replacement gpt-5 or gpt-4.1."
+		},
+		"gpt-3.5-turbo-instruct": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": false,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 4095,
+					"maxOutputTokens": 3685,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"top_logprobs": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 150,
+				"outputCentsPerMTokens": 200
+			},
+			"deprecated": true,
+			"notes": "OpenAI shut down gpt-3.5-turbo-instruct on 2026-09-28; replacement gpt-5.6-terra."
+		},
+		"gpt-3.5-turbo": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 16385,
+					"maxOutputTokens": 4096,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 50,
+				"outputCentsPerMTokens": 150,
+				"cacheReadCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-3.5-turbo (gpt-3.5-turbo-0125); it shuts down on 2026-10-23 (replacement: gpt-5.6-terra)."
+		},
+		"gpt-4": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": false
+					},
+					"maxInputTokens": 8192,
+					"maxOutputTokens": 8192,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 3000,
+				"outputCentsPerMTokens": 6000
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-4 (gpt-4-0613); it shuts down on 2026-10-23 (replacement: gpt-5.6-sol)."
+		},
+		"gpt-oss-20b": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 131072,
+					"maxOutputTokens": 131072,
+					"parameters": {
+						"max_tokens": true,
+						"temperature": true,
+						"stop": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"presence_penalty": true,
+						"seed": true,
+						"top_p": true,
+						"logprobs": true,
+						"top_logprobs": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"top_k": true,
+						"repetition_penalty": true,
+						"reasoning_effort": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					}
+				}
+			}
+		},
+		"gpt-oss-120b": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 131072,
+					"maxOutputTokens": 131072,
+					"parameters": {
+						"max_tokens": true,
+						"temperature": true,
+						"stop": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"top_k": true,
+						"top_p": true,
+						"structured_outputs": true,
+						"response_format": true,
+						"logprobs": true,
+						"top_logprobs": true,
+						"seed": true,
+						"frequency_penalty": true,
+						"presence_penalty": true,
+						"repetition_penalty": true,
+						"reasoning_effort": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					}
+				}
+			}
+		},
+		"gpt-6-astra": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"max_tokens": true,
+						"stop": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"seed": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high", "xhigh", "max"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 1000,
+				"outputCentsPerMTokens": 5000,
+				"cacheReadCentsPerMTokens": 100,
+				"cacheWriteCentsPerMTokens": 1250,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 2000,
+						"outputCentsPerMTokens": 7500,
+						"cacheReadCentsPerMTokens": 200,
+						"cacheWriteCentsPerMTokens": 2500
+					}
+				]
+			}
+		},
+		"gpt-6.1-sol": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"max_tokens": true,
+						"stop": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"seed": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high", "xhigh", "max"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 10,
+				"cacheWriteCentsPerMTokens": 250,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 1500,
+						"cacheReadCentsPerMTokens": 20,
+						"cacheWriteCentsPerMTokens": 500
+					}
+				]
+			}
+		},
+		"gpt-6.1-terra": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"max_tokens": true,
+						"stop": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"seed": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh", "max"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 100,
+				"outputCentsPerMTokens": 500,
+				"cacheReadCentsPerMTokens": 5,
+				"cacheWriteCentsPerMTokens": 125,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 200,
+						"outputCentsPerMTokens": 750,
+						"cacheReadCentsPerMTokens": 10,
+						"cacheWriteCentsPerMTokens": 250
+					}
+				]
+			}
+		},
+		"gpt-6-sol": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"max_tokens": true,
+						"stop": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"seed": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true,
+						"verbosity": true,
+						"temperature": {
+							"mode": "supported",
+							"notes": "OpenAI accepts temperature only when reasoning effort is `none`; any other effort rejects it."
+						}
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh", "max"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 20,
+				"cacheWriteCentsPerMTokens": 250,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 1500,
+						"cacheReadCentsPerMTokens": 40,
+						"cacheWriteCentsPerMTokens": 500
+					}
+				]
+			}
+		},
+		"gpt-6-luna": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"max_tokens": true,
+						"stop": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"seed": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true,
+						"verbosity": true,
+						"temperature": {
+							"mode": "supported",
+							"notes": "OpenAI accepts temperature only when reasoning effort is `none`; any other effort rejects it."
+						}
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high", "xhigh", "max"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 10,
+				"outputCentsPerMTokens": 50,
+				"cacheReadCentsPerMTokens": 1,
+				"cacheWriteCentsPerMTokens": 12.5,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 20,
+						"outputCentsPerMTokens": 75,
+						"cacheReadCentsPerMTokens": 2,
+						"cacheWriteCentsPerMTokens": 25
+					}
+				]
+			}
+		},
+		"gpt-realtime-2.1": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio", "text"],
+					"voices": [
+						"alloy",
+						"ash",
+						"ballad",
+						"coral",
+						"echo",
+						"sage",
+						"shimmer",
+						"verse",
+						"marin",
+						"cedar"
+					],
+					"supportsInstructions": true,
+					"supportsTools": true,
+					"reasoningEfforts": ["minimal", "low", "medium", "high", "xhigh"],
+					"supportsDeferredResponse": true,
+					"supportsSpeed": true,
+					"supportsTextInput": true,
+					"supportsImageInput": true,
+					"supportsInputTranscription": true,
+					"turnDetection": ["server_vad", "semantic_vad", "manual"]
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 400,
+				"outputCentsPerMTokens": 2400,
+				"cacheReadCentsPerMTokens": 40,
+				"audioInputCentsPerMTokens": 3200,
+				"audioOutputCentsPerMTokens": 6400,
+				"imageInputCentsPerMTokens": 500
+			},
+			"notes": "Realtime API (WebSocket). Reasoning model: 128k context, 32k max output. Input transcription runs on a separate transcription model, billed by OpenAI on its own."
+		},
+		"gpt-realtime-2.1-mini": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio", "text"],
+					"voices": [
+						"alloy",
+						"ash",
+						"ballad",
+						"coral",
+						"echo",
+						"sage",
+						"shimmer",
+						"verse",
+						"marin",
+						"cedar"
+					],
+					"supportsInstructions": true,
+					"supportsTools": true,
+					"reasoningEfforts": ["minimal", "low", "medium", "high", "xhigh"],
+					"supportsDeferredResponse": true,
+					"supportsSpeed": true,
+					"supportsTextInput": true,
+					"supportsImageInput": true,
+					"supportsInputTranscription": true,
+					"turnDetection": ["server_vad", "semantic_vad", "manual"]
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 60,
+				"outputCentsPerMTokens": 240,
+				"cacheReadCentsPerMTokens": 30,
+				"audioInputCentsPerMTokens": 1000,
+				"audioOutputCentsPerMTokens": 2000,
+				"imageInputCentsPerMTokens": 80
+			},
+			"notes": "Realtime API (WebSocket). Reasoning model: 128k context, 32k max output. OpenAI prices cached audio at $0.30 and cached text at $0.06 per 1M; the catalog has one cache rate, so the audio one applies."
+		},
+		"gpt-realtime-2": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio", "text"],
+					"voices": [
+						"alloy",
+						"ash",
+						"ballad",
+						"coral",
+						"echo",
+						"sage",
+						"shimmer",
+						"verse",
+						"marin",
+						"cedar"
+					],
+					"supportsInstructions": true,
+					"supportsTools": true,
+					"reasoningEfforts": ["minimal", "low", "medium", "high", "xhigh"],
+					"supportsDeferredResponse": true,
+					"supportsSpeed": true,
+					"supportsTextInput": true,
+					"supportsImageInput": true,
+					"supportsInputTranscription": true,
+					"turnDetection": ["server_vad", "semantic_vad", "manual"]
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 400,
+				"outputCentsPerMTokens": 2400,
+				"cacheReadCentsPerMTokens": 40,
+				"audioInputCentsPerMTokens": 3200,
+				"audioOutputCentsPerMTokens": 6400,
+				"imageInputCentsPerMTokens": 500
+			},
+			"notes": "Realtime API (WebSocket). Reasoning model: 128k context, 32k max output. gpt-realtime-2.1 improves on it."
+		},
+		"gpt-realtime-1.5": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio", "text"],
+					"voices": [
+						"alloy",
+						"ash",
+						"ballad",
+						"coral",
+						"echo",
+						"sage",
+						"shimmer",
+						"verse",
+						"marin",
+						"cedar"
+					],
+					"supportsInstructions": true,
+					"supportsTools": true,
+					"supportsDeferredResponse": true,
+					"supportsSpeed": true,
+					"supportsTextInput": true,
+					"supportsImageInput": true,
+					"supportsInputTranscription": true,
+					"turnDetection": ["server_vad", "semantic_vad", "manual"]
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 400,
+				"outputCentsPerMTokens": 1600,
+				"cacheReadCentsPerMTokens": 40,
+				"audioInputCentsPerMTokens": 3200,
+				"audioOutputCentsPerMTokens": 6400,
+				"imageInputCentsPerMTokens": 500
+			},
+			"notes": "Realtime API (WebSocket). Not a reasoning model: 32k context, 4,096 max output."
+		}
+	}
+}

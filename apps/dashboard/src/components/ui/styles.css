@@ -1,0 +1,471 @@
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+	color-scheme: light;
+	--accent: --alpha(var(--color-black) / 4%);
+	--accent-foreground: var(--color-neutral-800);
+	--background: var(--color-white);
+	--border: --alpha(var(--color-black) / 8%);
+	--card: var(--color-white);
+	--card-foreground: var(--color-neutral-800);
+	--destructive: var(--color-red-500);
+	--destructive-foreground: var(--color-red-700);
+	--foreground: var(--color-neutral-800);
+	--info: var(--color-blue-500);
+	--info-foreground: var(--color-blue-700);
+	--input: --alpha(var(--color-black) / 10%);
+	--muted: --alpha(var(--color-black) / 4%);
+	--muted-foreground: color-mix(
+		in srgb,
+		var(--color-neutral-500) 90%,
+		var(--color-black)
+	);
+	--popover: var(--color-white);
+	--popover-foreground: var(--color-neutral-800);
+	--primary: var(--color-neutral-800);
+	--primary-foreground: var(--color-neutral-50);
+	--ring: var(--color-neutral-400);
+	--secondary: --alpha(var(--color-black) / 4%);
+	--secondary-foreground: var(--color-neutral-800);
+	--success: var(--color-emerald-500);
+	/* Always dark on light: every payer app scans it. */
+	--qr: var(--color-black);
+	--qr-background: var(--color-white);
+	--success-foreground: var(--color-emerald-700);
+	--warning: var(--color-amber-500);
+	--warning-foreground: var(--color-amber-700);
+	--chart-1: oklch(0.646 0.222 41.116);
+	--chart-2: oklch(0.6 0.118 184.704);
+	--chart-3: oklch(0.398 0.07 227.392);
+	--chart-4: oklch(0.828 0.189 84.429);
+	--chart-5: oklch(0.769 0.188 70.08);
+}
+
+.dark {
+	color-scheme: dark;
+	--accent: lab(15.204% 0 0);
+	--accent-foreground: lab(98.26% 0 0);
+	--background: color-mix(
+		in srgb,
+		var(--color-neutral-950) 95%,
+		var(--color-white)
+	);
+	--border: --alpha(var(--color-white) / 6%);
+	--card: color-mix(in srgb, var(--background) 98%, var(--color-white));
+	--card-foreground: var(--color-neutral-100);
+	--destructive: color-mix(
+		in srgb,
+		var(--color-red-500) 90%,
+		var(--color-white)
+	);
+	--destructive-foreground: var(--color-red-400);
+	--foreground: var(--color-neutral-100);
+	--info: var(--color-blue-500);
+	--info-foreground: var(--color-blue-400);
+	--input: --alpha(var(--color-white) / 8%);
+	--muted: --alpha(var(--color-white) / 4%);
+	--muted-foreground: color-mix(
+		in srgb,
+		var(--color-neutral-500) 90%,
+		var(--color-white)
+	);
+	--popover: color-mix(in srgb, var(--background) 98%, var(--color-white));
+	--popover-foreground: var(--color-neutral-100);
+	--primary: lab(84.92% 0 0);
+	--primary-foreground: lab(7.78201% -0.0000149012 0);
+	--ring: var(--color-neutral-500);
+	--secondary: --alpha(var(--color-white) / 4%);
+	--secondary-foreground: var(--color-neutral-100);
+	--success: var(--color-emerald-500);
+	/* Always dark on light: every payer app scans it. */
+	--qr: var(--color-black);
+	--qr-background: var(--color-white);
+	--success-foreground: var(--color-emerald-400);
+	--warning: var(--color-amber-500);
+	--warning-foreground: var(--color-amber-400);
+	--chart-1: oklch(0.488 0.243 264.376);
+	--chart-2: oklch(0.696 0.17 162.48);
+	--chart-3: oklch(0.769 0.188 70.08);
+	--chart-4: oklch(0.627 0.265 303.9);
+	--chart-5: oklch(0.645 0.246 16.439);
+}
+
+body {
+	font-size: 14px;
+	line-height: 1.5;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+@theme inline {
+	--font-heading: var(--font-sans);
+
+	--color-sidebar-ring: var(--sidebar-ring);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar: var(--sidebar);
+	--color-chart-5: var(--chart-5);
+	--color-chart-4: var(--chart-4);
+	--color-chart-3: var(--chart-3);
+	--color-chart-2: var(--chart-2);
+	--color-chart-1: var(--chart-1);
+	--color-ring: var(--ring);
+	--color-input: var(--input);
+	--color-border: var(--border);
+	--color-destructive: var(--destructive);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-accent: var(--accent);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-muted: var(--muted);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-secondary: var(--secondary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-primary: var(--primary);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-popover: var(--popover);
+	--color-card-foreground: var(--card-foreground);
+	--color-card: var(--card);
+	--color-foreground: var(--foreground);
+	--color-background: var(--background);
+	--animate-skeleton: skeleton 2s -1s infinite linear;
+	--animate-caret-blink: 1s ease-out infinite caret-blink;
+	--animate-toast-success-odd: toast-success-odd 0.32s
+		cubic-bezier(0.5, 1, 0.89, 1);
+	--animate-toast-success-even: toast-success-even 0.32s
+		cubic-bezier(0.5, 1, 0.89, 1);
+	--animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
+	--animate-toast-error-even: toast-error-even 0.28s
+		cubic-bezier(0.5, 1, 0.89, 1);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-warning: var(--warning);
+	--color-success-foreground: var(--success-foreground);
+	--color-success: var(--success);
+	--color-qr: var(--qr);
+	--color-qr-background: var(--qr-background);
+	--color-info-foreground: var(--info-foreground);
+	--color-info: var(--info);
+	--color-destructive-foreground: var(--destructive-foreground);
+
+	@keyframes skeleton {
+		to {
+			background-position: -200% 0;
+		}
+	}
+	@keyframes caret-blink {
+		0%,
+		70%,
+		to {
+			opacity: 1;
+		}
+		20%,
+		50% {
+			opacity: 0;
+		}
+	}
+	@keyframes toast-success-odd {
+		0% {
+			scale: 1;
+		}
+		30% {
+			scale: 1.025;
+		}
+		60% {
+			scale: 0.99;
+		}
+		100% {
+			scale: 1;
+		}
+	}
+	@keyframes toast-error-odd {
+		0% {
+			translate: 0 0;
+		}
+		25% {
+			translate: -3px 0;
+		}
+		50% {
+			translate: 3px 0;
+		}
+		75% {
+			translate: -3px 0;
+		}
+		100% {
+			translate: 0 0;
+		}
+	}
+	@keyframes toast-success-even {
+		0% {
+			scale: 1;
+		}
+		30% {
+			scale: 1.025;
+		}
+		60% {
+			scale: 0.99;
+		}
+		100% {
+			scale: 1;
+		}
+	}
+	@keyframes toast-error-even {
+		0% {
+			translate: 0 0;
+		}
+		25% {
+			translate: -3px 0;
+		}
+		50% {
+			translate: 3px 0;
+		}
+		75% {
+			translate: -3px 0;
+		}
+		100% {
+			translate: 0 0;
+		}
+	}
+}
+
+@layer base {
+	/* biome-ignore lint/suspicious/noDuplicateSelectors: a cascade layer, so not the same rule as the unlayered one above */
+	* {
+		@apply border-border;
+	}
+	/* biome-ignore lint/suspicious/noDuplicateSelectors: a cascade layer, so not the same rule as the unlayered one above */
+	body {
+		@apply bg-background text-foreground;
+	}
+	html {
+		@apply font-sans;
+	}
+	/* The checkout grows as its steps open: keep the scrollbar's room so nothing shifts sideways. */
+}
+
+/**
+ * Neutralize hover/selected highlight on empty-state rows in card tables.
+ * Apply `data-empty` on the <tr> wrapping the placeholder cell.
+ *
+ * Placed outside @layer base so it wins over Tailwind utility classes applied
+ * by TableBody (which hover/select the descendant cells).
+ */
+[data-slot="table-body"] [data-empty] > [data-slot="table-cell"] {
+	background-color: transparent !important;
+}
+
+/**
+ * Phones have no room for a table of more than three columns (`DataTable` marks it `data-stack`):
+ * each row reads as a card, its first cell as the title and every other one below it beside its
+ * header (`data-label`). The markup is the table's own, so its skeleton, empty state and the link
+ * that opens a row stay the same. Outside any layer, like the rule above, to win over the card
+ * table's cell utilities.
+ */
+@media (width < 48rem) {
+	[data-stack] > thead {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+	[data-stack],
+	[data-stack] > tbody,
+	[data-stack] > tbody > tr,
+	[data-stack] > tbody > tr > td {
+		display: block;
+	}
+	[data-stack] > tbody {
+		border: 1px solid var(--border);
+		background-color: var(--card);
+	}
+	[data-stack] > tbody > tr {
+		display: flex;
+		flex-direction: column;
+		gap: --spacing(2);
+		padding: --spacing(3);
+	}
+	[data-stack] > tbody > tr:not(:last-child) {
+		border-bottom: 1px solid var(--border);
+	}
+	[data-stack] > tbody > tr > td {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: --spacing(4);
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		background-color: transparent;
+		white-space: normal;
+		line-height: 1.25;
+		text-align: end;
+	}
+	[data-stack] > tbody > tr > td:first-child,
+	[data-stack] > tbody > tr[data-empty] > td[colspan] {
+		justify-content: flex-start;
+		text-align: start;
+	}
+	/* A cell without a header holds the row's actions: at its end, as in the table. */
+	[data-stack] > tbody > tr > td:not(:first-child)[data-label=""] {
+		justify-content: flex-end;
+	}
+	[data-stack] > tbody > tr > td > * {
+		min-width: 0;
+	}
+	[data-stack] > tbody > tr > td:not(:first-child, [data-label=""])::before {
+		content: attr(data-label);
+		flex-shrink: 0;
+		color: var(--muted-foreground);
+		text-align: start;
+	}
+}
+
+/**
+ * Shiny edge: inner highlight with light/dark-aware hairlines.
+ *
+ * Replicates the "shiny" effect used by inputs, selects, tables, and frame panels:
+ * a 1px inner shadow that reads as a subtle highlight in light mode and an
+ * inverted hairline in dark mode.
+ *
+ * Usage:
+ *   <div class="shiny-edge rounded-xl border bg-background" />
+ *
+ * The ::before pseudo inherits the parent radius minus 1px. Override via CSS var:
+ *   style={{ "--shiny-radius": "calc(var(--radius-2xl) - 1px)" }}
+ */
+@utility shiny-edge {
+	position: relative;
+	background-clip: padding-box;
+	box-shadow: 0 1px 2px 0 --theme(--color-black / 5%);
+
+	&::before {
+		content: "";
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		border-radius: var(--shiny-radius, calc(var(--radius-xl) - 1px));
+		box-shadow: inset 0 1px 0 --theme(--color-white / 12%);
+	}
+
+	&:is(.dark *)::before {
+		box-shadow: inset 0 1px 0 --theme(--color-white / 6%);
+	}
+}
+
+/* biome-ignore lint/suspicious/noDuplicateSelectors: the dashboard's aliases over the shadcn tokens above, kept apart from them as in Billete */
+:root {
+	/* Billete's sidebar width: both dashboards share the shell's geometry. */
+	--app-sidebar-width: 268px;
+	--surface: var(--background);
+	--surface-2: var(--muted);
+	--sidebar: var(--background);
+	--sidebar-border: var(--border);
+	--sidebar-foreground: var(--foreground);
+	--sidebar-accent: var(--accent);
+	--sidebar-accent-foreground: var(--accent-foreground);
+	--sidebar-primary: var(--primary);
+	--sidebar-primary-foreground: var(--primary-foreground);
+	--sidebar-ring: var(--ring);
+	--field: var(--background);
+	--field-hover: var(--accent);
+	--field-muted: var(--muted-foreground);
+	--fg: var(--foreground);
+	--fg-muted: var(--muted-foreground);
+	--fg-disabled: var(--muted-foreground);
+	--fg-inverse: var(--primary-foreground);
+	--focus: var(--ring);
+	--primary-fg: var(--primary-foreground);
+	--secondary-fg: var(--secondary-foreground);
+	--danger: var(--destructive);
+	--danger-fg: var(--destructive-foreground);
+	--success-fg: var(--success-foreground);
+	--warning-fg: var(--warning-foreground);
+	--ui-radius-sm: var(--radius-sm);
+	--ui-radius-md: var(--radius-md);
+	--ui-radius-lg: var(--radius-lg);
+	--ui-radius-xl: var(--radius-xl);
+	--ui-radius-2xl: var(--radius-2xl);
+	--ui-radius-control: var(--radius-lg);
+	--ui-radius-surface: var(--radius-2xl);
+	--ui-radius-dialog: var(--radius-2xl);
+	--ui-radius-item: var(--radius-sm);
+}
+@theme inline {
+	--color-surface: var(--surface);
+	--color-surface-2: var(--surface-2);
+	--color-field: var(--field);
+	--color-field-hover: var(--field-hover);
+	--color-field-muted: var(--field-muted);
+	--color-fg: var(--fg);
+	--color-fg-muted: var(--fg-muted);
+	--color-fg-disabled: var(--fg-disabled);
+	--color-fg-inverse: var(--fg-inverse);
+	--color-focus: var(--focus);
+	--color-primary-fg: var(--primary-fg);
+	--color-primary-hover: var(--primary);
+	--color-secondary-fg: var(--secondary-fg);
+	--color-danger: var(--danger);
+	--color-danger-fg: var(--danger-fg);
+	--color-success-fg: var(--success-fg);
+	--color-warning-fg: var(--warning-fg);
+}
+@utility effect-3d {
+	@apply shiny-edge;
+}
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms;
+		transition-duration: 0.01ms;
+		scroll-behavior: auto;
+	}
+}
+
+@layer utilities {
+	[data-skeleton-form] * {
+		color: transparent;
+	}
+	[data-skeleton-form]
+		:is(
+			[data-slot="input-control"],
+			[data-slot="textarea-control"],
+			button,
+			label
+		) {
+		color: transparent;
+		background: var(--muted);
+		box-shadow: none;
+		border-color: transparent;
+		pointer-events: none;
+	}
+	[data-skeleton-form]
+		:is([data-slot="input-control"], [data-slot="textarea-control"], button)
+		> * {
+		visibility: hidden;
+	}
+	[data-skeleton-form] :is(p, h3, label) {
+		color: transparent;
+		background: var(--muted);
+		border-radius: var(--radius-sm);
+		width: fit-content;
+	}
+	[data-skeleton-form] :is(input, textarea) {
+		color: transparent;
+	}
+	[data-skeleton-form] [data-slot="switch"] {
+		background: var(--muted);
+	}
+	[data-skeleton-form] [data-slot="switch"] > * {
+		visibility: hidden;
+	}
+}

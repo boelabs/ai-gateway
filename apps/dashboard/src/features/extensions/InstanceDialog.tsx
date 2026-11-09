@@ -1,0 +1,207 @@
+"use client";
+
+import { SearchableSelect } from "#/components/ui/select";
+import { Textarea } from "#/components/ui/textarea";
+import { saveInstanceAction } from "./actions.ts";
+import type { InstanceInput } from "./common.ts";
+import { ErrorNote } from "#/components/ui/page";
+import { Button } from "#/components/ui/button";
+import { Switch } from "#/components/ui/switch";
+import { Input } from "#/components/ui/input";
+import { Form } from "#/components/ui/form";
+import { useState } from "react";
+
+import {
+	DialogDescription,
+	DialogHeader,
+	DialogFooter,
+	DialogTitle,
+	DialogBody,
+	Dialog,
+	Modal,
+} from "#/components/ui/modal";
+
+export interface InstanceDraft {
+	id: string;
+	definition: string;
+	enabled: boolean;
+	critical: boolean;
+	priority: number;
+	match: string;
+	config: string;
+}
+
+function parseJson(
+	raw: string,
+	field: string,
+): Record<string, unknown> | undefined {
+	const text = raw.trim();
+	if (text === "") {
+		return undefined;
+	}
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch (cause) {
+		throw new Error(`${field} is not valid JSON.`, { cause });
+	}
+	if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+		throw new Error(`${field} must be a JSON object.`);
+	}
+	return parsed as Record<string, unknown>;
+}
+
+/**
+ * Binds one uploaded definition to one running configuration.
+ *
+ * `match` and `config` are free-form JSON because the definition owns their shape — it declares its
+ * own schemas and the gateway validates against them. A generic key/value editor here would only
+ * invent a second, weaker contract on top.
+ */
+export function InstanceDialog({
+	draft,
+	definitions,
+	onClose,
+	onSaved,
+}: {
+	draft: InstanceDraft | null;
+	definitions: string[];
+	onClose: () => void;
+	onSaved: () => Promise<void> | void;
+}) {
+	const editing = draft?.id !== "" && draft !== null && draft.definition !== "";
+	const [definition, setDefinition] = useState(draft?.definition ?? "");
+	const [enabled, setEnabled] = useState(draft?.enabled ?? true);
+	const [critical, setCritical] = useState(draft?.critical ?? false);
+	const [error, setError] = useState<string | null>(null);
+	const [pending, setPending] = useState(false);
+
+	// The dialog is mounted fresh per open (keyed by the caller), so state initialises from the draft.
+
+	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		if (!draft) {
+			return;
+		}
+		setError(null);
+		setPending(true);
+		const form = new FormData(event.currentTarget);
+		try {
+			const match = parseJson(String(form.get("match") ?? ""), "Match");
+			const config = parseJson(String(form.get("config") ?? ""), "Config");
+			const priority = Number(form.get("priority") ?? 0);
+			const body: Omit<InstanceInput, "id"> = {
+				definition,
+				enabled,
+				critical,
+				priority,
+				...(match ? { match } : {}),
+				...(config ? { config } : {}),
+			};
+			const result = await saveInstanceAction(
+				{ id: String(form.get("id") ?? "").trim(), ...body },
+				draft.id && editing ? draft.id : undefined,
+			);
+			if (!result.ok) {
+				setError(result.message);
+				return;
+			}
+			await onSaved();
+			onClose();
+		} catch (cause) {
+			setError(
+				cause instanceof Error ? cause.message : "Could not save the instance.",
+			);
+		} finally {
+			setPending(false);
+		}
+	}
+
+	return (
+		<Modal isOpen={draft !== null} onOpenChange={(open) => !open && onClose()}>
+			<Dialog aria-label="Extension instance" layout="sectioned">
+				<DialogHeader>
+					<DialogTitle>
+						{editing ? "Edit instance" : "New instance"}
+					</DialogTitle>
+					<DialogDescription>
+						An instance is one definition, running with one configuration. The
+						same definition can run several times with different matches.
+					</DialogDescription>
+				</DialogHeader>
+
+				<Form className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit}>
+					<DialogBody>
+						{editing ? null : (
+							<Input
+								autoFocus
+								defaultValue={draft?.id ?? ""}
+								description="Stable name you will see in logs and in the reset action."
+								label="Instance id"
+								name="id"
+								placeholder="example-default"
+								required
+							/>
+						)}
+						<SearchableSelect
+							description="An uploaded artifact. Upload the code first if the list is empty."
+							items={definitions.map((key) => ({ value: key, label: key }))}
+							label="Definition"
+							onValueChange={(key) => setDefinition(key ?? "")}
+							searchPlaceholder="Search definitions"
+							value={definition}
+						/>
+						<Input
+							defaultValue={String(draft?.priority ?? 0)}
+							description="Lower runs first when several instances handle the same hook."
+							label="Priority"
+							name="priority"
+							type="number"
+						/>
+						<Textarea
+							defaultValue={draft?.match ?? ""}
+							description="Narrows which requests reach this instance. Empty means every request."
+							label="Match (JSON)"
+							name="match"
+							placeholder='{ "publicModel": "gpt-5.6-luna" }'
+							rows={3}
+						/>
+						<Textarea
+							defaultValue={draft?.config ?? ""}
+							description="Validated against the schema the definition declares."
+							label="Config (JSON)"
+							name="config"
+							rows={5}
+						/>
+
+						<div className="flex flex-col gap-3 pt-1">
+							<Switch checked={enabled} onCheckedChange={setEnabled}>
+								Enabled
+							</Switch>
+							<div className="flex flex-col gap-1">
+								<Switch checked={critical} onCheckedChange={setCritical}>
+									Critical
+								</Switch>
+								<p className="max-w-xl text-xs text-fg-muted">
+									A critical instance failing takes the request down with it. A
+									non-critical one is skipped after repeated failures and the
+									request continues without it.
+								</p>
+							</div>
+						</div>
+
+						{error ? <ErrorNote>{error}</ErrorNote> : null}
+					</DialogBody>
+					<DialogFooter>
+						<Button onClick={onClose} variant="secondary">
+							Cancel
+						</Button>
+						<Button disabled={pending || definition === ""} type="submit">
+							{pending ? "Saving…" : "Save instance"}
+						</Button>
+					</DialogFooter>
+				</Form>
+			</Dialog>
+		</Modal>
+	);
+}

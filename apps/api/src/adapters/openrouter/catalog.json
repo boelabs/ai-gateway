@@ -1,0 +1,143 @@
+{
+	"$schema": "../../../schemas/model-catalog.schema.json",
+	"schemaVersion": 1,
+	"provider": {
+		"id": "openrouter",
+		"adapterKey": "openrouter",
+		"name": "OpenRouter",
+		"docs": [
+			"https://openrouter.ai/docs/api/api-reference/rerank/submit-a-rerank-request",
+			"https://openrouter.ai/docs/guides/routing/provider-selection"
+		]
+	},
+	"models": {
+		"cohere/rerank-4-fast": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 32768,
+					"documentsPerSearchUnit": 100
+				}
+			},
+			"pricing": {
+				"searchUnitCents": 0.2
+			}
+		},
+		"cohere/rerank-4-pro": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 32768,
+					"documentsPerSearchUnit": 100
+				}
+			},
+			"pricing": {
+				"searchUnitCents": 0.25
+			}
+		},
+		"cohere/rerank-5-fast": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 32768,
+					"documentsPerSearchUnit": 100
+				}
+			}
+		},
+		"cohere/rerank-5-pro": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 32768,
+					"documentsPerSearchUnit": 100
+				}
+			}
+		},
+		"cohere/rerank-v3.5": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 4096,
+					"documentsPerSearchUnit": 100
+				}
+			},
+			"pricing": {
+				"searchUnitCents": 0.1
+			}
+		},
+		"mongodb/rerank-2.5": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 32000
+				}
+			}
+		},
+		"mongodb/rerank-2.5-lite": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 32000
+				}
+			}
+		},
+		"mongodb/rerank-3": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 32000
+				}
+			}
+		},
+		"mongodb/rerank-3-lite": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 32000
+				}
+			}
+		},
+		"nvidia/llama-nemotron-rerank-vl-1b-v2:free": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 10240
+				}
+			},
+			"pricing": {
+				"searchUnitCents": 0
+			}
+		},
+		"nvidia/nemotron-3.5-rerank-8b:free": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 32768
+				}
+			},
+			"pricing": {
+				"searchUnitCents": 0
+			}
+		},
+		"qwen/qwen3-reranker-8b": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 40960
+				}
+			}
+		}
+	}
+}

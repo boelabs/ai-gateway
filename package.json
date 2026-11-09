@@ -1,0 +1,41 @@
+{
+	"name": "ai-gateway",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Boelabs AI Gateway — the gateway service, its docs site, and shared packages.",
+	"license": "MIT",
+	"author": "Boelabs",
+	"type": "module",
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	],
+	"scripts": {
+		"audit": "bun scripts/audit-dependencies.ts",
+		"build": "turbo run build",
+		"check": "biome check . --diagnostic-level=warn --error-on-warnings --max-diagnostics=100 && bun apps/api/scripts/check-adapter-transports.ts",
+		"check:fix": "biome check --write .",
+		"dev": "turbo run dev",
+		"format": "biome format --write . && bun scripts/sort-imports.ts",
+		"lint": "biome lint .",
+		"test": "turbo run test",
+		"test:all": "turbo run test:all",
+		"typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json"
+	},
+	"overrides": {
+		"esbuild": "0.28.2",
+		"zod": "4.6.7"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.6.4",
+		"@boelabs/tsconfig": "workspace:*",
+		"@types/node": "26.6.6",
+		"turbo": "2.11.10",
+		"typescript": "7.0.2",
+		"ultracite": "8.1.1"
+	},
+	"packageManager": "bun@1.4.4",
+	"engines": {
+		"bun": ">=1.4"
+	}
+}

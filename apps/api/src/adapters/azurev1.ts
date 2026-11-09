@@ -1,0 +1,180 @@
+import { looksLikeContextWindowError } from "#core/httpError.ts";
+import { GatewayError, type ErrorClass } from "#core/errors.ts";
+import type { CanonicalChatRequest } from "#core/canonical.ts";
+
+import {
+	makeOpenAIStyleAdapter,
+	type OpenAIStyleConfig,
+} from "./openaiStyle.ts";
+
+/**
+ * Accepts the resource endpoint or the full v1 base. Never allows legacy deployment routes or
+ * query parameters in the base URL; operation-specific version selectors are added by handlers.
+ */
+export function normalizeAzurev1BaseUrl(value: string): string {
+	let url: URL;
+	try {
+		url = new URL(value);
+	} catch (cause) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: "Azure v1: credentials.baseUrl must be a valid URL",
+			cause,
+		});
+	}
+	if (url.protocol !== "https:") {
+		throw new GatewayError({
+			class: "bad_request",
+			message: "Azure v1: credentials.baseUrl must use HTTPS",
+		});
+	}
+	if (url.username || url.password || url.search || url.hash) {
+		throw new GatewayError({
+			class: "bad_request",
+			message:
+				"Azure v1: credentials.baseUrl cannot contain credentials, query parameters, or fragments",
+		});
+	}
+
+	const path = url.pathname.replace(/\/+$/u, "");
+	if (
+		/\/openai\/deployments(?:\/|$)/iu.test(path) ||
+		/\/deployments(?:\/|$)/iu.test(path)
+	) {
+		throw new GatewayError({
+			class: "bad_request",
+			message:
+				"Azure v1: deployment-based URLs are legacy; provide the resource endpoint or /openai/v1",
+		});
+	}
+	if (path === "" || path === "/") {
+		url.pathname = "/openai/v1";
+	} else if (path.toLowerCase() === "/openai/v1") {
+		url.pathname = "/openai/v1";
+	} else {
+		throw new GatewayError({
+			class: "bad_request",
+			message:
+				"Azure v1: credentials.baseUrl must be the resource endpoint or end in /openai/v1",
+		});
+	}
+	return url.toString().replace(/\/+$/u, "");
+}
+
+/** Azure v1's default API version selector; its image surface is only reachable with it. */
+export const AZURE_V1_API_VERSION = "preview";
+
+/** Reads an operator-supplied `credentials.apiVersion`, falling back to `fallback`. */
+export function azureApiVersion(
+	value: unknown,
+	fallback: string,
+	label: string,
+): string {
+	if (value === undefined) {
+		return fallback;
+	}
+	if (typeof value !== "string" || value.trim() === "") {
+		throw new GatewayError({
+			class: "bad_request",
+			message: `${label}: credentials.apiVersion must be a non-empty string`,
+			param: "credentials.apiVersion",
+		});
+	}
+	return value.trim();
+}
+
+/** Adds (or replaces) the `api-version` query parameter on a built request URL. */
+export function withAzureApiVersion(url: string, version: string): string {
+	const parsed = new URL(url);
+	parsed.searchParams.set("api-version", version);
+	return parsed.toString();
+}
+
+export function azureRefineBadRequest(
+	message: string,
+	body: unknown,
+): ErrorClass | null {
+	const error = (
+		body as { error?: { code?: string; innererror?: { code?: string } } }
+	)?.error;
+	const code = error?.innererror?.code ?? error?.code;
+	if (
+		code === "context_length_exceeded" ||
+		looksLikeContextWindowError(message)
+	) {
+		return "context_window";
+	}
+	if (
+		[
+			"content_filter",
+			"content_policy_violation",
+			"ResponsibleAIPolicyViolation",
+		].includes(code ?? "")
+	) {
+		return "content_policy";
+	}
+	return null;
+}
+
+function usesStrictTools(req: CanonicalChatRequest): boolean {
+	return req.tools?.some((tool) => tool.strict === true) === true;
+}
+
+function assertAzureStrictRequest(req: CanonicalChatRequest): void {
+	if (usesStrictTools(req) && req.parallelToolCalls === true) {
+		throw new GatewayError({
+			class: "bad_request",
+			deploymentHealth: "neutral",
+			message:
+				"Azure strict tool schemas require parallel_tool_calls to be false",
+			code: "strict_tools_parallel_conflict",
+			param: "parallel_tool_calls",
+		});
+	}
+}
+
+function prepareAzureStrictRequest(
+	req: CanonicalChatRequest,
+): CanonicalChatRequest {
+	return usesStrictTools(req) && req.parallelToolCalls === undefined
+		? { ...req, parallelToolCalls: false }
+		: req;
+}
+
+export function makeAzurev1Adapter(
+	config: Pick<
+		OpenAIStyleConfig,
+		| "key"
+		| "label"
+		| "defaultTransport"
+		| "supportedChatTransports"
+		| "contentInputs"
+		| "embeddings"
+		| "supportsDeveloperRole"
+		| "imageTransports"
+		| "defaultImageTransport"
+	>,
+) {
+	return makeOpenAIStyleAdapter({
+		...config,
+		// Azure rejects a baseUrl carrying a query string, so the selector is added per request.
+		finalizeImageRequestUrl: (url, ctx) =>
+			withAzureApiVersion(
+				url,
+				azureApiVersion(
+					(ctx.credentials as { apiVersion?: unknown }).apiVersion,
+					AZURE_V1_API_VERSION,
+					config.label,
+				),
+			),
+		maxTokensField: "max_completion_tokens",
+		...(config.supportsDeveloperRole === undefined
+			? {}
+			: { supportsDeveloperRole: config.supportsDeveloperRole }),
+		authScheme: "api-key",
+		normalizeBaseUrl: normalizeAzurev1BaseUrl,
+		refineBadRequest: azureRefineBadRequest,
+		assertChatRequestSupported: assertAzureStrictRequest,
+		prepareChatRequest: prepareAzureStrictRequest,
+	});
+}

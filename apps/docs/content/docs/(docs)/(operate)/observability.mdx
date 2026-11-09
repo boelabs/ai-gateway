@@ -1,0 +1,150 @@
+---
+title: "Observability"
+description: "Durable operation lifecycles, upstream attempts, structured logs, and OpenTelemetry."
+---
+
+Every public execution has two correlation keys: `x-request-id`, which may come from the client, and
+an internal `operationId`. Neither is used as a metric label. Application logs are structured JSON on
+stdout/stderr and include the request id, method, path, status, and duration.
+
+## Durable lifecycle
+
+The current observability model uses four tables:
+
+| Table | Purpose | Retention |
+|---|---|---|
+| `gateway_operations` | One row from request start through a verified terminal outcome. | 30 days operational target. |
+| `upstream_attempts` | One row per deployment interaction, inserted before the upstream call. | 30 days operational target. |
+| `payload_samples` | Redacted, AEAD-encrypted forensic samples, one per finished operation. | 7 days by default. |
+| `payload_access_audit` | One immutable audit row for every forensic payload lookup, including the refused and the empty ones. | Operator audit policy. |
+
+An operation is either `in_progress` or `finished`. Its outcome is `success`, `incomplete`, `blocked`,
+`error`, `cancelled`, `abandoned`, or `unknown`. `degraded` is orthogonal: a recovered retry or fallback
+is still successful but remains visible. A database constraint rejects new `success`, `incomplete`, or
+`blocked` rows unless `terminalVerified=true`.
+
+The stream supervisor records headers/first-event/first-reasoning/first-output timing, last progress,
+maximum inter-event gap, upstream/downstream bytes, frame classes, the physical transport terminator,
+and the normalized semantic terminal. A stream cut before any finish reason or end marker, and
+malformed JSON/SSE, are errors; departures the provider's own SDK tolerates (a missing `[DONE]` or
+finish reason, an empty answer, repeated terminal events) complete normally and are listed in the
+attempt's `diagnostics.metadata.anomalies`. Only a verified terminal rewards deployment health.
+
+## What a failed attempt records
+
+Every failed attempt keeps what the upstream said, without opening a payload sample:
+
+- `failurePhase` — `connect` (no response: network, DNS, TLS), `response` (an error answer, or none
+  within `responseMs`), `stream` (after the stream opened), `client` (the caller left or stopped
+  reading), or `gateway` (before any upstream exchange).
+- `failureOwner` — `provider`, `gateway_deadline` (the gateway stopped waiting), `deployment_config`,
+  `client` (the caller left, or the upstream rejected the request itself), or `gateway`.
+- `error` — the class, code, HTTP and provider status, `retryAfterMs`, the gateway's internal
+  `message`, and `provider`: the provider's own `type`, `code`, `param` and `message`.
+- `diagnostics.providerRequestId` — the provider's request id, for its support.
+
+Messages are bounded to 2,000 characters and scrubbed of credential-shaped strings. With
+`OBSERVABILITY_PAYLOAD_ACCESS=sealed` only the structured fields are kept, because a provider's
+message can quote the request it rejected. None of this reaches the caller, whose error is the
+provider's public answer. Each failed attempt is also logged as an `upstream attempt failed` line at
+`warn`, with the same fields.
+
+`GET /admin/logs` lists operation summaries. `GET /admin/logs/{operationId}` returns the operation and
+its complete attempt timeline. `GET /admin/observability/summary` returns outcome, stall, retry,
+active/abandoned, and latency aggregates — for a trailing `window=5m|1h|24h`, or for an explicit
+`start`/`end` range of at most 31 days, which is what the dashboard's own range control sends.
+
+## Dashboard logs
+
+The **Logs** page lists one row per request with its HTTP status, the cause of its latest failed
+attempt in one phrase (`Upstream 503 · server error`, `Deadline · response`, `Rejected 400 · bad
+request`), how many attempts it took, which deployment answered last, and its first-output time. A
+cause on a successful row is one a retry or fallback recovered from. Filter by cause (provider
+errors, gateway deadlines, rejected or cancelled requests, misconfigured deployments, gateway
+errors) or paste a request id from `x-request-id`. Opening a row shows every attempt on the
+request's own timeline, with the provider's answer and the facts in
+[What a failed attempt records](#what-a-failed-attempt-records).
+
+## Dashboard metrics
+
+The dashboard's **Metrics** section filters by public model, deployment, operation and date range.
+Today and calendar dates use UTC; custom end dates are inclusive. Charts switch between traffic,
+errors, latency and deployment token usage. Tables show public model consumption, deployment
+attempts, and failures grouped by deployment, kind, phase and provider status.
+
+`GET /admin/observability/metrics` requires `usage:read` and accepts `start`, `end`, `bucket=hour|day`,
+`publicModel`, `deploymentId` and `operation`. The range is `[start, end)`, limited to 31 days, and
+uses **request start time** for both request and attempt aggregates. Buckets are anchored at `start`.
+Each request counts once; upstream tokens and errors count each attempt, including recovered retries.
+With a deployment filter, request metrics describe requests that used that deployment, including
+their fallbacks, while deployment metrics include only its own attempts. Request costs are not
+attributed to individual attempts. Error rates divide errors by finished requests or attempts.
+
+Only retained records contribute. Deleted deployments remain visible through their recorded attempt
+metadata. Missing token totals show as unavailable; reported totals include only known usage.
+Reasoning and cache counts are subsets of usage, not additional tokens to add to the total.
+
+Rerank request summaries record only the public model, document count and byte totals, `top_n`, and
+provider-option names. Response summaries contain only result count, indexes, usage, and cost. Query
+and document contents are never stored in normal rows. `searchUnits` is persisted on operations and
+attempts and included in `/admin/usage` aggregates.
+
+## Payload privacy
+
+Ordinary rows contain summaries and HMAC fingerprints, never request or response bodies. IP addresses
+and user agents are fingerprinted rather than stored verbatim. Every finished operation keeps one
+sample under the versioned encryption keyring — the successful ones too, because a request that
+returned 200 and the wrong answer is the case you cannot reconstruct from metadata. Encryption and
+fingerprinting use separate, purpose-bound derived subkeys; request, response, error, and attempt
+components are each capped at 32 KiB after recursive secret-field redaction. What bounds the
+exposure is the retention window (`OBSERVABILITY_PAYLOAD_RETENTION_DAYS`), not chance.
+
+### Reading one
+
+`GET /admin/logs/{operationId}/payload` needs `payloads:read` (master key, owner, or admin). Every
+lookup writes a durable audit row and emits a structured audit log carrying its outcome —
+`revealed`, `missing`, `sealed`, or `unreadable` — and a successful one also updates the sample's
+access timestamp. The gateway never falls back to plaintext.
+
+`GET /admin/logs/{operationId}` already reports whether a sample stands behind the operation and
+whether it can be read, so a caller (and the dashboard) can tell "swept by retention" from "sealed"
+without spending an audit entry to find out.
+
+### Sealing payloads
+
+`OBSERVABILITY_PAYLOAD_ACCESS=sealed` keeps capture exactly as it is and closes reading for
+everyone: the route refuses before it touches the envelope, so the plaintext never exists in the
+process, and the attempt is audited like any other. Reopening is a deployment change — the variable
+plus a restart — which is the point: no role, session, or stolen master key can lift it from the
+outside. The key that sealed the sample still lives in the gateway, so this is an access policy, not
+a cryptographic guarantee against the gateway itself; for that, shorten retention or run sealed and
+export nothing.
+
+## OpenTelemetry
+
+OpenTelemetry is off by default. Enable it only after an OTLP collector is available:
+
+```bash
+OTEL_ENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+```
+
+The gateway exports the ingress-to-close operation span with routing, upstream-attempt, stream,
+render, and persistence children, plus low-cardinality counters, histograms, active gauges, queue
+depth, and persistence-loss metrics. Payload bodies are never emitted to OpenTelemetry. PostgreSQL,
+`/health/ready`, the observability summary, and structured JSON logs remain sufficient for the initial
+operating model.
+
+Rerank usage also increments `ai_gateway_search_units_total`; it remains independent from
+`ai_gateway_tokens_total`.
+
+## Initial alerts
+
+- Any successful/incomplete/blocked operation without a verified terminal, abandoned operation, or
+  persistence loss is critical.
+- Stalls above 2% over five minutes (minimum 20 requests), protocol errors above 1%, or p95 first
+  output above 25 seconds require investigation.
+- Degraded/retry above 5% and client cancellations above 5% are warnings.
+
+Use the request id supplied by the client to find the operation, then inspect its attempts and terminal
+timeline. See [Admin API](/docs/reference-admin-api) and [Routing](/docs/routing).

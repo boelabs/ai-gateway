@@ -1,0 +1,104 @@
+---
+title: "Audio transcriptions"
+description: "POST /v1/audio/transcriptions — the OpenAI Audio contract."
+---
+
+Transcribe an uploaded audio file. The public model must support `audio.transcribe`; available
+formats, timestamps, and streaming depend on its profile.
+
+## Example request
+
+Set `GATEWAY` to the gateway origin and `API_KEY` to your virtual key. Replace the example
+public model with one from [Model discovery](/docs/models-discovery).
+
+```bash
+curl -X POST "$GATEWAY/v1/audio/transcriptions" \
+  -H "Authorization: Bearer $API_KEY" \
+  -F "model=transcribe" \
+  -F "file=@recording.mp3"
+```
+
+Multipart only (`file` field). The uploaded file is streamed to temporary disk for validation — never
+buffered fully in memory — and removed after success, failure, timeout, or client cancellation.
+`AUDIO_MAX_MULTIPART_BYTES` (default 30 MB) caps the aggregate upload size.
+
+## Fields
+
+`model`, `file`, `language`, `languages`, `keywords`, `prompt`, `temperature`, `response_format` (`json`, `text`, `srt`,
+`verbose_json`, `vtt`, `diarized_json`), `timestamp_granularities` (`word`/`segment`, `verbose_json` only), `include`,
+`transcription_mode` (`verbatim`/`smart`), `stream`. Which response formats and whether
+streaming/timestamp granularities are available is declared per model in its `audio.transcribe`
+catalog profile.
+
+`transcription_mode` is an AI Gateway extension: `smart` asks a model that supports it to drop fillers
+and format numbers in context; `verbatim` is every model's default and is always accepted.
+`response_format=diarized_json` returns OpenAI's diarized shape: `segments` with `speaker` (`A`, `B`, …), `start`,
+`end` and `text`.
+
+### Vocabulary and language hints
+
+`keywords[]` supplies literal words or phrases to help recognize names and domain terms;
+`languages[]` supplies possible input languages. They are independent of `prompt`, which carries
+free-form context. For example, add these fields to the request above:
+
+```bash
+  -F 'keywords[]=AI Gateway' \
+  -F 'keywords[]=AC-42' \
+  -F 'languages[]=es' \
+  -F 'languages[]=en'
+```
+
+Repeated bare names (`keywords`, `languages`) are also accepted. A request may contain up to 1,024
+text fields, including repeated hints. Keywords cannot contain `<`, `>`, carriage returns, or line
+feeds. Send either `language` or `languages`, not both.
+
+The `gpt-transcribe` catalog entries for OpenAI and Azure OpenAI enable both hints. Custom compatible
+models can opt in through `supportsKeywords` and `supportsLanguageHints` in their `audio.transcribe`
+profile. Hints without declared support are dropped for each selected deployment, including
+fallbacks; keywords are never rewritten into a prompt. For models with `supportsLanguageHints`, a
+singular `language` is sent upstream as a one-element `languages[]` list.
+
+See OpenAI's [transcription context guide](https://developers.openai.com/api/docs/guides/speech-to-text#add-transcription-context).
+
+## Gemini Transcribe
+
+`gemini-3.5-transcribe` (Google AI Studio) answers on this endpoint through Gemini's Interactions API.
+The request stays OpenAI's; the gateway translates it:
+
+| Request | Sent to Gemini |
+|---|---|
+| `keywords[]` (up to 1,000) | `custom_vocabulary` |
+| `language` / `languages[]` (BCP-47, for example `es-419`) | `language_codes`; none means automatic detection |
+| `response_format=diarized_json` | speaker diarization (up to 8 speakers) with word timestamps, grouped into timed segments |
+| `timestamp_granularities[]=word` with `verbose_json` | word timestamps, returned as OpenAI `words` |
+| `response_format=srt` or `vtt` | word timestamps, grouped into subtitle cues by the gateway |
+| `transcription_mode=smart` | smart mode |
+
+Google rejects some combinations, and so does the gateway, before contacting it: vocabulary with
+diarization or timestamps (`srt`/`vtt` included), and smart mode with diarization or timestamps.
+Segment granularity and streaming are not offered; use `gemini-3.5-transcribe-live` on
+[Realtime transcription](/docs/realtime-transcription) for live audio. `prompt`, `temperature` and `include` have no Gemini equivalent and are not sent. Audio may
+last up to one hour, 30 minutes with diarization or word timestamps; Google enforces the duration.
+See Google's [audio transcription guide](https://ai.google.dev/gemini-api/docs/transcribe).
+
+## Response format
+
+Returned as JSON, plain text, or SSE depending on the requested `response_format` and `stream` — not
+always JSON like the other endpoints.
+
+When the provider reports detected languages, JSON responses and the final `transcript.text.done`
+SSE event preserve `languages: [{ "code": "es" }]`. An empty list means no language was reliably
+detected; an absent field stays absent.
+
+## Azure OpenAI note
+
+Azure uses the classic deployment-based transcription API by default because some resources return
+`DeploymentNotFound` from the v1 preview route for deployments that work through the classic route.
+The adapter constructs the classic URL from your deployment name and resource `baseUrl`; v1 remains an
+explicit transport override. See [Providers → Azure OpenAI](/docs/providers-azure-openai) and the
+Azure-specific example in [Creating deployments](/docs/creating-deployments#azure-openai-classic-audio).
+
+## Next steps
+
+- [Creating deployments](/docs/creating-deployments#4-audio-transcription--catalog-model) — registering a transcription model.
+- [Streaming](/docs/streaming) — the SSE variant of this endpoint.

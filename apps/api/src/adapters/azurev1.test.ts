@@ -1,0 +1,341 @@
+import type { CanonicalEmbeddingsRequest } from "#core/embeddings.ts";
+import type { CanonicalChatRequest } from "#core/canonical.ts";
+import { azurefoundryAdapter } from "./azurefoundry/index.ts";
+import { azureopenaiAdapter } from "./azureopenai/index.ts";
+import { jsonBody, must } from "#test-support/adapters.ts";
+import { normalizeAzurev1BaseUrl } from "./azurev1.ts";
+import type { AdapterContext } from "./types.ts";
+import { GatewayError } from "#core/errors.ts";
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+const request: CanonicalChatRequest = {
+	callType: "chat",
+	model: "public-model",
+	messages: [{ role: "user", content: "hello" }],
+	stream: false,
+	maxTokens: 256,
+};
+
+const embeddingsRequest: CanonicalEmbeddingsRequest = {
+	model: "embed",
+	input: ["hello", "world"],
+	encodingFormat: "float",
+	dimensions: 512,
+};
+
+function context(
+	transport: AdapterContext["transport"],
+	model: string,
+): AdapterContext {
+	return {
+		upstreamModel: model,
+		transport,
+		credentials: {
+			apiKey: "azure-secret",
+			baseUrl: "https://omni-resource.openai.azure.com",
+		},
+		meta: {
+			capabilities: {
+				tools: true,
+				strictTools: true,
+				vision: true,
+				reasoning: false,
+				structuredOutputs: true,
+			},
+		},
+		requestId: "azure-test",
+	};
+}
+
+test("azureopenai: uses /openai/v1/responses, api-key, and deployment=model", () => {
+	const built = must(azureopenaiAdapter, "chat").buildRequest(
+		request,
+		context("responses", "gpt-5.4"),
+	);
+	assert.equal(
+		built.url,
+		"https://omni-resource.openai.azure.com/openai/v1/responses",
+	);
+	assert.equal(built.headers["api-key"], "azure-secret");
+	assert.equal(built.headers.authorization, undefined);
+	const body = jsonBody(built);
+	assert.equal(body.model, "gpt-5.4");
+	assert.equal(body.max_output_tokens, 256);
+});
+
+test("azureopenai: strict tools use native schemas and disable parallel calls", () => {
+	const strictRequest: CanonicalChatRequest = {
+		...request,
+		tools: [
+			{
+				name: "lookup",
+				strict: true,
+				parameters: {
+					type: "object",
+					properties: { id: { type: "string" } },
+					required: ["id"],
+					additionalProperties: false,
+				},
+			},
+		],
+	};
+
+	for (const transport of ["chat_completions", "responses"] as const) {
+		const built = must(azureopenaiAdapter, "chat").buildRequest(
+			strictRequest,
+			context(transport, "gpt-5.4"),
+		);
+		const body = jsonBody(built);
+		assert.equal(body.parallel_tool_calls, false);
+		assert.equal(
+			transport === "responses"
+				? body.tools[0].strict
+				: body.tools[0].function.strict,
+			true,
+		);
+	}
+
+	assert.throws(
+		() =>
+			must(azureopenaiAdapter, "chat").buildRequest(
+				{ ...strictRequest, parallelToolCalls: true },
+				context("responses", "gpt-5.4"),
+			),
+		(error) =>
+			GatewayError.is(error) &&
+			error.code === "strict_tools_parallel_conflict" &&
+			error.param === "parallel_tool_calls",
+	);
+});
+
+test("azureopenai: uses /openai/v1/embeddings, api-key, and OpenAI body", () => {
+	const handler = azureopenaiAdapter.embeddings;
+	assert.ok(handler);
+	const built = handler.buildRequest(
+		embeddingsRequest,
+		context("embeddings", "text-embedding-3-small"),
+	);
+	assert.equal(
+		built.url,
+		"https://omni-resource.openai.azure.com/openai/v1/embeddings",
+	);
+	assert.equal(built.headers["api-key"], "azure-secret");
+	assert.equal(built.headers.authorization, undefined);
+	const body = jsonBody(built);
+	assert.deepEqual(body, {
+		model: "text-embedding-3-small",
+		input: ["hello", "world"],
+		encoding_format: "float",
+		dimensions: 512,
+	});
+});
+
+test("azurefoundry: uses modern Chat Completions and max_completion_tokens", () => {
+	const built = must(azurefoundryAdapter, "chat").buildRequest(request, {
+		...context("chat_completions", "DeepSeek-V3.1"),
+		credentials: {
+			apiKey: "azure-secret",
+			baseUrl: "https://omni-resource.services.ai.azure.com/openai/v1/",
+		},
+	});
+	assert.equal(
+		built.url,
+		"https://omni-resource.services.ai.azure.com/openai/v1/chat/completions",
+	);
+	assert.equal(built.headers["api-key"], "azure-secret");
+	const body = jsonBody(built);
+	assert.equal(body.model, "DeepSeek-V3.1");
+	assert.equal(body.max_completion_tokens, 256);
+	assert.equal(body.max_tokens, undefined);
+});
+
+test("azureopenai: preserves the OpenAI developer role", () => {
+	const built = must(azureopenaiAdapter, "chat").buildRequest(
+		{
+			...request,
+			messages: [{ role: "developer", content: "instructions" }],
+		},
+		context("chat_completions", "gpt-5.4"),
+	);
+	assert.equal(jsonBody(built).messages[0].role, "developer");
+});
+
+test("azurefoundry: DeepSeek V4 keeps xhigh distinct from native max", () => {
+	const reasoning = {
+		kind: "openai_effort" as const,
+		levels: ["none", "high", "max"] as ("none" | "high" | "max")[],
+	};
+
+	for (const [effort, upstream] of [
+		["none", "none"],
+		["high", "high"],
+		["xhigh", "high"],
+		["max", "max"],
+	] as const) {
+		const built = must(azurefoundryAdapter, "chat").buildRequest(
+			{ ...request, reasoning: { effort } },
+			{
+				...context("chat_completions", "DeepSeek-V4-Flash"),
+				meta: {
+					capabilities: {
+						tools: false,
+						vision: false,
+						reasoning: true,
+						structuredOutputs: false,
+					},
+					reasoning,
+				},
+			},
+		);
+
+		assert.equal(jsonBody(built).reasoning_effort, upstream);
+	}
+});
+
+test("azurefoundry: Kimi is a fixed high reasoner without inventing an upstream knob", () => {
+	const fixedReasoning = {
+		kind: "fixed" as const,
+		levels: ["high"] as "high"[],
+	};
+	const ctx: AdapterContext = {
+		...context("chat_completions", "Kimi-K2.6"),
+		meta: {
+			capabilities: {
+				tools: true,
+				vision: true,
+				reasoning: true,
+				structuredOutputs: false,
+			},
+			reasoning: fixedReasoning,
+		},
+	};
+
+	for (const reasoning of [undefined, { effort: "high" as const }]) {
+		const req: CanonicalChatRequest =
+			reasoning === undefined ? request : { ...request, reasoning };
+		const built = must(azurefoundryAdapter, "chat").buildRequest(req, ctx);
+		const body = jsonBody(built);
+		assert.equal(body.reasoning_effort, undefined);
+		assert.equal(body.thinking, undefined);
+	}
+});
+
+test("azure adapters: modular transports", () => {
+	assert.deepEqual(azureopenaiAdapter.transports?.chat?.supported, [
+		"responses",
+		"chat_completions",
+	]);
+	assert.equal(azureopenaiAdapter.transports?.chat?.default, "responses");
+	assert.deepEqual(azureopenaiAdapter.transports?.embeddings?.supported, [
+		"embeddings",
+	]);
+	assert.equal(
+		azureopenaiAdapter.transports?.embeddings?.default,
+		"embeddings",
+	);
+	assert.deepEqual(azurefoundryAdapter.transports?.chat?.supported, [
+		"chat_completions",
+	]);
+	assert.equal(
+		azurefoundryAdapter.transports?.chat?.default,
+		"chat_completions",
+	);
+	// Azure OpenAI serves images on its v1 surface; Azure AI Foundry does not.
+	assert.ok(azureopenaiAdapter.imageGeneration);
+	assert.ok(azureopenaiAdapter.imageEdit);
+	assert.ok(azureopenaiAdapter.embeddings);
+	assert.equal(azurefoundryAdapter.imageGeneration, undefined);
+	assert.equal(azurefoundryAdapter.embeddings, undefined);
+});
+
+test("azurefoundry: rejects forced Responses upstream", () => {
+	assert.throws(
+		() =>
+			must(azurefoundryAdapter, "chat").buildRequest(
+				request,
+				context("responses", "DeepSeek-V3.1"),
+			),
+		(error) => GatewayError.is(error) && /not supported/u.test(error.message),
+	);
+});
+
+test("azure v1: normalizes endpoint and rejects legacy deployments/api-version", () => {
+	assert.equal(
+		normalizeAzurev1BaseUrl("https://resource.openai.azure.com/"),
+		"https://resource.openai.azure.com/openai/v1",
+	);
+	assert.equal(
+		normalizeAzurev1BaseUrl(
+			"https://resource.services.ai.azure.com/openai/v1/",
+		),
+		"https://resource.services.ai.azure.com/openai/v1",
+	);
+	assert.throws(
+		() =>
+			normalizeAzurev1BaseUrl(
+				"https://resource.openai.azure.com/openai/deployments/gpt",
+			),
+		/legacy/u,
+	);
+	assert.throws(
+		() =>
+			normalizeAzurev1BaseUrl(
+				"https://resource.openai.azure.com/openai/v1?api-version=2025-01-01",
+			),
+		/query parameters/u,
+	);
+});
+
+test("azureopenai: images reach the v1 surface with an api-version selector", async () => {
+	const imageRequest = {
+		operation: "generation" as const,
+		model: "public-model",
+		prompt: "a cat",
+		stream: false,
+		responseFormat: "b64_json" as const,
+	};
+	const base = context("images", "gpt-image-2.5-flare");
+	const generation = await must(
+		azureopenaiAdapter,
+		"imageGeneration",
+	).buildRequest(imageRequest, base);
+	// Azure only reaches /images/* with the selector, and its baseUrl may not carry a query string.
+	assert.equal(
+		generation.url,
+		"https://omni-resource.openai.azure.com/openai/v1/images/generations?api-version=preview",
+	);
+	assert.equal(
+		(generation.headers as Record<string, string>)["api-key"],
+		"azure-secret",
+	);
+
+	const edit = await must(azureopenaiAdapter, "imageEdit").buildRequest(
+		{ ...imageRequest, operation: "edit", images: [] },
+		base,
+	);
+	assert.equal(
+		edit.url,
+		"https://omni-resource.openai.azure.com/openai/v1/images/edits?api-version=preview",
+	);
+
+	// An operator may pin a dated version instead of the preview default.
+	const pinned = await must(azureopenaiAdapter, "imageGeneration").buildRequest(
+		imageRequest,
+		{
+			...base,
+			credentials: { ...base.credentials, apiVersion: "2026-04-01" },
+		},
+	);
+	assert.equal(
+		pinned.url,
+		"https://omni-resource.openai.azure.com/openai/v1/images/generations?api-version=2026-04-01",
+	);
+
+	// Chat keeps the bare v1 path it has always used.
+	const chat = must(azureopenaiAdapter, "chat").buildRequest(
+		request,
+		context("responses", "public-model"),
+	);
+	assert.equal(chat.url.includes("api-version"), false);
+});
