@@ -52,6 +52,12 @@ credentials and choose a model available to your provider account. See
   the supported keywords and moves the rest into the field's `description`, as Anthropic's SDKs do;
   clients keep validating against their original schema. Native `/v1/messages` tools are sent as
   written.
+- **Sampling and forced tool use follow Anthropic's thinking limits** through the
+  [parameter policy](/docs/parameter-policy): while thinking is on, `temperature` and `top_k` and a
+  `top_p` outside 0.95–1 count as unsupported, and so does a forced `tool_choice` (`required` or a
+  named tool) with budget-based thinking. Claude 4.7 and later models declare `temperature`, `top_p`
+  and `top_k` unsupported on every request, and Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 also
+  reject forced tool use. Under `drop` these fields are removed and listed in `droppedParameters`.
 - Catalog: `src/adapters/anthropic/catalog.json`.
 
 ## Next steps

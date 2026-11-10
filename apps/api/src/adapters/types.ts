@@ -418,6 +418,15 @@ export interface Adapter {
 	 * strategy) instead of the adapter losing it silently. A model's catalog entry overrides it.
 	 */
 	chatParameters?: Partial<Record<UpstreamTransport, ParameterSupportMap>>;
+	/**
+	 * Parameters this request makes unsupported on top of the model's declarations, for constraints
+	 * that depend on the request itself (Anthropic rejects temperature while thinking is on). The
+	 * parameter policy applies them like any other declaration: dropped and recorded, or rejected.
+	 */
+	chatRequestParameters?: (
+		req: CanonicalChatRequest,
+		ctx: ChatSupportContext,
+	) => ParameterSupportMap | undefined;
 }
 
 /** A provider as a self-contained upstream-protocol unit. The JSON catalog is mounted in the central registry. */

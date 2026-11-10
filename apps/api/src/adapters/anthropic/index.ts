@@ -38,9 +38,12 @@ import type {
 	CanonicalMessage,
 } from "#core/canonical.ts";
 
+import type { ParameterSupportMap } from "#catalog/parameters.ts";
+
 import type {
 	MessageTokenCountRequest,
 	MessageTokenCountHandler,
+	ChatSupportContext,
 	AdapterContext,
 	ProviderModule,
 	ChatHandler,
@@ -514,6 +517,92 @@ function applyReasoning(
 			: fitThinkingBudget(budget.tokens, Number(body.max_tokens)),
 		display,
 	};
+}
+
+/** Whether the request forces a tool call, which `tool_choice` any or tool means on Anthropic. */
+function forcesToolUse(choice: CanonicalChatRequest["toolChoice"]): boolean {
+	if (choice === undefined || typeof choice === "string") {
+		return choice === "required";
+	}
+	return "name" in choice || choice.mode === "required";
+}
+
+/** Which thinking the request turns on for this model, if any. */
+function thinkingMode(
+	req: CanonicalChatRequest,
+	ctx: ChatSupportContext,
+): "manual" | "adaptive" | undefined {
+	let resolved: ReturnType<typeof resolveAdapterReasoning>;
+	try {
+		resolved = resolveAdapterReasoning(
+			req,
+			{ ...ctx, credentials: {}, requestId: "" },
+			["anthropic_adaptive", "anthropic_budget"],
+		);
+	} catch {
+		// An unusable reasoning request is rejected when the request is built.
+		return undefined;
+	}
+	if (resolved === undefined || resolved.effort === "none") {
+		return undefined;
+	}
+	return resolved.spec.kind === "anthropic_budget" ? "manual" : "adaptive";
+}
+
+const THINKING_CONFLICT = "Not accepted by Anthropic while thinking is on.";
+
+/**
+ * What this request makes unsupported, from Anthropic's documented limits. While thinking is on,
+ * temperature and top_k are rejected and top_p must lie between 0.95 and 1 (models that reject
+ * sampling parameters outright declare that in the catalog). Manual (budget) thinking cannot be
+ * combined with forced tool use, and a catalog `tool_choice` whose `values` leave out forcing marks a
+ * model that rejects it on every request. The parameter policy then drops and records these, or
+ * rejects them, instead of Anthropic answering with a 400.
+ */
+function anthropicRequestParameters(
+	req: CanonicalChatRequest,
+	ctx: ChatSupportContext,
+): ParameterSupportMap | undefined {
+	const parameters: ParameterSupportMap = {};
+	const forced = forcesToolUse(req.toolChoice);
+	const toolChoice =
+		ctx.meta.operations?.["text.generate"]?.parameters?.tool_choice;
+	if (
+		forced &&
+		typeof toolChoice === "object" &&
+		toolChoice.values !== undefined &&
+		!toolChoice.values.includes("required")
+	) {
+		parameters.tool_choice = {
+			mode: "unsupported",
+			notes: "This model rejects forced tool use.",
+		};
+	}
+	const thinking = thinkingMode(req, ctx);
+	if (thinking !== undefined) {
+		if (req.temperature !== undefined) {
+			parameters.temperature = {
+				mode: "unsupported",
+				notes: THINKING_CONFLICT,
+			};
+		}
+		if (req.topK !== undefined) {
+			parameters.top_k = { mode: "unsupported", notes: THINKING_CONFLICT };
+		}
+		if (req.topP !== undefined && (req.topP < 0.95 || req.topP > 1)) {
+			parameters.top_p = {
+				mode: "unsupported",
+				notes: "Must lie between 0.95 and 1 while thinking is on.",
+			};
+		}
+		if (thinking === "manual" && forced) {
+			parameters.tool_choice = {
+				mode: "unsupported",
+				notes: "Forced tool use is not accepted with budget-based thinking.",
+			};
+		}
+	}
+	return Object.keys(parameters).length > 0 ? parameters : undefined;
 }
 
 /** Anthropic's floor for `thinking.budget_tokens`. */
@@ -1568,6 +1657,7 @@ export const anthropicAdapter: Adapter = {
 		},
 	},
 	transports: { chat: { supported: ["messages"], default: "messages" } },
+	chatRequestParameters: anthropicRequestParameters,
 	// The Messages request has no sampling seed, no repetition penalties and no cache key (caching is
 	// marked per block with cache_control).
 	chatParameters: {

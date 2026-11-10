@@ -32,10 +32,26 @@
 						"response_format": true,
 						"stop": true,
 						"structured_outputs": true,
-						"tool_choice": true,
+						"tool_choice": {
+							"mode": "range",
+							"values": ["auto", "none"],
+							"notes": "Forced tool use (any or a named tool) is rejected with a 400 on this model."
+						},
 						"tools": true,
 						"verbosity": true,
-						"reasoning_effort": true
+						"reasoning_effort": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					},
 					"maxInputTokens": 1000000,
 					"maxOutputTokens": 128000
@@ -76,7 +92,19 @@
 						"tool_choice": true,
 						"tools": true,
 						"verbosity": true,
-						"reasoning_effort": true
+						"reasoning_effort": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					},
 					"maxInputTokens": 1000000,
 					"maxOutputTokens": 128000
@@ -117,8 +145,19 @@
 						"tool_choice": true,
 						"tools": true,
 						"verbosity": true,
-						"temperature": true,
-						"reasoning_effort": true
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"reasoning_effort": true,
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					},
 					"maxInputTokens": 1000000,
 					"maxOutputTokens": 128000
@@ -159,8 +198,19 @@
 						"tool_choice": true,
 						"tools": true,
 						"verbosity": true,
-						"temperature": true,
-						"reasoning_effort": true
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"reasoning_effort": true,
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					},
 					"maxInputTokens": 1000000,
 					"maxOutputTokens": 128000
@@ -241,10 +291,26 @@
 						"response_format": true,
 						"stop": true,
 						"structured_outputs": true,
-						"tool_choice": true,
+						"tool_choice": {
+							"mode": "range",
+							"values": ["auto", "none"],
+							"notes": "Forced tool use (any or a named tool) is rejected with a 400 on this model."
+						},
 						"tools": true,
 						"verbosity": true,
-						"reasoning_effort": true
+						"reasoning_effort": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					},
 					"maxInputTokens": 1000000,
 					"maxOutputTokens": 128000
@@ -286,7 +352,19 @@
 						"tool_choice": true,
 						"tools": true,
 						"verbosity": true,
-						"reasoning_effort": true
+						"reasoning_effort": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					},
 					"maxInputTokens": 1000000,
 					"maxOutputTokens": 128000
@@ -341,8 +419,19 @@
 						"tool_choice": true,
 						"tools": true,
 						"verbosity": true,
-						"temperature": true,
-						"reasoning_effort": true
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"reasoning_effort": true,
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					},
 					"maxInputTokens": 1000000,
 					"maxOutputTokens": 128000
@@ -426,7 +515,19 @@
 						"tool_choice": true,
 						"tools": true,
 						"verbosity": true,
-						"reasoning_effort": true
+						"reasoning_effort": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					},
 					"maxInputTokens": 1000000,
 					"maxOutputTokens": 128000
@@ -456,6 +557,20 @@
 					"reasoning": {
 						"kind": "anthropic_adaptive",
 						"levels": ["low", "medium", "high", "xhigh", "max"]
+					},
+					"parameters": {
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					}
 				}
 			},
@@ -477,16 +592,31 @@
 					"maxOutputTokens": 128000,
 					"parameters": {
 						"max_tokens": true,
-						"temperature": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
 						"stop": true,
 						"tools": true,
-						"tool_choice": true,
+						"tool_choice": {
+							"mode": "range",
+							"values": ["auto", "none"],
+							"notes": "Forced tool use (any or a named tool) is rejected with a 400 on this model."
+						},
 						"reasoning": true,
 						"include_reasoning": true,
 						"structured_outputs": true,
 						"response_format": true,
 						"verbosity": true,
-						"reasoning_effort": true
+						"reasoning_effort": true,
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					},
 					"capabilities": {
 						"tools": true,
@@ -588,8 +718,19 @@
 						"tool_choice": true,
 						"tools": true,
 						"verbosity": true,
-						"temperature": true,
-						"reasoning_effort": true
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"reasoning_effort": true,
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					}
 				}
 			},
@@ -627,10 +768,26 @@
 						"response_format": true,
 						"stop": true,
 						"structured_outputs": true,
-						"tool_choice": true,
+						"tool_choice": {
+							"mode": "range",
+							"values": ["auto", "none"],
+							"notes": "Forced tool use (any or a named tool) is rejected with a 400 on this model."
+						},
 						"tools": true,
 						"verbosity": true,
-						"reasoning_effort": true
+						"reasoning_effort": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					},
 					"maxInputTokens": 1000000,
 					"maxOutputTokens": 128000
@@ -674,7 +831,19 @@
 						"tool_choice": true,
 						"tools": true,
 						"verbosity": true,
-						"reasoning_effort": true
+						"reasoning_effort": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					}
 				}
 			},
@@ -715,7 +884,19 @@
 						"structured_outputs": true,
 						"tool_choice": true,
 						"tools": true,
-						"verbosity": true
+						"verbosity": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					}
 				}
 			},
@@ -958,16 +1139,31 @@
 					"maxOutputTokens": 128000,
 					"parameters": {
 						"max_tokens": true,
-						"temperature": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
 						"stop": true,
 						"tools": true,
-						"tool_choice": true,
+						"tool_choice": {
+							"mode": "range",
+							"values": ["auto", "none"],
+							"notes": "Forced tool use (any or a named tool) is rejected with a 400 on this model."
+						},
 						"reasoning": true,
 						"include_reasoning": true,
 						"structured_outputs": true,
 						"response_format": true,
 						"verbosity": true,
-						"reasoning_effort": true
+						"reasoning_effort": true,
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
 					},
 					"capabilities": {
 						"tools": true,

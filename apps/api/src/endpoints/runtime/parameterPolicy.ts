@@ -20,6 +20,7 @@ import {
 	applyUnsupportedParameterPolicy,
 	assertSupportedChatParameters,
 	type ParameterPolicyResult,
+	withRequestParameters,
 	withAdapterParameters,
 } from "#catalog/parameters.ts";
 
@@ -51,18 +52,34 @@ export function parameterEligibility(
 	return (candidate) =>
 		assertSupportedChatParameters(
 			req,
-			candidateParameterMeta(candidate, resolveTransport(candidate, "chat")),
+			candidateParameterMeta(
+				candidate,
+				resolveTransport(candidate, "chat"),
+				req,
+			),
 		);
 }
 
-/** The candidate's metadata with its adapter's per-transport parameter declarations underneath. */
+/**
+ * The candidate's metadata as the parameter policy sees it for this request: its adapter's
+ * per-transport declarations underneath the catalog, and what the request itself rules out on top.
+ */
 export function candidateParameterMeta(
 	candidate: DeploymentCandidate,
 	transport: UpstreamTransport,
+	req: CanonicalChatRequest,
 ) {
-	return withAdapterParameters(
+	const meta = withAdapterParameters(
 		candidate.meta,
 		candidate.adapter.chatParameters?.[transport],
+	);
+	return withRequestParameters(
+		meta,
+		candidate.adapter.chatRequestParameters?.(req, {
+			upstreamModel: candidate.upstreamModel,
+			meta,
+			transport,
+		}),
 	);
 }
 
@@ -75,7 +92,7 @@ export function requestForCandidate(
 ): CanonicalChatRequest {
 	const result = applyUnsupportedParameterPolicy(
 		req,
-		candidateParameterMeta(candidate, transport),
+		candidateParameterMeta(candidate, transport, req),
 		strategy,
 	);
 	record(result);

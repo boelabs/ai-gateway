@@ -99,6 +99,30 @@ export function withAdapterParameters(
 	};
 }
 
+/**
+ * The metadata with request-specific declarations on top: what this particular request makes
+ * unsupported (sampling parameters while thinking is on, say), which wins over the catalog.
+ */
+export function withRequestParameters(
+	meta: ResolvedModelMetadata,
+	requestParameters: ParameterSupportMap | undefined,
+): ResolvedModelMetadata {
+	if (!requestParameters || Object.keys(requestParameters).length === 0) {
+		return meta;
+	}
+	const text = meta.operations?.["text.generate"];
+	return {
+		...meta,
+		operations: {
+			...meta.operations,
+			"text.generate": {
+				...text,
+				parameters: { ...text?.parameters, ...requestParameters },
+			},
+		},
+	};
+}
+
 /** Whether one catalog entry says the parameter reaches the provider at all. */
 function entrySupport(
 	entry: boolean | { mode?: string },
