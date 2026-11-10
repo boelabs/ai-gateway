@@ -1,6 +1,7 @@
 import { revokeSessionsForUser } from "#db/repos/dashboardSessions.ts";
 import { setCookie, getCookie, deleteCookie } from "hono/cookie";
 import { authMiddleware, getAuth } from "./middleware.ts";
+import { reserveLoginAttempt } from "./loginThrottle.ts";
 import { env, rootCredentials } from "#config/env.ts";
 import { clientIp } from "#endpoints/shared.ts";
 import { GatewayError } from "#core/errors.ts";
@@ -33,14 +34,9 @@ import {
 	hashPassword,
 } from "./password.ts";
 
-import {
-	assertLoginAllowed,
-	recordLoginFailure,
-	clearLoginFailures,
-} from "./loginThrottle.ts";
-
 const loginSchema = z.object({
-	username: z.string().min(1),
+	// Long enough for any account name or root operator name; the throttle checks the pattern.
+	username: z.string().min(1).max(256),
 	password: z.string().min(1),
 });
 
@@ -90,7 +86,11 @@ export const authApp = new Hono<AppEnv>();
 authApp.post("/session", async (c) => {
 	const input = await parseJsonBody(c, loginSchema);
 	const ip = clientIp(c);
-	await assertLoginAllowed(input.username, ip);
+	const attempt = await reserveLoginAttempt(
+		input.username,
+		ip,
+		rootCredentials?.user ?? null,
+	);
 
 	const root = rootCredentials;
 	const isRootLogin =
@@ -115,7 +115,6 @@ authApp.post("/session", async (c) => {
 			"$argon2id$v=19$m=65536,t=2,p=1$aaaaaaaaaaaaaaaa$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 		const valid = await verifyPassword(input.password, digest);
 		if (!(user?.enabled && valid)) {
-			await recordLoginFailure(input.username, ip);
 			throw invalidCredentials();
 		}
 		userId = user.id;
@@ -124,7 +123,7 @@ authApp.post("/session", async (c) => {
 		await touchDashboardUserLogin(user.id);
 	}
 
-	await clearLoginFailures(input.username, ip);
+	await attempt.succeeded();
 
 	const issued = await issueSession({
 		userId,
