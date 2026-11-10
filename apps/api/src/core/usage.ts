@@ -40,6 +40,11 @@ export interface Usage {
 	rejectedPredictionTokens?: number;
 	/** Provider-reported reranking search units. Independent from token counters. */
 	searchUnits?: number;
+	/**
+	 * Calls the provider made to tools it runs itself (web search, web fetch, code execution), keyed
+	 * by tool. Independent from token counters; billed separately by the provider.
+	 */
+	serverToolCalls?: Record<string, number>;
 	/** Upstream-reported request cost in USD cents, used only when configured pricing is absent. */
 	providerCostCents?: number;
 	/**

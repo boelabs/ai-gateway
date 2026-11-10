@@ -18,6 +18,9 @@ import {
 	providerFieldsWithAnthropicThinking,
 	anthropicThinkingFromProviderFields,
 	type AnthropicThinkingBlock,
+	providerFieldsWithAnthropicStreamBlock,
+	providerFieldsWithAnthropicStopReason,
+	hasNonCanonicalAnthropicContent,
 	anthropicContentMatches,
 	mergeProviderFields,
 } from "#core/providerSpecificFields.ts";
@@ -60,6 +63,8 @@ interface AnthropicUsage {
 		ephemeral_5m_input_tokens?: number;
 		ephemeral_1h_input_tokens?: number;
 	};
+	/** Requests to tools Anthropic runs itself: `web_search_requests`, `web_fetch_requests`, ... */
+	server_tool_use?: Record<string, unknown> | null;
 }
 
 interface AnthropicContentBlock {
@@ -93,6 +98,7 @@ interface AnthropicStreamEvent {
 		thinking?: string;
 		signature?: string;
 		partial_json?: string;
+		citation?: unknown;
 		stop_reason?: string | null;
 		stop_sequence?: string | null;
 	};
@@ -663,8 +669,28 @@ function mapUsage(usage: AnthropicUsage | undefined): Usage {
 	if (usage?.output_tokens_details?.thinking_tokens != null) {
 		out.reasoningTokens = usage.output_tokens_details.thinking_tokens;
 	}
+	const serverToolCalls = serverToolCallsOf(usage?.server_tool_use);
+	if (serverToolCalls !== undefined) {
+		out.serverToolCalls = serverToolCalls;
+	}
 	return out;
 }
+
+/** `{ web_search_requests: 2 }` -> `{ web_search: 2 }`. */
+function serverToolCallsOf(
+	counters: Record<string, unknown> | null | undefined,
+): Record<string, number> | undefined {
+	const calls: Record<string, number> = {};
+	for (const [key, value] of Object.entries(counters ?? {})) {
+		if (typeof value === "number" && Number.isFinite(value)) {
+			calls[key.replace(/_requests$/u, "")] = value;
+		}
+	}
+	return Object.keys(calls).length > 0 ? calls : undefined;
+}
+
+/** Stop reasons the canonical finish reason folds into another, kept for the native wire. */
+const FOLDED_STOP_REASONS = new Set(["pause_turn"]);
 
 function mapFinishReason(
 	reason: string | null | undefined,
@@ -764,6 +790,11 @@ function parseResponse(
 	if (toolCalls.length > 0) {
 		outMessage.toolCalls = toolCalls;
 	}
+	if (message.stop_reason && FOLDED_STOP_REASONS.has(message.stop_reason)) {
+		const fields = providerFieldsWithAnthropicStopReason(message.stop_reason);
+		outMessage.providerFields =
+			mergeProviderFields(outMessage.providerFields, fields) ?? fields;
+	}
 	const response: CanonicalChatResponse = {
 		id: message.id ?? `msg_${randomUUID()}`,
 		created: Math.floor(Date.now() / 1000),
@@ -842,37 +873,32 @@ function mergeStreamUsage(
 	return merged;
 }
 
-const REPLAYABLE_BLOCK_TYPES = new Set([
-	"text",
-	"thinking",
-	"redacted_thinking",
-	"tool_use",
-]);
-
 /**
- * The assistant content exactly as Anthropic returned it, when it carries thinking. Anthropic binds
- * each thinking signature to the content before it (block order included), so a later turn must
- * replay these blocks as they were. Content with blocks the canonical form cannot hold is skipped.
+ * The assistant content exactly as Anthropic returned it, whenever it holds something the canonical
+ * message cannot (thinking, server-tool calls and results, citations). Anthropic binds each thinking
+ * signature to the content before it and needs server-tool results (their `encrypted_content`) sent
+ * back unchanged, so a later turn must replay these blocks as they were.
  */
 function replayableContent(
 	blocks: Record<string, unknown>[],
 ): Record<string, unknown>[] | undefined {
-	return blocks.every((block) =>
-		REPLAYABLE_BLOCK_TYPES.has(String(block.type)),
-	) &&
-		blocks.some(
-			(block) =>
-				block.type === "thinking" || block.type === "redacted_thinking",
-		)
+	return hasNonCanonicalAnthropicContent(blocks)
 		? structuredClone(blocks)
 		: undefined;
+}
+
+/** Blocks whose input streams as input_json_delta: client, server and MCP tool calls. */
+function streamsInput(type: string | undefined): boolean {
+	return (
+		type === "tool_use" || type === "server_tool_use" || type === "mcp_tool_use"
+	);
 }
 
 /** Rebuilds streamed content blocks for `replayableContent`. */
 interface StreamedContent {
 	blocks: Map<number, Record<string, unknown>>;
 	json: Map<number, string>;
-	/** False once the stream carried something these blocks cannot reproduce (citations). */
+	/** False once a streamed input could not be parsed back, so the blocks are no longer exact. */
 	exact: boolean;
 }
 
@@ -883,19 +909,19 @@ function startStreamedBlock(
 ): void {
 	if (block?.type === "text") {
 		content.blocks.set(index, { type: "text", text: block.text ?? "" });
-	} else if (block?.type === "tool_use") {
-		content.blocks.set(index, {
-			type: "tool_use",
-			id: block.id,
-			name: block.name,
-			input: {},
-		});
-		content.json.set(index, "");
 	} else if (block?.type === "redacted_thinking") {
 		content.blocks.set(index, { type: block.type, data: block.data });
 	} else {
-		// Thinking blocks are recorded whole when they stop; others are kept to fail the check.
-		content.blocks.set(index, { type: block?.type ?? "unknown" });
+		// Thinking blocks are replaced whole when they stop. Every other block (client and server
+		// tool calls, server-tool results, MCP blocks) starts complete except for a streamed input.
+		const started = structuredClone(
+			(block ?? { type: "unknown" }) as Record<string, unknown>,
+		);
+		if (streamsInput(block?.type)) {
+			started.input = {};
+			content.json.set(index, "");
+		}
+		content.blocks.set(index, started);
 	}
 }
 
@@ -912,8 +938,9 @@ function streamedDelta(
 			index,
 			`${content.json.get(index) ?? ""}${delta.partial_json ?? ""}`,
 		);
-	} else if (delta.type === "citations_delta") {
-		content.exact = false;
+	} else if (delta.type === "citations_delta" && block?.type === "text") {
+		const citations = Array.isArray(block.citations) ? block.citations : [];
+		block.citations = [...citations, structuredClone(delta.citation)];
 	}
 }
 
@@ -928,7 +955,7 @@ function stopStreamedBlock(
 	}
 	const block = content.blocks.get(index);
 	const json = content.json.get(index);
-	if (block?.type !== "tool_use" || json === undefined) {
+	if (block === undefined || json === undefined) {
 		return;
 	}
 	try {
@@ -1168,7 +1195,10 @@ async function* parseStream(
 				}
 			} else if (
 				event.delta?.type === "input_json_delta" &&
-				event.delta.partial_json !== undefined
+				event.delta.partial_json !== undefined &&
+				// Only client tool calls reach the client as tool calls: a server tool's input is
+				// Anthropic's own and travels whole with its block when that block stops.
+				native.blocks.get(event.index ?? 0)?.type === "tool_use"
 			) {
 				const index = toolCallIndex(event.index ?? 0);
 				yield {
@@ -1197,6 +1227,29 @@ async function* parseStream(
 			const index = event.index ?? 0;
 			const block = thinkingBlocks.get(index);
 			stopStreamedBlock(native, index, block);
+			const stopped = native.blocks.get(index);
+			if (
+				block === undefined &&
+				stopped !== undefined &&
+				stopped.type !== "text" &&
+				hasNonCanonicalAnthropicContent([stopped])
+			) {
+				// A block the canonical delta cannot carry, handed on whole in its streamed position.
+				yield {
+					id,
+					created,
+					model,
+					choices: [
+						{
+							index: 0,
+							delta: {
+								providerFields: providerFieldsWithAnthropicStreamBlock(stopped),
+							},
+							finishReason: null,
+						},
+					],
+				};
+			}
 			if (block !== undefined) {
 				thinkingBlocks.delete(index);
 				yield {
@@ -1304,7 +1357,13 @@ async function* parseStream(
 				choices: [
 					{
 						index: 0,
-						delta: {},
+						delta: FOLDED_STOP_REASONS.has(terminal.originalTerminalReason)
+							? {
+									providerFields: providerFieldsWithAnthropicStopReason(
+										terminal.originalTerminalReason,
+									),
+								}
+							: {},
 						finishReason: terminal.finishReason,
 						stopSequence: terminal.stopSequence,
 					},

@@ -129,6 +129,14 @@ replay it and nothing is stored. See [Provider-specific fields](/docs/provider-s
 but reported no usage — the reserved input plus the observed output. See
 [Cost accounting](/docs/cost-accounting#when-the-provider-reports-no-usage).
 
+## Server Tool
+
+A tool the provider runs itself during a turn, such as Anthropic's web search, web fetch or code
+execution. Its call and result blocks have no canonical form, so they travel as native provider
+content: `/v1/messages` returns and streams them where the model produced them, and a client that
+sends the turn back reaches the provider with them unchanged. `Usage.serverToolCalls` counts the
+calls per tool (`server_tool_use` on the Messages wire).
+
 ## Fallback Policy
 
 An ordered chain of Public Models identified by `(primaryModel, reason)`. `reason` is `general`,

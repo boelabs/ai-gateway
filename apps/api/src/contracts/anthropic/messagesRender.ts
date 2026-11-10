@@ -8,6 +8,9 @@ import { randomUUID } from "node:crypto";
 import {
 	anthropicContentBlocksFromProviderFields,
 	providerFieldsWithAnthropicContentBlocks,
+	anthropicStreamBlockFromProviderFields,
+	anthropicStopReasonFromProviderFields,
+	hasNonCanonicalAnthropicContent,
 	googleContentPartsFromProviderFields,
 	providerFieldsWithGoogleContentParts,
 	providerFieldsWithAnthropicThinking,
@@ -415,18 +418,29 @@ export function messagesRequestToCanonical(
 			if (toolCalls.length > 0) {
 				msg.toolCalls = toolCalls;
 			}
-			if (thinkingBlocks.length > 0) {
-				// The turn exactly as the client holds it: Anthropic binds thinking to block order.
-				const native = providerFieldsWithAnthropicContentBlocks(
-					blocks.filter(
-						(block) => gatewayStateOf(block) === undefined,
-					) as Record<string, unknown>[],
-				);
+			const nativeBlocks = blocks.filter(
+				(block) => gatewayStateOf(block) === undefined,
+			) as Record<string, unknown>[];
+			if (
+				thinkingBlocks.length > 0 ||
+				// Thinking counts only when signed (above): unsigned thinking is portable text.
+				hasNonCanonicalAnthropicContent(
+					nativeBlocks.filter(
+						(block) =>
+							block.type !== "thinking" && block.type !== "redacted_thinking",
+					),
+				)
+			) {
+				// The turn exactly as the client holds it: Anthropic binds thinking to block order and
+				// needs server-tool calls and results (their encrypted content) back unchanged.
+				const native = providerFieldsWithAnthropicContentBlocks(nativeBlocks);
 				msg.providerFields =
-					mergeProviderFields(
-						providerFieldsWithAnthropicThinking(thinkingBlocks),
-						native,
-					) ?? native;
+					thinkingBlocks.length > 0
+						? (mergeProviderFields(
+								providerFieldsWithAnthropicThinking(thinkingBlocks),
+								native,
+							) ?? native)
+						: native;
 			}
 			restoreMessageStates(msg, carriers, options.messageState);
 			messages.push(msg);
@@ -599,7 +613,11 @@ export function messagesRequestToCanonical(
 function mapStopReason(
 	finish: CanonicalFinishReason | null,
 	stopSequence?: string | null,
+	native?: string,
 ): string | null {
+	if (native !== undefined) {
+		return native;
+	}
 	if (stopSequence) {
 		return "stop_sequence";
 	}
@@ -645,6 +663,16 @@ function usageToAnthropic(usage: Usage): Record<string, unknown> {
 		...(usage.reasoningTokens === undefined
 			? {}
 			: { output_tokens_details: { thinking_tokens: usage.reasoningTokens } }),
+		...(usage.serverToolCalls === undefined
+			? {}
+			: {
+					server_tool_use: Object.fromEntries(
+						Object.entries(usage.serverToolCalls).map(([tool, calls]) => [
+							`${tool}_requests`,
+							calls,
+						]),
+					),
+				}),
 	};
 }
 
@@ -747,6 +775,7 @@ export function canonicalToMessagesResponse(
 		stop_reason: mapStopReason(
 			choice?.finishReason ?? null,
 			choice?.stopSequence,
+			anthropicStopReasonFromProviderFields(choice?.message.providerFields),
 		),
 		stop_sequence: choice?.stopSequence ?? null,
 		usage: usageToAnthropic(resp.usage),
@@ -767,6 +796,7 @@ export async function* canonicalChunksToMessagesEvents(
 	let finalUsage: Usage | null = null;
 	let finish: CanonicalFinishReason | null = null;
 	let stopSequence: string | null = null;
+	let nativeStopReason: string | undefined;
 
 	let nextIndex = 0;
 	let textOpen = false;
@@ -813,6 +843,42 @@ export async function* canonicalChunksToMessagesEvents(
 			({ stopSequence } = choice);
 		}
 		const { delta } = choice;
+		nativeStopReason =
+			anthropicStopReasonFromProviderFields(delta.providerFields) ??
+			nativeStopReason;
+		const streamBlock = anthropicStreamBlockFromProviderFields(
+			delta.providerFields,
+		);
+		if (streamBlock !== undefined) {
+			// A server-tool call or result, where Anthropic streamed it.
+			if (textOpen) {
+				yield sse("content_block_stop", { index: textIndex });
+				textOpen = false;
+			}
+			if (thinkingOpen) {
+				yield sse("content_block_stop", { index: thinkingIndex });
+				thinkingOpen = false;
+			}
+			const index = nextIndex++;
+			const { input } = streamBlock;
+			const streamedInput = "input" in streamBlock;
+			yield sse("content_block_start", {
+				index,
+				content_block: streamedInput
+					? { ...streamBlock, input: {} }
+					: streamBlock,
+			});
+			if (streamedInput) {
+				yield sse("content_block_delta", {
+					index,
+					delta: {
+						type: "input_json_delta",
+						partial_json: JSON.stringify(input ?? {}),
+					},
+				});
+			}
+			yield sse("content_block_stop", { index });
+		}
 		googleParts =
 			googleContentPartsFromProviderFields(delta.providerFields) ?? googleParts;
 		for (const item of openaiReasoningFromProviderFields(
@@ -977,7 +1043,7 @@ export async function* canonicalChunksToMessagesEvents(
 
 	yield sse("message_delta", {
 		delta: {
-			stop_reason: mapStopReason(finish, stopSequence),
+			stop_reason: mapStopReason(finish, stopSequence, nativeStopReason),
 			stop_sequence: stopSequence,
 		},
 		// Cross-provider transports may learn input usage only at the end. Current Anthropic SDKs
