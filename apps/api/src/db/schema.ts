@@ -980,6 +980,12 @@ export const dashboardUsers = pgTable(
 		mustChangePassword: boolean("must_change_password")
 			.notNull()
 			.default(false),
+		/**
+		 * Bumped in the same UPDATE that changes the role, the password or `enabled`. A session
+		 * carries the epoch it was issued at and stops resolving once the two differ, so no session
+		 * outlives one of those changes, whatever raced with it.
+		 */
+		sessionEpoch: integer("session_epoch").notNull().default(0),
 		lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
 		/** Actor that created the row ("root" or "user:<uuid>"). */
 		createdBy: text("created_by"),
@@ -1014,6 +1020,8 @@ export const dashboardSessions = pgTable(
 		}),
 		/** Denormalized so a session keeps working while its row is being read. */
 		role: dashboardRoleEnum("role").notNull(),
+		/** The user's `session_epoch` at issue; null for root and for sessions issued before it existed. */
+		userEpoch: integer("user_epoch"),
 		/** Absolute expiry; see dashboard_settings.session_ttl_minutes. */
 		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 		/** Sliding idle expiry (dashboard_settings.session_idle_minutes) is derived from this. */

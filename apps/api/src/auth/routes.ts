@@ -101,6 +101,7 @@ authApp.post("/session", async (c) => {
 	let userId: string | null = null;
 	let role: "owner" | "admin" | "viewer" = "owner";
 	let mustChangePassword = false;
+	let userEpoch: number | null = null;
 
 	if (isRootLogin) {
 		// Root is the environment, not a row: it cannot be disabled, demoted, or deleted.
@@ -120,6 +121,7 @@ authApp.post("/session", async (c) => {
 		userId = user.id;
 		({ role } = user);
 		({ mustChangePassword } = user);
+		userEpoch = user.sessionEpoch;
 		await touchDashboardUserLogin(user.id);
 	}
 
@@ -127,6 +129,7 @@ authApp.post("/session", async (c) => {
 
 	const issued = await issueSession({
 		userId,
+		userEpoch,
 		role,
 		ip,
 		userAgent: c.req.header("user-agent") ?? null,
@@ -214,7 +217,7 @@ authApp.post("/password", authMiddleware(), async (c) => {
 		throw invalidCredentials();
 	}
 
-	await updateDashboardUser(user.id, {
+	const updated = await updateDashboardUser(user.id, {
 		passwordHash: await hashPassword(input.newPassword),
 		mustChangePassword: false,
 	});
@@ -225,7 +228,8 @@ authApp.post("/password", authMiddleware(), async (c) => {
 
 	const issued = await issueSession({
 		userId: user.id,
-		role: user.role,
+		userEpoch: updated?.sessionEpoch ?? user.sessionEpoch + 1,
+		role: updated?.role ?? user.role,
 		ip: clientIp(c),
 		userAgent: c.req.header("user-agent") ?? null,
 	});

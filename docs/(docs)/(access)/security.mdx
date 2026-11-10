@@ -53,7 +53,9 @@ login form somewhere else.
 stored as a SHA-256 hash of the token, exactly like virtual keys, with an absolute expiry
 and a sliding idle expiry, both set in **Settings › Operator sessions**. Disabling a
 user, changing their role, or resetting their password revokes every live session of theirs
-immediately rather than waiting for expiry.
+immediately rather than waiting for expiry. The same change bumps the user's session epoch, and a
+session only resolves while its epoch matches, so even a sign-in that raced the change cannot keep
+the old role or password; a session's role is always read from the user row.
 
 **Failed logins** are counted three ways, each attempt reserved before the password is checked so
 concurrent guesses cannot slip past the limit. The username and client IP *pair* locks after the

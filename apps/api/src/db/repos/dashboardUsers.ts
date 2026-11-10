@@ -103,9 +103,20 @@ export async function updateDashboardUser(
 	id: string,
 	patch: UpdateDashboardUserInput,
 ): Promise<DashboardUserRow | null> {
+	// Anything that changes who may act, or with what, ends every session issued before it.
+	const endsSessions =
+		patch.role !== undefined ||
+		patch.passwordHash !== undefined ||
+		patch.enabled !== undefined;
 	const [row] = await db
 		.update(dashboardUsers)
-		.set({ ...patch, updatedAt: new Date() })
+		.set({
+			...patch,
+			...(endsSessions
+				? { sessionEpoch: drizzleSql`${dashboardUsers.sessionEpoch} + 1` }
+				: {}),
+			updatedAt: new Date(),
+		})
 		.where(eq(dashboardUsers.id, id))
 		.returning();
 	return row ?? null;
