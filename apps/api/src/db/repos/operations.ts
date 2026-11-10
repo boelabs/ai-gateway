@@ -1,8 +1,8 @@
 import { type SQL, count, desc, and, gte, lte, sql, eq, lt } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { cacheMetrics } from "./cacheMetrics.ts";
+import { analyticsDb, db } from "#db/client.ts";
 import type { Page } from "./deployments.ts";
-import { db } from "#db/client.ts";
 
 import {
 	gatewayOperations,
@@ -228,14 +228,14 @@ export async function listOperationsPage(
 		? sql`(${gatewayOperations.startedAt}, ${gatewayOperations.id}) < (${opts.cursor.startedAt.toISOString()}::timestamptz, ${opts.cursor.id}::uuid)`
 		: undefined;
 	const [rows, counted] = await Promise.all([
-		db
+		analyticsDb
 			.select({ ...listColumns, ...attemptSummary })
 			.from(gatewayOperations)
 			.where(after ? and(where, after) : where)
 			.orderBy(desc(gatewayOperations.startedAt), desc(gatewayOperations.id))
 			.limit(opts.limit + 1)
 			.offset(opts.cursor ? 0 : opts.offset),
-		db.execute<{ n: number }>(sql`
+		analyticsDb.execute<{ n: number }>(sql`
 			SELECT count(*)::int AS n FROM (
 				SELECT 1 FROM ${gatewayOperations}
 				${where ? sql`WHERE ${where}` : sql``}
@@ -317,7 +317,7 @@ export async function operationSummary(since: Date, until?: Date) {
 		until === undefined
 			? gte(column, since)
 			: and(gte(column, since), lt(column, until));
-	const rows = await db
+	const rows = await analyticsDb
 		.select({
 			outcome: gatewayOperations.outcome,
 			requests: count(),
@@ -338,13 +338,13 @@ export async function operationSummary(since: Date, until?: Date) {
 		.from(gatewayOperations)
 		.where(started(gatewayOperations.startedAt))
 		.groupBy(gatewayOperations.outcome);
-	const [active] = await db
+	const [active] = await analyticsDb
 		.select({ value: count() })
 		.from(gatewayOperations)
 		.where(eq(gatewayOperations.lifecycleState, "in_progress"));
 	const [totals, byModel, byAdapter, byDeployment, protocolErrorOperations] =
 		await Promise.all([
-			db
+			analyticsDb
 				.select({
 					requests: count(),
 					// The first-output clause is streaming-only by construction: a non-progressive
@@ -363,22 +363,22 @@ export async function operationSummary(since: Date, until?: Date) {
 				})
 				.from(gatewayOperations)
 				.where(started(gatewayOperations.startedAt)),
-			db
+			analyticsDb
 				.select({ key: gatewayOperations.publicModel, requests: count() })
 				.from(gatewayOperations)
 				.where(started(gatewayOperations.startedAt))
 				.groupBy(gatewayOperations.publicModel),
-			db
+			analyticsDb
 				.select({ key: upstreamAttempts.adapterKey, attempts: count() })
 				.from(upstreamAttempts)
 				.where(started(upstreamAttempts.startedAt))
 				.groupBy(upstreamAttempts.adapterKey),
-			db
+			analyticsDb
 				.select({ key: upstreamAttempts.deploymentId, attempts: count() })
 				.from(upstreamAttempts)
 				.where(started(upstreamAttempts.startedAt))
 				.groupBy(upstreamAttempts.deploymentId),
-			db
+			analyticsDb
 				.select({
 					value: sql<number>`count(distinct ${upstreamAttempts.operationId})::int`,
 				})
@@ -455,13 +455,16 @@ export async function aggregateOperationUsage(
 		upstreamCostCents: sql<number>`coalesce(sum(${gatewayOperations.upstreamCostCents}), 0)::float8`,
 	};
 	if (filter.groupBy === "none") {
-		const [row] = await db.select(metrics).from(gatewayOperations).where(where);
+		const [row] = await analyticsDb
+			.select(metrics)
+			.from(gatewayOperations)
+			.where(where);
 		return [{ key: null, ...row }];
 	}
 	// `hour` exists for 24h dashboards: `day` collapses a whole day into one point, which is useless
 	// at that window. Both bucket in UTC so the series is stable regardless of the server's zone.
 	const key = groupKeyColumn(filter.groupBy);
-	return db
+	return analyticsDb
 		.select({ key, ...metrics })
 		.from(gatewayOperations)
 		.where(where)

@@ -16,6 +16,7 @@ deployment. Gateway and dashboard processes read separate environment files.
 | `ACTIVE_ENCRYPTION_KEY_ID` | Key id | Must exist in `ENCRYPTION_KEYRING`; encrypts every new envelope. |
 | `DATABASE_URL` | Postgres connection URL | TLS follows `sslmode` as in libpq; without it the connection is plaintext. |
 | `REDIS_URL` | Redis connection URL | |
+| `DATABASE_STATEMENT_TIMEOUT_MS` | `30000` | Postgres cancels a request-path statement running longer. Admin lists and analytics use a separate 4-connection pool with a 120 s limit; every connection also ends transactions idle for 60 s and closes after 60 s unused. Redis commands and connections time out after 5 s. |
 | `REDIS_TLS_CA` | — | CA that signs a `rediss://` server certificate (PEM, or `file:/path`). Verification is always on otherwise. |
 | `REDIS_TLS_INSECURE` | `false` | `true` skips `rediss://` certificate verification. |
 

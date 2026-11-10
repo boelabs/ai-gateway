@@ -38,7 +38,14 @@ const FINALIZATION_QUEUE_LIMIT = 10_000;
 const FINALIZATION_QUEUE_MAX_BYTES = 128 * 1024 * 1024;
 /** What a write with no payload is charged, so even those cannot grow the queue without bound. */
 const SMALL_JOB_BYTES = 512;
-const FINALIZATION_BATCH_SIZE = 100;
+/**
+ * Finalizations run in parallel up to half the pool, each a transaction holding a connection: more
+ * than the pool would only queue inside it, and starve request-path queries while doing so.
+ */
+const FINALIZATION_BATCH_SIZE = Math.max(
+	1,
+	Math.floor(env.DATABASE_POOL_MAX / 2),
+);
 const finalizationQueue: Array<{
 	run: () => Promise<void>;
 	resolve: () => void;

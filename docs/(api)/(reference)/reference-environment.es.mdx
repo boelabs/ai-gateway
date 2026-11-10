@@ -13,6 +13,7 @@ El gateway valida su entorno al inicio y sale si falta una variable requerida o 
 | `ACTIVE_ENCRYPTION_KEY_ID` | Identificación de clave | Debe existir en `ENCRYPTION_KEYRING`; cifra cada sobre nuevo. |
 | `DATABASE_URL` | URL de conexión de Postgres | TLS sigue `sslmode` como en libpq; sin él, la conexión va en texto plano. |
 | `REDIS_URL` | URL de conexión de Redis | |
+| `DATABASE_STATEMENT_TIMEOUT_MS` | `30000` | Postgres cancela una sentencia de la ruta de solicitudes que dure más. Las listas y la analítica de administración usan un pool aparte de 4 conexiones con un límite de 120 s; toda conexión termina además las transacciones inactivas 60 s y se cierra tras 60 s sin uso. Los comandos y las conexiones de Redis expiran a los 5 s. |
 | `REDIS_TLS_CA` | — | CA que firma el certificado de un servidor `rediss://` (PEM, o `file:/path`). Si no, la verificación siempre está activa. |
 | `REDIS_TLS_INSECURE` | `false` | `true` omite la verificación del certificado de `rediss://`. |
 

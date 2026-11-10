@@ -80,6 +80,15 @@ export const env = createEnv({
 		 * its operation record, so a pool that is too small queues requests behind log writes.
 		 */
 		DATABASE_POOL_MAX: z.coerce.number().int().min(2).max(200).default(20),
+		/**
+		 * Longest a request-path statement may run before Postgres cancels it. Admin analytics run on
+		 * a pool of their own with a longer limit, so a heavy report cannot starve inference.
+		 */
+		DATABASE_STATEMENT_TIMEOUT_MS: z.coerce
+			.number()
+			.int()
+			.min(1000)
+			.default(30_000),
 		REDIS_URL: z.url(),
 		/**
 		 * A `rediss://` connection verifies the server certificate. REDIS_TLS_CA trusts a private CA

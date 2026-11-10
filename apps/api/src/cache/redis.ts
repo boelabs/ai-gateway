@@ -38,6 +38,10 @@ export function redisTlsOptions(config: {
 
 export const redis = new Redis(env.REDIS_URL, {
 	maxRetriesPerRequest: 3,
+	// A command or a connection attempt that hangs fails instead, so a stalled Redis degrades
+	// requests rather than holding them open.
+	commandTimeout: 5000,
+	connectTimeout: 5000,
 	...redisTlsOptions({
 		url: env.REDIS_URL,
 		ca: env.REDIS_TLS_CA,
@@ -51,13 +55,20 @@ redis.on("error", (err: Error) => {
 	log.debug("redis", "connection error", { err });
 });
 
-/** Health ping. */
+/** Health ping, answered within two seconds or reported down. */
 export async function pingRedis(): Promise<boolean> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
 	try {
-		const pong = await redis.ping();
-		return pong === "PONG";
+		return await Promise.race([
+			redis.ping().then((pong) => pong === "PONG"),
+			new Promise<boolean>((resolve) => {
+				timer = setTimeout(() => resolve(false), 2000);
+			}),
+		]);
 	} catch {
 		return false;
+	} finally {
+		clearTimeout(timer);
 	}
 }
 
