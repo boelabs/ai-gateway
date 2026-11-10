@@ -461,3 +461,42 @@ export async function claimDueVideoJobs(
 			.returning();
 	});
 }
+
+/**
+ * Removes the rows of jobs that are gone for good: deleted or past their asset expiry for longer
+ * than `before`, with no stored object left to delete and no budget reservation still to settle
+ * (an unsettled one is the reconciler's to finish first). Their asset rows go with them (cascade).
+ * Asset rows whose object was deleted long ago are removed too. Batched; returns rows removed.
+ */
+export async function purgeFinishedVideoRows(
+	before: Date,
+	limit = 500,
+): Promise<number> {
+	const iso = before.toISOString();
+	const jobs = await db.execute(sql`
+		DELETE FROM ${videoJobs}
+		WHERE ${videoJobs.id} IN (
+			SELECT ${videoJobs.id} FROM ${videoJobs}
+			WHERE (
+				${videoJobs.deletedAt} < ${iso}::timestamptz
+				OR ${videoJobs.expiresAt} < ${iso}::timestamptz
+			)
+			AND COALESCE(${videoJobs.billing}->>'state', 'settled') NOT IN ('reserved', 'settling')
+			AND NOT EXISTS (
+				SELECT 1 FROM ${videoAssets}
+				WHERE ${videoAssets.videoId} = ${videoJobs.id}
+				AND ${videoAssets.deletedAt} IS NULL
+			)
+			LIMIT ${limit}
+		)
+		RETURNING ${videoJobs.id}`);
+	const assets = await db.execute(sql`
+		DELETE FROM ${videoAssets}
+		WHERE ${videoAssets.id} IN (
+			SELECT ${videoAssets.id} FROM ${videoAssets}
+			WHERE ${videoAssets.deletedAt} < ${iso}::timestamptz
+			LIMIT ${limit}
+		)
+		RETURNING ${videoAssets.id}`);
+	return jobs.length + assets.length;
+}

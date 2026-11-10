@@ -1,7 +1,10 @@
 import { deleteExpiredVideoAssets, refreshDueVideoJobs } from "./service.ts";
+import { purgeFinishedVideoRows } from "#db/repos/videos.ts";
 import { reconcileVideoBilling } from "./billing.ts";
 import { log } from "#logging/log.ts";
 import { env } from "#config/env.ts";
+
+const VIDEO_ROW_RETENTION_MS = 7 * 24 * 60 * 60_000;
 
 export function startVideoJobs(): () => void {
 	let running = false;
@@ -24,6 +27,18 @@ export function startVideoJobs(): () => void {
 				})
 				.catch((err: unknown) => {
 					log.error("videos", "asset gc failed", { err });
+				});
+			// Rows outlive their media by a week, long enough to answer late lookups and audits.
+			await purgeFinishedVideoRows(
+				new Date(Date.now() - VIDEO_ROW_RETENTION_MS),
+			)
+				.then((purged) => {
+					if (purged > 0) {
+						log.info("videos", "purged finished video rows", { purged });
+					}
+				})
+				.catch((err: unknown) => {
+					log.error("videos", "video row purge failed", { err });
 				});
 			await reconcileVideoBilling()
 				.then((finished) => {

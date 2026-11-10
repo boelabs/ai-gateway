@@ -1,6 +1,6 @@
+import { createVideoJob, purgeFinishedVideoRows } from "#db/repos/videos.ts";
 import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
 import { reserveVirtualKeyUsage } from "#ratelimit/index.ts";
-import { createVideoJob } from "#db/repos/videos.ts";
 import { videoJobs } from "#db/schema.ts";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
@@ -172,6 +172,41 @@ test("deleting a running job settles unless the cancellation was confirmed", {
 		assert.equal(byId.get(charged.id)?.state, "settled");
 		assert.equal(byId.get(cancelled.id)?.state, "released");
 		assert.equal(await spend(row.id), 3);
+		await db.delete(videoJobs).where(eq(videoJobs.virtualKeyId, row.id));
+	} finally {
+		await cleanup(row.id);
+	}
+});
+
+test("finished video rows are purged once nothing is left to settle or delete", {
+	skip,
+}, async () => {
+	const { row } = await budgetedKey();
+	try {
+		const gone = await videoJob(row.id, null, "completed");
+		const unsettled = await videoJob(
+			row.id,
+			reservedBilling(await reserveVirtualKeyUsage(row as never, 0, 0)) ?? {
+				state: "reserved",
+				lease: { keyId: row.id, tpmFirst: false, counters: [] },
+			},
+			"completed",
+		);
+		const old = new Date(Date.now() - 30 * 86_400_000);
+		await db
+			.update(videoJobs)
+			.set({ deletedAt: old })
+			.where(eq(videoJobs.virtualKeyId, row.id));
+		await purgeFinishedVideoRows(new Date(Date.now() - 7 * 86_400_000));
+		const left = await db
+			.select({ id: videoJobs.id })
+			.from(videoJobs)
+			.where(eq(videoJobs.virtualKeyId, row.id));
+		assert.deepEqual(
+			left.map((job) => job.id),
+			[unsettled.id],
+		);
+		assert.ok(!left.some((job) => job.id === gone.id));
 		await db.delete(videoJobs).where(eq(videoJobs.virtualKeyId, row.id));
 	} finally {
 		await cleanup(row.id);
