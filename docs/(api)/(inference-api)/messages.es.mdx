@@ -25,6 +25,10 @@ Los bloques `document` de Messages admiten URL, base64 y archivos del proveedor.
 
 El router prefiere el transport nativo de Messages cuando está disponible. `top_k` se convierte al formato canonical y se traduce para los proveedores que admiten ese control. Los metadatos de solicitud requieren un deployment compatible con Messages; no se descartan silenciosamente.
 
+## Campos y betas exclusivos de Anthropic [#anthropic-only-fields-and-betas]
+
+`container`, `mcp_servers`, `context_management`, `inference_geo`, `service_tier`, `speed` y `diagnostics` no tienen equivalente en otros proveedores. Llegan a un deployment de Anthropic tal como se enviaron, y una solicitud que lleva alguno solo se enruta a Anthropic. El header `anthropic-beta` se reenvía a los deployments de Anthropic junto con los betas que añade el propio gateway; cada nombre debe seguir la forma `feature-name-YYYY-MM-DD` de Anthropic. Cualquier otro campo de nivel superior que la API no define se rechaza con `400 unknown_parameter` en lugar de descartarse.
+
 ## Breakpoints de prompt caching [#prompt-caching-breakpoints]
 
 `cache_control: { "type": "ephemeral" }` se conserva en bloques de sistema, contenido y herramientas como un valor opaco: el core no lo interpreta y solo lo emite el adapter de Anthropic. Como eliminar un breakpoint de cache altera la facturación y la latencia, estas solicitudes requieren un deployment nativo de Messages; no se degradan silenciosamente a otro protocolo.

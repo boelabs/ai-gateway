@@ -169,6 +169,14 @@ interface CanonicalMessagesTransportOptions {
 	metadata?: Record<string, unknown>;
 	/** Exact Anthropic tool definitions when built-in tools cannot be represented as functions. */
 	rawTools?: Record<string, unknown>[];
+	/** The client's `anthropic-beta` features, sent to a Messages upstream with the adapter's own. */
+	betas?: string[];
+	/**
+	 * Top-level Messages fields with no canonical form (`container`, `mcp_servers`,
+	 * `context_management`, `inference_geo`, `service_tier`, `speed`, `diagnostics`), sent as given.
+	 * A request carrying them requires the native wire.
+	 */
+	nativeFields?: Record<string, unknown>;
 }
 
 export type PublicChatWire = "chat_completions" | "responses" | "messages";

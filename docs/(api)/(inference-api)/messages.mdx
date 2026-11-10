@@ -36,6 +36,15 @@ The router prefers the native Messages transport when it is available. `top_k` i
 translated to providers that expose the same control. Request metadata is native-only and requires a
 Messages-capable deployment instead of being silently dropped.
 
+## Anthropic-only fields and betas
+
+`container`, `mcp_servers`, `context_management`, `inference_geo`, `service_tier`, `speed` and
+`diagnostics` have no equivalent on other providers. They reach an Anthropic deployment exactly as
+sent, and a request that carries one is only routed to Anthropic. The `anthropic-beta` header is
+forwarded to Anthropic deployments together with the betas the gateway adds itself; each name must
+follow Anthropic's `feature-name-YYYY-MM-DD` form. Any other top-level field the API does not define
+is rejected with `400 unknown_parameter` rather than dropped.
+
 ## Prompt-caching breakpoints
 
 `cache_control: { "type": "ephemeral" }` on a system block, content block, or tool is preserved

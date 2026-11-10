@@ -260,8 +260,10 @@ export async function messagesHandler(c: Context<AppEnv>): Promise<Response> {
 		log.requestBody = json;
 		const req = parseBody(messagesRequestSchema, json);
 		log.publicModel = req.model;
+		const beta = c.req.header("anthropic-beta");
 		let canonical = messagesRequestToCanonical(req, {
 			messageState: messageStateCodec,
+			...(beta === undefined ? {} : { betas: [beta] }),
 		});
 		await preflight(c, canonical.model);
 		canonical = await applyCanonicalRequestExtensions(c, "chat", canonical);

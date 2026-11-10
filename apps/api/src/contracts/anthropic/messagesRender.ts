@@ -1,5 +1,5 @@
 import { assertNoManagedExtraBodyKeys } from "#core/extraBody.ts";
-import type { MessagesRequest } from "./messages.ts";
+import { type MessagesRequest, messagesRequestSchema } from "./messages.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { SSEEvent } from "#core/sse.ts";
 import type { Usage } from "#core/usage.ts";
@@ -67,6 +67,71 @@ export interface MessagesRenderOptions {
 export interface MessagesCanonicalOptions {
 	/** Opens gateway state carriers. Without it they are dropped. */
 	messageState?: MessageStateCodec;
+	/** The request's `anthropic-beta` header values. */
+	betas?: readonly string[];
+}
+
+/**
+ * Documented top-level Messages fields the canonical request has no form for. They reach an
+ * Anthropic upstream unchanged and make the request require it; no other provider can honour them.
+ */
+const NATIVE_TOP_LEVEL_FIELDS = new Set([
+	"container",
+	"mcp_servers",
+	"context_management",
+	"inference_geo",
+	"service_tier",
+	"speed",
+	"diagnostics",
+]);
+
+const MAPPED_TOP_LEVEL_FIELDS: ReadonlySet<string> = new Set(
+	Object.keys(messagesRequestSchema.shape),
+);
+
+/** Beta names follow `feature-name-YYYY-MM-DD`; anything else is not a beta Anthropic documents. */
+const BETA_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*-\d{4}-\d{2}-\d{2}$/u;
+
+function betaNames(values: readonly string[]): string[] {
+	const names = values
+		.flatMap((value) => value.split(","))
+		.map((name) => name.trim())
+		.filter((name) => name.length > 0);
+	const invalid = names.find((name) => !BETA_NAME.test(name));
+	if (invalid !== undefined) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_request_error",
+			param: "anthropic-beta",
+			message: `Unexpected value \`${invalid}\` for the anthropic-beta header`,
+		});
+	}
+	return [...new Set(names)];
+}
+
+/**
+ * The request's top-level fields the canonical request does not map, split into the documented
+ * native ones and the rest, which is rejected: a field accepted and then lost is never acceptable.
+ */
+function nativeTopLevelFields(
+	req: MessagesRequest,
+): Record<string, unknown> | undefined {
+	const native: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(req)) {
+		if (MAPPED_TOP_LEVEL_FIELDS.has(key)) {
+			continue;
+		}
+		if (!NATIVE_TOP_LEVEL_FIELDS.has(key)) {
+			throw new GatewayError({
+				class: "bad_request",
+				code: "unknown_parameter",
+				param: key,
+				message: `Unknown parameter: ${key}`,
+			});
+		}
+		native[key] = structuredClone(value);
+	}
+	return Object.keys(native).length > 0 ? native : undefined;
 }
 
 /** A gateway state carrier: Anthropic clients replay `thinking` blocks verbatim. */
@@ -507,6 +572,15 @@ export function messagesRequestToCanonical(
 			cacheControl: req.cache_control,
 		};
 		u.requiresNativeWire = true;
+	}
+	const nativeFields = nativeTopLevelFields(req);
+	if (nativeFields !== undefined) {
+		u.messagesTransport = { ...u.messagesTransport, nativeFields };
+		u.requiresNativeWire = true;
+	}
+	const betas = betaNames(options.betas ?? []);
+	if (betas.length > 0) {
+		u.messagesTransport = { ...u.messagesTransport, betas };
 	}
 	const effort = reasoningEffortFromMessages(req);
 	const display = displayFromThinking(req.thinking);

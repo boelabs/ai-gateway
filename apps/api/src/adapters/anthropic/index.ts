@@ -758,6 +758,23 @@ function buildBody(
 	}
 	applyReasoning(body, req, ctx);
 	applyResponseFormat(body, req);
+	for (const [key, value] of Object.entries(
+		req.messagesTransport?.nativeFields ?? {},
+	)) {
+		if (
+			body[key] !== undefined &&
+			JSON.stringify(body[key]) !== JSON.stringify(value)
+		) {
+			// `speed` is set by the fast-mode aliases.
+			throw new GatewayError({
+				class: "bad_request",
+				code: "invalid_request_error",
+				param: key,
+				message: `${key} conflicts with the value the selected model requires`,
+			});
+		}
+		body[key] = structuredClone(value);
+	}
 	const extraBody = req.extraBody ? { ...req.extraBody } : undefined;
 	if (extraBody !== undefined) {
 		if (body.top_k === undefined && typeof extraBody.top_k === "number") {
@@ -1557,7 +1574,11 @@ function addBetaHeader(headers: Record<string, string>, beta: string): void {
 
 function requestHeaders(
 	ctx: AdapterContext,
-	options: { fastMode?: boolean; providerFileId?: boolean } = {},
+	options: {
+		fastMode?: boolean;
+		providerFileId?: boolean;
+		betas?: readonly string[];
+	} = {},
 ): { base: string; headers: Record<string, string> } {
 	const c = creds(ctx);
 	const headers: Record<string, string> = {
@@ -1571,6 +1592,9 @@ function requestHeaders(
 	}
 	if (options.providerFileId) {
 		addBetaHeader(headers, "files-api-2025-04-14");
+	}
+	for (const beta of options.betas ?? []) {
+		addBetaHeader(headers, beta);
 	}
 	return {
 		base: (c.baseUrl ?? DEFAULT_BASE).replace(/\/+$/u, ""),
@@ -1619,6 +1643,9 @@ const chat: ChatHandler = {
 		const { base, headers } = requestHeaders(ctx, {
 			fastMode: FAST_MODE_ALIASES.has(ctx.upstreamModel),
 			providerFileId: requestUsesProviderFileId(req),
+			...(req.messagesTransport?.betas
+				? { betas: req.messagesTransport.betas }
+				: {}),
 		});
 		return {
 			method: "POST",
