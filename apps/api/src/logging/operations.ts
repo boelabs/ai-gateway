@@ -30,11 +30,21 @@ import {
 const pending = new Set<Promise<void>>();
 const persistenceHealth = new PersistenceHealthTracker();
 const FINALIZATION_QUEUE_LIMIT = 10_000;
+/**
+ * Bytes the queued writes may hold. Each job keeps only the bounded, redacted forms of its payloads
+ * (never the raw bodies), and counts their size here, so a burst of large requests is bounded by
+ * memory rather than only by how many there are.
+ */
+const FINALIZATION_QUEUE_MAX_BYTES = 128 * 1024 * 1024;
+/** What a write with no payload is charged, so even those cannot grow the queue without bound. */
+const SMALL_JOB_BYTES = 512;
 const FINALIZATION_BATCH_SIZE = 100;
 const finalizationQueue: Array<{
 	run: () => Promise<void>;
 	resolve: () => void;
+	bytes: number;
 }> = [];
+let queuedBytes = 0;
 let drainingFinalizations = false;
 const SENSITIVE_KEY =
 	/authorization|api[-_]?key|token|secret|password|cookie/iu;
@@ -52,6 +62,9 @@ async function drainFinalizations(): Promise<void> {
 		while (finalizationQueue.length > 0) {
 			const batch = finalizationQueue.splice(0, FINALIZATION_BATCH_SIZE);
 			recordPersistenceQueueDelta(-batch.length);
+			for (const job of batch) {
+				queuedBytes -= job.bytes;
+			}
 			await Promise.allSettled(
 				batch.map(async (job) => {
 					try {
@@ -73,18 +86,24 @@ async function drainFinalizations(): Promise<void> {
 function enqueueFinalization(
 	run: () => Promise<void>,
 	requestId: string,
+	bytes = SMALL_JOB_BYTES,
 ): Promise<void> {
-	if (finalizationQueue.length >= FINALIZATION_QUEUE_LIMIT) {
+	if (
+		finalizationQueue.length >= FINALIZATION_QUEUE_LIMIT ||
+		queuedBytes + bytes > FINALIZATION_QUEUE_MAX_BYTES
+	) {
 		persistenceHealth.recordDrop();
 		recordPersistenceLoss("dropped");
 		log.error("operation-log", "finalization queue is full", {
 			requestId,
 			queueDepth: finalizationQueue.length,
+			queuedBytes,
 		});
 		return Promise.resolve();
 	}
 	const task = new Promise<void>((resolve) => {
-		finalizationQueue.push({ run, resolve });
+		finalizationQueue.push({ run, resolve, bytes });
+		queuedBytes += bytes;
 		recordPersistenceQueueDelta(1);
 	});
 	queueMicrotask(drainFinalizations);
@@ -94,6 +113,17 @@ function enqueueFinalization(
 function track(task: Promise<void>): void {
 	pending.add(task);
 	void task.finally(() => pending.delete(task));
+}
+
+/**
+ * A small write (operation start, attempt start, progress, model), through the same bounded queue
+ * as finalizations so that no kind of operation write can pile up without limit.
+ */
+function enqueueWrite(
+	requestId: string,
+	write: () => Promise<void>,
+): Promise<void> {
+	return enqueueFinalization(() => retry(write, requestId), requestId);
 }
 
 async function retry(
@@ -158,11 +188,11 @@ function semanticByteCounts(value: unknown): {
 	return { outputBytes, reasoningBytes };
 }
 
-function safeSummary(value: unknown): Record<string, unknown> {
-	let json = "";
-	try {
-		json = JSON.stringify(value) ?? "";
-	} catch {
+function safeSummary(
+	value: unknown,
+	json: string | null,
+): Record<string, unknown> {
+	if (json === null) {
 		return { serializable: false };
 	}
 	const summary: Record<string, unknown> = {
@@ -259,15 +289,39 @@ export function decryptPayload(
 	return decryptJson(envelope, "observability-payload");
 }
 
-export function payloadFingerprint(value: unknown): string {
-	const fingerprintKey = deriveActiveKey("observability-fingerprint");
-	let serialized: string;
+function serialize(value: unknown): string | null {
 	try {
-		serialized = JSON.stringify(value) ?? "";
+		return JSON.stringify(value) ?? "";
 	} catch {
-		serialized = "[not_serializable]";
+		return null;
 	}
-	return createHmac("sha256", fingerprintKey).update(serialized).digest("hex");
+}
+
+function fingerprintOf(serialized: string | null): string {
+	const fingerprintKey = deriveActiveKey("observability-fingerprint");
+	return createHmac("sha256", fingerprintKey)
+		.update(serialized ?? "[not_serializable]")
+		.digest("hex");
+}
+
+export function payloadFingerprint(value: unknown): string {
+	return fingerprintOf(serialize(value));
+}
+
+/**
+ * A payload reduced to what is persisted: its summary and fingerprint, from one serialization, and
+ * its bounded, redacted form. Computed once per operation, so the raw body is not retained by the
+ * queued write and a retry does not redo the work.
+ */
+function reducePayload(value: unknown): {
+	summary: Record<string, unknown>;
+	bounded: unknown;
+} {
+	const json = serialize(value);
+	return {
+		summary: { ...safeSummary(value, json), fingerprint: fingerprintOf(json) },
+		bounded: boundedPayloadComponent(value),
+	};
 }
 
 export interface OperationStart {
@@ -286,7 +340,7 @@ export function newOperationId(): string {
 }
 
 export function beginOperation(input: OperationStart): Promise<void> {
-	const task = retry(async () => {
+	const task = enqueueWrite(input.requestId, async () => {
 		await db
 			.insert(gatewayOperations)
 			.values({
@@ -306,7 +360,7 @@ export function beginOperation(input: OperationStart): Promise<void> {
 			"EX",
 			OPERATION_LEASE_TTL_SECONDS,
 		);
-	}, input.requestId);
+	});
 	track(task);
 	return task;
 }
@@ -326,7 +380,7 @@ export function beginUpstreamAttempt(input: {
 	startedAt: Date;
 	requestId: string;
 }): void {
-	const task = retry(async () => {
+	const task = enqueueWrite(input.requestId, async () => {
 		await db
 			.insert(upstreamAttempts)
 			.values({
@@ -342,7 +396,7 @@ export function beginUpstreamAttempt(input: {
 				lastProgressAt: input.startedAt,
 			})
 			.onConflictDoNothing();
-	}, input.requestId);
+	});
 	track(task);
 }
 
@@ -614,6 +668,42 @@ export function completeOperation(
 	started: Promise<void>,
 	input: OperationLogInput,
 ): void {
+	// Reducing the payloads (serializing, redacting, encrypting) is real work on bodies that can be
+	// megabytes; it runs after the current turn, so the response is not held up by it.
+	const prepared = new Promise<void>((resolve) => {
+		setImmediate(() => {
+			try {
+				finalizeOperation(operationId, started, input);
+			} catch (err) {
+				log.error("operation-log", "failed to prepare an operation record", {
+					requestId: input.requestId,
+					err,
+				});
+			} finally {
+				resolve();
+			}
+		});
+	});
+	track(prepared);
+}
+
+function finalizeOperation(
+	operationId: string,
+	started: Promise<void>,
+	fullInput: OperationLogInput,
+): void {
+	const request = reducePayload(fullInput.requestBody);
+	const response = reducePayload(fullInput.responseBody);
+	const streamedBody =
+		fullInput.responseBody !== null &&
+		typeof fullInput.responseBody === "object" &&
+		(fullInput.responseBody as { streamed?: unknown }).streamed === true;
+	// From here on only the reduced forms are held; the raw bodies can be collected.
+	const input: OperationLogInput = {
+		...fullInput,
+		requestBody: null,
+		responseBody: null,
+	};
 	const lifecycle = input.metadata.streamLifecycle as
 		| {
 				firstEventAt?: number | null;
@@ -623,11 +713,7 @@ export function completeOperation(
 				terminal?: { outcome?: string } | null;
 		  }
 		| undefined;
-	const streamed =
-		lifecycle !== undefined ||
-		(input.responseBody !== null &&
-			typeof input.responseBody === "object" &&
-			(input.responseBody as { streamed?: unknown }).streamed === true);
+	const streamed = lifecycle !== undefined || streamedBody;
 	const terminal =
 		lifecycle?.terminal ??
 		(input.metadata.terminal as { outcome?: string } | undefined) ??
@@ -663,14 +749,23 @@ export function completeOperation(
 		(total, attempt) => total + (attempt.downstreamBytes ?? 0),
 		0,
 	);
-	const requestSummary: Record<string, unknown> = {
-		...safeSummary(input.requestBody),
-		fingerprint: payloadFingerprint(input.requestBody),
-	};
-	const responseSummary: Record<string, unknown> = {
-		...safeSummary(input.responseBody),
-		fingerprint: payloadFingerprint(input.responseBody),
-	};
+	const requestSummary = request.summary;
+	const responseSummary = response.summary;
+	// Every finished operation keeps a sample. Sampling the successful ones was a storage decision
+	// that cost the operator the one case they always need: the request that "worked" and still
+	// returned the wrong thing. What limits the exposure is retention, redaction and
+	// OBSERVABILITY_PAYLOAD_ACCESS - not luck.
+	const envelope = encryptJson(
+		{
+			request: request.bounded,
+			response: response.bounded,
+			error: boundedPayloadComponent(input.error),
+			attempts: boundedPayloadComponent(input.attempts),
+		},
+		"observability-payload",
+	);
+	const jobBytes =
+		Buffer.byteLength(JSON.stringify(envelope)) + SMALL_JOB_BYTES;
 	/** What the summary measured, for responses no attempt reported a byte count for. */
 	const summaryBytes =
 		typeof responseSummary.bytes === "number" ? responseSummary.bytes : null;
@@ -921,19 +1016,6 @@ export function completeOperation(
 							);
 					});
 
-					// Every finished operation keeps a sample. Sampling the successful ones was a
-					// storage decision that cost the operator the one case they always need: the
-					// request that "worked" and still returned the wrong thing. What limits the
-					// exposure is retention, redaction and OBSERVABILITY_PAYLOAD_ACCESS - not luck.
-					const envelope = encryptJson(
-						{
-							request: boundedPayloadComponent(input.requestBody),
-							response: boundedPayloadComponent(input.responseBody),
-							error: boundedPayloadComponent(input.error),
-							attempts: boundedPayloadComponent(input.attempts),
-						},
-						"observability-payload",
-					);
 					await db
 						.insert(payloadSamples)
 						.values({
@@ -950,6 +1032,7 @@ export function completeOperation(
 				}, input.requestId),
 			),
 		input.requestId,
+		jobBytes,
 	);
 	void task.finally(() => finishOperationChildTelemetry(persistenceTelemetry));
 	track(task);
@@ -957,7 +1040,7 @@ export function completeOperation(
 
 export function touchOperation(operationId: string, requestId: string): void {
 	const now = new Date();
-	const task = retry(async () => {
+	const task = enqueueWrite(requestId, async () => {
 		await Promise.all([
 			db
 				.update(gatewayOperations)
@@ -974,7 +1057,7 @@ export function touchOperation(operationId: string, requestId: string): void {
 				),
 			redis.expire(operationLeaseKey(operationId), OPERATION_LEASE_TTL_SECONDS),
 		]);
-	}, requestId);
+	});
 	track(task);
 }
 
@@ -984,20 +1067,23 @@ export function identifyOperation(
 	requestId: string,
 	publicModel: string | null,
 ): void {
-	const task = started.then(() =>
-		retry(async () => {
-			await db
-				.update(gatewayOperations)
-				.set({ publicModel })
-				.where(eq(gatewayOperations.id, operationId));
-		}, requestId),
-	);
+	const task = enqueueWrite(requestId, async () => {
+		await started;
+		await db
+			.update(gatewayOperations)
+			.set({ publicModel })
+			.where(eq(gatewayOperations.id, operationId));
+	});
 	track(task);
 }
 
 export async function flushOperationLogs(): Promise<void> {
-	await drainFinalizations();
-	await Promise.allSettled([...pending]);
+	// A record prepared after the response (see completeOperation) enqueues its write only once its
+	// preparation runs, so one pass is not enough: drain until nothing is pending or queued.
+	while (pending.size > 0 || finalizationQueue.length > 0) {
+		await drainFinalizations();
+		await Promise.allSettled([...pending]);
+	}
 }
 
 export function operationPersistenceStatus() {
