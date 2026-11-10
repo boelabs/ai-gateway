@@ -114,12 +114,8 @@ const PROBES: readonly Probe[] = [
 	},
 ];
 
-/** Instances the plan fixes in later items; each entry goes when its fix lands. */
-const KNOWN_GAPS = new Set<string>([
-	// C7: Anthropic tool_choice.disable_parallel_tool_use and metadata.user_id.
-	"anthropic:parallelToolCalls",
-	"anthropic:user",
-]);
+/** Instances still to be fixed; each entry goes when its fix lands. */
+const KNOWN_GAPS = new Set<string>([]);
 
 function declaredDropped(
 	parameters: Record<string, boolean | { mode?: string }> | undefined,

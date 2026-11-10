@@ -117,3 +117,33 @@ test("effort with thinking disabled keeps thinking off and reaches Anthropic", (
 	assert.deepEqual(body.thinking, { type: "disabled" });
 	assert.deepEqual(body.output_config, { effort: "high" });
 });
+
+test("disable_parallel_tool_use survives the canonical round trip", () => {
+	const req = canonical({
+		tools: [{ name: "lookup", input_schema: { type: "object" } }],
+		tool_choice: { type: "any", disable_parallel_tool_use: true },
+	});
+	assert.equal(req.parallelToolCalls, false);
+	const body = jsonBody(must(anthropicAdapter, "chat").buildRequest(req, ctx));
+	assert.deepEqual(body.tool_choice, {
+		type: "any",
+		disable_parallel_tool_use: true,
+	});
+});
+
+test("the canonical end user becomes metadata.user_id", () => {
+	const body = jsonBody(
+		must(anthropicAdapter, "chat").buildRequest(
+			{ ...canonical({}), user: "user-42" },
+			ctx,
+		),
+	);
+	assert.deepEqual(body.metadata, { user_id: "user-42" });
+});
+
+test("an unknown tool_choice type is rejected instead of becoming auto", () => {
+	assert.throws(
+		() => canonical({ tool_choice: { type: "sometimes" } }),
+		(error) => GatewayError.is(error) && error.param === "tool_choice",
+	);
+});

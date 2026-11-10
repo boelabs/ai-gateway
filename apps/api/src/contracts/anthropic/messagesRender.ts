@@ -362,9 +362,19 @@ function mapToolChoice(
 	}
 	if (type === "tool") {
 		const { name } = tc as { name?: string };
-		return name ? { name } : "auto";
+		if (name) {
+			return { name };
+		}
 	}
-	return "auto";
+	throw new GatewayError({
+		class: "bad_request",
+		code: "invalid_request_error",
+		param: "tool_choice",
+		message:
+			type === "tool"
+				? 'tool_choice "tool" requires a name'
+				: `Unsupported tool_choice type: ${String(type)}`,
+	});
 }
 
 function displayFromThinking(
@@ -680,6 +690,12 @@ export function messagesRequestToCanonical(
 	const tc = mapToolChoice(req.tool_choice);
 	if (tc !== undefined) {
 		u.toolChoice = tc;
+	}
+	const disableParallel = (
+		req.tool_choice as { disable_parallel_tool_use?: unknown } | undefined
+	)?.disable_parallel_tool_use;
+	if (typeof disableParallel === "boolean") {
+		u.parallelToolCalls = !disableParallel;
 	}
 	const carriesNativeMessageState = messages.some((message) => {
 		if (

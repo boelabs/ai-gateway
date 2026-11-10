@@ -58,6 +58,8 @@ credentials and choose a model available to your provider account. See
   named tool) with budget-based thinking. Claude 4.7 and later models declare `temperature`, `top_p`
   and `top_k` unsupported on every request, and Opus 5.5, Sonnet 5.5, Fable 5.1 and Mythos 5.1 also
   reject forced tool use. Under `drop` these fields are removed and listed in `droppedParameters`.
+- `parallel_tool_calls: false` becomes `tool_choice.disable_parallel_tool_use: true`, and the
+  OpenAI `user` field becomes `metadata.user_id` unless the request already sets one.
 - Catalog: `src/adapters/anthropic/catalog.json`.
 
 ## Next steps

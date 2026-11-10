@@ -720,6 +720,14 @@ function buildBody(
 	if (req.messagesTransport?.metadata !== undefined) {
 		body.metadata = req.messagesTransport.metadata;
 	}
+	// The end user the request is for: OpenAI's `user` and Anthropic's `metadata.user_id` both mean
+	// an opaque, stable identifier of the end user. Native metadata from the client wins.
+	if (req.user !== undefined) {
+		const metadata = (body.metadata ?? {}) as Record<string, unknown>;
+		if (metadata.user_id === undefined) {
+			body.metadata = { ...metadata, user_id: req.user };
+		}
+	}
 	if (req.stop !== undefined) {
 		body.stop_sequences = req.stop;
 	}
@@ -761,6 +769,16 @@ function buildBody(
 			body.tool_choice = {
 				type: req.toolChoice.mode === "required" ? "any" : "auto",
 			};
+		}
+	}
+	if (req.parallelToolCalls === false) {
+		// Anthropic spells it on tool_choice; `none` calls no tools, so there is nothing to limit.
+		const choice = (body.tool_choice ?? { type: "auto" }) as Record<
+			string,
+			unknown
+		>;
+		if (choice.type !== "none") {
+			body.tool_choice = { ...choice, disable_parallel_tool_use: true };
 		}
 	}
 	applyReasoning(body, req, ctx);
