@@ -39,7 +39,9 @@ jobs:
   deploy:
     name: Deploy ${{ inputs.version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Worst case: settle (5 min) + rollout (20 min) + rollback settle and rollout (25 min) + polling
+    # retries. Less than that and GitHub kills the job mid-rollback.
+    timeout-minutes: 60
     environment: production
     # One production change at a time, never cancelled halfway.
     concurrency:

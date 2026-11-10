@@ -31,9 +31,31 @@ call() {
 	fi
 }
 
+# A read that fails for a transient reason (network, 5xx, rate limit) is tried again: one flaky poll
+# must not abort a rollout that is going fine and leave production half-deployed. A 4xx other than
+# 429 is an answer, not a hiccup, and is returned at once.
+poll() {
+	local path=$1 attempt status
+	for attempt in 1 2 3 4 5; do
+		status=$(curl -sS -o response.json -w '%{http_code}' -X GET 			--max-time 30 			-H "Authorization: Bearer $COOLIFY_TOKEN" 			-H "Accept: application/json" 			"$api$path" || echo 000)
+		if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+			return 0
+		fi
+		if [ "$status" -ge 400 ] && [ "$status" -lt 500 ] && [ "$status" -ne 429 ]; then
+			break
+		fi
+		[ "$attempt" -lt 5 ] && sleep $((attempt * 5))
+	done
+	if [ -z "${QUIET:-}" ]; then
+		echo "::error::Coolify answered HTTP $status to GET ${path%%\?*}"
+		cat response.json >&2 || true
+	fi
+	return 1
+}
+
 # An id Coolify never ran (see "already queued" below) is not found, which counts as not running.
 running() {
-	QUIET=1 call GET "/deployments/$1" || return 1
+	QUIET=1 poll "/deployments/$1" || return 1
 	case "$(jq -r '.status // "unknown"' response.json)" in
 		queued | in_progress) return 0 ;;
 		*) return 1 ;;
@@ -92,7 +114,11 @@ deadline=$((SECONDS + timeout_seconds))
 failed=0
 for deployment in "${deployments[@]}"; do
 	while :; do
-		call GET "/deployments/${deployment}"
+		if ! poll "/deployments/${deployment}"; then
+			echo "::error::Coolify stopped answering about deployment $deployment."
+			failed=1
+			break
+		fi
 		status=$(jq -r '.status // "unknown"' response.json)
 		case "$status" in
 			finished)
