@@ -135,6 +135,30 @@ function validatePricing(value: unknown, path: string): void {
 	if (!isRecord(value)) {
 		fail(path, "must be an object");
 	}
+	validateTokenPricing(value, path);
+	if (value.serviceTiers !== undefined) {
+		if (!isRecord(value.serviceTiers)) {
+			fail(`${path}.serviceTiers`, "must be an object");
+		}
+		for (const [tier, rates] of Object.entries(value.serviceTiers)) {
+			if (!/^[a-z][a-z0-9_-]{0,31}$/u.test(tier)) {
+				fail(`${path}.serviceTiers.${tier}`, "is not a service tier name");
+			}
+			if (!isRecord(rates)) {
+				fail(`${path}.serviceTiers.${tier}`, "must be an object");
+			}
+			if (rates.serviceTiers !== undefined) {
+				fail(`${path}.serviceTiers.${tier}.serviceTiers`, "cannot be nested");
+			}
+			validateTokenPricing(rates, `${path}.serviceTiers.${tier}`);
+		}
+	}
+}
+
+function validateTokenPricing(
+	value: Record<string, unknown>,
+	path: string,
+): void {
 	for (const key of [
 		"inputCentsPerMTokens",
 		"outputCentsPerMTokens",

@@ -600,6 +600,15 @@ interface TransportResponse {
 		};
 	}>;
 	usage?: TransportUsage;
+	/** The tier the provider served the request at; it may differ from the one requested. */
+	service_tier?: string | null;
+}
+
+/** Usage with the service tier the response says it was served at. */
+function servedUsage(usage: Usage, serviceTier: unknown): Usage {
+	return typeof serviceTier === "string" && serviceTier.length > 0
+		? { ...usage, serviceTier }
+		: usage;
 }
 
 /**
@@ -673,9 +682,10 @@ export function parseOpenAIChatResponse(raw: unknown): CanonicalChatResponse {
 	};
 	return {
 		...response,
-		usage: r.usage
-			? mapUsage(r.usage)
-			: unreportedResponseUsage(response.choices),
+		usage: servedUsage(
+			r.usage ? mapUsage(r.usage) : unreportedResponseUsage(response.choices),
+			r.service_tier,
+		),
 	};
 }
 
@@ -699,6 +709,7 @@ interface TransportChunk {
 		};
 	}>;
 	usage?: TransportUsage | null;
+	service_tier?: string | null;
 }
 
 export function parseOpenAIChatChunk(raw: unknown): CanonicalChatStreamChunk {
@@ -753,7 +764,9 @@ export function parseOpenAIChatChunk(raw: unknown): CanonicalChatStreamChunk {
 		}),
 	};
 	if (r.usage !== undefined) {
-		chunk.usage = r.usage ? mapUsage(r.usage) : null;
+		chunk.usage = r.usage
+			? servedUsage(mapUsage(r.usage), r.service_tier)
+			: null;
 	}
 	return chunk;
 }

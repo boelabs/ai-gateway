@@ -594,7 +594,17 @@ interface RWResponse {
 	incomplete_details?: { reason?: string };
 	output?: RWOutputItem[];
 	usage?: ResponsesUsage;
+	/** The tier the provider served the request at; it may differ from the one requested. */
+	service_tier?: string | null;
 	error?: Record<string, unknown>;
+}
+
+/** Response usage, tagged with the service tier the response reports. */
+function servedResponsesUsage(r: RWResponse): Usage {
+	const usage = parseResponsesUsage(r.usage);
+	return typeof r.service_tier === "string" && r.service_tier.length > 0
+		? { ...usage, serviceTier: r.service_tier }
+		: usage;
 }
 
 function finishFrom(
@@ -698,7 +708,7 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 		choices: [
 			{ index: 0, finishReason: finishFrom(r, toolCalls.length > 0), message },
 		],
-		usage: parseResponsesUsage(r.usage),
+		usage: servedResponsesUsage(r),
 	};
 }
 
@@ -1014,7 +1024,7 @@ export async function* responsesEventsToCanonicalChunks(
 						finishReason,
 					},
 				],
-				usage: parseResponsesUsage(r.usage),
+				usage: servedResponsesUsage(r),
 			};
 			continue;
 		}

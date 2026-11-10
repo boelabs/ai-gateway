@@ -761,6 +761,9 @@ export function completeOperation(
 											}),
 									// The upstream reported no usage: the counts above are the gateway's estimate.
 									...(input.usage?.estimated ? { usageEstimated: true } : {}),
+									...(input.usage?.serviceTier === undefined
+										? {}
+										: { serviceTier: input.usage.serviceTier }),
 									client: {
 										ipFingerprint: payloadFingerprint(input.ip),
 										userAgentFingerprint: payloadFingerprint(input.userAgent),

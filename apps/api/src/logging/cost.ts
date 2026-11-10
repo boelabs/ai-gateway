@@ -93,6 +93,23 @@ function effectiveRates(p: PricingShape, promptTokens: number): PricingShape {
 }
 
 /**
+ * The pricing of the service tier the provider reports it served. A declared tier replaces the
+ * standard token rates and context tiers (its own `tiers`, if any, apply instead); what it leaves
+ * out falls back to the standard pricing. An undeclared or standard tier is the standard pricing.
+ */
+function servedPricing(
+	pricing: PricingShape,
+	serviceTier: string | undefined,
+): PricingShape {
+	const tier =
+		serviceTier === undefined ? undefined : pricing.serviceTiers?.[serviceTier];
+	if (tier === undefined) {
+		return pricing;
+	}
+	return { ...pricing, tiers: [], ...tier };
+}
+
+/**
  * Computes the cost from the model's pricing (cents per 1M tokens) and the usage.
  * `cacheReadTokens` and `cacheWriteTokens` are disjoint subsets of promptTokens: they are subtracted
  * from input and charged at their rate (read -> cacheRead or input; write -> cacheWrite or input).
@@ -104,7 +121,10 @@ export function computeCost(
 	meta: Pick<ResolvedModelMetadata, "pricing">,
 	usage: Usage,
 ): CostBreakdown {
-	const r = effectiveRates(meta.pricing ?? {}, usage.promptTokens);
+	const r = effectiveRates(
+		servedPricing(meta.pricing ?? {}, usage.serviceTier),
+		usage.promptTokens,
+	);
 	const inputRate = (r.inputCentsPerMTokens ?? 0) / 1_000_000;
 	const outputRate = (r.outputCentsPerMTokens ?? 0) / 1_000_000;
 	const cacheReadRate = (r.cacheReadCentsPerMTokens ?? 0) / 1_000_000;
@@ -231,7 +251,22 @@ export function estimateMaximumCostCents(
 	if (pricing === undefined) {
 		return null;
 	}
-	const rates = [
+	const rates = [pricing, ...Object.values(pricing.serviceTiers ?? {})].flatMap(
+		tokenRates,
+	);
+	if (rates.length === 0 && pricing.searchUnitCents === undefined) {
+		return null;
+	}
+	const maximumTokenRate = rates.length > 0 ? Math.max(...rates) : 0;
+	return (
+		(Math.max(0, totalTokens) * maximumTokenRate) / 1_000_000 +
+		Math.max(0, searchUnits) * (pricing.searchUnitCents ?? 0)
+	);
+}
+
+/** Every token rate a pricing declares, context tiers included. */
+function tokenRates(pricing: PricingShape): number[] {
+	return [
 		pricing.inputCentsPerMTokens,
 		pricing.outputCentsPerMTokens,
 		pricing.cacheReadCentsPerMTokens,
@@ -254,12 +289,4 @@ export function estimateMaximumCostCents(
 			...Object.values(tier.cacheWriteCentsPerMTokensByTtl ?? {}),
 		]),
 	].filter((rate): rate is number => rate !== undefined);
-	if (rates.length === 0 && pricing.searchUnitCents === undefined) {
-		return null;
-	}
-	const maximumTokenRate = rates.length > 0 ? Math.max(...rates) : 0;
-	return (
-		(Math.max(0, totalTokens) * maximumTokenRate) / 1_000_000 +
-		Math.max(0, searchUnits) * (pricing.searchUnitCents ?? 0)
-	);
 }

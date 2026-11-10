@@ -3765,6 +3765,97 @@ components:
             required:
               - aboveInputTokens
             additionalProperties: false
+        serviceTiers:
+          type: object
+          propertyNames:
+            type: string
+            pattern: ^[a-z][a-z0-9_-]{0,31}$
+          additionalProperties:
+            type: object
+            properties:
+              inputCentsPerMTokens:
+                type: number
+                minimum: 0
+              outputCentsPerMTokens:
+                type: number
+                minimum: 0
+              cacheReadCentsPerMTokens:
+                type: number
+                minimum: 0
+              cacheWriteCentsPerMTokens:
+                type: number
+                minimum: 0
+              cacheWriteCentsPerMTokensByTtl:
+                type: object
+                propertyNames:
+                  type: string
+                  pattern: ^[1-9][0-9]*$
+                additionalProperties:
+                  type: number
+                  minimum: 0
+              imageInputCentsPerMTokens:
+                type: number
+                minimum: 0
+              imageOutputCentsPerMTokens:
+                type: number
+                minimum: 0
+              audioInputCentsPerMTokens:
+                type: number
+                minimum: 0
+              audioOutputCentsPerMTokens:
+                type: number
+                minimum: 0
+              videoOutputCentsPerMTokens:
+                type: number
+                minimum: 0
+              searchUnitCents:
+                type: number
+                minimum: 0
+              tiers:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    aboveInputTokens:
+                      type: integer
+                      exclusiveMinimum: 0
+                      maximum: 9007199254740991
+                    inputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    outputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    cacheReadCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    cacheWriteCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    cacheWriteCentsPerMTokensByTtl:
+                      type: object
+                      propertyNames:
+                        type: string
+                        pattern: ^[1-9][0-9]*$
+                      additionalProperties:
+                        type: number
+                        minimum: 0
+                    imageInputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    imageOutputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    audioInputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    audioOutputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                  required:
+                    - aboveInputTokens
+                  additionalProperties: false
+            additionalProperties: false
       additionalProperties: false
       description: "Operator pricing in USD cents: token rates are per 1 million tokens and searchUnitCents is per search unit."
     TransportOverrides:

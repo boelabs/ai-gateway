@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
 	assertResponsesRequestSupported,
 	buildResponsesRequestBody,
+	parseResponsesResponse,
 	parseResponsesUsage,
 } from "./responsesTransport.ts";
 
@@ -88,4 +89,14 @@ test("Responses usage retains reasoning and cache counts, including zero and abs
 		0,
 	);
 	assert.equal(parseResponsesUsage({}).reasoningTokens, undefined);
+});
+
+test("Responses usage carries the service tier the response reports", () => {
+	const canonical = parseResponsesResponse({
+		status: "completed",
+		output: [],
+		usage: { input_tokens: 4, output_tokens: 2, total_tokens: 6 },
+		service_tier: "default",
+	});
+	assert.equal(canonical.usage.serviceTier, "default");
 });

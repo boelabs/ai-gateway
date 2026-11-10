@@ -117,49 +117,60 @@ export const attemptOutcomeEnum = pgEnum("attempt_outcome", [
 
 /* ----------------------------------------------------------------- types */
 
-/** Model metadata: pricing, limits, supported modalities. Used by the cost calc. */
-export interface RuntimeModelMetadata {
-	pricing?: {
-		/** Cost in USD cents per 1M input tokens. */
+/** Token rates, shared by the standard pricing and each service tier's. */
+export interface TokenPricing {
+	/** Cost in USD cents per 1M input tokens. */
+	inputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M output tokens. */
+	outputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M tokens read from cache. */
+	cacheReadCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M tokens written to cache (cache creation). */
+	cacheWriteCentsPerMTokens?: number;
+	cacheWriteCentsPerMTokensByTtl?: Record<string, number>;
+	/** Cost in USD cents per 1M image input tokens. Absent: image input is billed as input. */
+	imageInputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M image output tokens. Absent: image output is billed as output. */
+	imageOutputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M audio input tokens. Absent: audio input is billed as input. */
+	audioInputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M audio output tokens. Absent: audio output is billed as output. */
+	audioOutputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M video output tokens. Absent: video output is billed as output. */
+	videoOutputCentsPerMTokens?: number;
+	/** Cost in USD cents per reranking search unit. */
+	searchUnitCents?: number;
+	/**
+	 * TIERED rate by context size. When the input tokens (promptTokens, which include cache
+	 * read/write) exceed `aboveInputTokens`, the WHOLE request is charged at the tier's rates
+	 * (a step function, not marginal). E.g. GPT-5.5 >272k, Gemini Pro >200k, MiniMax-M3 >512k.
+	 * The highest `aboveInputTokens` tier the prompt exceeds is chosen; fields not defined in the
+	 * tier inherit the already-resolved base rate.
+	 */
+	tiers?: Array<{
+		aboveInputTokens: number;
 		inputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M output tokens. */
 		outputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M tokens read from cache. */
 		cacheReadCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M tokens written to cache (cache creation). */
 		cacheWriteCentsPerMTokens?: number;
 		cacheWriteCentsPerMTokensByTtl?: Record<string, number>;
-		/** Cost in USD cents per 1M image input tokens. Absent: image input is billed as input. */
 		imageInputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M image output tokens. Absent: image output is billed as output. */
 		imageOutputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M audio input tokens. Absent: audio input is billed as input. */
 		audioInputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M audio output tokens. Absent: audio output is billed as output. */
 		audioOutputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M video output tokens. Absent: video output is billed as output. */
-		videoOutputCentsPerMTokens?: number;
-		/** Cost in USD cents per reranking search unit. */
-		searchUnitCents?: number;
+	}>;
+}
+
+/** Model metadata: pricing, limits, supported modalities. Used by the cost calc. */
+export interface RuntimeModelMetadata {
+	pricing?: TokenPricing & {
 		/**
-		 * TIERED rate by context size. When the input tokens (promptTokens, which include cache
-		 * read/write) exceed `aboveInputTokens`, the WHOLE request is charged at the tier's rates
-		 * (a step function, not marginal). E.g. GPT-5.5 >272k, Gemini Pro >200k, MiniMax-M3 >512k.
-		 * The highest `aboveInputTokens` tier the prompt exceeds is chosen; fields not defined in the
-		 * tier inherit the already-resolved base rate.
+		 * Rates for non-standard service tiers, keyed by the tier name the provider reports it served
+		 * (OpenAI `service_tier`: `flex`, `fast`/`priority`, `ultrafast`). A request served at a tier
+		 * listed here is charged at that tier's rates, which replace the standard token rates and
+		 * context tiers; fields it leaves out fall back to the standard ones.
 		 */
-		tiers?: Array<{
-			aboveInputTokens: number;
-			inputCentsPerMTokens?: number;
-			outputCentsPerMTokens?: number;
-			cacheReadCentsPerMTokens?: number;
-			cacheWriteCentsPerMTokens?: number;
-			cacheWriteCentsPerMTokensByTtl?: Record<string, number>;
-			imageInputCentsPerMTokens?: number;
-			imageOutputCentsPerMTokens?: number;
-			audioInputCentsPerMTokens?: number;
-			audioOutputCentsPerMTokens?: number;
-		}>;
+		serviceTiers?: Record<string, TokenPricing>;
 	};
 	maxInputTokens?: number;
 	maxOutputTokens?: number;

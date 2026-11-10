@@ -25,6 +25,14 @@ output), and realtime sessions report the split per modality.
 Video output tokens use `videoOutputCentsPerMTokens`; absent, they fall back to the output rate. Video
 jobs finish after the request returns, so the gateway charges them when the job reaches a terminal
 state, from the provider's reported usage (see [Videos](/docs/videos#gemini-omni-flash)).
+Service tiers have their own rates in `serviceTiers`, keyed by the tier name the provider reports it
+served (OpenAI's `service_tier`: `flex`, `fast` — formerly `priority` — and `ultrafast`). The gateway
+charges the tier in the **response**, not the one requested, because a provider may serve a request at
+another tier (OpenAI downgrades Fast mode to `default` under its ramp-rate limit). A declared tier
+replaces the standard token rates and context tiers, with its own `tiers` for long context; a tier with
+no declared rates is charged at the standard rates. The served tier is recorded as
+`metadata.serviceTier` on the operation.
+
 A deployment's own `pricing` field, if set, **overrides** the catalog rate entirely for that deployment
 — useful for a negotiated rate or a custom model with no catalog entry at all. A model with no pricing
 anywhere (no catalog rate, no override) normally bills as **zero cost**, not an error. Reranking has

@@ -437,3 +437,52 @@ test("the budget bound prices reserved tokens at the video rate when it is the h
 	);
 	assert.equal(max, 1200);
 });
+
+test("service tier: the served tier's rates replace the standard ones", () => {
+	const pricing = {
+		inputCentsPerMTokens: 200,
+		outputCentsPerMTokens: 1000,
+		cacheReadCentsPerMTokens: 10,
+		tiers: [{ aboveInputTokens: 272_000, inputCentsPerMTokens: 400 }],
+		serviceTiers: {
+			flex: {
+				inputCentsPerMTokens: 100,
+				outputCentsPerMTokens: 500,
+				cacheReadCentsPerMTokens: 5,
+			},
+		},
+	};
+	const usage = {
+		promptTokens: 1_000_000,
+		completionTokens: 1_000_000,
+		totalTokens: 2_000_000,
+	};
+	const standard = computeCost({ pricing }, usage);
+	const flex = computeCost({ pricing }, { ...usage, serviceTier: "flex" });
+	assert.equal(standard.inputCents, 400);
+	assert.equal(flex.inputCents, 100);
+	assert.equal(flex.outputCents, 500);
+});
+
+test("service tier: an undeclared tier is charged at the standard rates", () => {
+	const pricing = { inputCentsPerMTokens: 200, outputCentsPerMTokens: 1000 };
+	const cost = computeCost(
+		{ pricing },
+		{
+			promptTokens: 1_000_000,
+			completionTokens: 0,
+			totalTokens: 1_000_000,
+			serviceTier: "default",
+		},
+	);
+	assert.equal(cost.inputCents, 200);
+});
+
+test("service tier: the budget bound covers the most expensive declared tier", () => {
+	const pricing = {
+		inputCentsPerMTokens: 200,
+		outputCentsPerMTokens: 1000,
+		serviceTiers: { ultrafast: { outputCentsPerMTokens: 6000 } },
+	};
+	assert.equal(estimateMaximumCostCents({ pricing }, 1_000_000), 6000);
+});

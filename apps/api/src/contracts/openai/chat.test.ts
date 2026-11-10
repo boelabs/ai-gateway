@@ -1068,6 +1068,15 @@ test("chat response: a response with no usage carries an estimate of its output"
 	});
 });
 
+test("chat response: usage carries the service tier the response reports", () => {
+	const canonical = parseOpenAIChatResponse({
+		choices: [{ finish_reason: "stop", message: { content: "done" } }],
+		usage: { prompt_tokens: 7, completion_tokens: 3 },
+		service_tier: "flex",
+	});
+	assert.equal(canonical.usage.serviceTier, "flex");
+});
+
 test("chat response: preserves detailed usage and provider-reported cost", () => {
 	const canonical = parseOpenAIChatResponse({
 		choices: [{ finish_reason: "stop", message: { content: "done" } }],

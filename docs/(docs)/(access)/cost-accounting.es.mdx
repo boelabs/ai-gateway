@@ -8,6 +8,8 @@ La tarifa de cada modelo se declara en centavos por 1 millón de tokens en la en
 
 Los tokens de salida de video usan `videoOutputCentsPerMTokens`; si no se define, se facturan a la tarifa de salida. Los trabajos de video terminan después de que la solicitud responde, así que el gateway los cobra cuando el trabajo llega a un estado terminal, con el uso que informa el proveedor (consulta [Videos](/docs/videos#gemini-omni-flash)).
 
+Los niveles de servicio tienen sus propias tarifas en `serviceTiers`, con el nombre del nivel que el proveedor informa haber servido (el `service_tier` de OpenAI: `flex`, `fast`, antes `priority`, y `ultrafast`). El gateway cobra el nivel de la **respuesta**, no el solicitado, porque un proveedor puede servir la solicitud en otro nivel (OpenAI baja Fast mode a `default` por su límite de rampa). Un nivel declarado reemplaza las tarifas de tokens estándar y los niveles por contexto, con sus propios `tiers` para contexto largo; un nivel sin tarifas declaradas se cobra a las tarifas estándar. El nivel servido se registra como `metadata.serviceTier` en la operación.
+
 ## Cómo se realiza el seguimiento del gasto [#how-spend-is-tracked]
 
 En cada solicitud con uso (tokens y/o unidades de búsqueda de reranking realmente consumidas), el gateway calcula el costo a partir del precio resuelto y:

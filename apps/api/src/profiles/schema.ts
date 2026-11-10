@@ -5,42 +5,59 @@ import { EFFORT_ORDER } from "#core/reasoning.ts";
 import { QUALITY_ORDER } from "#core/quality.ts";
 import { z } from "zod/v4";
 
+const tokenPricingShape = {
+	inputCentsPerMTokens: z.number().nonnegative().optional(),
+	outputCentsPerMTokens: z.number().nonnegative().optional(),
+	cacheReadCentsPerMTokens: z.number().nonnegative().optional(),
+	cacheWriteCentsPerMTokens: z.number().nonnegative().optional(),
+	cacheWriteCentsPerMTokensByTtl: z
+		.record(z.string().regex(/^[1-9][0-9]*$/u), z.number().nonnegative())
+		.optional(),
+	imageInputCentsPerMTokens: z.number().nonnegative().optional(),
+	imageOutputCentsPerMTokens: z.number().nonnegative().optional(),
+	audioInputCentsPerMTokens: z.number().nonnegative().optional(),
+	audioOutputCentsPerMTokens: z.number().nonnegative().optional(),
+	videoOutputCentsPerMTokens: z.number().nonnegative().optional(),
+	searchUnitCents: z.number().nonnegative().optional(),
+	tiers: z
+		.array(
+			z
+				.object({
+					aboveInputTokens: z.number().int().positive(),
+					inputCentsPerMTokens: z.number().nonnegative().optional(),
+					outputCentsPerMTokens: z.number().nonnegative().optional(),
+					cacheReadCentsPerMTokens: z.number().nonnegative().optional(),
+					cacheWriteCentsPerMTokens: z.number().nonnegative().optional(),
+					cacheWriteCentsPerMTokensByTtl: z
+						.record(
+							z.string().regex(/^[1-9][0-9]*$/u),
+							z.number().nonnegative(),
+						)
+						.optional(),
+					imageInputCentsPerMTokens: z.number().nonnegative().optional(),
+					imageOutputCentsPerMTokens: z.number().nonnegative().optional(),
+					audioInputCentsPerMTokens: z.number().nonnegative().optional(),
+					audioOutputCentsPerMTokens: z.number().nonnegative().optional(),
+				})
+				.strict(),
+		)
+		.optional(),
+};
+
+/** Service tier names as providers report them (`flex`, `priority`, `fast`, `ultrafast`). */
+const SERVICE_TIER_NAME = /^[a-z][a-z0-9_-]{0,31}$/u;
+
 export const pricingSchema = z
 	.object({
-		inputCentsPerMTokens: z.number().nonnegative().optional(),
-		outputCentsPerMTokens: z.number().nonnegative().optional(),
-		cacheReadCentsPerMTokens: z.number().nonnegative().optional(),
-		cacheWriteCentsPerMTokens: z.number().nonnegative().optional(),
-		cacheWriteCentsPerMTokensByTtl: z
-			.record(z.string().regex(/^[1-9][0-9]*$/u), z.number().nonnegative())
-			.optional(),
-		imageInputCentsPerMTokens: z.number().nonnegative().optional(),
-		imageOutputCentsPerMTokens: z.number().nonnegative().optional(),
-		audioInputCentsPerMTokens: z.number().nonnegative().optional(),
-		audioOutputCentsPerMTokens: z.number().nonnegative().optional(),
-		videoOutputCentsPerMTokens: z.number().nonnegative().optional(),
-		searchUnitCents: z.number().nonnegative().optional(),
-		tiers: z
-			.array(
-				z
-					.object({
-						aboveInputTokens: z.number().int().positive(),
-						inputCentsPerMTokens: z.number().nonnegative().optional(),
-						outputCentsPerMTokens: z.number().nonnegative().optional(),
-						cacheReadCentsPerMTokens: z.number().nonnegative().optional(),
-						cacheWriteCentsPerMTokens: z.number().nonnegative().optional(),
-						cacheWriteCentsPerMTokensByTtl: z
-							.record(
-								z.string().regex(/^[1-9][0-9]*$/u),
-								z.number().nonnegative(),
-							)
-							.optional(),
-						imageInputCentsPerMTokens: z.number().nonnegative().optional(),
-						imageOutputCentsPerMTokens: z.number().nonnegative().optional(),
-						audioInputCentsPerMTokens: z.number().nonnegative().optional(),
-						audioOutputCentsPerMTokens: z.number().nonnegative().optional(),
-					})
-					.strict(),
+		...tokenPricingShape,
+		/**
+		 * Rates per non-standard service tier, keyed by the tier the provider reports it served. They
+		 * replace the standard token rates and context tiers for requests served at that tier.
+		 */
+		serviceTiers: z
+			.record(
+				z.string().regex(SERVICE_TIER_NAME),
+				z.object(tokenPricingShape).strict(),
 			)
 			.optional(),
 	})

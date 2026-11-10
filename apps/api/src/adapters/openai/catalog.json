@@ -763,7 +763,39 @@
 						"cacheReadCentsPerMTokens": 80,
 						"cacheWriteCentsPerMTokens": 1000
 					}
-				]
+				],
+				"serviceTiers": {
+					"fast": {
+						"inputCentsPerMTokens": 800,
+						"outputCentsPerMTokens": 4000,
+						"cacheReadCentsPerMTokens": 80,
+						"cacheWriteCentsPerMTokens": 1000,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 1600,
+								"outputCentsPerMTokens": 6000,
+								"cacheReadCentsPerMTokens": 160,
+								"cacheWriteCentsPerMTokens": 2000
+							}
+						]
+					},
+					"priority": {
+						"inputCentsPerMTokens": 800,
+						"outputCentsPerMTokens": 4000,
+						"cacheReadCentsPerMTokens": 80,
+						"cacheWriteCentsPerMTokens": 1000,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 1600,
+								"outputCentsPerMTokens": 6000,
+								"cacheReadCentsPerMTokens": 160,
+								"cacheWriteCentsPerMTokens": 2000
+							}
+						]
+					}
+				}
 			}
 		},
 		"gpt-5.6-terra": {
@@ -2827,7 +2859,69 @@
 						"cacheReadCentsPerMTokens": 200,
 						"cacheWriteCentsPerMTokens": 2500
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 500,
+						"outputCentsPerMTokens": 2500,
+						"cacheReadCentsPerMTokens": 50,
+						"cacheWriteCentsPerMTokens": 625,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 1000,
+								"outputCentsPerMTokens": 3750,
+								"cacheReadCentsPerMTokens": 100,
+								"cacheWriteCentsPerMTokens": 1250
+							}
+						]
+					},
+					"fast": {
+						"inputCentsPerMTokens": 2000,
+						"outputCentsPerMTokens": 10000,
+						"cacheReadCentsPerMTokens": 200,
+						"cacheWriteCentsPerMTokens": 2500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 4000,
+								"outputCentsPerMTokens": 15000,
+								"cacheReadCentsPerMTokens": 400,
+								"cacheWriteCentsPerMTokens": 5000
+							}
+						]
+					},
+					"priority": {
+						"inputCentsPerMTokens": 2000,
+						"outputCentsPerMTokens": 10000,
+						"cacheReadCentsPerMTokens": 200,
+						"cacheWriteCentsPerMTokens": 2500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 4000,
+								"outputCentsPerMTokens": 15000,
+								"cacheReadCentsPerMTokens": 400,
+								"cacheWriteCentsPerMTokens": 5000
+							}
+						]
+					},
+					"ultrafast": {
+						"inputCentsPerMTokens": 6000,
+						"outputCentsPerMTokens": 30000,
+						"cacheReadCentsPerMTokens": 600,
+						"cacheWriteCentsPerMTokens": 7500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 12000,
+								"outputCentsPerMTokens": 45000,
+								"cacheReadCentsPerMTokens": 1200,
+								"cacheWriteCentsPerMTokens": 15000
+							}
+						]
+					}
+				}
 			}
 		},
 		"gpt-6.1-sol": {
@@ -2874,7 +2968,69 @@
 						"cacheReadCentsPerMTokens": 20,
 						"cacheWriteCentsPerMTokens": 500
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 100,
+						"outputCentsPerMTokens": 500,
+						"cacheReadCentsPerMTokens": 5,
+						"cacheWriteCentsPerMTokens": 125,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 200,
+								"outputCentsPerMTokens": 750,
+								"cacheReadCentsPerMTokens": 10,
+								"cacheWriteCentsPerMTokens": 250
+							}
+						]
+					},
+					"fast": {
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 2000,
+						"cacheReadCentsPerMTokens": 20,
+						"cacheWriteCentsPerMTokens": 500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 800,
+								"outputCentsPerMTokens": 3000,
+								"cacheReadCentsPerMTokens": 40,
+								"cacheWriteCentsPerMTokens": 1000
+							}
+						]
+					},
+					"priority": {
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 2000,
+						"cacheReadCentsPerMTokens": 20,
+						"cacheWriteCentsPerMTokens": 500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 800,
+								"outputCentsPerMTokens": 3000,
+								"cacheReadCentsPerMTokens": 40,
+								"cacheWriteCentsPerMTokens": 1000
+							}
+						]
+					},
+					"ultrafast": {
+						"inputCentsPerMTokens": 1200,
+						"outputCentsPerMTokens": 6000,
+						"cacheReadCentsPerMTokens": 60,
+						"cacheWriteCentsPerMTokens": 1500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 2400,
+								"outputCentsPerMTokens": 9000,
+								"cacheReadCentsPerMTokens": 120,
+								"cacheWriteCentsPerMTokens": 3000
+							}
+						]
+					}
+				}
 			}
 		},
 		"gpt-6.1-terra": {
@@ -2921,7 +3077,54 @@
 						"cacheReadCentsPerMTokens": 10,
 						"cacheWriteCentsPerMTokens": 250
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 50,
+						"outputCentsPerMTokens": 250,
+						"cacheReadCentsPerMTokens": 2.5,
+						"cacheWriteCentsPerMTokens": 62.5,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 100,
+								"outputCentsPerMTokens": 375,
+								"cacheReadCentsPerMTokens": 5,
+								"cacheWriteCentsPerMTokens": 125
+							}
+						]
+					},
+					"fast": {
+						"inputCentsPerMTokens": 200,
+						"outputCentsPerMTokens": 1000,
+						"cacheReadCentsPerMTokens": 10,
+						"cacheWriteCentsPerMTokens": 250,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 400,
+								"outputCentsPerMTokens": 1500,
+								"cacheReadCentsPerMTokens": 20,
+								"cacheWriteCentsPerMTokens": 500
+							}
+						]
+					},
+					"priority": {
+						"inputCentsPerMTokens": 200,
+						"outputCentsPerMTokens": 1000,
+						"cacheReadCentsPerMTokens": 10,
+						"cacheWriteCentsPerMTokens": 250,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 400,
+								"outputCentsPerMTokens": 1500,
+								"cacheReadCentsPerMTokens": 20,
+								"cacheWriteCentsPerMTokens": 500
+							}
+						]
+					}
+				}
 			}
 		},
 		"gpt-6-sol": {
@@ -3023,7 +3226,54 @@
 						"cacheReadCentsPerMTokens": 2,
 						"cacheWriteCentsPerMTokens": 25
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 5,
+						"outputCentsPerMTokens": 25,
+						"cacheReadCentsPerMTokens": 0.5,
+						"cacheWriteCentsPerMTokens": 6.25,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 10,
+								"outputCentsPerMTokens": 37.5,
+								"cacheReadCentsPerMTokens": 1,
+								"cacheWriteCentsPerMTokens": 12.5
+							}
+						]
+					},
+					"fast": {
+						"inputCentsPerMTokens": 20,
+						"outputCentsPerMTokens": 100,
+						"cacheReadCentsPerMTokens": 2,
+						"cacheWriteCentsPerMTokens": 25,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 40,
+								"outputCentsPerMTokens": 150,
+								"cacheReadCentsPerMTokens": 4,
+								"cacheWriteCentsPerMTokens": 50
+							}
+						]
+					},
+					"priority": {
+						"inputCentsPerMTokens": 20,
+						"outputCentsPerMTokens": 100,
+						"cacheReadCentsPerMTokens": 2,
+						"cacheWriteCentsPerMTokens": 25,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 40,
+								"outputCentsPerMTokens": 150,
+								"cacheReadCentsPerMTokens": 4,
+								"cacheWriteCentsPerMTokens": 50
+							}
+						]
+					}
+				}
 			}
 		},
 		"gpt-realtime-2.1": {

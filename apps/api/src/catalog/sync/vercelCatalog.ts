@@ -22,7 +22,7 @@ type Pricing = NonNullable<CatalogEntry["pricing"]>;
 type PricingTier = NonNullable<Pricing["tiers"]>[number];
 type PricingField = Exclude<
 	keyof Pricing,
-	"tiers" | "cacheWriteCentsPerMTokensByTtl"
+	"tiers" | "cacheWriteCentsPerMTokensByTtl" | "serviceTiers"
 >;
 type TierPricingField = Exclude<
 	PricingField,

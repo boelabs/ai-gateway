@@ -47,6 +47,11 @@ export interface Usage {
 	 * input plus observed output) rather than the provider's figures. Absent on reported usage.
 	 */
 	estimated?: true;
+	/**
+	 * Service tier the provider reports it served the request at (OpenAI `service_tier`), which can
+	 * differ from the one requested. Selects that tier's rates when the pricing declares them.
+	 */
+	serviceTier?: string;
 }
 
 /** Does the usage satisfy the invariant total = prompt + completion? (helper for tests/dev). */
