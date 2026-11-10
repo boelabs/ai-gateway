@@ -1,4 +1,5 @@
 import { gatewayUrl } from "#/shared/config/server.ts";
+import { gatewayClientHeaders } from "./forwarded.ts";
 
 /**
  * Forwards a browser request to the gateway and hands its answer straight back.
@@ -30,7 +31,7 @@ const RETURNED = [
 ];
 
 export async function relay(request: Request, path: string): Promise<Response> {
-	const headers = new Headers();
+	const headers = gatewayClientHeaders(request.headers);
 	for (const name of FORWARDED) {
 		const value = request.headers.get(name);
 		if (value) {

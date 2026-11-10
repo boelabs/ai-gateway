@@ -22,7 +22,7 @@ deployment. Gateway and dashboard processes read separate environment files.
 | Variable | Default | Controls |
 |---|---|---|
 | `PORT` | `4000` | HTTP listen port. |
-| `TRUSTED_PROXY_HOPS` | `0` | Number of rightmost, operator-controlled proxy hops trusted in `X-Forwarded-For`. `0` ignores the header. |
+| `TRUSTED_PROXY_HOPS` | `0` | Number of rightmost, operator-controlled proxy hops trusted in `X-Forwarded-For`. `0` ignores the header. The dashboard is one such hop: it forwards the operator's `X-Forwarded-For` and `User-Agent`, so a gateway it calls directly needs at least `1`, or every sign-in shares one throttle address. |
 | `PUBLIC_MODELS_RPM` | `600` | Per-process anonymous `/v1/models` requests allowed each minute per resolved client IP. `0` disables the limit. |
 | `NODE_ENV` | `development` | `development` \| `test` \| `production`. |
 | `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error`. |
