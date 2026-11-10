@@ -79,12 +79,14 @@ function checkAudioRates(
 		) {
 			continue;
 		}
-		const required = [
+		const required: Array<
+			"audioInputCentsPerMTokens" | "audioOutputCentsPerMTokens"
+		> = [
 			"audioInputCentsPerMTokens",
 			...(operations.includes("audio.converse.realtime")
-				? ["audioOutputCentsPerMTokens"]
+				? (["audioOutputCentsPerMTokens"] as const)
 				: []),
-		] as const;
+		];
 		for (const field of required) {
 			if (pricing[field] === undefined) {
 				missingAudioRates.push(`${adapterKey}/${model} has no ${field}`);

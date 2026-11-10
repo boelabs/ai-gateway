@@ -52,6 +52,13 @@ export interface Usage {
 	 * differ from the one requested. Selects that tier's rates when the pricing declares them.
 	 */
 	serviceTier?: string;
+	/** Images generated, for models priced per image. Independent from token counters. */
+	outputImages?: number;
+	/** Size and quality of those images, which select a per-image price variant. */
+	outputImageSize?: string;
+	outputImageQuality?: string;
+	/** Seconds of input audio, for models priced by duration. Independent from token counters. */
+	inputAudioSeconds?: number;
 }
 
 /** Does the usage satisfy the invariant total = prompt + completion? (helper for tests/dev). */

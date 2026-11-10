@@ -486,3 +486,42 @@ test("service tier: the budget bound covers the most expensive declared tier", (
 	};
 	assert.equal(estimateMaximumCostCents({ pricing }, 1_000_000), 6000);
 });
+
+test("per-unit pricing: images by variant and audio by the second", () => {
+	const pricing = {
+		imageOutputCentsPerImage: 6,
+		imageOutputCentsPerImageByVariant: { low: 4, "low:2048x2048": 5 },
+		audioInputCentsPerSecond: 0.0075,
+	};
+	const zero = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+	assert.equal(
+		computeCost({ pricing }, { ...zero, outputImages: 2 }).totalCents,
+		12,
+	);
+	assert.equal(
+		computeCost(
+			{ pricing },
+			{ ...zero, outputImages: 1, outputImageQuality: "low" },
+		).totalCents,
+		4,
+	);
+	assert.equal(
+		computeCost(
+			{ pricing },
+			{
+				...zero,
+				outputImages: 1,
+				outputImageQuality: "low",
+				outputImageSize: "2048x2048",
+			},
+		).totalCents,
+		5,
+	);
+	assert.ok(
+		Math.abs(
+			computeCost({ pricing }, { ...zero, inputAudioSeconds: 60 }).totalCents -
+				0.45,
+		) < 1e-9,
+	);
+	assert.equal(estimateMaximumCostCents({ pricing }, 0, 0, 3), 18);
+});

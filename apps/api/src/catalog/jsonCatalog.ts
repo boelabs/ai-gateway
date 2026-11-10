@@ -170,6 +170,8 @@ function validateTokenPricing(
 		"audioOutputCentsPerMTokens",
 		"videoOutputCentsPerMTokens",
 		"searchUnitCents",
+		"imageOutputCentsPerImage",
+		"audioInputCentsPerSecond",
 	]) {
 		if (value[key] !== undefined) {
 			assertNumber(value[key], `${path}.${key}`);
@@ -179,6 +181,19 @@ function validateTokenPricing(
 		value.cacheWriteCentsPerMTokensByTtl,
 		`${path}.cacheWriteCentsPerMTokensByTtl`,
 	);
+	if (value.imageOutputCentsPerImageByVariant !== undefined) {
+		if (!isRecord(value.imageOutputCentsPerImageByVariant)) {
+			fail(`${path}.imageOutputCentsPerImageByVariant`, "must be an object");
+		}
+		for (const [variant, cents] of Object.entries(
+			value.imageOutputCentsPerImageByVariant,
+		)) {
+			assertNumber(
+				cents,
+				`${path}.imageOutputCentsPerImageByVariant.${variant}`,
+			);
+		}
+	}
 	if (value.tiers !== undefined) {
 		if (!Array.isArray(value.tiers)) {
 			fail(`${path}.tiers`, "must be an array");

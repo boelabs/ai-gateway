@@ -76,6 +76,9 @@ export function transcriptionToCanonical(
 }
 
 function renderUsage(usage: TranscriptionUsage): Record<string, unknown> {
+	if (usage.type === "duration") {
+		return { type: "duration", seconds: usage.seconds ?? 0 };
+	}
 	const details = usage.inputTokenDetails;
 	return {
 		type: "tokens",

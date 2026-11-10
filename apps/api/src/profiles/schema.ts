@@ -19,6 +19,11 @@ const tokenPricingShape = {
 	audioOutputCentsPerMTokens: z.number().nonnegative().optional(),
 	videoOutputCentsPerMTokens: z.number().nonnegative().optional(),
 	searchUnitCents: z.number().nonnegative().optional(),
+	imageOutputCentsPerImage: z.number().nonnegative().optional(),
+	imageOutputCentsPerImageByVariant: z
+		.record(z.string().min(1).max(64), z.number().nonnegative())
+		.optional(),
+	audioInputCentsPerSecond: z.number().nonnegative().optional(),
 	tiers: z
 		.array(
 			z

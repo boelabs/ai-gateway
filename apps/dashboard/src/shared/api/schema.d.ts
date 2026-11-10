@@ -3069,6 +3069,11 @@ export interface components {
             audioOutputCentsPerMTokens?: number;
             videoOutputCentsPerMTokens?: number;
             searchUnitCents?: number;
+            imageOutputCentsPerImage?: number;
+            imageOutputCentsPerImageByVariant?: {
+                [key: string]: number;
+            };
+            audioInputCentsPerSecond?: number;
             tiers?: {
                 aboveInputTokens: number;
                 inputCentsPerMTokens?: number;
@@ -3098,6 +3103,11 @@ export interface components {
                     audioOutputCentsPerMTokens?: number;
                     videoOutputCentsPerMTokens?: number;
                     searchUnitCents?: number;
+                    imageOutputCentsPerImage?: number;
+                    imageOutputCentsPerImageByVariant?: {
+                        [key: string]: number;
+                    };
+                    audioInputCentsPerSecond?: number;
                     tiers?: {
                         aboveInputTokens: number;
                         inputCentsPerMTokens?: number;

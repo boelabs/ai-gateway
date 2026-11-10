@@ -25,7 +25,16 @@ export interface VercelModelPricing {
 	input_cache_read_tiers?: VercelPricingTier[];
 	input_cache_write?: string;
 	input_cache_write_tiers?: VercelPricingTier[];
+	/** Dollars per generated image. */
 	image?: string;
+	/** Per-image dollar prices for a size, a quality, both, or another option (style, operation). */
+	image_dimension_quality_pricing?: Array<{
+		size?: string;
+		quality?: string;
+		style?: string;
+		operation?: string;
+		cost?: string;
+	}>;
 }
 
 export interface VercelModel {

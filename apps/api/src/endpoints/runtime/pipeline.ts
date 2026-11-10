@@ -120,6 +120,8 @@ export function usageQuotaForRequest(
 	c: Context<AppEnv>,
 	options: {
 		searchUnits?: number;
+		/** Images the request may generate, reserved at the highest per-image price. */
+		outputImages?: number;
 		/** Called with each reserved lease, for callers that settle it after the request ends. */
 		onReserve?: (lease: VirtualKeyUsageLease) => void;
 	} = {},
@@ -145,8 +147,12 @@ export function usageQuotaForRequest(
 		assertCandidate: (candidate) => {
 			if (
 				auth.key.maxBudgetCents != null &&
-				estimateMaximumCostCents(candidate.meta, 0, options.searchUnits) ===
-					null
+				estimateMaximumCostCents(
+					candidate.meta,
+					0,
+					options.searchUnits,
+					options.outputImages,
+				) === null
 			) {
 				throw new GatewayError({
 					class: "bad_request",
@@ -161,6 +167,7 @@ export function usageQuotaForRequest(
 					candidate.meta,
 					reservedTokens,
 					options.searchUnits,
+					options.outputImages,
 				) ?? 0;
 			const lease = await reserveVirtualKeyUsage(
 				auth.key,

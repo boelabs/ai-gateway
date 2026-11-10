@@ -29,6 +29,13 @@ output), and realtime sessions report the split per modality.
 Video output tokens use `videoOutputCentsPerMTokens`; absent, they fall back to the output rate. Video
 jobs finish after the request returns, so the gateway charges them when the job reaches a terminal
 state, from the provider's reported usage (see [Videos](/docs/videos#gemini-omni-flash)).
+Some models are not priced by the token. `imageOutputCentsPerImage` charges each generated image, with
+`imageOutputCentsPerImageByVariant` for prices that depend on the image (keys `<quality>:<size>`,
+`<size>` or `<quality>`, tried in that order). `audioInputCentsPerSecond` charges transcription by the
+second of input audio the provider reports (`usage.type: "duration"`). These units add to any token
+cost. A budgeted key reserves per-image prices up front at the request's `n`; audio duration is only
+known once the provider reports it, so it is charged at settlement without a reservation.
+
 Service tiers have their own rates in `serviceTiers`, keyed by the tier name the provider reports it
 served (OpenAI's `service_tier`: `flex`, `fast` — formerly `priority` — and `ultrafast`). The gateway
 charges the tier in the **response**, not the one requested, because a provider may serve a request at

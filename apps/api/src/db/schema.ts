@@ -140,6 +140,15 @@ export interface TokenPricing {
 	videoOutputCentsPerMTokens?: number;
 	/** Cost in USD cents per reranking search unit. */
 	searchUnitCents?: number;
+	/** Cost in USD cents per generated image, for models priced per image. */
+	imageOutputCentsPerImage?: number;
+	/**
+	 * Per-image prices that depend on the image: keys are `<quality>:<size>`, `<size>` or
+	 * `<quality>`, tried in that order before `imageOutputCentsPerImage`.
+	 */
+	imageOutputCentsPerImageByVariant?: Record<string, number>;
+	/** Cost in USD cents per second of input audio, for models priced by duration. */
+	audioInputCentsPerSecond?: number;
 	/**
 	 * TIERED rate by context size. When the input tokens (promptTokens, which include cache
 	 * read/write) exceed `aboveInputTokens`, the WHOLE request is charged at the tier's rates

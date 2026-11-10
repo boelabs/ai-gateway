@@ -1,8 +1,8 @@
+import { dollarsPerTokenToCentsPerMillion, dollarsToCents } from "./pricing.ts";
 import type { VercelModelPricing, VercelModel } from "./sources/vercel.ts";
 import { EFFORT_ORDER, isReasoningEffort } from "#core/reasoning.ts";
 import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import { candidateAdapterMappings } from "./providerIdentity.ts";
-import { dollarsPerTokenToCentsPerMillion } from "./pricing.ts";
 import type { CatalogDocument } from "#catalog/jsonCatalog.ts";
 import type { ReasoningEffort } from "#core/reasoning.ts";
 import type { CatalogEntry } from "#catalog/types.ts";
@@ -22,13 +22,22 @@ type Pricing = NonNullable<CatalogEntry["pricing"]>;
 type PricingTier = NonNullable<Pricing["tiers"]>[number];
 type PricingField = Exclude<
 	keyof Pricing,
-	"tiers" | "cacheWriteCentsPerMTokensByTtl" | "serviceTiers"
+	| "tiers"
+	| "cacheWriteCentsPerMTokensByTtl"
+	| "serviceTiers"
+	| "imageOutputCentsPerImageByVariant"
 >;
 type TierPricingField = Exclude<
 	PricingField,
-	"searchUnitCents" | "videoOutputCentsPerMTokens"
+	| "searchUnitCents"
+	| "videoOutputCentsPerMTokens"
+	| "imageOutputCentsPerImage"
+	| "audioInputCentsPerSecond"
 >;
-type TierField = Exclude<keyof VercelModelPricing, "image">;
+type TierField = Exclude<
+	keyof VercelModelPricing,
+	"image" | "image_dimension_quality_pricing"
+>;
 
 interface TierDefinition {
 	source: TierField;
@@ -492,15 +501,56 @@ function imageOperation(
 	return base;
 }
 
+/**
+ * Vercel's per-image prices: `pricing.image` is the default, and size and quality variants become
+ * `imageOutputCentsPerImageByVariant` keys (`<quality>:<size>`, `<size>`, `<quality>`). Variants keyed
+ * by anything else (a style, a grounding operation) have no request field to select them and are
+ * reported instead.
+ */
+function withPerImagePricing(
+	pricing: Pricing | undefined,
+	model: VercelModel,
+	report: VercelCatalogReport,
+): Pricing | undefined {
+	const perImage = dollarsToCents(model.pricing?.image);
+	const variants: Record<string, number> = {};
+	for (const variant of model.pricing?.image_dimension_quality_pricing ?? []) {
+		const cents = dollarsToCents(variant.cost);
+		const key =
+			variant.style === undefined && variant.operation === undefined
+				? [variant.quality, variant.size].filter(Boolean).join(":")
+				: "";
+		if (cents === undefined || key.length === 0) {
+			report.unrepresentedPricing.push({
+				id: model.id,
+				field: "pricing.image_dimension_quality_pricing",
+			});
+			continue;
+		}
+		variants[key] = cents;
+	}
+	if (perImage === undefined && Object.keys(variants).length === 0) {
+		return pricing;
+	}
+	return {
+		...pricing,
+		...(perImage === undefined ? {} : { imageOutputCentsPerImage: perImage }),
+		...(Object.keys(variants).length === 0
+			? {}
+			: { imageOutputCentsPerImageByVariant: variants }),
+	};
+}
+
 function imageEntry(
 	model: VercelModel,
 	report: VercelCatalogReport,
 	references: ReferenceCatalogs | undefined,
 ): CatalogEntry {
-	if (model.pricing?.image !== undefined) {
-		report.unrepresentedPricing.push({ id: model.id, field: "pricing.image" });
-	}
-	const pricing = pricingForVercelModel(model.pricing);
+	const pricing = withPerImagePricing(
+		pricingForVercelModel(model.pricing),
+		model,
+		report,
+	);
 	return {
 		operations: {
 			"image.generate": imageOperation(

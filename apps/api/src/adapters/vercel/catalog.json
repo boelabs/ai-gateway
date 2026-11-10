@@ -2605,6 +2605,16 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 4.8,
+				"imageOutputCentsPerImageByVariant": {
+					"768x768": 4.1,
+					"1024x1024": 4.8,
+					"1536x1536": 7,
+					"2048x2048": 10,
+					"4096x4096": 60.7
+				}
 			}
 		},
 		"bfl/flux-3-image-klein": {
@@ -2615,6 +2625,16 @@
 					"autoSize": {},
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
+				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 0.9,
+				"imageOutputCentsPerImageByVariant": {
+					"768x768": 0.8,
+					"1024x1024": 0.9,
+					"1536x1536": 1.1,
+					"2048x2048": 1.4,
+					"4096x4096": 3.6
 				}
 			}
 		},
@@ -2627,6 +2647,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 8
 			}
 		},
 		"bfl/flux-kontext-pro": {
@@ -2638,6 +2661,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 4
 			}
 		},
 		"bfl/flux-pro-1.0-fill": {
@@ -2649,6 +2675,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 5
 			}
 		},
 		"bfl/flux-pro-1.1": {
@@ -2660,6 +2689,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 4
 			}
 		},
 		"bfl/flux-pro-1.1-ultra": {
@@ -2671,6 +2703,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 6
 			}
 		},
 		"bytedance/seed-1.6": {
@@ -2810,6 +2845,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 3
 			}
 		},
 		"bytedance/seedream-4.5": {
@@ -2821,6 +2859,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 4
 			}
 		},
 		"bytedance/seedream-5.0-lite": {
@@ -2832,6 +2873,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 3.5
 			}
 		},
 		"bytedance/seedream-5.0-pro": {
@@ -2845,7 +2889,8 @@
 				}
 			},
 			"pricing": {
-				"inputCentsPerMTokens": 0.3
+				"inputCentsPerMTokens": 0.3,
+				"imageOutputCentsPerImage": 3.5
 			}
 		},
 		"callstack/apex": {
@@ -7016,6 +7061,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 1
 			}
 		},
 		"meta/muse-spark-1.1": {
@@ -12812,6 +12860,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 2.2
 			}
 		},
 		"recraft/recraft-v3": {
@@ -12823,6 +12874,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 4
 			}
 		},
 		"recraft/recraft-v4": {
@@ -12834,6 +12888,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 4
 			}
 		},
 		"recraft/recraft-v4-pro": {
@@ -12845,6 +12902,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 25
 			}
 		},
 		"recraft/recraft-v4.1": {
@@ -12856,6 +12916,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 3.5
 			}
 		},
 		"recraft/recraft-v4.1-flash": {
@@ -12867,6 +12930,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 0.7
 			}
 		},
 		"recraft/recraft-v4.1-pro": {
@@ -12878,6 +12944,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 21
 			}
 		},
 		"recraft/recraft-v4.1-utility": {
@@ -12889,6 +12958,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 3.5
 			}
 		},
 		"recraft/recraft-v4.1-utility-pro": {
@@ -12900,6 +12972,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 21
 			}
 		},
 		"reflection/beam": {
@@ -13951,6 +14026,9 @@
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
 				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 2
 			}
 		},
 		"spacexai/grok-imagine-image-2.0": {
@@ -13961,6 +14039,14 @@
 					"autoSize": {},
 					"nativeOutputFormat": false,
 					"nativeOutputCompression": false
+				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 6,
+				"imageOutputCentsPerImageByVariant": {
+					"low": 4,
+					"2048x2048": 8,
+					"low:2048x2048": 6
 				}
 			}
 		},

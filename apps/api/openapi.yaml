@@ -3721,6 +3721,21 @@ components:
         searchUnitCents:
           type: number
           minimum: 0
+        imageOutputCentsPerImage:
+          type: number
+          minimum: 0
+        imageOutputCentsPerImageByVariant:
+          type: object
+          propertyNames:
+            type: string
+            minLength: 1
+            maxLength: 64
+          additionalProperties:
+            type: number
+            minimum: 0
+        audioInputCentsPerSecond:
+          type: number
+          minimum: 0
         tiers:
           type: array
           items:
@@ -3809,6 +3824,21 @@ components:
                 type: number
                 minimum: 0
               searchUnitCents:
+                type: number
+                minimum: 0
+              imageOutputCentsPerImage:
+                type: number
+                minimum: 0
+              imageOutputCentsPerImageByVariant:
+                type: object
+                propertyNames:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                additionalProperties:
+                  type: number
+                  minimum: 0
+              audioInputCentsPerSecond:
                 type: number
                 minimum: 0
               tiers:

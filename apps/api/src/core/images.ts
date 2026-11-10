@@ -77,6 +77,37 @@ export function imageUsageToCore(u: ImageUsage | undefined): Usage | null {
 	};
 }
 
+/**
+ * Usage of an image response: the provider's token usage plus the images it produced, for models
+ * priced per image. Without token usage the tokens are marked `estimated` for the router to fill.
+ */
+export function imageResponseUsage(
+	u: ImageUsage | undefined,
+	output: {
+		images: number;
+		size?: string | undefined;
+		quality?: string | undefined;
+	},
+): Usage | null {
+	const tokens = imageUsageToCore(u);
+	if (output.images <= 0) {
+		return tokens;
+	}
+	return {
+		...(tokens ?? {
+			promptTokens: 0,
+			completionTokens: 0,
+			totalTokens: 0,
+			estimated: true,
+		}),
+		outputImages: output.images,
+		...(output.size === undefined ? {} : { outputImageSize: output.size }),
+		...(output.quality === undefined
+			? {}
+			: { outputImageQuality: output.quality }),
+	};
+}
+
 export interface CanonicalImageData {
 	b64Json: string;
 	revisedPrompt?: string;

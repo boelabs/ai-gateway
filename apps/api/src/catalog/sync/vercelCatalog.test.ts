@@ -178,8 +178,47 @@ test("Vercel catalog generates conservative embedding and image profiles", () =>
 			nativeOutputCompression: false,
 		},
 	);
+	assert.deepEqual(
+		generated.document.models["xai/grok-imagine-image"]?.pricing,
+		{
+			imageOutputCentsPerImage: 2,
+		},
+	);
+	assert.deepEqual(generated.report.unrepresentedPricing, []);
+});
+
+test("Vercel per-image variants map by size and quality; other options are reported", () => {
+	const generated = buildVercelCatalog([
+		{
+			id: "example/image-variants",
+			type: "image",
+			pricing: {
+				image: "0.06",
+				image_dimension_quality_pricing: [
+					{ quality: "low", cost: "0.04" },
+					{ size: "2048x2048", cost: "0.08" },
+					{ size: "2048x2048", quality: "low", cost: "0.06" },
+					{ style: "vector_illustration", cost: "0.1" },
+				],
+			},
+		},
+	]);
+	assert.deepEqual(
+		generated.document.models["example/image-variants"]?.pricing,
+		{
+			imageOutputCentsPerImage: 6,
+			imageOutputCentsPerImageByVariant: {
+				low: 4,
+				"2048x2048": 8,
+				"low:2048x2048": 6,
+			},
+		},
+	);
 	assert.deepEqual(generated.report.unrepresentedPricing, [
-		{ id: "xai/grok-imagine-image", field: "pricing.image" },
+		{
+			id: "example/image-variants",
+			field: "pricing.image_dimension_quality_pricing",
+		},
 	]);
 });
 

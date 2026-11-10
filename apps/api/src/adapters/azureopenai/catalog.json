@@ -437,6 +437,9 @@
 					"supportsLanguageHints": true,
 					"maxFileBytes": 26214400
 				}
+			},
+			"pricing": {
+				"audioInputCentsPerSecond": 0.0075
 			}
 		},
 		"gpt-4o-transcribe": {
