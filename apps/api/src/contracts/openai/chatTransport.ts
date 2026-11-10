@@ -525,9 +525,34 @@ interface TransportUsage {
 	cost?: number;
 }
 
+/**
+ * `completion_tokens` with reasoning included, as the canonical usage requires. OpenAI counts
+ * reasoning inside `completion_tokens`; some OpenAI-compatible providers (xAI) report it beside it,
+ * so that `total_tokens = prompt + completion + reasoning`. The provider's own total tells the two
+ * apart; without a total the reported figure is taken as inclusive, the OpenAI semantics.
+ */
+export function completionTokensWithReasoning(
+	promptTokens: number,
+	completionTokens: number,
+	reasoningTokens: number | undefined,
+	totalTokens: number | undefined,
+): number {
+	const reasoning = reasoningTokens ?? 0;
+	const excludesReasoning =
+		reasoning > 0 &&
+		totalTokens !== undefined &&
+		totalTokens === promptTokens + completionTokens + reasoning;
+	return excludesReasoning ? completionTokens + reasoning : completionTokens;
+}
+
 function mapUsage(u: TransportUsage | undefined | null): Usage {
 	const promptTokens = u?.prompt_tokens ?? 0;
-	const completionTokens = u?.completion_tokens ?? 0;
+	const completionTokens = completionTokensWithReasoning(
+		promptTokens,
+		u?.completion_tokens ?? 0,
+		u?.completion_tokens_details?.reasoning_tokens,
+		u?.total_tokens,
+	);
 	const usage: Usage = {
 		promptTokens,
 		completionTokens,

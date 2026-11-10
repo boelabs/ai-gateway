@@ -12,6 +12,7 @@
  */
 
 import { writePromptCachePolicy, writeCacheBreakpoint } from "./promptCache.ts";
+import { completionTokensWithReasoning } from "./chatTransport.ts";
 import { mergeExtraBody } from "#core/extraBody.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { SSEEvent } from "#core/sse.ts";
@@ -525,11 +526,17 @@ export interface ResponsesUsage {
 export function parseResponsesUsage(
 	u: ResponsesUsage | undefined | null,
 ): Usage {
+	const promptTokens = u?.input_tokens ?? 0;
+	const completionTokens = completionTokensWithReasoning(
+		promptTokens,
+		u?.output_tokens ?? 0,
+		u?.output_tokens_details?.reasoning_tokens,
+		u?.total_tokens,
+	);
 	const usage: Usage = {
-		promptTokens: u?.input_tokens ?? 0,
-		completionTokens: u?.output_tokens ?? 0,
-		totalTokens:
-			u?.total_tokens ?? (u?.input_tokens ?? 0) + (u?.output_tokens ?? 0),
+		promptTokens,
+		completionTokens,
+		totalTokens: u?.total_tokens ?? promptTokens + completionTokens,
 	};
 	if (u?.input_tokens_details?.cached_tokens != null) {
 		usage.cacheReadTokens = u.input_tokens_details.cached_tokens;

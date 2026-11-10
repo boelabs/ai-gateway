@@ -18,6 +18,10 @@ counts, OpenAI's `input_tokens_details`/`output_tokens_details`); output of an i
 the provider does not split is counted as image output. The Vercel snapshot inherits a first-party
 model's image rates only when Vercel resells it at the provider's own price.
 
+Reasoning tokens are output and bill at the output rate. Some OpenAI-compatible providers (xAI) report
+them beside `completion_tokens` rather than inside it; the gateway recognizes this from the provider's
+own `total_tokens` (prompt + completion + reasoning) and adds them, so they are never billed as free.
+
 Audio tokens work the same way with `audioInputCentsPerMTokens` and `audioOutputCentsPerMTokens`:
 Gemini's Live models bill audio well above text ($3 against $0.75 per 1M input, $12 against $4.50
 output), and realtime sessions report the split per modality.
