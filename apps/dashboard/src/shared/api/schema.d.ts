@@ -2001,12 +2001,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List gateway operations (master key, paginated, newest first) */
+        /**
+         * List gateway operations (master key, paginated, newest first)
+         * @description The window is bounded: without `start` it is the last 7 days, and start to end may span at most 93 days. `total` counts up to 10,000 (`totalIsLowerBound` past that). Pass `pagination.nextCursor` back as `cursor` for keyset pagination, which stays fast on deep pages.
+         */
         get: {
             parameters: {
                 query?: {
                     limit?: components["parameters"]["Limit"];
                     offset?: components["parameters"]["Offset"];
+                    /** @description pagination.nextCursor of the previous page */
+                    cursor?: string;
                     virtualKeyId?: string;
                     publicModel?: string;
                     deploymentId?: string;
@@ -3617,6 +3622,8 @@ export interface components {
             offset: number;
             total: number;
             nextOffset: number | null;
+            nextCursor?: string | null;
+            totalIsLowerBound?: boolean;
         };
         /** @description Whether human authentication exists on this deployment. Unauthenticated and content-free. */
         DashboardConfig: {

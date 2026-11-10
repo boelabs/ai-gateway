@@ -1559,9 +1559,17 @@ export function buildOpenApiDocument() {
 					tags: ["Admin"],
 					summary:
 						"List gateway operations (master key, paginated, newest first)",
+					description:
+						"The window is bounded: without `start` it is the last 7 days, and start to end may span at most 93 days. `total` counts up to 10,000 (`totalIsLowerBound` past that). Pass `pagination.nextCursor` back as `cursor` for keyset pagination, which stays fast on deep pages.",
 					parameters: [
 						{ $ref: "#/components/parameters/Limit" },
 						{ $ref: "#/components/parameters/Offset" },
+						{
+							name: "cursor",
+							in: "query",
+							schema: { type: "string" },
+							description: "pagination.nextCursor of the previous page",
+						},
 						{
 							name: "virtualKeyId",
 							in: "query",

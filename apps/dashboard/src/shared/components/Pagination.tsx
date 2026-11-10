@@ -23,10 +23,13 @@ export function Pagination({
 	onOffsetChange,
 	label,
 	alwaysVisible = false,
+	totalIsLowerBound = false,
 }: {
 	limit: number;
 	offset: number;
 	total: number;
+	/** The gateway stopped counting at `total`: there are at least that many, so paging goes on. */
+	totalIsLowerBound?: boolean;
 	onOffsetChange: (offset: number) => void;
 	/** Plural noun for the rows being paged, e.g. "keys". */
 	label: string;
@@ -35,16 +38,22 @@ export function Pagination({
 	if (!alwaysVisible && total <= limit && offset === 0) {
 		return null;
 	}
-	const first = total === 0 || offset >= total ? 0 : offset + 1;
-	const last = offset >= total ? 0 : Math.min(offset + limit, total);
+	const first =
+		total === 0 || (offset >= total && !totalIsLowerBound) ? 0 : offset + 1;
+	let last = 0;
+	if (totalIsLowerBound) {
+		last = offset + limit;
+	} else if (offset < total) {
+		last = Math.min(offset + limit, total);
+	}
 	return (
 		<nav
 			aria-label={`${label} pages`}
 			className="flex flex-wrap items-center justify-between gap-3 pt-4"
 		>
 			<p className="text-xs text-fg-muted tabular-nums">
-				{count.format(first)}–{count.format(last)} of {count.format(total)}{" "}
-				{label}
+				{count.format(first)}–{count.format(last)} of {count.format(total)}
+				{totalIsLowerBound ? "+" : ""} {label}
 			</p>
 			<div className="flex items-center gap-2">
 				<Button
@@ -57,7 +66,7 @@ export function Pagination({
 					Previous
 				</Button>
 				<Button
-					disabled={offset + limit >= total}
+					disabled={!totalIsLowerBound && offset + limit >= total}
 					onClick={() => onOffsetChange(offset + limit)}
 					size="sm"
 					variant="secondary"

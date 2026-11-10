@@ -109,6 +109,10 @@ export const Pagination = z
 		offset: z.int(),
 		total: z.int(),
 		nextOffset: nullableInteger,
+		/** Keyset position of the next page (GET /admin/logs); pass it back as `cursor`. */
+		nextCursor: nullableString.optional(),
+		/** True when `total` stopped counting at its cap. */
+		totalIsLowerBound: z.boolean().optional(),
 	})
 	.meta({ id: "Pagination" });
 

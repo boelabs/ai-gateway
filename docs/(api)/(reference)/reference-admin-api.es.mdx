@@ -61,11 +61,11 @@ La especificación se genera a partir de los mismos esquemas Zod con los que val
 
 | Ruta | Propósito |
 |---|---|
-| `GET /admin/logs` | Resúmenes de operación paginados. Los filtros incluyen `outcome`, `degraded`, `active`, `terminalVerified`, `failureKind`, `failurePhase`, duración, modelo, clave, identificación de solicitud, cache y rango de tiempo. |
+| `GET /admin/logs` | Resúmenes de operación paginados. Los filtros incluyen `outcome`, `degraded`, `active`, `terminalVerified`, `failureKind`, `failurePhase`, duración, modelo, clave, identificación de solicitud, cache y rango de tiempo. La ventana está acotada: sin `start` son los últimos 7 días, y puede abarcar como máximo 93 días (`400 invalid_window`). `pagination.total` cuenta hasta 10.000 (`totalIsLowerBound` a partir de ahí); devuelve `pagination.nextCursor` como `cursor` para paginar por keyset, que sigue siendo rápido en páginas profundas. Las filas traen solo columnas escalares; los resúmenes y metadatos están en el detalle. |
 | `GET /admin/logs/:operationId` | Registro de operación completo, cronograma de intentos ascendentes ordenados y si existe una muestra retenida y se puede leer (`payload.retained`, `payload.readable`, `payload.access`). |
 | `GET /admin/logs/:operationId/payload` | Descifre la muestra forense retenida para cada operación finalizada. Requiere `payloads:read` (maestro, propietario o administrador) y se registra la auditoría, incluido el resultado. 403 `payload_access_sealed` cuando el deployment ejecuta `OBSERVABILITY_PAYLOAD_ACCESS=sealed`, 404 una vez que la retención ha barrido la muestra, 409 cuando sobrevivió a su clave. |
 | `GET /admin/observability/summary` | Resultados, recuentos degradados/estancados/activos/abandonados, reintentos y percentiles de latencia. Toma un rango final de `window=5m|1h|24h` o un `start`/`end` explícito de como máximo 31 días; `active` siempre cuenta lo que está en vuelo ahora. |
-| `GET /admin/usage` | Uso/costo del consumidor y costo upstream estimado en cada intento; agrupar por `public_model`, `virtual_key`, `actor`, `hour`, `day` o `none`. Filtrable por `actor`. Consulta [Contabilidad de costos](/docs/cost-accounting). |
+| `GET /admin/usage` | Uso/costo del consumidor y costo upstream estimado en cada intento; agrupar por `public_model`, `virtual_key`, `actor`, `hour`, `day` o `none`. Filtrable por `actor`. Sin `start` cubre los últimos 30 días; la ventana puede abarcar como máximo 400 días. Consulta [Contabilidad de costos](/docs/cost-accounting). |
 
 ## Registro de auditoría [#audit-trail]
 

@@ -51,6 +51,7 @@ import {
 
 import {
 	aggregateOperationUsage,
+	decodeOperationCursor,
 	type OperationFilter,
 	getOperationDetail,
 	listOperationsPage,
@@ -238,6 +239,51 @@ function parseLogFilter(c: import("hono").Context): OperationFilter {
 		...(start ? { start } : {}),
 		...(end ? { end } : {}),
 	};
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * The time window of a log or usage query, always bounded: a missing `start` means the last
+ * `defaultDays`, and a span longer than `maxDays` is refused, so no request scans the whole table.
+ */
+function boundedWindow(
+	filter: OperationFilter,
+	options: { defaultDays: number; maxDays: number },
+): OperationFilter {
+	const end = filter.end ?? new Date();
+	const start =
+		filter.start ?? new Date(end.getTime() - options.defaultDays * DAY_MS);
+	if (end.getTime() - start.getTime() > options.maxDays * DAY_MS) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_window",
+			param: "start",
+			message: `The window between start and end may span at most ${options.maxDays} days`,
+			publicMessage: `The window between start and end may span at most ${options.maxDays} days.`,
+		});
+	}
+	return { ...filter, start, end };
+}
+
+function parseCursor(
+	c: import("hono").Context,
+): { startedAt: Date; id: string } | undefined {
+	const raw = c.req.query("cursor");
+	if (raw === undefined || raw === "") {
+		return undefined;
+	}
+	const cursor = decodeOperationCursor(raw);
+	if (!(cursor && isUuid(cursor.id))) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_cursor",
+			param: "cursor",
+			message: "cursor is not a value this endpoint returned",
+			publicMessage: "cursor is not a value this endpoint returned.",
+		});
+	}
+	return cursor;
 }
 
 function parsePage(c: import("hono").Context): {
@@ -733,17 +779,24 @@ type OperationUsageGroupBy = (typeof USAGE_GROUP_BY)[number];
 
 adminApp.get("/logs", async (c) => {
 	const { limit, offset } = parsePage(c);
-	const filter = parseLogFilter(c);
-	const { rows, total } = await listOperationsPage({
+	const cursor = parseCursor(c);
+	const filter = boundedWindow(parseLogFilter(c), {
+		defaultDays: 7,
+		maxDays: 93,
+	});
+	const page = await listOperationsPage({
 		limit,
 		offset,
 		...filter,
+		...(cursor ? { cursor } : {}),
 	});
-	return paginated(c, rows, {
+	return paginated(c, page.rows, {
 		limit,
-		offset,
-		total,
-		nextOffset: offset + limit < total ? offset + limit : null,
+		offset: cursor ? 0 : offset,
+		total: page.total,
+		nextOffset: !cursor && page.nextCursor !== null ? offset + limit : null,
+		nextCursor: page.nextCursor,
+		totalIsLowerBound: page.totalIsLowerBound,
 	});
 });
 
@@ -910,7 +963,7 @@ adminApp.get("/usage", async (c) => {
 	}
 	const rows = await aggregateOperationUsage({
 		groupBy: groupByRaw as OperationUsageGroupBy,
-		...parseLogFilter(c),
+		...boundedWindow(parseLogFilter(c), { defaultDays: 30, maxDays: 400 }),
 	});
 	return ok(c, rows);
 });
