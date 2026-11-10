@@ -25,6 +25,7 @@ import {
 	assertFinalModelAllowed,
 	notifyExtensionError,
 	usageQuotaForRequest,
+	enforceKeyLimits,
 	computeUsageCost,
 	toGatewayError,
 	extensionScope,
@@ -391,6 +392,7 @@ export async function imageGenerationsHandler(
 }
 
 export async function imageEditsHandler(c: Context<AppEnv>): Promise<Response> {
+	await enforceKeyLimits(c);
 	const multipart = await parseImageEditMultipart(c.req.raw);
 	return handleImageRequest(
 		c,

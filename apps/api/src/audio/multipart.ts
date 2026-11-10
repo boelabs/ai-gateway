@@ -1,14 +1,9 @@
+import { receiveMultipart } from "#http/multipartToDisk.ts";
 import type { CanonicalAudioInput } from "#core/audio.ts";
-import { mkdtemp, rm, stat } from "node:fs/promises";
-import { basename, extname, join } from "node:path";
-import { pipeline } from "node:stream/promises";
 import { GatewayError } from "#core/errors.ts";
-import { createWriteStream } from "node:fs";
-import { randomUUID } from "node:crypto";
-import { Readable } from "node:stream";
+import { basename, extname } from "node:path";
+import { stat } from "node:fs/promises";
 import { env } from "#config/env.ts";
-import { tmpdir } from "node:os";
-import Busboy from "busboy";
 
 import {
 	transcriptionFieldsSchema,
@@ -119,108 +114,56 @@ function buildFields(
 export async function parseTranscriptionMultipart(
 	request: Request,
 ): Promise<ParsedTranscriptionMultipart> {
-	const contentType = request.headers.get("content-type");
-	if (!contentType?.toLowerCase().startsWith("multipart/form-data")) {
-		throw badMultipart("Content-Type must be multipart/form-data", null);
-	}
-	if (!request.body) {
-		throw badMultipart("Missing multipart body", null);
-	}
-
-	const dir = await mkdtemp(join(tmpdir(), "ai-gateway-audio-"));
-	const cleanup = () => rm(dir, { recursive: true, force: true });
+	const received = await receiveMultipart({
+		request,
+		tmpPrefix: "ai-gateway-audio-",
+		limits: {
+			files: 1,
+			fileSize: MAX_AUDIO_BYTES,
+			fields: 1024,
+			fieldSize: 65_536,
+			parts: 1025,
+			totalFileBytes: env.AUDIO_MAX_MULTIPART_BYTES,
+		},
+		error: badMultipart,
+		acceptFile: (name, accepted) => {
+			if (name !== "file") {
+				return badMultipart(`Unexpected file field "${name}"`, name);
+			}
+			if (accepted.length > 0) {
+				return badMultipart("Only one file is allowed", "file");
+			}
+			return null;
+		},
+		fileTooLarge: () => badMultipart("file exceeds 25 MB", "file"),
+	});
+	const { cleanup } = received;
 	const scalars: Record<string, string> = {};
 	const arrays: Record<string, string[]> = {};
-	let upload: { path: string; filename: string } | null = null;
-	const writes: Promise<void>[] = [];
-	let failure: GatewayError | null = null;
-	let source: Readable | null = null;
+	const [received0] = received.files;
+	const upload = received0
+		? { path: received0.path, filename: safeFilename(received0.filename) }
+		: null;
 
 	try {
-		const bb = Busboy({
-			headers: Object.fromEntries(request.headers.entries()),
-			limits: {
-				files: 1,
-				fileSize: MAX_AUDIO_BYTES,
-				fields: 1024,
-				fieldSize: 65_536,
-				parts: 1025,
-			},
-		});
-
-		bb.on("field", (name, value, info) => {
-			if (info.valueTruncated) {
-				failure ??= badMultipart(`Field "${name}" exceeds 64 KiB`, name);
-			}
+		for (const [name, value] of received.fields) {
 			if (name.endsWith("[]")) {
 				const base = name.slice(0, -2);
 				const list = arrays[base] ?? [];
 				list.push(value);
 				arrays[base] = list;
-				return;
+				continue;
 			}
 			if (ARRAY_FIELDS.has(name)) {
 				const list = arrays[name] ?? [];
 				list.push(value);
 				arrays[name] = list;
-				return;
+				continue;
 			}
 			if (scalars[name] !== undefined) {
-				failure ??= badMultipart(`Duplicate field "${name}"`, name);
+				throw badMultipart(`Duplicate field "${name}"`, name);
 			}
 			scalars[name] = value;
-		});
-		bb.on("file", (name, stream, info) => {
-			if (name !== "file") {
-				failure ??= badMultipart(`Unexpected file field "${name}"`, name);
-				stream.resume();
-				return;
-			}
-			if (upload) {
-				failure ??= badMultipart("Only one file is allowed", "file");
-				stream.resume();
-				return;
-			}
-			upload = {
-				path: join(dir, randomUUID()),
-				filename: safeFilename(info.filename),
-			};
-			stream.on("limit", () => {
-				failure ??= badMultipart("file exceeds 25 MB", "file");
-			});
-			writes.push(
-				pipeline(stream, createWriteStream(upload.path, { flags: "wx" })),
-			);
-		});
-		bb.on("filesLimit", () => {
-			failure ??= badMultipart("At most one file is allowed", "file");
-		});
-		bb.on("fieldsLimit", () => {
-			failure ??= badMultipart("Too many multipart fields", null);
-		});
-		bb.on("partsLimit", () => {
-			failure ??= badMultipart("Too many multipart parts", null);
-		});
-
-		const finished = new Promise<void>((resolve, reject) => {
-			bb.once("finish", resolve);
-			bb.once("error", reject);
-		});
-		const readable = Readable.fromWeb(
-			request.body as import("node:stream/web").ReadableStream<Uint8Array>,
-		);
-		source = readable;
-		const abort = () => readable.destroy(new Error("request aborted"));
-		request.signal.addEventListener("abort", abort, { once: true });
-		try {
-			source.pipe(bb);
-			await finished;
-			await Promise.all(writes);
-		} finally {
-			request.signal.removeEventListener("abort", abort);
-		}
-		if (failure) {
-			throw failure;
 		}
 		if (!upload) {
 			throw badMultipart("A `file` audio part is required", "file");

@@ -97,8 +97,27 @@ export async function preflight(
 	model: string,
 	options?: { writeHeaders?: boolean },
 ): Promise<void> {
+	assertModelAllowed(getAuth(c), model);
+	if (!keyLimitsEnforced.has(c)) {
+		await enforceKeyLimits(c, options);
+	}
+}
+
+/** Requests whose virtual-key limits were already applied (see `enforceKeyLimits`). */
+const keyLimitsEnforced = new WeakSet<Context<AppEnv>>();
+
+/**
+ * Applies the virtual key's RPM, TPM and budget gates on their own, before a body is read. A
+ * multipart upload names its model inside the body, so its model scope can only be checked after
+ * parsing — but a key over its limits must not get to stream tens of megabytes to disk first.
+ * The later `preflight` then checks only the model.
+ */
+export async function enforceKeyLimits(
+	c: Context<AppEnv>,
+	options?: { writeHeaders?: boolean },
+): Promise<void> {
+	keyLimitsEnforced.add(c);
 	const auth = getAuth(c);
-	assertModelAllowed(auth, model);
 	if (auth.type === "virtual") {
 		const limited = await enforceVirtualKey(auth.key);
 		if (options?.writeHeaders !== false) {
