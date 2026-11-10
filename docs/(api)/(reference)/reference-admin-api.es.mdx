@@ -85,7 +85,10 @@ Envía `Idempotency-Key: <opaque string>` con un `POST` y el gateway recuerda lo
 - Reutilizar una clave con un cuerpo diferente es `409 idempotency_key_reuse`, porque se trata de un error del cliente en lugar de un reintento.
 - Un reintento que llega mientras la primera solicitud aún se está ejecutando es `409 idempotency_key_in_progress`.
 - Sólo se recuerdan las respuestas exitosas. Una llamada rechazada o fallida libera la clave, por lo que la solicitud corregida puede reutilizarla.
-- La respuesta recordada se guarda cifrada con el keyring, porque algunas llevan un secreto (el texto plano de una virtual key nueva). Si la clave que la cifró se retiró, un reintento recibe `409 idempotency_response_unreadable`: comprueba si la primera llamada tuvo efecto antes de reintentar con una clave nueva.
+- Una respuesta que lleva un secreto (crear o rotar una virtual key devuelve su texto plano) nunca se guarda. Un reintento de esa llamada no la vuelve a ejecutar; recibe `409 idempotency_response_withheld`, cuyo mensaje da el estado de la primera llamada.
+- Cualquier otra respuesta recordada se guarda cifrada con el keyring. Si la clave que la cifró se retiró, un reintento recibe `409 idempotency_response_unreadable`: comprueba si la primera llamada tuvo efecto antes de reintentar con una clave nueva.
+- Una primera solicitud que nunca terminó (su proceso murió) es `409 idempotency_outcome_unknown` a los cinco minutos, en lugar de `idempotency_key_in_progress` el resto del día.
+- Una repetición se responde después de las comprobaciones de permisos: quien perdió el permiso recibe `403`.
 
 ## Operadores y sesiones [#operators-and-sessions]
 

@@ -84,7 +84,24 @@ export async function completeIdempotencyKey(
 export type StoredResponse =
 	| { readable: true; body: unknown }
 	/** Sealed with a key the keyring no longer has. */
-	| { readable: false };
+	| { readable: false }
+	/** Its route returns a secret, so only the outcome was kept (see `withholdIdempotencyResponse`). */
+	| { readable: true; withheld: true };
+
+/** Marks a row whose response was deliberately not stored. Admin responses are `{ data }` or empty. */
+const WITHHELD = { withheld: true } as const;
+
+/** Completes a key, keeping its status but not its response, which carried a secret. */
+export async function withholdIdempotencyResponse(
+	actor: string,
+	key: string,
+	status: number,
+): Promise<void> {
+	await db
+		.update(idempotencyKeys)
+		.set({ status, response: WITHHELD, completedAt: new Date() })
+		.where(and(eq(idempotencyKeys.actor, actor), eq(idempotencyKeys.key, key)));
+}
 
 /**
  * The body a completed row replays.
@@ -96,6 +113,13 @@ export type StoredResponse =
  */
 export function storedResponse(row: IdempotencyRow): StoredResponse {
 	const { response } = row;
+	if (
+		response !== null &&
+		typeof response === "object" &&
+		(response as { withheld?: unknown }).withheld === true
+	) {
+		return { readable: true, withheld: true };
+	}
 	if (!isSealed(response)) {
 		return { readable: true, body: response ?? null };
 	}

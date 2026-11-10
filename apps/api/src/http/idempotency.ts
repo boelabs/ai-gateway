@@ -6,6 +6,7 @@ import { getAuth } from "#auth/middleware.ts";
 import { createHash } from "node:crypto";
 
 import {
+	withholdIdempotencyResponse,
 	completeIdempotencyKey,
 	releaseIdempotencyKey,
 	claimIdempotencyKey,
@@ -17,6 +18,19 @@ export const IDEMPOTENCY_REPLAY_HEADER = "idempotent-replay";
 /** Long enough to cover a retry loop or an operator coming back after a timeout; short enough to forget. */
 export const IDEMPOTENCY_TTL_MS = 24 * 3_600_000;
 const MAX_KEY_LENGTH = 255;
+/**
+ * How long a claim may stay uncompleted. A process that died mid-request leaves its claim behind;
+ * past this the outcome is reported as unknown instead of "still in progress" forever.
+ */
+export const IDEMPOTENCY_LEASE_MS = 5 * 60_000;
+
+export interface IdempotencyOptions {
+	/**
+	 * Routes whose success response carries a secret (a virtual key's plaintext). Their response is
+	 * not stored: a replay says the request completed, and with what status, but not what it returned.
+	 */
+	withholdsResponse?: (method: string, path: string) => boolean;
+}
 
 /** The request, reduced to a value that changes whenever the request does. */
 function fingerprint(body: Uint8Array, method: string, path: string): string {
@@ -47,7 +61,9 @@ function replay(status: number, response: unknown): Response {
  *
  * Opt-in by design. A request without the header behaves exactly as it did before.
  */
-export function idempotencyMiddleware(): MiddlewareHandler<AppEnv> {
+export function idempotencyMiddleware(
+	options: IdempotencyOptions = {},
+): MiddlewareHandler<AppEnv> {
 	return async (c, next) => {
 		const key = c.req.header(IDEMPOTENCY_HEADER)?.trim();
 		if (!key || c.req.method !== "POST") {
@@ -88,6 +104,19 @@ export function idempotencyMiddleware(): MiddlewareHandler<AppEnv> {
 						"This Idempotency-Key was already used for a different request. Use a new key.",
 				});
 			}
+			if (
+				existing.status === null &&
+				existing.createdAt.getTime() < Date.now() - IDEMPOTENCY_LEASE_MS
+			) {
+				throw new GatewayError({
+					class: "bad_request",
+					status: 409,
+					code: "idempotency_outcome_unknown",
+					message: `Idempotency-Key "${key}" never completed`,
+					publicMessage:
+						"The first request with this Idempotency-Key never finished, so whether it took effect is unknown. Check before retrying with a new key.",
+				});
+			}
 			if (existing.status === null) {
 				throw new GatewayError({
 					class: "bad_request",
@@ -99,6 +128,15 @@ export function idempotencyMiddleware(): MiddlewareHandler<AppEnv> {
 				});
 			}
 			const stored = storedResponse(existing);
+			if ("withheld" in stored) {
+				throw new GatewayError({
+					class: "bad_request",
+					status: 409,
+					code: "idempotency_response_withheld",
+					message: `Idempotency-Key "${key}" completed with status ${existing.status}; its response held a secret and was not kept`,
+					publicMessage: `The first request with this Idempotency-Key completed (status ${existing.status}). Its response contained a secret and is not replayed.`,
+				});
+			}
 			if (!stored.readable) {
 				// Replaying anything else would be a lie, and running the request again could create the
 				// thing twice: the honest answer is that this key's outcome can no longer be told.
@@ -141,7 +179,11 @@ export function idempotencyMiddleware(): MiddlewareHandler<AppEnv> {
 				return;
 			}
 		}
-		await completeIdempotencyKey(actor, key, status, body);
+		if (options.withholdsResponse?.(c.req.method, path)) {
+			await withholdIdempotencyResponse(actor, key, status);
+		} else {
+			await completeIdempotencyKey(actor, key, status, body);
+		}
 		c.res.headers.set(IDEMPOTENCY_REPLAY_HEADER, "false");
 	};
 }

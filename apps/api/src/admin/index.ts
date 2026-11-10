@@ -287,12 +287,6 @@ export const adminApp = new Hono<AppEnv>();
 adminApp.use("*", authMiddleware(), requireOperator(), auditMiddleware());
 
 /**
- * After the identity is resolved, because an idempotency key is scoped to the actor that sent it, and
- * before the permission gates, so a replay is answered by the same rules that answered the original.
- */
-adminApp.use("*", idempotencyMiddleware());
-
-/**
  * Per-group permissions. The master key satisfies every one of them; a session must carry the
  * permission its role grants (see auth/roles.ts). Registered before the routes so Hono applies them
  * as middleware rather than as handlers.
@@ -323,6 +317,22 @@ adminApp.use("/fallbacks", methodPermission("settings"));
 adminApp.use("/cache", requirePermission("settings:write"));
 adminApp.use("/extensions/*", requirePermission("extensions:manage"));
 adminApp.use("/extensions", requirePermission("extensions:manage"));
+adminApp.use("/users/*", requirePermission("users:manage"));
+adminApp.use("/users", requirePermission("users:manage"));
+
+/**
+ * After the identity is resolved, because an idempotency key is scoped to the actor that sent it, and
+ * after the permission gates, so a replay is only answered to someone who may make the request now.
+ * Creating and rotating a key return its plaintext, so those responses are never stored.
+ */
+adminApp.use(
+	"*",
+	idempotencyMiddleware({
+		withholdsResponse: (method, path) =>
+			method === "POST" &&
+			(path === "/admin/keys" || /^\/admin\/keys\/[^/]+\/rotate$/u.test(path)),
+	}),
+);
 adminApp.route("/users", dashboardUsersApp);
 adminApp.use("*", async (c, next) => {
 	const mutatesConfiguration = ["POST", "PUT", "PATCH", "DELETE"].includes(
