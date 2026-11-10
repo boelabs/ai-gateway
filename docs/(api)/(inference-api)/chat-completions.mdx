@@ -40,6 +40,14 @@ Whether a given deployment actually **supports** a field you send is a per-model
 see [Parameter policy](/docs/parameter-policy) for what happens when it doesn't (`drop`, `error`, or
 `allow`, operator-configured).
 
+OpenAI and Azure OpenAI deployments speak the Responses API by default, which has no `n`, `stop` or
+`seed`. A request that uses them, or a Chat-only field such as `logprobs` or `audio`, goes to the
+deployment's Chat Completions API instead when the model offers it. Models OpenAI documents for one
+API only declare it in the catalog (`gpt-5-pro` and the Codex models answer only on Responses,
+`gpt-audio` and the search-preview models only on Chat Completions), and a deployment's transport
+override always wins. Where the request ends up on Responses, `n`, `stop` and `seed` go through the
+parameter policy.
+
 ## Tools and tool choice
 
 `tools` (JSON Schema `parameters`) and `tool_choice` (`"auto"`, `"none"`, `"required"`, or

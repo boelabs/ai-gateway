@@ -27,6 +27,8 @@ Forma de solicitud/respuesta compatible con OpenAI. Cada campo a continuación s
 
 Si un deployment determinada realmente **admite** un campo que envía es una declaración de catálogo por modelo; consulta [Política de parámetros](/docs/parameter-policy) para saber qué sucede cuando no lo hace (`drop`, `error` o `allow`, configurado por el operador).
 
+Los deployments de OpenAI y Azure OpenAI usan por defecto la API Responses, que no tiene `n`, `stop` ni `seed`. Una solicitud que los usa, o un campo exclusivo de Chat como `logprobs` o `audio`, va a la API Chat Completions del deployment cuando el modelo la ofrece. Los modelos que OpenAI documenta para una sola API la declaran en el catálogo (`gpt-5-pro` y los modelos Codex solo responden en Responses; `gpt-audio` y los modelos search-preview solo en Chat Completions), y el override de transport de un deployment siempre gana. Si la solicitud termina en Responses, `n`, `stop` y `seed` pasan por la política de parámetros.
+
 ## Tools y selección de herramientas [#tools-and-tool-choice]
 
 `tools` (esquema JSON `parameters`) y `tool_choice` (`"auto"`, `"none"`, `"required"` o `{"type": "function", "function": {"name": "..."}}`) siguen la forma OpenAI. El formulario `allowed_tools` también se acepta y conserva tanto el subconjunto permitido como su modo `auto` o `required`. La traducción del proveedor se realiza por adapter; en particular, Google AI Studio limita la herramienta `parameters` a su propio subconjunto OpenAPI; consulta [Google AI Studio](/docs/providers-google).

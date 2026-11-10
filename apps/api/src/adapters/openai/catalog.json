@@ -973,7 +973,8 @@
 						"temperature": true,
 						"stop": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1063,7 +1064,8 @@
 						"stop": true,
 						"reasoning_effort": true,
 						"verbosity": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1184,7 +1186,8 @@
 						"temperature": true,
 						"stop": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1262,7 +1265,8 @@
 						"stop": true,
 						"reasoning_effort": true,
 						"verbosity": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1464,7 +1468,8 @@
 						"temperature": true,
 						"stop": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1501,7 +1506,8 @@
 						"tools": true,
 						"temperature": true,
 						"stop": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1752,7 +1758,8 @@
 						"tools": true,
 						"top_logprobs": true,
 						"top_p": true
-					}
+					},
+					"transport": "chat_completions"
 				}
 			},
 			"pricing": {
@@ -1791,7 +1798,8 @@
 						"tools": true,
 						"top_logprobs": true,
 						"top_p": true
-					}
+					},
+					"transport": "chat_completions"
 				}
 			},
 			"pricing": {
@@ -1828,7 +1836,8 @@
 						"stop": true,
 						"max_completion_tokens": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1897,7 +1906,8 @@
 						"stop": true,
 						"max_completion_tokens": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1963,7 +1973,8 @@
 						"stop": true,
 						"max_completion_tokens": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1999,7 +2010,8 @@
 						"stop": true,
 						"max_completion_tokens": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -2039,7 +2051,8 @@
 						"tools": true,
 						"top_logprobs": true,
 						"top_p": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -2079,7 +2092,8 @@
 						"tools": true,
 						"top_logprobs": true,
 						"top_p": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -2113,7 +2127,8 @@
 						"tools": true,
 						"temperature": true,
 						"stop": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -2243,7 +2258,8 @@
 						"response_format": true,
 						"seed": true,
 						"structured_outputs": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -2271,7 +2287,8 @@
 						"web_search_options": true,
 						"temperature": true,
 						"stop": true
-					}
+					},
+					"transport": "chat_completions"
 				}
 			},
 			"pricing": {
@@ -2297,7 +2314,8 @@
 						"response_format": true,
 						"structured_outputs": true,
 						"web_search_options": true
-					}
+					},
+					"transport": "chat_completions"
 				}
 			},
 			"pricing": {
@@ -2784,7 +2802,8 @@
 						"vision": false,
 						"structuredOutputs": true,
 						"strictTools": true
-					}
+					},
+					"transport": "responses"
 				}
 			}
 		},
@@ -2816,7 +2835,8 @@
 						"vision": false,
 						"structuredOutputs": true,
 						"strictTools": true
-					}
+					},
+					"transport": "responses"
 				}
 			}
 		},

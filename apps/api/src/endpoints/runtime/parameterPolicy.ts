@@ -42,6 +42,28 @@ export type ChatCandidateExecutor = (
 	request: CanonicalChatRequest,
 ) => Promise<ChatExecResult>;
 
+/**
+ * The transport a chat request needs when an adapter's default cannot carry it: the client's own
+ * wire for features only that wire has, and Chat Completions for its portable controls that
+ * Responses lacks (`n` above one, `stop`, `seed`). A deployment override or the model's declared
+ * transport still wins; the parameter policy then handles whatever that transport cannot carry.
+ */
+export function preferredChatTransport(
+	req: CanonicalChatRequest,
+): UpstreamTransport | undefined {
+	if (req.requiresNativeWire) {
+		return req.publicWire ?? "chat_completions";
+	}
+	if (
+		(req.n ?? 1) > 1 ||
+		(req.stop?.length ?? 0) > 0 ||
+		req.seed !== undefined
+	) {
+		return "chat_completions";
+	}
+	return undefined;
+}
+
 export function parameterEligibility(
 	req: CanonicalChatRequest,
 	strategy: UnsupportedParameterStrategy,
@@ -54,7 +76,7 @@ export function parameterEligibility(
 			req,
 			candidateParameterMeta(
 				candidate,
-				resolveTransport(candidate, "chat"),
+				resolveTransport(candidate, "chat", preferredChatTransport(req)),
 				req,
 			),
 		);
@@ -139,8 +161,9 @@ export async function routeChat(
 		settings.unsupportedParameterStrategy,
 	);
 	const publicWire = canonical.publicWire ?? "chat_completions";
+	const preferredTransport = preferredChatTransport(canonical);
 	const transportForCandidate = (candidate: DeploymentCandidate) =>
-		resolveTransport(candidate, "chat");
+		resolveTransport(candidate, "chat", preferredTransport);
 	const candidateEligibility: NonNullable<
 		RouteOptions["candidateEligibility"]
 	> = (candidate) => {
@@ -188,6 +211,9 @@ export async function routeChat(
 					? { preferredDeploymentId: options.preferredDeploymentId }
 					: {}),
 				candidateEligibility,
+				...(preferredTransport === undefined
+					? {}
+					: { preferredTransport: () => preferredTransport }),
 				tokenReservation: (candidate) =>
 					estimateTokenReservation(canonical, {
 						maxOutputTokens:

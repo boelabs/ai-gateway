@@ -34,7 +34,6 @@ import {
 
 import {
 	responsesEventsToCanonicalChunks,
-	assertResponsesRequestSupported,
 	buildResponsesRequestBody,
 	parseResponsesResponse,
 } from "#contracts/openai/responsesTransport.ts";
@@ -266,9 +265,21 @@ const TOP_K_UNSUPPORTED: ParameterSupportMap = {
 	},
 };
 
+const NOT_IN_RESPONSES =
+	"Chat Completions only; the Responses request has no such field.";
+
+/** Chat Completions controls the Responses request has no field for. */
+const RESPONSES_UNSUPPORTED: ParameterSupportMap = {
+	...TOP_K_UNSUPPORTED,
+	n: { mode: "unsupported", notes: NOT_IN_RESPONSES },
+	stop: { mode: "unsupported", notes: NOT_IN_RESPONSES },
+	seed: { mode: "unsupported", notes: NOT_IN_RESPONSES },
+};
+
 /**
  * What these transports cannot carry. OpenAI defines no `top_k` on either wire; Chat Completions
- * emits the common extension only for providers that opt in with `supportsTopK`.
+ * emits the common extension only for providers that opt in with `supportsTopK`. Responses has no
+ * `n`, `stop` or `seed`; requests that use them prefer Chat Completions where the model offers it.
  */
 function openAIStyleChatParameters(
 	transports: readonly ("chat_completions" | "responses")[],
@@ -276,7 +287,9 @@ function openAIStyleChatParameters(
 ): NonNullable<Adapter["chatParameters"]> {
 	const parameters: NonNullable<Adapter["chatParameters"]> = {};
 	for (const transport of transports) {
-		if (transport === "responses" || !supportsTopK) {
+		if (transport === "responses") {
+			parameters[transport] = RESPONSES_UNSUPPORTED;
+		} else if (!supportsTopK) {
 			parameters[transport] = TOP_K_UNSUPPORTED;
 		}
 	}
@@ -1133,12 +1146,11 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 		},
 		supportedCallTypes,
 		chat,
-		assertChatRequestSupported(req, ctx) {
-			config.assertChatRequestSupported?.(req, ctx);
-			if (ctx.transport === "responses") {
-				assertResponsesRequestSupported(req);
-			}
-		},
+		// n, stop and seed on Responses go through the parameter policy (chatParameters), so a drop
+		// strategy can drop them; the body builder still refuses them if they arrive regardless.
+		...(config.assertChatRequestSupported
+			? { assertChatRequestSupported: config.assertChatRequestSupported }
+			: {}),
 		...(config.responsesWebSocket
 			? {
 					responsesWebSocket: makeOpenAIResponsesWebSocketHandler({

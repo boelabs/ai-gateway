@@ -1,3 +1,4 @@
+import type { UpstreamTransport } from "#core/transport.ts";
 import { getEffectiveSettings, type EffectiveSettings } from "./settings.ts";
 import type { AdapterContext, AdapterDiagnostics } from "#adapters/types.ts";
 import { buildRoutingError, type FailReason } from "./routingError.ts";
@@ -75,6 +76,13 @@ export interface RouteOptions {
 	requestId: string;
 	/** Excludes deployments incompatible with the request before balancing, without cooldown. */
 	candidateEligibility?: (candidate: DeploymentCandidate) => void;
+	/**
+	 * The transport this request would rather use on a candidate, when one of the adapter's
+	 * transports carries it better than the default. Overrides and model declarations still win.
+	 */
+	preferredTransport?: (
+		candidate: DeploymentCandidate,
+	) => UpstreamTransport | undefined;
 	/** Session affinity hint; used only when this deployment is still healthy and eligible. */
 	preferredDeploymentId?: string;
 	executionMode?: "json" | "stream";
@@ -407,7 +415,11 @@ function buildContext(
 			upstreamModel: candidate.upstreamModel,
 			credentials,
 			meta: candidate.meta,
-			transport: resolveTransport(candidate, callType),
+			transport: resolveTransport(
+				candidate,
+				callType,
+				opts.preferredTransport?.(candidate),
+			),
 			requestId: opts.requestId,
 			...(opts.operationId ? { operationId: opts.operationId } : {}),
 			watchdog,
@@ -710,7 +722,11 @@ export async function route<T>(
 						(candidate) => candidate.row.id === opts.preferredDeploymentId,
 					) ??
 					pickDeployment(settings.routingStrategy, withAttemptsLeft, metrics);
-				const transport = resolveTransport(chosen, callType);
+				const transport = resolveTransport(
+					chosen,
+					callType,
+					opts.preferredTransport?.(chosen),
+				);
 				const deployment = deploymentSubject(chosen.row.id);
 				const capacity = capacitySubject(
 					chosen.row.id,

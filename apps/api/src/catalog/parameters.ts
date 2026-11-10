@@ -68,7 +68,7 @@ const NO_CATALOG_PARAMETERS: ParameterSupportMap = {};
 /**
  * The model's metadata as the parameter policy sees it on one transport: what the adapter declares it
  * does with each canonical field there (`Adapter.chatParameters`), overridden by whatever the catalog
- * entry says about the model. Without the adapter's declaration a field the transport cannot express
+ * entry says about the model, except that a field the transport cannot carry stays unsupported. Without the adapter's declaration a field the transport cannot express
  * would be "unknown" for every model that does not repeat it, and pass through to be lost.
  */
 export function withAdapterParameters(
@@ -87,7 +87,14 @@ export function withAdapterParameters(
 	}
 	let parameters = byAdapter.get(adapterParameters);
 	if (!parameters) {
-		parameters = { ...adapterParameters, ...catalog };
+		// The catalog says what the model accepts; what the transport cannot carry at all stays out
+		// whatever the model accepts (gpt-4.1 takes `stop`, the Responses request has no field for it).
+		const uncarried = Object.fromEntries(
+			Object.entries(adapterParameters).filter(
+				([, entry]) => entrySupport(entry) === "unsupported",
+			),
+		);
+		parameters = { ...adapterParameters, ...catalog, ...uncarried };
 		byAdapter.set(adapterParameters, parameters);
 	}
 	return {

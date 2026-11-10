@@ -19,7 +19,9 @@ import {
  *  2. The model's own declaration — which of a provider's APIs this model answers on. Google runs
  *     Veo on `:predictLongRunning` and its omni models on `/interactions`, and no amount of
  *     configuration changes that, so the catalog is where it belongs.
- *  3. The adapter's default — what the provider's models speak unless one of them says otherwise.
+ *  3. The request's preference — a transport that can carry what this request asks for when the
+ *     default cannot (Chat Completions' `stop` or `seed`, say), among those the adapter offers.
+ *  4. The adapter's default — what the provider's models speak unless one of them says otherwise.
  *
  * A transport nothing supports is a configuration error either way, but the message says which of
  * the three chose it: hunting for a deployment setting that was never made is how an afternoon goes.
@@ -43,6 +45,7 @@ function transportSource(
 export function resolveTransport(
 	candidate: DeploymentCandidate,
 	callType: CallType,
+	preferred?: UpstreamTransport,
 ): UpstreamTransport {
 	const transports = candidate.adapter.transports?.[callType];
 	const operation = operationForCallType(callType);
@@ -68,8 +71,16 @@ export function resolveTransport(
 		transports?.default,
 	);
 	const supported = transports?.supported;
+	const preference =
+		preferred !== undefined && supported?.includes(preferred)
+			? preferred
+			: undefined;
 	const transport =
-		configuredOverride ?? declared ?? transports?.default ?? "chat_completions";
+		configuredOverride ??
+		declared ??
+		preference ??
+		transports?.default ??
+		"chat_completions";
 	if (supported && !supported.includes(transport)) {
 		throw new GatewayError({
 			class: "server",
