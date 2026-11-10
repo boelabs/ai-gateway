@@ -44,6 +44,7 @@ Para el segundo, por recurso:
 - **No hay puerto de host publicado.** Coolify recurre a detener y luego iniciar cuando un puerto de host está vinculado, cuando *Nombres de contenedores consistentes* está activado, con un nombre de contenedor personalizado o IP, y para vistas previas de relaciones públicas.
 - **Conectarse a una red predefinida** (Configuración → Avanzada). Una stack de Compose tiene su propia red y un proyecto o entorno compartido no crea conectividad. Una vez conectado, dirija sus servicios por su nombre completo: `postgres-<uuid>:5432`, no `postgres:5432`.
 - **Las migraciones no necesitan ningún paso.** El gateway las aplica en el arranque, detrás de un bloqueo de aviso, por lo que cada réplica puede intentarlo y solo una lo hace. No busca aquí un enlace de "preimplementación" de plataforma: se ejecutan en el contenedor *saliente*, que es la imagen anterior y no contiene los nuevos archivos de migración.
+- **Las migraciones esperan su turno.** El DDL se ejecuta con un `lock_timeout` de 5 s y reintenta con espera creciente, así que una migración que queda detrás de una transacción larga se aparta en lugar de bloquear todas las consultas de la tabla; una réplica espera como máximo diez minutos a que otra termine de migrar. Los índices de tablas grandes se crean `CONCURRENTLY` desde `src/db/migrations-concurrent/`, después de las migraciones normales, sin bloquear las escrituras.
 
 ## Los cambios de esquema deben sobrevivir a la superposición [#schema-changes-must-survive-the-overlap]
 
