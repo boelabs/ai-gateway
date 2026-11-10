@@ -50,6 +50,8 @@ const finalizationQueue: Array<{
 	run: () => Promise<void>;
 	resolve: () => void;
 	bytes: number;
+	/** Writes of one request run in the order they were queued; different requests in parallel. */
+	key: string;
 }> = [];
 let queuedBytes = 0;
 let drainingFinalizations = false;
@@ -72,12 +74,22 @@ async function drainFinalizations(): Promise<void> {
 			for (const job of batch) {
 				queuedBytes -= job.bytes;
 			}
+			// One operation's writes stay in order (its row before its attempts, which reference it);
+			// different operations' writes run concurrently.
+			const byKey = new Map<string, typeof batch>();
+			for (const job of batch) {
+				byKey.set(job.key, [...(byKey.get(job.key) ?? []), job]);
+			}
 			await Promise.allSettled(
-				batch.map(async (job) => {
-					try {
-						await job.run();
-					} finally {
-						job.resolve();
+				[...byKey.values()].map(async (jobs) => {
+					for (const job of jobs) {
+						try {
+							await job.run();
+						} catch {
+							// retry() already logged and counted it.
+						} finally {
+							job.resolve();
+						}
 					}
 				}),
 			);
@@ -109,7 +121,7 @@ function enqueueFinalization(
 		return Promise.resolve();
 	}
 	const task = new Promise<void>((resolve) => {
-		finalizationQueue.push({ run, resolve, bytes });
+		finalizationQueue.push({ run, resolve, bytes, key: requestId });
 		queuedBytes += bytes;
 		recordPersistenceQueueDelta(1);
 	});
@@ -797,99 +809,113 @@ function finalizeOperation(
 				retry(async () => {
 					// A finished parent must never be observable with stale in-progress attempts.
 					await db.transaction(async (tx) => {
-						await tx
-							.update(gatewayOperations)
-							.set({
-								publicModel: input.publicModel,
-								lifecycleState: "finished",
-								outcome,
-								degraded,
-								terminalVerified,
-								cacheHit: input.cacheHit,
-								stream: streamed,
-								httpStatus: input.httpStatus,
-								promptTokens: input.usage?.promptTokens ?? null,
-								completionTokens: input.usage?.completionTokens ?? null,
-								reasoningTokens: input.usage?.reasoningTokens ?? null,
-								cacheReadTokens: input.usage?.cacheReadTokens ?? null,
-								cacheWriteTokens: input.usage?.cacheWriteTokens ?? null,
-								totalTokens: input.usage?.totalTokens ?? null,
-								searchUnits: input.usage?.searchUnits ?? null,
-								consumerCostCents: input.cost?.totalCents.toFixed(10) ?? null,
-								upstreamCostCents:
-									(attempts.length > 0
-										? knownUpstreamCost
-										: input.cost?.totalCents
-									)?.toFixed(10) ?? null,
-								durationMs: input.durationMs,
-								firstOutputMs: firstOutputMsOf(
-									streamed,
-									lifecycle?.firstOutputAt ?? null,
-									input,
-								),
-								firstEventMs:
-									lifecycle?.firstEventAt == null
-										? null
-										: lifecycle.firstEventAt - input.startTime.getTime(),
-								firstReasoningMs:
-									lifecycle?.firstReasoningAt == null
-										? null
-										: lifecycle.firstReasoningAt - input.startTime.getTime(),
-								maxInterEventGapMs: lifecycle?.maxInterEventGapMs ?? null,
-								downstreamBlockedMs:
-									downstream?.maxBlockedMs ??
-									(attempts.length > 0
-										? Math.max(
-												...attempts.map(
-													(attempt) => attempt.downstreamBlockedMs ?? 0,
-												),
-											)
-										: null),
-								upstreamBytes: attempts.length > 0 ? upstreamBytes : null,
-								downstreamBytes:
-									downstreamBytes > 0 ? downstreamBytes : summaryBytes,
-								endedAt: input.endTime,
-								lastProgressAt: input.endTime,
-								reasoning: input.metadata.reasoning ?? null,
-								requestSummary,
-								responseSummary,
-								metadata: {
-									...input.metadata,
-									...(input.usage?.cacheWriteTokensByTtl === undefined
-										? {}
-										: {
-												cacheWriteTokensByTtl:
-													input.usage.cacheWriteTokensByTtl,
-											}),
-									// The upstream reported no usage: the counts above are the gateway's estimate.
-									...(input.usage?.estimated ? { usageEstimated: true } : {}),
-									...(input.usage?.serviceTier === undefined
-										? {}
-										: { serviceTier: input.usage.serviceTier }),
-									client: {
-										ipFingerprint: payloadFingerprint(input.ip),
-										userAgentFingerprint: payloadFingerprint(input.userAgent),
-									},
-								},
-								error: input.error
-									? {
-											class: input.error.class,
-											code: input.error.code,
-											http_status: input.error.http_status,
-											failure_kind: input.error.failure_kind,
-											...(input.error.phase === undefined
-												? {}
-												: { phase: input.error.phase }),
-											...internalMessage(
-												typeof input.error.message === "string"
-													? input.error.message
-													: undefined,
-												payloadAccessIsOpen(),
+						// An upsert, not an update: the row opened at the start may never have been
+						// written (its write was dropped or failed), and the finished record must not
+						// be lost with it.
+						const finished: Partial<typeof gatewayOperations.$inferInsert> = {
+							publicModel: input.publicModel,
+							lifecycleState: "finished",
+							outcome,
+							degraded,
+							terminalVerified,
+							cacheHit: input.cacheHit,
+							stream: streamed,
+							httpStatus: input.httpStatus,
+							promptTokens: input.usage?.promptTokens ?? null,
+							completionTokens: input.usage?.completionTokens ?? null,
+							reasoningTokens: input.usage?.reasoningTokens ?? null,
+							cacheReadTokens: input.usage?.cacheReadTokens ?? null,
+							cacheWriteTokens: input.usage?.cacheWriteTokens ?? null,
+							totalTokens: input.usage?.totalTokens ?? null,
+							searchUnits: input.usage?.searchUnits ?? null,
+							consumerCostCents: input.cost?.totalCents.toFixed(10) ?? null,
+							upstreamCostCents:
+								(attempts.length > 0
+									? knownUpstreamCost
+									: input.cost?.totalCents
+								)?.toFixed(10) ?? null,
+							durationMs: input.durationMs,
+							firstOutputMs: firstOutputMsOf(
+								streamed,
+								lifecycle?.firstOutputAt ?? null,
+								input,
+							),
+							firstEventMs:
+								lifecycle?.firstEventAt == null
+									? null
+									: lifecycle.firstEventAt - input.startTime.getTime(),
+							firstReasoningMs:
+								lifecycle?.firstReasoningAt == null
+									? null
+									: lifecycle.firstReasoningAt - input.startTime.getTime(),
+							maxInterEventGapMs: lifecycle?.maxInterEventGapMs ?? null,
+							downstreamBlockedMs:
+								downstream?.maxBlockedMs ??
+								(attempts.length > 0
+									? Math.max(
+											...attempts.map(
+												(attempt) => attempt.downstreamBlockedMs ?? 0,
 											),
-										}
-									: missingTerminalError,
+										)
+									: null),
+							upstreamBytes: attempts.length > 0 ? upstreamBytes : null,
+							downstreamBytes:
+								downstreamBytes > 0 ? downstreamBytes : summaryBytes,
+							endedAt: input.endTime,
+							lastProgressAt: input.endTime,
+							reasoning: input.metadata.reasoning ?? null,
+							requestSummary,
+							responseSummary,
+							metadata: {
+								...input.metadata,
+								...(input.usage?.cacheWriteTokensByTtl === undefined
+									? {}
+									: {
+											cacheWriteTokensByTtl: input.usage.cacheWriteTokensByTtl,
+										}),
+								// The upstream reported no usage: the counts above are the gateway's estimate.
+								...(input.usage?.estimated ? { usageEstimated: true } : {}),
+								...(input.usage?.serviceTier === undefined
+									? {}
+									: { serviceTier: input.usage.serviceTier }),
+								client: {
+									ipFingerprint: payloadFingerprint(input.ip),
+									userAgentFingerprint: payloadFingerprint(input.userAgent),
+								},
+							},
+							error: input.error
+								? {
+										class: input.error.class,
+										code: input.error.code,
+										http_status: input.error.http_status,
+										failure_kind: input.error.failure_kind,
+										...(input.error.phase === undefined
+											? {}
+											: { phase: input.error.phase }),
+										...internalMessage(
+											typeof input.error.message === "string"
+												? input.error.message
+												: undefined,
+											payloadAccessIsOpen(),
+										),
+									}
+								: missingTerminalError,
+						};
+						await tx
+							.insert(gatewayOperations)
+							.values({
+								id: operationId,
+								requestId: input.requestId,
+								virtualKeyId: input.virtualKeyId,
+								actor: input.actor ?? null,
+								callType: input.callType,
+								startedAt: input.startTime,
+								...finished,
 							})
-							.where(eq(gatewayOperations.id, operationId));
+							.onConflictDoUpdate({
+								target: gatewayOperations.id,
+								set: finished,
+							});
 
 						if (attempts.length > 0) {
 							await tx

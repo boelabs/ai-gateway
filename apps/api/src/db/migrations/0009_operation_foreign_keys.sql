@@ -1,0 +1,2 @@
+ALTER TABLE "payload_samples" ADD CONSTRAINT "payload_samples_operation_id_gateway_operations_id_fk" FOREIGN KEY ("operation_id") REFERENCES "public"."gateway_operations"("id") ON DELETE cascade ON UPDATE no action NOT VALID;--> statement-breakpoint
+ALTER TABLE "upstream_attempts" ADD CONSTRAINT "upstream_attempts_operation_id_gateway_operations_id_fk" FOREIGN KEY ("operation_id") REFERENCES "public"."gateway_operations"("id") ON DELETE cascade ON UPDATE no action NOT VALID;

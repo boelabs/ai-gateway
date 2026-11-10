@@ -600,7 +600,11 @@ export const upstreamAttempts = pgTable(
 	"upstream_attempts",
 	{
 		id: uuid("id").primaryKey().defaultRandom(),
-		operationId: uuid("operation_id").notNull(),
+		operationId: uuid("operation_id")
+			.notNull()
+			// Shipped NOT VALID (migration 0009): enforced for new rows, existing ones are checked
+			// by a later release after an orphan sweep.
+			.references(() => gatewayOperations.id, { onDelete: "cascade" }),
 		ordinal: integer("ordinal").notNull(),
 		deploymentId: uuid("deployment_id"),
 		deploymentLabel: text("deployment_label"),
@@ -655,7 +659,11 @@ export const payloadSamples = pgTable(
 	"payload_samples",
 	{
 		id: uuid("id").primaryKey().defaultRandom(),
-		operationId: uuid("operation_id").notNull(),
+		operationId: uuid("operation_id")
+			.notNull()
+			// Shipped NOT VALID (migration 0009): enforced for new rows, existing ones are checked
+			// by a later release after an orphan sweep.
+			.references(() => gatewayOperations.id, { onDelete: "cascade" }),
 		captureReason: text("capture_reason").notNull(),
 		envelope: jsonb("envelope").$type<EncEnvelope>().notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })

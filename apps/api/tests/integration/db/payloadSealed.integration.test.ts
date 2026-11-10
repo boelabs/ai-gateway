@@ -13,7 +13,9 @@ import { test } from "node:test";
 
 process.env.OBSERVABILITY_PAYLOAD_ACCESS = "sealed";
 
-const { payloadAccessAudit, payloadSamples } = await import("#db/schema.ts");
+const { gatewayOperations, payloadAccessAudit, payloadSamples } = await import(
+	"#db/schema.ts"
+);
 const { getPayloadSample, payloadAccessIsOpen } = await import(
 	"#logging/operations.ts"
 );
@@ -29,6 +31,18 @@ test("sealed access: a live sample is refused, audited, and never decrypted", {
 }, async () => {
 	assert.equal(payloadAccessIsOpen(), false);
 	const operationId = randomUUID();
+	// A sample belongs to an operation (foreign key).
+	await db.insert(gatewayOperations).values({
+		id: operationId,
+		requestId: randomUUID(),
+		publicModel: "m",
+		callType: "chat",
+		lifecycleState: "finished",
+		outcome: "error",
+		degraded: true,
+		startedAt: new Date(),
+		endedAt: new Date(),
+	});
 	await db.insert(payloadSamples).values({
 		operationId,
 		captureReason: "success",
@@ -79,5 +93,8 @@ test("sealed access: a live sample is refused, audited, and never decrypted", {
 		await db
 			.delete(payloadAccessAudit)
 			.where(eq(payloadAccessAudit.operationId, operationId));
+		await db
+			.delete(gatewayOperations)
+			.where(eq(gatewayOperations.id, operationId));
 	}
 });

@@ -64,6 +64,13 @@
       "when": 1794317984294,
       "tag": "0008_session_epoch",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794324716905,
+      "tag": "0009_operation_foreign_keys",
+      "breakpoints": true
     }
   ]
 }

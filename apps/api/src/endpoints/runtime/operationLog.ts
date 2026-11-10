@@ -216,6 +216,7 @@ export class OperationLogDraft {
 			operationId: this.operationId,
 			requestId: this.requestId,
 			virtualKeyId: this.virtualKeyId,
+			actor: this.actor,
 			publicModel: this.publicModel,
 			deploymentId: this.deploymentId,
 			adapterKey: this.adapterKey,
