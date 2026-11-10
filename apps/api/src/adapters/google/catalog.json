@@ -268,7 +268,8 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 200,
-				"outputCentsPerMTokens": 1200
+				"outputCentsPerMTokens": 1200,
+				"audioInputCentsPerMTokens": 200
 			},
 			"notes": "Interactions API. Audio up to 1 hour, 30 minutes with diarization or word timestamps (srt, vtt and diarized_json request word timestamps); Google enforces the duration. Diarization attributes up to 8 speakers."
 		},
@@ -285,7 +286,8 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 350,
-				"outputCentsPerMTokens": 2100
+				"outputCentsPerMTokens": 2100,
+				"audioInputCentsPerMTokens": 350
 			},
 			"notes": "Live API (BidiGenerateContent). Gemini ends a session after 10 minutes; the gateway reconnects behind one public session. No diarization or word timestamps live. Gemini reports no usage for transcription sessions; the gateway estimates it from audio duration and transcript length."
 		},
@@ -3540,7 +3542,9 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 350,
-				"outputCentsPerMTokens": 2100
+				"outputCentsPerMTokens": 2100,
+				"audioInputCentsPerMTokens": 350,
+				"audioOutputCentsPerMTokens": 2100
 			},
 			"notes": "Live API speech-to-speech translation into 70+ languages; requires session.translation.target_language (AI Gateway extension). Audio in, translated audio out; no instructions, tools or text input. The source language is detected. Each connection lasts about 10 minutes; the gateway reconnects without carrying context. Translation streams without turns; the gateway ends a response after 1.5 s without translated output."
 		}

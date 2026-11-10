@@ -1159,6 +1159,18 @@ function mapGeminiUsage(u: GeminiUsage | undefined): Usage {
 	if (completionImageTokens) {
 		usage.completionImageTokens = completionImageTokens;
 	}
+	// Gemini bills audio above text (see the Live and TTS models' audio rates), so the split matters.
+	const promptAudioTokens = modalityTokens(u?.promptTokensDetails, "AUDIO");
+	if (promptAudioTokens) {
+		usage.promptAudioTokens = promptAudioTokens;
+	}
+	const completionAudioTokens = modalityTokens(
+		u?.candidatesTokensDetails,
+		"AUDIO",
+	);
+	if (completionAudioTokens) {
+		usage.completionAudioTokens = completionAudioTokens;
+	}
 	return usage;
 }
 

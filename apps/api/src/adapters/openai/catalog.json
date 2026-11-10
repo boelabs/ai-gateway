@@ -651,7 +651,8 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 250,
-				"outputCentsPerMTokens": 1000
+				"outputCentsPerMTokens": 1000,
+				"audioInputCentsPerMTokens": 250
 			},
 			"deprecated": true,
 			"notes": "OpenAI deprecated gpt-4o-transcribe; it shuts down on 2027-02-26 (replacement: gpt-transcribe or gpt-live-transcribe)."
@@ -666,7 +667,8 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 125,
-				"outputCentsPerMTokens": 500
+				"outputCentsPerMTokens": 500,
+				"audioInputCentsPerMTokens": 125
 			},
 			"deprecated": true,
 			"notes": "OpenAI deprecated gpt-4o-mini-transcribe; it shuts down on 2027-02-26 (replacement: gpt-transcribe or gpt-live-transcribe)."
@@ -1752,7 +1754,9 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 250,
-				"outputCentsPerMTokens": 1000
+				"outputCentsPerMTokens": 1000,
+				"audioInputCentsPerMTokens": 3200,
+				"audioOutputCentsPerMTokens": 6400
 			},
 			"deprecated": true,
 			"notes": "OpenAI deprecated gpt-audio; it shuts down on 2027-01-20 (replacement: gpt-audio-1.5)."
@@ -1789,7 +1793,9 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 60,
-				"outputCentsPerMTokens": 240
+				"outputCentsPerMTokens": 240,
+				"audioInputCentsPerMTokens": 1000,
+				"audioOutputCentsPerMTokens": 2000
 			},
 			"deprecated": true,
 			"notes": "OpenAI deprecated gpt-audio-mini; it shuts down on 2027-01-20 (replacement: gpt-audio-1.5)."

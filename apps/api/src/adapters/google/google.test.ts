@@ -899,6 +899,32 @@ test("google.parseResponse: maps candidates/usageMetadata to canonical", () => {
 	assert.equal(u.usage.promptTokens, 5);
 });
 
+test("google.parseResponse: splits audio tokens out of prompt and output", () => {
+	const u = must(googleAdapter, "chat").parseResponse(
+		{
+			candidates: [
+				{
+					content: { role: "model", parts: [{ text: "hi" }] },
+					finishReason: "STOP",
+				},
+			],
+			usageMetadata: {
+				promptTokenCount: 30,
+				candidatesTokenCount: 12,
+				totalTokenCount: 42,
+				promptTokensDetails: [
+					{ modality: "TEXT", tokenCount: 5 },
+					{ modality: "AUDIO", tokenCount: 25 },
+				],
+				candidatesTokensDetails: [{ modality: "AUDIO", tokenCount: 12 }],
+			},
+		},
+		ctx,
+	);
+	assert.equal(u.usage.promptAudioTokens, 25);
+	assert.equal(u.usage.completionAudioTokens, 12);
+});
+
 test("google.parseResponse: documented and future finish reasons remain observable", () => {
 	const parse = (finishReason: string) =>
 		must(googleAdapter, "chat").parseResponse(
