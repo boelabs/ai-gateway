@@ -740,6 +740,19 @@ export async function* responsesEventsToCanonicalChunks(
 	// Encrypted reasoning item ids already forwarded as delta.providerFields (dedupes the final
 	// response against per-item events).
 	const reasoningStateSeen = new Set<string>();
+	// Chat's tool_calls[].index counts tool calls from zero; Responses' output_index counts every
+	// output item (reasoning and messages too). Each function call gets the next ordinal when it
+	// first appears.
+	const toolCallOrdinals = new Map<number, number>();
+	const toolCallOrdinal = (outputIndex: unknown): number => {
+		const key = Number(outputIndex ?? 0);
+		let ordinal = toolCallOrdinals.get(key);
+		if (ordinal === undefined) {
+			ordinal = toolCallOrdinals.size;
+			toolCallOrdinals.set(key, ordinal);
+		}
+		return ordinal;
+	};
 
 	const base = () => ({ id, created, model });
 
@@ -895,7 +908,7 @@ export async function* responsesEventsToCanonicalChunks(
 				providerFields: providerFieldsWithOpenAIResponsesStreamEvent(type, d),
 			};
 			if (item?.type === "function_call") {
-				const idx = Number(d.output_index ?? 0);
+				const idx = toolCallOrdinal(d.output_index);
 				delta.toolCalls = [
 					{
 						index: idx,
@@ -916,7 +929,7 @@ export async function* responsesEventsToCanonicalChunks(
 		}
 
 		if (type === "response.function_call_arguments.delta") {
-			const idx = Number(d.output_index ?? 0);
+			const idx = toolCallOrdinal(d.output_index);
 			yield {
 				...base(),
 				choices: [
