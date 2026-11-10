@@ -489,3 +489,30 @@ test("extensions: image output hooks can replace the encoded bytes", async (t) =
 	const transformed = await extensionRuntime.runImageOutput(scope(), output);
 	assert.deepEqual([...transformed.data], [4, 5, 6]);
 });
+
+test("extensions: a realtime session on a targeted model is refused, others pass", async (t) => {
+	await resetRuntime();
+	t.after(resetRuntime);
+	await load(
+		{
+			"noop.mjs": `export default { key: "noop", hooks: { onCanonicalRequest(ctx, req) { return req; } } };`,
+		},
+		[
+			{
+				id: "noop-default",
+				definition: "noop",
+				match: { models: ["demo-model"] },
+				config: {},
+			},
+		],
+	);
+	assert.throws(
+		() => extensionRuntime.assertNoInstanceTargets(scope("demo-model")),
+		(error: unknown) =>
+			(error as { code?: string }).code ===
+			"extensions_unsupported_for_realtime",
+	);
+	assert.doesNotThrow(() =>
+		extensionRuntime.assertNoInstanceTargets(scope("other-model")),
+	);
+});

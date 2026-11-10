@@ -88,4 +88,5 @@ tokens de entrada a partir de la duración del audio (25 tokens por segundo, la 
 Google) y los de salida a partir del largo de la transcripción (unos 4 caracteres por token). La
 operación queda marcada con `usageEstimated` y los eventos `completed` no traen `usage`. La virtual
 key se cobra mientras la sesión transcurre, en cada transcripción completada, y cuando se agota su
-presupuesto el gateway envía un `error` con código `budget_exceeded` y cierra el socket con 1008.
+presupuesto el gateway envía un `error` con código `budget_exceeded` y cierra el socket con 1008. Las credenciales y las extensiones se tratan como en
+[Conversaciones realtime](/docs/realtime-conversations#limits-and-billing).

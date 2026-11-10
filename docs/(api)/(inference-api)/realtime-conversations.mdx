@@ -177,3 +177,9 @@ generating it, and it is billed.
 - A virtual key is charged as the session runs, at every `response.done`, not only when it closes:
   the spend and the TPM window are current while a long session is open. Once the key's budget is
   spent the gateway sends an `error` with code `budget_exceeded` and closes the socket with 1008.
+- The credential is re-checked at every provider run and once a minute: a disabled, expired or
+  deleted key, or a revoked session, ends the socket with an `error` and close code 1008. A session
+  opened with a client secret is checked against the key that minted it, so the secret's own short
+  expiry does not end it.
+- Realtime sessions have no extension hooks yet, so a session whose model an active extension
+  instance targets is refused with `extensions_unsupported_for_realtime` instead of running without it.

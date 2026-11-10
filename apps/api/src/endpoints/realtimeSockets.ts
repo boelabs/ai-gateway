@@ -1,8 +1,12 @@
 import { RealtimeClientEventError } from "#contracts/openai/realtime.ts";
 import type { DownstreamWriteObservation } from "./runtime/sse.ts";
+import { getAuth, revalidateAuth } from "#auth/middleware.ts";
+import { toGatewayError } from "./runtime/pipeline.ts";
 import { GatewayError } from "#core/errors.ts";
+import type { AppEnv } from "#auth/types.ts";
 import type { WSContext } from "hono/ws";
 import { env } from "#config/env.ts";
+import type { Context } from "hono";
 
 /**
  * What every `/v1/realtime` socket shares, whatever kind of session it carries: the connection
@@ -12,6 +16,34 @@ import { env } from "#config/env.ts";
 export const REALTIME_MAX_MS = 60 * 60 * 1000;
 export const MAX_MESSAGE_BYTES = 16 * 1024 * 1024;
 export const MAX_QUEUED_EVENTS = 2000;
+/** How often an open socket's credential is re-checked between provider runs. */
+export const CREDENTIAL_CHECK_MS = 60_000;
+
+/**
+ * Re-checks the connection's credential now (at every provider run start) and stores the fresh
+ * identity on the context, so a revoked key or session cannot open new runs.
+ */
+export async function revalidateConnection(c: Context<AppEnv>): Promise<void> {
+	c.set("auth", await revalidateAuth(c, getAuth(c)));
+}
+
+/**
+ * Re-checks the credential on a timer for as long as the socket is open, so a disabled key or a
+ * revoked session ends a session that would otherwise outlive it by up to an hour. Returns a stop.
+ */
+export function watchCredential(
+	c: Context<AppEnv>,
+	onRevoked: (error: GatewayError) => void,
+): () => void {
+	const timer = setInterval(() => {
+		revalidateConnection(c).catch((error: unknown) => {
+			clearInterval(timer);
+			onRevoked(toGatewayError(error));
+		});
+	}, CREDENTIAL_CHECK_MS);
+	timer.unref?.();
+	return () => clearInterval(timer);
+}
 
 export interface RealtimeSocketEntry {
 	scopeKey: string;

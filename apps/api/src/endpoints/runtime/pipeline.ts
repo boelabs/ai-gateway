@@ -221,6 +221,17 @@ export function extensionScope(
 	};
 }
 
+/** Refuses a realtime session whose model an active extension instance targets (see the runtime). */
+export function assertRealtimeExtensionsSupported(
+	c: Context<AppEnv>,
+	callType: CallType,
+	publicModel: string,
+): void {
+	extensionRuntime.assertNoInstanceTargets(
+		extensionScope(c, callType, publicModel),
+	);
+}
+
 export async function applyCanonicalRequestExtensions<
 	T extends ExtensionCanonicalRequest,
 >(c: Context<AppEnv>, callType: CallType, request: T): Promise<T> {

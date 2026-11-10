@@ -35,6 +35,8 @@ export interface SessionAuth {
 export interface RealtimeSecretGrant {
 	/** The `session` given when the secret was minted, or null. */
 	session: Record<string, unknown> | null;
+	/** Hash of the virtual key that minted it (null: the master key), for revalidation. */
+	keyHash?: string | null;
 }
 
 export type Auth =

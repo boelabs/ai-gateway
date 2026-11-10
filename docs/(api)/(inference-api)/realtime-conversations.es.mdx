@@ -178,3 +178,10 @@ Gemini termina de generarlo y se factura.
 - La virtual key se cobra mientras la sesión transcurre, en cada `response.done`, y no solo al cerrar:
   el gasto y la ventana de TPM están al día durante una sesión larga. Cuando se agota el presupuesto
   de la key, el gateway envía un `error` con código `budget_exceeded` y cierra el socket con 1008.
+- La credencial se vuelve a comprobar en cada ejecución con el proveedor y una vez por minuto: una key
+  deshabilitada, caducada o eliminada, o una sesión revocada, cierra el socket con un `error` y el
+  código 1008. Una sesión abierta con un client secret se comprueba contra la key que lo emitió, así
+  que la caducidad corta del propio secret no la termina.
+- Las sesiones realtime aún no tienen hooks de extensiones, así que una sesión cuyo modelo apunta una
+  instancia de extensión activa se rechaza con `extensions_unsupported_for_realtime` en lugar de
+  ejecutarse sin ella.

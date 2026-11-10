@@ -576,6 +576,26 @@ class ExtensionRuntime {
 		return selected;
 	}
 
+	/**
+	 * Realtime sessions have no extension hook points yet. Until they do, a session whose model an
+	 * active instance targets is refused rather than run with the extension silently skipped.
+	 */
+	assertNoInstanceTargets(scope: ExtensionScope): void {
+		const targeting = this.instances.find(
+			(instance) => instance.enabled && matchApplies(instance.match, scope),
+		);
+		if (targeting) {
+			throw new GatewayError({
+				class: "bad_request",
+				code: "extensions_unsupported_for_realtime",
+				message: `Extension instance ${targeting.id} (${targeting.definitionKey}) targets ${scope.publicModel ?? "this model"}, and realtime sessions cannot run extension hooks`,
+				publicMessage:
+					"This model has an active extension, which realtime sessions do not support.",
+				deploymentHealth: "neutral",
+			});
+		}
+	}
+
 	async runCanonicalRequest<T extends ExtensionCanonicalRequest>(
 		scope: ExtensionScope,
 		request: T,

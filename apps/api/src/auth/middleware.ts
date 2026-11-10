@@ -167,7 +167,7 @@ async function authenticateRealtimeSecret(
 			message: "Client secret is invalid or expired",
 		});
 	}
-	const realtimeSecret = { session: secret.session };
+	const realtimeSecret = { session: secret.session, keyHash: secret.keyHash };
 	if (secret.keyHash === null) {
 		return { type: "master", realtimeSecret };
 	}
@@ -175,6 +175,25 @@ async function authenticateRealtimeSecret(
 		await getCachedVirtualKeyByHash(secret.keyHash),
 	);
 	return { ...auth, realtimeSecret };
+}
+
+/**
+ * Re-checks a long-lived connection's credential: a disabled, expired or deleted key, or a revoked
+ * session, ends it rather than living as long as the socket. A realtime client secret only opens a
+ * session and may expire long before it ends, so what is re-checked is the key that minted it.
+ */
+export async function revalidateAuth(c: Context, auth: Auth): Promise<Auth> {
+	if (auth.type !== "session" && auth.realtimeSecret) {
+		const { keyHash } = auth.realtimeSecret;
+		if (keyHash === undefined || keyHash === null) {
+			return auth;
+		}
+		return {
+			...activeVirtualKey(await getCachedVirtualKeyByHash(keyHash)),
+			realtimeSecret: auth.realtimeSecret,
+		};
+	}
+	return authenticateRequest(c);
 }
 
 /** Resolves the identity (master key, virtual key, or session) and stores it in c.get('auth'). */

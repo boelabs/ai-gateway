@@ -37,12 +37,23 @@ import {
 	unregisterRealtimeSocket,
 	registerRealtimeSocket,
 	eventQueueLimitError,
+	revalidateConnection,
 	sessionExpiredError,
 	realtimeMessageJson,
 	sendRealtimeEvent,
 	MAX_QUEUED_EVENTS,
 	REALTIME_MAX_MS,
+	watchCredential,
 } from "./realtimeSockets.ts";
+
+import {
+	assertRealtimeExtensionsSupported,
+	assertFinalModelAllowed,
+	usageQuotaForRequest,
+	computeUsageCost,
+	toGatewayError,
+	preflight,
+} from "./runtime/pipeline.ts";
 
 import {
 	type CanonicalRealtimeTranscriptionConfig,
@@ -56,14 +67,6 @@ import {
 	type DownstreamWriteObservation,
 	newDownstreamWriteObservation,
 } from "./runtime/sse.ts";
-
-import {
-	assertFinalModelAllowed,
-	usageQuotaForRequest,
-	computeUsageCost,
-	toGatewayError,
-	preflight,
-} from "./runtime/pipeline.ts";
 
 export { closeRealtimeWebSockets } from "./realtimeSockets.ts";
 
@@ -113,6 +116,8 @@ interface RealtimeConnection {
 	run: UpstreamRun | null;
 	lastItemId: string | null;
 	timer: ReturnType<typeof setTimeout> | undefined;
+	/** Stops the periodic credential re-check (see `watchCredential`). */
+	stopCredentialWatch?: () => void;
 	closed: boolean;
 }
 
@@ -289,6 +294,12 @@ async function startRun(
 	log.requestBody = { session: renderSession(state) };
 	const abort = new AbortController();
 	try {
+		await revalidateConnection(c);
+		assertRealtimeExtensionsSupported(
+			c,
+			"realtime.transcription",
+			config.model,
+		);
 		await preflight(c, config.model, { writeHeaders: false });
 		assertFinalModelAllowed(c, config.model);
 		const routing = await route(
@@ -461,6 +472,7 @@ async function closeConnection(connection: RealtimeConnection): Promise<void> {
 	}
 	connection.closed = true;
 	clearTimeout(connection.timer);
+	connection.stopCredentialWatch?.();
 	unregisterRealtimeSocket(connection.entry);
 	await connection.queue.catch(() => undefined);
 	if (connection.run) {
@@ -508,6 +520,10 @@ function realtimeTranscriptionSocket(
 				entry.socket?.close(1000, "60 minute session limit");
 			}, REALTIME_MAX_MS);
 			connection.timer.unref?.();
+			connection.stopCredentialWatch = watchCredential(c, (error) => {
+				sendError(connection, error);
+				entry.socket?.close(1008, "credential revoked");
+			});
 		},
 		onMessage(event) {
 			if (connection.queued >= MAX_QUEUED_EVENTS) {
