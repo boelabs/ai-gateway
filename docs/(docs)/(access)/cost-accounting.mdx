@@ -38,7 +38,8 @@ no declared rates is charged at the standard rates. The served tier is recorded 
 `metadata.serviceTier` on the operation.
 
 A deployment's own `pricing` field, if set, **overrides** the catalog rate entirely for that deployment
-— useful for a negotiated rate or a custom model with no catalog entry at all. A model with no pricing
+— useful for a negotiated rate or a custom model with no catalog entry at all. An override must
+declare at least one rate (`{}` is rejected); `null` clears it. A model with no pricing
 anywhere (no catalog rate, no override) normally bills as **zero cost**, not an error. Reranking has
 one guarded fallback: when no configured rate exists and OpenRouter reports `usage.cost`, that value
 is used so a paid request is not falsely recorded as free. When both are present, configured pricing

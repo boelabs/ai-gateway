@@ -61,7 +61,13 @@ export const pricingSchema = z
 			)
 			.optional(),
 	})
-	.strict();
+	.strict()
+	// A pricing replaces the catalog's entirely, so an empty one would silently price the model at
+	// zero. Clearing an override is `null`, not `{}`.
+	.refine((pricing) => Object.keys(pricing).length > 0, {
+		message:
+			"pricing must declare at least one rate; send null to clear an override",
+	});
 
 const capabilitiesSchema = z
 	.object({

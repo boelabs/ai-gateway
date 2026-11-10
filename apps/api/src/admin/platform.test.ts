@@ -133,6 +133,22 @@ test("admin platform: rejects empty credential patches", () => {
 	assert.equal(parsed.success, false);
 });
 
+test("admin platform: an empty pricing override is rejected; null clears it", () => {
+	assert.equal(
+		updateDeploymentSchema.safeParse({ pricing: {} }).success,
+		false,
+	);
+	assert.equal(
+		updateDeploymentSchema.safeParse({ pricing: null }).success,
+		true,
+	);
+	assert.equal(
+		updateDeploymentSchema.safeParse({ pricing: { inputCentsPerMTokens: 1 } })
+			.success,
+		true,
+	);
+});
+
 test("admin platform: rejects legacy provider field", async () => {
 	const app = adminAppWithErrors();
 	const parsed = createDeploymentSchema.safeParse({
