@@ -152,6 +152,11 @@ interface CanonicalResponsesTransportOptions {
 	contextManagement?: Record<string, unknown>[];
 	/** Exact wire items retained when canonical emulation cannot represent them losslessly. */
 	rawInput?: Record<string, unknown>[];
+	/**
+	 * The request's own `instructions`, kept beside `rawInput`: with the raw items sent as they are,
+	 * only these may become instructions, since the items already carry every other message.
+	 */
+	instructions?: string;
 	/** Exact wire tools retained for native Responses transports. */
 	rawTools?: Record<string, unknown>[];
 }

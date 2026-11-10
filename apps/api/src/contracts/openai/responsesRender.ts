@@ -919,7 +919,10 @@ export function responsesRequestToCanonical(
 				? {}
 				: { contextManagement: req.context_management }),
 			...(requiresNativeInput && Array.isArray(req.input)
-				? { rawInput: withoutGatewayStateItems(structuredClone(req.input)) }
+				? {
+						rawInput: withoutGatewayStateItems(structuredClone(req.input)),
+						...(req.instructions ? { instructions: req.instructions } : {}),
+					}
 				: {}),
 		};
 	}

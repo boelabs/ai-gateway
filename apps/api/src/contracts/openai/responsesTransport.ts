@@ -295,16 +295,20 @@ export function buildResponsesRequestBody(
 	assertResponsesRequestSupported(req);
 	const input: Record<string, unknown>[] = [];
 	const instructions: string[] = [];
+	const rawInput = req.responsesTransport?.rawInput;
 	const preserveInstructions =
-		req.responsesTransport?.rawInput === undefined &&
+		rawInput === undefined &&
 		req.messages.some(
 			(m) =>
 				Array.isArray(m.content) && m.content.some((p) => p.cacheBreakpoint),
 		);
+	// Only the leading run of system and developer messages becomes `instructions`; one later in the
+	// conversation stays an input item where it was, so the model reads it in order.
+	let leading = true;
 
 	for (const m of req.messages) {
 		if (m.role === "system" || m.role === "developer") {
-			if (preserveInstructions) {
+			if (preserveInstructions || !leading) {
 				input.push({
 					role: m.role,
 					content: contentToInput(m.content, "user"),
@@ -323,6 +327,7 @@ export function buildResponsesRequestBody(
 			}
 			continue;
 		}
+		leading = false;
 		if (m.role === "tool") {
 			const output = toolOutputOf(m.content);
 			input.push({
@@ -371,11 +376,16 @@ export function buildResponsesRequestBody(
 
 	const body: Record<string, unknown> = {
 		model: upstreamModel,
-		input: req.responsesTransport?.rawInput ?? input,
+		input: rawInput ?? input,
 		stream: req.stream,
 	};
-	if (instructions.length > 0) {
-		body.instructions = instructions.join("\n");
+	// Raw items already carry every message; only the request's own instructions are added.
+	const bodyInstructions =
+		rawInput === undefined
+			? instructions.join("\n")
+			: (req.responsesTransport?.instructions ?? "");
+	if (bodyInstructions.length > 0) {
+		body.instructions = bodyInstructions;
 	}
 	if (req.maxTokens !== undefined) {
 		body.max_output_tokens = req.maxTokens;
