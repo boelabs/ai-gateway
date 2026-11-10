@@ -1,16 +1,16 @@
 import { deriveActiveKey, decryptJson, encryptJson } from "#db/crypto.ts";
+import { and, asc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { EXECUTION_POLICY_MAX_TOTAL_MS } from "#core/executionPolicy.ts";
 import { providerErrorDetail, internalMessage } from "./errorRecord.ts";
-import { and, eq, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { PersistenceHealthTracker } from "./persistenceHealth.ts";
 import { purgeExpiredAuditEntries } from "#db/repos/audit.ts";
 import type { AdapterDiagnostics } from "#adapters/types.ts";
+import { db, sql as postgresClient } from "#db/client.ts";
 import type { OperationLogInput } from "./logger.ts";
 import { randomUUID } from "node:crypto";
 import { createHmac } from "node:crypto";
 import { redis } from "#cache/redis.ts";
 import { env } from "#config/env.ts";
-import { db } from "#db/client.ts";
 import { log } from "./log.ts";
 
 import {
@@ -1228,63 +1228,167 @@ export async function getPayloadSample(
 	return { outcome: "revealed", payload };
 }
 
-export function startOperationMaintenance(): () => void {
-	const run = async () => {
-		const abandoned = await reconcileAbandonedOperations();
-		if (abandoned > 0) {
-			log.error("operation-log", "reconciled abandoned operations", {
-				abandoned,
-			});
-		}
-		await db
-			.delete(payloadSamples)
-			.where(lte(payloadSamples.expiresAt, new Date()));
-		const retentionCutoff = new Date(
-			Date.now() - env.OBSERVABILITY_METADATA_RETENTION_DAYS * 86_400_000,
-		);
-		await db
-			.delete(payloadAccessAudit)
-			.where(lt(payloadAccessAudit.accessedAt, retentionCutoff));
-		const auditCutoff = new Date(
-			Date.now() - env.ADMIN_AUDIT_RETENTION_DAYS * 86_400_000,
-		);
-		const audited = await purgeExpiredAuditEntries(auditCutoff);
-		if (audited > 0) {
-			log.info("operation-log", "purged expired audit entries", { audited });
-		}
+/** Rows deleted per statement, and the most statements one maintenance pass may run per table. */
+const PURGE_BATCH = 1000;
+const MAX_PURGE_BATCHES = 50;
+const MAINTENANCE_INTERVAL_MS = 60_000;
+/** Shared by every replica, so only one runs maintenance at a time. Never change it. */
+const MAINTENANCE_LOCK_ID = 918_273_646;
+
+/** Expired operations, oldest first, along with their attempts and samples. Returns rows removed. */
+async function purgeExpiredOperations(cutoff: Date): Promise<number> {
+	let purged = 0;
+	for (let batch = 0; batch < MAX_PURGE_BATCHES; batch += 1) {
+		// Served by the partial index on (ended_at) WHERE lifecycle_state = 'finished'.
 		const expired = await db
 			.select({ id: gatewayOperations.id })
 			.from(gatewayOperations)
 			.where(
 				and(
 					eq(gatewayOperations.lifecycleState, "finished"),
-					lt(gatewayOperations.endedAt, retentionCutoff),
+					lt(gatewayOperations.endedAt, cutoff),
 				),
 			)
-			.limit(1000);
-		if (expired.length > 0) {
-			const ids = expired.map((row) => row.id);
-			await db.transaction(async (tx) => {
-				await tx
-					.delete(payloadSamples)
-					.where(inArray(payloadSamples.operationId, ids));
-				await tx
-					.delete(upstreamAttempts)
-					.where(inArray(upstreamAttempts.operationId, ids));
-				await tx
-					.delete(gatewayOperations)
-					.where(inArray(gatewayOperations.id, ids));
-			});
+			.orderBy(asc(gatewayOperations.endedAt))
+			.limit(PURGE_BATCH);
+		if (expired.length === 0) {
+			break;
+		}
+		const ids = expired.map((row) => row.id);
+		await db.transaction(async (tx) => {
+			await tx
+				.delete(payloadSamples)
+				.where(inArray(payloadSamples.operationId, ids));
+			await tx
+				.delete(upstreamAttempts)
+				.where(inArray(upstreamAttempts.operationId, ids));
+			await tx
+				.delete(gatewayOperations)
+				.where(inArray(gatewayOperations.id, ids));
+		});
+		purged += ids.length;
+		if (expired.length < PURGE_BATCH) {
+			break;
+		}
+	}
+	return purged;
+}
+
+/** Samples past their own expiry, in batches. */
+async function purgeExpiredSamples(now: Date): Promise<number> {
+	let purged = 0;
+	for (let batch = 0; batch < MAX_PURGE_BATCHES; batch += 1) {
+		const rows = await db.execute(sql`
+			DELETE FROM ${payloadSamples}
+			WHERE ${payloadSamples.id} IN (
+				SELECT ${payloadSamples.id} FROM ${payloadSamples}
+				WHERE ${payloadSamples.expiresAt} <= ${now.toISOString()}::timestamptz
+				LIMIT ${PURGE_BATCH}
+			)
+			RETURNING ${payloadSamples.id}`);
+		purged += rows.length;
+		if (rows.length < PURGE_BATCH) {
+			break;
+		}
+	}
+	return purged;
+}
+
+/**
+ * One maintenance pass. Each step runs on its own, so a failing one (a lock timeout on the audit
+ * table, say) does not skip the retention work after it.
+ */
+export async function runOperationMaintenance(now = new Date()): Promise<void> {
+	const retentionCutoff = new Date(
+		now.getTime() - env.OBSERVABILITY_METADATA_RETENTION_DAYS * 86_400_000,
+	);
+	const steps: [string, () => Promise<void>][] = [
+		[
+			"reconcile abandoned operations",
+			async () => {
+				const abandoned = await reconcileAbandonedOperations();
+				if (abandoned > 0) {
+					log.error("operation-log", "reconciled abandoned operations", {
+						abandoned,
+					});
+				}
+			},
+		],
+		[
+			"purge expired samples",
+			() => purgeExpiredSamples(now).then(() => undefined),
+		],
+		[
+			"purge payload access audit",
+			async () => {
+				await db
+					.delete(payloadAccessAudit)
+					.where(lt(payloadAccessAudit.accessedAt, retentionCutoff));
+			},
+		],
+		[
+			"purge admin audit",
+			async () => {
+				const audited = await purgeExpiredAuditEntries(
+					new Date(now.getTime() - env.ADMIN_AUDIT_RETENTION_DAYS * 86_400_000),
+				);
+				if (audited > 0) {
+					log.info("operation-log", "purged expired audit entries", {
+						audited,
+					});
+				}
+			},
+		],
+		[
+			"purge expired operations",
+			async () => {
+				const purged = await purgeExpiredOperations(retentionCutoff);
+				if (purged > 0) {
+					log.info("operation-log", "purged expired operations", { purged });
+				}
+			},
+		],
+	];
+	for (const [name, step] of steps) {
+		try {
+			await step();
+		} catch (err) {
+			log.error("operation-log", `maintenance step failed: ${name}`, { err });
+		}
+	}
+}
+
+/**
+ * Runs maintenance every minute on whichever replica holds the maintenance lock (others skip the
+ * pass), and schedules the next pass only once the current one has finished, so passes never
+ * overlap however long one takes.
+ */
+export function startOperationMaintenance(): () => void {
+	let stopped = false;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const pass = async () => {
+		try {
+			await postgresClient.lock(
+				MAINTENANCE_LOCK_ID,
+				() => runOperationMaintenance(),
+				{
+					wait: false,
+				},
+			);
+		} catch (err) {
+			if ((err as { code?: string }).code !== "LOCK_NOT_AVAILABLE") {
+				log.error("operation-log", "maintenance failed", { err });
+			}
+		} finally {
+			if (!stopped) {
+				timer = setTimeout(() => void pass(), MAINTENANCE_INTERVAL_MS);
+				timer.unref();
+			}
 		}
 	};
-	void run().catch((err: unknown) =>
-		log.error("operation-log", "maintenance failed", { err }),
-	);
-	const timer = setInterval(() => {
-		void run().catch((err: unknown) =>
-			log.error("operation-log", "maintenance failed", { err }),
-		);
-	}, 60_000);
-	timer.unref();
-	return () => clearInterval(timer);
+	void pass();
+	return () => {
+		stopped = true;
+		clearTimeout(timer);
+	};
 }
