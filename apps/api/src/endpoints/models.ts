@@ -4,11 +4,12 @@ import { enforcePublicModelRateLimit } from "./modelsRateLimit.ts";
 import { supportedParameterNames } from "#catalog/parameters.ts";
 import type { ResolvedModelMetadata } from "#catalog/types.ts";
 import type { DeploymentRow } from "#db/repos/deployments.ts";
+import { authMiddleware, getAuth } from "#auth/middleware.ts";
 import type { OperationId } from "#operations/registry.ts";
 import { getEffectiveSettings } from "#router/settings.ts";
 import type { RuntimeModelMetadata } from "#db/schema.ts";
 import { OPERATIONS } from "#operations/registry.ts";
-import { authMiddleware } from "#auth/middleware.ts";
+import { assertModelAllowed } from "#auth/scope.ts";
 import { fetchMetrics } from "#router/state.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { AppEnv } from "#auth/types.ts";
@@ -378,7 +379,12 @@ function wildcardModelId(c: Context<AppEnv>): {
 	const suffix = "/deployments";
 	const deployments = raw.endsWith(suffix);
 	const model = deployments ? raw.slice(0, -suffix.length) : raw;
-	return { model: decodeURIComponent(model), deployments };
+	try {
+		return { model: decodeURIComponent(model), deployments };
+	} catch {
+		// A malformed escape names no model.
+		throw notFound(model);
+	}
 }
 
 /** GET /v1/models - public model discovery with OpenAI-compatible base fields. */
@@ -404,6 +410,8 @@ export async function modelsWildcardHandler(
 		await authMiddleware()(c, async () => {
 			/* intentionally empty */
 		});
+		// Per-deployment detail is held to the same model scope as inference on that model.
+		assertModelAllowed(getAuth(c), model);
 	} else {
 		enforcePublicModelRateLimit(c);
 	}

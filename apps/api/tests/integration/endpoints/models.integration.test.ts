@@ -201,3 +201,41 @@ test("public model cache invalidates after deployment mutations", {
 		}
 	}
 });
+
+test("GET /v1/models/{id}/deployments holds a key to its model scope", {
+	skip,
+}, async () => {
+	const app = modelsTestApp();
+	const publicModel = `models-scope-${randomUUID()}`;
+	let deploymentId: string | undefined;
+	let scoped: CreatedVirtualKey | undefined;
+	try {
+		const deployment = await createDeployment({
+			publicModel,
+			adapterKey: "openai",
+			upstreamModel: "gpt-5.5",
+			credentials: { apiKey: "test-upstream-key" },
+		});
+		deploymentId = deployment.row.id;
+		scoped = await createVirtualKey({
+			name: `models-scope-${randomUUID()}`,
+			allowedModels: ["some-other-model"],
+		});
+		const denied = await app.request(`/v1/models/${publicModel}/deployments`, {
+			headers: { authorization: `Bearer ${scoped.rawKey}` },
+		});
+		assert.equal(denied.status, 403);
+		const malformed = await app.request("/v1/models/%E0%A4%A/deployments", {
+			headers: { authorization: `Bearer ${scoped.rawKey}` },
+		});
+		assert.equal(malformed.status, 404);
+	} finally {
+		if (scoped) {
+			await invalidateVirtualKey(scoped.row.keyHash);
+			await deleteVirtualKey(scoped.row.id);
+		}
+		if (deploymentId) {
+			await deleteDeployment(deploymentId);
+		}
+	}
+});
