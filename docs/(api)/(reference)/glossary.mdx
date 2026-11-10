@@ -123,6 +123,12 @@ Gemini signature on a text response or Claude's signed `thinking` blocks. Where 
 gateway seals it into a `reasoning` item whose `encrypted_content` starts with `bfrs_`; clients
 replay it and nothing is stored. See [Provider-specific fields](/docs/provider-specific-fields).
 
+## Estimated Usage
+
+`Usage` flagged `estimated: true`: the counts the gateway settles when an upstream accepted a request
+but reported no usage — the reserved input plus the observed output. See
+[Cost accounting](/docs/cost-accounting#when-the-provider-reports-no-usage).
+
 ## Fallback Policy
 
 An ordered chain of Public Models identified by `(primaryModel, reason)`. `reason` is `general`,

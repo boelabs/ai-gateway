@@ -255,9 +255,10 @@ export async function compactResponseHandler(
 				message: "Compaction returned no summary",
 			});
 		}
-		await lifecycle.finish(response.usage);
+		const settledUsage =
+			(await lifecycle.finish(response.usage)) ?? response.usage;
 		const { meta } = routing.candidate;
-		const cost = computeUsageCost(meta, response.usage);
+		const cost = computeUsageCost(meta, settledUsage);
 		const metadata: Record<string, unknown> = candidateMetadata(
 			routing.candidate,
 		);
@@ -292,7 +293,7 @@ export async function compactResponseHandler(
 		log.write({
 			status: "success",
 			httpStatus: 200,
-			usage: response.usage,
+			usage: settledUsage,
 			cost,
 			firstOutputMs: null,
 			responseBody: body,
@@ -599,8 +600,9 @@ function streamResponses(
 				}
 			}
 		} finally {
+			let settledUsage: Usage | null = usage;
 			if (routed) {
-				await routed.routing.finish(
+				settledUsage = await routed.routing.finish(
 					usage,
 					lastChunkAt ?? undefined,
 					streamError,
@@ -611,7 +613,7 @@ function streamResponses(
 				finishDownstreamWriteObservation(downstream, streamError?.code);
 			}
 			const cost = routed
-				? computeUsageCost(routed.routing.candidate.meta, usage)
+				? computeUsageCost(routed.routing.candidate.meta, settledUsage)
 				: null;
 			log.write({
 				status: streamError ? "error" : "success",
@@ -620,7 +622,7 @@ function streamResponses(
 					streamError?.code === "client_closed_request"
 						? 499
 						: 200,
-				usage,
+				usage: settledUsage,
 				cost,
 				firstOutputMs:
 					firstTokenAt === null ? null : firstTokenAt - log.startedAt,
@@ -751,8 +753,8 @@ export async function responsesHandler(c: Context<AppEnv>): Promise<Response> {
 				routing.value.response,
 			);
 			const { usage } = response;
-			await lifecycle.finish(usage);
-			const cost = computeUsageCost(meta, usage);
+			const settledUsage = (await lifecycle.finish(usage)) ?? usage;
+			const cost = computeUsageCost(meta, settledUsage);
 			const internalRendered = canonicalToResponsesResponse(
 				response,
 				renderOpts,
@@ -769,12 +771,12 @@ export async function responsesHandler(c: Context<AppEnv>): Promise<Response> {
 				requestId: log.requestId,
 				metadata,
 			});
-			cache.store(rendered, usage);
+			cache.store(rendered, settledUsage);
 			const body = attachRoutingMetadata(rendered, routingMetadata);
 			log.write({
 				status: "success",
 				httpStatus: 200,
-				usage,
+				usage: settledUsage,
 				cost,
 				firstOutputMs: null,
 				responseBody: rendered,
@@ -1214,15 +1216,16 @@ async function executeResponsesWebSocketTurn(
 			if (firstTokenAt !== null) {
 				log.upstreamTtftMs = firstTokenAt - upstreamStartedAt;
 			}
-			await lifecycle.finish(usage, streamError, {
-				...(lastChunkAt === null ? {} : { finishedAt: lastChunkAt }),
-				downstream,
-			});
-			const cost = computeUsageCost(meta, usage);
+			const settledUsage =
+				(await lifecycle.finish(usage, streamError, {
+					...(lastChunkAt === null ? {} : { finishedAt: lastChunkAt }),
+					downstream,
+				})) ?? usage;
+			const cost = computeUsageCost(meta, settledUsage);
 			log.write({
 				status: streamError ? "error" : "success",
 				httpStatus: streamError?.httpStatus ?? 200,
-				usage,
+				usage: settledUsage,
 				cost,
 				firstOutputMs:
 					firstTokenAt === null ? null : firstTokenAt - log.startedAt,

@@ -4,7 +4,9 @@ import { candidateMetadata } from "#gateway/candidateMetadata.ts";
 import { OperationLogDraft } from "./runtime/operationLog.ts";
 import type { RerankExecResult } from "#gateway/executor.ts";
 import { route, type RouteResult } from "#router/index.ts";
+import { withEstimatedSearchUnits } from "#core/rerank.ts";
 import { executeRerank } from "#gateway/executor.ts";
+import { rerankProfileFor } from "#catalog/types.ts";
 import type { AppEnv } from "#auth/types.ts";
 import type { Usage } from "#core/usage.ts";
 import type { Context } from "hono";
@@ -50,12 +52,12 @@ export async function rerankHandler(c: Context<AppEnv>): Promise<Response> {
 	const finish = async (
 		usage: Usage | null,
 		error?: ReturnType<typeof toGatewayError> | null,
-	): Promise<void> => {
+	): Promise<Usage | null> => {
 		if (!routing || finished) {
-			return;
+			return null;
 		}
 		finished = true;
-		await routing.finish(usage ?? fallbackUsage, undefined, error);
+		return routing.finish(usage ?? fallbackUsage, undefined, error);
 	};
 
 	try {
@@ -101,14 +103,18 @@ export async function rerankHandler(c: Context<AppEnv>): Promise<Response> {
 			routing.value.response,
 		);
 		assertRerankResponseValid(canonical, response);
-		const usage = response.usage ?? null;
-		await finish(usage);
-		const cost = computeUsageCost(routing.candidate.meta, usage);
+		const usage = withEstimatedSearchUnits(
+			response.usage ?? null,
+			canonical.documents.length,
+			rerankProfileFor(routing.candidate.meta),
+		);
+		const settledUsage = (await finish(usage)) ?? usage;
+		const cost = computeUsageCost(routing.candidate.meta, settledUsage);
 		const rendered = toOpenRouterRerankResponse(canonical, response, cost);
 		log.write({
 			status: "success",
 			httpStatus: 200,
-			usage,
+			usage: settledUsage,
 			cost,
 			firstOutputMs: null,
 			responseBody: rerankResponseSummary(response, cost),

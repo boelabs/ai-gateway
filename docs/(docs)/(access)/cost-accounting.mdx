@@ -42,6 +42,18 @@ resolved pricing and:
 - **Postgres** (`spend_cents` on the virtual key, plus consumer and estimated upstream cost in `gateway_operations`)
   is the durable source of truth, updated on every billed request.
 
+### When the provider reports no usage
+
+A stream can end before its final usage frame (the client disconnects, the upstream fails or times
+out) and some OpenAI-compatible upstreams never send usage at all. Once the upstream has accepted the
+request it may already bill it, so the gateway does not treat that as free: it charges a conservative
+estimate — the input it reserved at admission (one token per UTF-8 byte of the request) plus the
+output it actually saw, counted the same way. The estimate settles the budget and TPM like reported
+usage, and the operation records it with `metadata.usageEstimated: true`. A reranking upstream that
+omits search units is charged one unit per `documentsPerSearchUnit` documents. Only a request the
+upstream never accepted releases its reservation without a charge; token counting and video jobs,
+which settle later by their own lifecycle, are not estimated.
+
 Master-key traffic is never billed against any budget (the master key has no limits) — see
 [Security](/docs/security) for the full auth model.
 

@@ -602,9 +602,36 @@ interface TransportResponse {
 	usage?: TransportUsage;
 }
 
+/**
+ * Usage for a response whose upstream sent none. Only the output is observable here, counted one token
+ * per UTF-8 byte; the router completes the input side from its reservation when it settles.
+ */
+function unreportedResponseUsage(
+	choices: CanonicalChatResponse["choices"],
+): Usage {
+	let bytes = 0;
+	for (const { message } of choices) {
+		const texts = [
+			typeof message.content === "string" ? message.content : "",
+			message.reasoning ?? "",
+			message.refusal ?? "",
+			...(message.toolCalls ?? []).map((call) => call.name + call.arguments),
+		];
+		for (const text of texts) {
+			bytes += Buffer.byteLength(text, "utf8");
+		}
+	}
+	return {
+		promptTokens: 0,
+		completionTokens: bytes,
+		totalTokens: bytes,
+		estimated: true,
+	};
+}
+
 export function parseOpenAIChatResponse(raw: unknown): CanonicalChatResponse {
 	const r = (raw ?? {}) as TransportResponse;
-	return {
+	const response = {
 		id: r.id ?? "",
 		created: r.created ?? Math.floor(Date.now() / 1000),
 		model: r.model ?? "",
@@ -643,7 +670,12 @@ export function parseOpenAIChatResponse(raw: unknown): CanonicalChatResponse {
 				message,
 			};
 		}),
-		usage: mapUsage(r.usage),
+	};
+	return {
+		...response,
+		usage: r.usage
+			? mapUsage(r.usage)
+			: unreportedResponseUsage(response.choices),
 	};
 }
 

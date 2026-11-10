@@ -239,8 +239,9 @@ function streamChatCompletion(
 				}
 			}
 		} finally {
+			let settledUsage = finalUsage;
 			if (routed) {
-				await routed.routing.finish(
+				settledUsage = await routed.routing.finish(
 					finalUsage,
 					lastChunkAt ?? undefined,
 					streamError,
@@ -251,7 +252,7 @@ function streamChatCompletion(
 				finishDownstreamWriteObservation(downstream, streamError?.code);
 			}
 			const cost = routed
-				? computeUsageCost(routed.routing.candidate.meta, finalUsage)
+				? computeUsageCost(routed.routing.candidate.meta, settledUsage)
 				: null;
 			log.write({
 				status: streamError ? "error" : "success",
@@ -260,7 +261,7 @@ function streamChatCompletion(
 					streamError?.code === "client_closed_request"
 						? 499
 						: 200,
-				usage: finalUsage,
+				usage: settledUsage,
 				cost,
 				firstOutputMs:
 					firstTokenAt === null ? null : firstTokenAt - log.startedAt,
@@ -368,13 +369,14 @@ export async function chatCompletionsHandler(
 				canonical.model,
 				routing.value.response,
 			);
-			await lifecycle.finish(response.usage);
-			const cost = computeUsageCost(meta, response.usage);
+			const settledUsage =
+				(await lifecycle.finish(response.usage)) ?? response.usage;
+			const cost = computeUsageCost(meta, settledUsage);
 			const baseResponse = toOpenAIChatResponse(
 				response,
 				routing.candidate.row.publicModel,
 			);
-			cache.store(baseResponse, response.usage);
+			cache.store(baseResponse, settledUsage);
 			const oa = attachRoutingMetadata(
 				baseResponse as unknown as Record<string, unknown>,
 				routingMetadata,
@@ -382,7 +384,7 @@ export async function chatCompletionsHandler(
 			log.write({
 				status: "success",
 				httpStatus: 200,
-				usage: response.usage,
+				usage: settledUsage,
 				cost,
 				firstOutputMs: null, // non-stream: there is no first output distinct from the last
 				responseBody: oa,

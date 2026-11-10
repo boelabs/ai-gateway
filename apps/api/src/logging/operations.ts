@@ -759,6 +759,8 @@ export function completeOperation(
 												cacheWriteTokensByTtl:
 													input.usage.cacheWriteTokensByTtl,
 											}),
+									// The upstream reported no usage: the counts above are the gateway's estimate.
+									...(input.usage?.estimated ? { usageEstimated: true } : {}),
 									client: {
 										ipFingerprint: payloadFingerprint(input.ip),
 										userAgentFingerprint: payloadFingerprint(input.userAgent),

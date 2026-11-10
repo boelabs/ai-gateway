@@ -249,6 +249,8 @@ async function handleVideoCreate(
 						resolveTransport(candidate, "videos.generations"),
 					);
 				},
+				// The job settles its held lease when it reaches a terminal state.
+				unreportedUsage: "release",
 				tokenReservation: (candidate) =>
 					// Redacted body: inline reference media would otherwise be reserved as megabytes of tokens.
 					estimateTokenReservation(sanitizeVideoRequestBody(req), {

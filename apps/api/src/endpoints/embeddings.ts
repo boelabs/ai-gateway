@@ -8,6 +8,7 @@ import { embeddingsUsageToCore } from "#core/embeddings.ts";
 import { route, type RouteResult } from "#router/index.ts";
 import { executeEmbeddings } from "#gateway/executor.ts";
 import type { AppEnv } from "#auth/types.ts";
+import type { Usage } from "#core/usage.ts";
 import type { Context } from "hono";
 
 import {
@@ -41,12 +42,12 @@ export async function embeddingsHandler(c: Context<AppEnv>): Promise<Response> {
 	const finish = async (
 		usage: ReturnType<typeof embeddingsUsageToCore>,
 		error?: ReturnType<typeof toGatewayError> | null,
-	): Promise<void> => {
+	): Promise<Usage | null> => {
 		if (!routing || finished) {
-			return;
+			return null;
 		}
 		finished = true;
-		await routing.finish(usage ?? fallbackUsage, undefined, error);
+		return routing.finish(usage ?? fallbackUsage, undefined, error);
 	};
 
 	try {
@@ -104,8 +105,8 @@ export async function embeddingsHandler(c: Context<AppEnv>): Promise<Response> {
 			routing.value.response,
 		);
 		const usage = embeddingsUsageToCore(response.usage);
-		await finish(usage);
-		const cost = computeUsageCost(routing.candidate.meta, usage);
+		const settledUsage = (await finish(usage)) ?? usage;
+		const cost = computeUsageCost(routing.candidate.meta, settledUsage);
 		const rendered = toOpenAIEmbeddingsResponse(response);
 		if (usage) {
 			cache.store(rendered, usage);
@@ -113,7 +114,7 @@ export async function embeddingsHandler(c: Context<AppEnv>): Promise<Response> {
 		log.write({
 			status: "success",
 			httpStatus: 200,
-			usage,
+			usage: settledUsage,
 			cost,
 			firstOutputMs: null,
 			responseBody: embeddingsResponseLog(rendered),

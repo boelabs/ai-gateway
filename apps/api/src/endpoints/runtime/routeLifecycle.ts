@@ -6,12 +6,13 @@ import type { Usage } from "#core/usage.ts";
 
 /**
  * Owns the terminal transition of a routed upstream attempt. Endpoint post-processing is allowed to
- * fail, but it must never strand an inflight counter or half-open circuit permit.
+ * fail, but it must never strand an inflight counter or half-open circuit permit. `finish` resolves
+ * to the usage the router settled, which is what the operation log must record.
  */
 export class RouteLifecycle<TResult> {
 	#route: RouteResult<TResult> | null = null;
 	#fallbackUsage: Usage | null = null;
-	#settled = false;
+	#settled: Promise<Usage | null> | null = null;
 
 	attach(route: RouteResult<TResult>): void {
 		if (this.#route !== null) {
@@ -22,7 +23,7 @@ export class RouteLifecycle<TResult> {
 
 	/** Retains provider-reported usage so a later gateway post-processing failure is still charged. */
 	rememberUsage(usage: Usage | null): void {
-		if (this.#settled) {
+		if (this.#settled !== null) {
 			return;
 		}
 		this.#fallbackUsage = usage;
@@ -36,17 +37,17 @@ export class RouteLifecycle<TResult> {
 			terminalOverride?: CanonicalTerminal | null;
 			downstream?: DownstreamWriteObservation;
 		} = {},
-	): Promise<void> {
-		if (this.#route === null || this.#settled) {
-			return;
+	): Promise<Usage | null> {
+		if (this.#route === null) {
+			return null;
 		}
-		this.#settled = true;
-		await this.#route.finish(
+		this.#settled ??= this.#route.finish(
 			usage ?? this.#fallbackUsage,
 			options.finishedAt,
 			error,
 			options.terminalOverride,
 			options.downstream,
 		);
+		return this.#settled;
 	}
 }

@@ -65,6 +65,16 @@ describe("observeChatStream", () => {
 		assert.deepEqual(anomalies(observed.observation.diagnostics), []);
 	});
 
+	test("counts the UTF-8 bytes of generated text as observed output", async () => {
+		async function* source() {
+			yield chunk("héllo");
+			yield chunk(undefined, "stop");
+		}
+		const observed = observeChatStream(source(), ended());
+		await drain(observed.items);
+		assert.equal(observed.observation.outputBytes, 6);
+	});
+
 	test("a finished stream without [DONE] is complete", async () => {
 		async function* source() {
 			yield chunk("hello");

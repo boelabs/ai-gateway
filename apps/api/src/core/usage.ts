@@ -42,6 +42,11 @@ export interface Usage {
 	searchUnits?: number;
 	/** Upstream-reported request cost in USD cents, used only when configured pricing is absent. */
 	providerCostCents?: number;
+	/**
+	 * The upstream reported no usage, so these counts are the gateway's conservative estimate (reserved
+	 * input plus observed output) rather than the provider's figures. Absent on reported usage.
+	 */
+	estimated?: true;
 }
 
 /** Does the usage satisfy the invariant total = prompt + completion? (helper for tests/dev). */

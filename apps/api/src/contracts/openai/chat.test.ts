@@ -1055,6 +1055,19 @@ test("chat response: derives total usage when an OpenAI-compatible upstream omit
 	assert.equal(isUsageConsistent(canonical.usage), true);
 });
 
+test("chat response: a response with no usage carries an estimate of its output", () => {
+	const canonical = parseOpenAIChatResponse({
+		choices: [{ finish_reason: "stop", message: { content: "done" } }],
+	});
+
+	assert.deepEqual(canonical.usage, {
+		promptTokens: 0,
+		completionTokens: 4,
+		totalTokens: 4,
+		estimated: true,
+	});
+});
+
 test("chat response: preserves detailed usage and provider-reported cost", () => {
 	const canonical = parseOpenAIChatResponse({
 		choices: [{ finish_reason: "stop", message: { content: "done" } }],
