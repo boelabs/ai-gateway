@@ -696,14 +696,31 @@ test("anthropic.buildRequest: structured output drops constraints Anthropic cann
 	});
 });
 
-test("anthropic.buildRequest: json_object uses an open object schema", () => {
-	const built = must(anthropicAdapter, "chat").buildRequest(
-		{ ...req, responseFormat: { type: "json_object" } },
-		ctx,
+test("anthropic.buildRequest: json_object is rejected rather than constrained to an empty object", () => {
+	assert.throws(
+		() =>
+			must(anthropicAdapter, "chat").buildRequest(
+				{ ...req, responseFormat: { type: "json_object" } },
+				ctx,
+			),
+		(error) =>
+			GatewayError.is(error) &&
+			error.code === "unsupported_parameter" &&
+			error.param === "response_format",
 	);
-	assert.deepEqual(jsonBody(built).output_config, {
-		format: { type: "json_schema", schema: { type: "object" } },
+});
+
+test("anthropic: the parameter policy drops json_object and records it", () => {
+	const request = { ...req, responseFormat: { type: "json_object" as const } };
+	const params = anthropicAdapter.chatRequestParameters?.(request, {
+		upstreamModel: ctx.upstreamModel,
+		meta: ctx.meta,
+		transport: "messages",
 	});
+	assert.equal(
+		typeof params?.response_format === "object" && params.response_format.mode,
+		"unsupported",
+	);
 });
 
 test("anthropic.buildRequest: omitted effort explicitly disables optional adaptive reasoning", () => {

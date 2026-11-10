@@ -552,6 +552,13 @@ function thinkingMode(
 const THINKING_CONFLICT = "Not accepted by Anthropic while thinking is on.";
 
 /**
+ * Anthropic has no schema-less JSON mode: `output_config.format` takes a JSON schema whose objects
+ * must set `additionalProperties: false`, so an open object would only ever produce `{}`.
+ */
+const JSON_OBJECT_UNSUPPORTED =
+	'Anthropic has no JSON mode without a schema; use response_format "json_schema"';
+
+/**
  * What this request makes unsupported, from Anthropic's documented limits. While thinking is on,
  * temperature and top_k are rejected and top_p must lie between 0.95 and 1 (models that reject
  * sampling parameters outright declare that in the catalog). Manual (budget) thinking cannot be
@@ -564,6 +571,12 @@ function anthropicRequestParameters(
 	ctx: ChatSupportContext,
 ): ParameterSupportMap | undefined {
 	const parameters: ParameterSupportMap = {};
+	if (req.responseFormat?.type === "json_object") {
+		parameters.response_format = {
+			mode: "unsupported",
+			notes: JSON_OBJECT_UNSUPPORTED,
+		};
+	}
 	const forced = forcesToolUse(req.toolChoice);
 	const toolChoice =
 		ctx.meta.operations?.["text.generate"]?.parameters?.tool_choice;
@@ -637,11 +650,17 @@ function applyResponseFormat(
 	if (format === undefined || format.type === "text") {
 		return;
 	}
+	if (format.type === "json_object") {
+		// Reaches here only under the allow strategy; the parameter policy drops or rejects it first.
+		throw new GatewayError({
+			class: "bad_request",
+			code: "unsupported_parameter",
+			param: "response_format",
+			message: JSON_OBJECT_UNSUPPORTED,
+		});
+	}
 	// Anthropic always decodes `output_config.format` under strict-mode schema limits.
-	const schema =
-		format.type === "json_schema"
-			? toAnthropicStrictSchema(format.schema)
-			: { type: "object" };
+	const schema = toAnthropicStrictSchema(format.schema);
 	const outputConfig = (body.output_config ?? {}) as Record<string, unknown>;
 	body.output_config = {
 		...outputConfig,

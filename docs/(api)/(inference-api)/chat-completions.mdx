@@ -65,8 +65,9 @@ rich clients, and all forms are accepted back. See
 `response_format: { "type": "json_schema", "json_schema": { ..., "strict": true } }` requests
 schema-adherent output on models that declare `structuredOutputs: true`; the strict flag is preserved
 on native transports that expose it. `{"type": "json_object"}` remains available as legacy
-JSON mode — valid JSON, but no schema adherence guarantee — on any model, and does not imply structured
-output support.
+JSON mode — valid JSON, but no schema adherence guarantee — and does not imply structured output
+support. Anthropic has no JSON mode without a schema, so on Claude models `json_object` goes through
+the [parameter policy](/docs/parameter-policy) as unsupported; use `json_schema` there.
 
 ## Reasoning
 

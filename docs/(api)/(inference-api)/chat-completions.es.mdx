@@ -37,7 +37,7 @@ Algunos proveedores devuelven un estado de llamada de herramienta opaco que debe
 
 ## Salidas estructuradas [#structured-outputs]
 
-`response_format: { "type": "json_schema", "json_schema": { ..., "strict": true } }` solicita resultados compatibles con el esquema en modelos que declaran `structuredOutputs: true`; la estricta bandera se conserva en los transports nativos que la exponen. `{"type": "json_object"}` permanece disponible como modo JSON heredado (JSON válido, pero sin garantía de cumplimiento del esquema) en cualquier modelo y no implica soporte de salida estructurada.
+`response_format: { "type": "json_schema", "json_schema": { ..., "strict": true } }` solicita resultados compatibles con el esquema en modelos que declaran `structuredOutputs: true`; la estricta bandera se conserva en los transports nativos que la exponen. `{"type": "json_object"}` permanece disponible como modo JSON heredado (JSON válido, pero sin garantía de cumplimiento del esquema) y no implica soporte de salida estructurada. Anthropic no tiene modo JSON sin esquema, así que en los modelos Claude `json_object` pasa por la [política de parámetros](/docs/parameter-policy) como no admitido; usa `json_schema` allí.
 
 ## Reasoning [#reasoning]
 
