@@ -26,6 +26,7 @@ import {
 	providerFieldsWithAnthropicStopReason,
 	hasNonCanonicalAnthropicContent,
 	anthropicContentMatches,
+	isGatewayState,
 	mergeProviderFields,
 } from "#core/providerSpecificFields.ts";
 
@@ -197,6 +198,9 @@ function partToAnthropic(part: CanonicalContentPart): Record<string, unknown> {
 		if (source !== null) {
 			return withPartCacheControl(part, { type: "image", source });
 		}
+	}
+	if (part.type === "file" && part.native !== undefined) {
+		return structuredClone(part.native);
 	}
 	if (part.type === "file") {
 		let source: Record<string, unknown> | null = null;
@@ -1227,6 +1231,9 @@ async function* parseStream(
 							finishReason: null,
 						},
 					],
+					...(event.message?.usage === undefined
+						? {}
+						: { initialUsage: mapUsage(streamUsage) }),
 				},
 				{
 					...(event.message?.id ? { providerRequestId: event.message.id } : {}),
@@ -1632,6 +1639,25 @@ function buildTokenCountBody(
 	ctx: AdapterContext,
 ): Record<string, unknown> {
 	const body = structuredClone(req.rawBody);
+	// Gateway state carriers hold other providers' state for the client to replay; they mean nothing
+	// to Anthropic, which would count them as thinking.
+	if (Array.isArray(body.messages)) {
+		body.messages = body.messages.map((message: unknown) => {
+			const content = (message as { content?: unknown })?.content;
+			return Array.isArray(content)
+				? {
+						...(message as Record<string, unknown>),
+						content: content.filter(
+							(block: { type?: unknown; data?: unknown }) =>
+								!(
+									block?.type === "redacted_thinking" &&
+									isGatewayState(block.data)
+								),
+						),
+					}
+				: message;
+		});
+	}
 	const extraBody =
 		body.extra_body !== null &&
 		typeof body.extra_body === "object" &&

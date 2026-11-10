@@ -27,7 +27,7 @@ El router prefiere el transport nativo de Messages cuando está disponible. `top
 
 ## Campos y betas exclusivos de Anthropic [#anthropic-only-fields-and-betas]
 
-`container`, `mcp_servers`, `context_management`, `inference_geo`, `service_tier`, `speed` y `diagnostics` no tienen equivalente en otros proveedores. Llegan a un deployment de Anthropic tal como se enviaron, y una solicitud que lleva alguno solo se enruta a Anthropic. El header `anthropic-beta` se reenvía a los deployments de Anthropic junto con los betas que añade el propio gateway; cada nombre debe seguir la forma `feature-name-YYYY-MM-DD` de Anthropic. Cualquier otro campo de nivel superior que la API no define se rechaza con `400 unknown_parameter` en lugar de descartarse.
+`container`, `mcp_servers`, `context_management`, `inference_geo`, `service_tier`, `speed` y `diagnostics` no tienen equivalente en otros proveedores. Llegan a un deployment de Anthropic tal como se enviaron, y una solicitud que lleva alguno solo se enruta a Anthropic. El header `anthropic-beta` se reenvía a los deployments de Anthropic junto con los betas que añade el propio gateway; cada nombre debe seguir la forma `feature-name-YYYY-MM-DD` de Anthropic. Cualquier otro campo de nivel superior que la API no define se rechaza con `400 unknown_parameter` en lugar de descartarse. Lo mismo vale para el contenido: los documentos con citations o una fuente de texto, las imágenes por `file_id`, los search results y las definiciones de herramientas con campos exclusivos de Anthropic llegan a Anthropic tal como se escribieron, y solo a Anthropic.
 
 ## Breakpoints de prompt caching [#prompt-caching-breakpoints]
 

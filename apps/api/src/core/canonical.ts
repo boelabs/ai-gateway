@@ -51,6 +51,12 @@ export interface CanonicalFilePart extends CanonicalCacheControlled {
 	filename?: string;
 	/** Responses-only PDF rendering hint; ignored by transports that do not expose it. */
 	detail?: "auto" | "low" | "high";
+	/**
+	 * The provider's own input block, when it holds what no canonical part can (an Anthropic
+	 * document with citations, context or a text source, an image by file id, a search result).
+	 * Sent unchanged; a request carrying one requires the native wire.
+	 */
+	native?: Record<string, unknown>;
 }
 export type CanonicalContentPart =
 	| CanonicalTextPart
@@ -311,4 +317,9 @@ export interface CanonicalChatStreamChunk {
 	}>;
 	/** Only present in the final chunk if includeUsage. */
 	usage?: Usage | null;
+	/**
+	 * Usage the provider reported as the stream opened (its input tokens, before any output).
+	 * Provisional: the final chunk's `usage` replaces it.
+	 */
+	initialUsage?: Usage;
 }

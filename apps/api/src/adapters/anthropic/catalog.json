@@ -936,6 +936,16 @@
 						"tool_choice": true,
 						"tools": true,
 						"verbosity": true
+					},
+					"reasoning": {
+						"kind": "anthropic_budget",
+						"levels": ["none", "low", "medium", "high", "xhigh"],
+						"budgets": {
+							"low": 2048,
+							"medium": 8192,
+							"high": 16000,
+							"xhigh": 32000
+						}
 					}
 				}
 			},
@@ -974,6 +984,16 @@
 						"tools": true,
 						"top_k": true,
 						"top_p": true
+					},
+					"reasoning": {
+						"kind": "anthropic_budget",
+						"levels": ["none", "low", "medium", "high", "xhigh"],
+						"budgets": {
+							"low": 2048,
+							"medium": 8192,
+							"high": 16000,
+							"xhigh": 32000
+						}
 					}
 				}
 			},
@@ -1011,6 +1031,16 @@
 						"tools": true,
 						"top_p": true,
 						"top_k": true
+					},
+					"reasoning": {
+						"kind": "anthropic_budget",
+						"levels": ["none", "low", "medium", "high", "xhigh"],
+						"budgets": {
+							"low": 2048,
+							"medium": 8192,
+							"high": 16000,
+							"xhigh": 32000
+						}
 					}
 				}
 			},
@@ -1079,7 +1109,18 @@
 					"capabilities": {
 						"tools": true,
 						"vision": true,
-						"structuredOutputs": false
+						"structuredOutputs": false,
+						"reasoning": true
+					},
+					"reasoning": {
+						"kind": "anthropic_budget",
+						"levels": ["none", "low", "medium", "high", "xhigh"],
+						"budgets": {
+							"low": 2048,
+							"medium": 8192,
+							"high": 16000,
+							"xhigh": 32000
+						}
 					}
 				}
 			},
@@ -1115,7 +1156,18 @@
 					"capabilities": {
 						"tools": true,
 						"vision": true,
-						"structuredOutputs": false
+						"structuredOutputs": false,
+						"reasoning": true
+					},
+					"reasoning": {
+						"kind": "anthropic_budget",
+						"levels": ["none", "low", "medium", "high", "xhigh"],
+						"budgets": {
+							"low": 2048,
+							"medium": 8192,
+							"high": 16000,
+							"xhigh": 32000
+						}
 					}
 				}
 			},

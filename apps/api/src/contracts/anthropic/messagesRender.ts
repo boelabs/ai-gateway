@@ -71,6 +71,15 @@ export interface MessagesCanonicalOptions {
 	betas?: readonly string[];
 }
 
+/** Custom tool fields the canonical function tool carries. */
+const PORTABLE_TOOL_FIELDS = new Set([
+	"name",
+	"description",
+	"input_schema",
+	"strict",
+	"cache_control",
+]);
+
 /**
  * Documented top-level Messages fields the canonical request has no form for. They reach an
  * Anthropic upstream unchanged and make the request require it; no other provider can honour them.
@@ -224,7 +233,49 @@ function withCacheControl(
 	return part;
 }
 
-function blockToPart(block: Block): CanonicalContentPart | null {
+/** Document fields the canonical file part has no form for. */
+const NATIVE_DOCUMENT_FIELDS = ["citations", "context"] as const;
+
+/** A block only Anthropic can read, carried as written. */
+function nativePart(block: Block): CanonicalContentPart {
+	return {
+		type: "file",
+		native: structuredClone(block) as Record<string, unknown>,
+		...(typeof block.title === "string" ? { filename: block.title } : {}),
+	};
+}
+
+function needsNativeBlock(block: Block): boolean {
+	if (block.type === "text") {
+		return Array.isArray((block as { citations?: unknown }).citations);
+	}
+	if (block.type === "image") {
+		return block.source?.type === "file";
+	}
+	if (block.type === "document") {
+		return (
+			NATIVE_DOCUMENT_FIELDS.some(
+				(field) => (block as Record<string, unknown>)[field] !== undefined,
+			) ||
+			block.source?.type === "text" ||
+			block.source?.type === "content"
+		);
+	}
+	return true;
+}
+
+/**
+ * One input block as a canonical part. User content the canonical form cannot hold is carried
+ * natively; assistant content has its own native carrier (the turn's content blocks), so there
+ * `native: false` keeps the portable parts only.
+ */
+function blockToPart(
+	block: Block,
+	{ native = true }: { native?: boolean } = {},
+): CanonicalContentPart | null {
+	if (native && needsNativeBlock(block)) {
+		return nativePart(block);
+	}
 	switch (block.type) {
 		case "text":
 			return withCacheControl({ type: "text", text: block.text ?? "" }, block);
@@ -338,7 +389,7 @@ function toolResultToCanonical(
 				return { type: "text", text: value };
 			}
 			const part = blockToPart(value as Block);
-			return part ?? { type: "text", text: JSON.stringify(value) };
+			return part ?? nativePart(value as Block);
 		});
 	}
 	return JSON.stringify(content ?? "");
@@ -485,7 +536,7 @@ export function messagesRequestToCanonical(
 						...(extraContent === undefined ? {} : { extraContent }),
 					});
 				} else {
-					const p = blockToPart(b);
+					const p = blockToPart(b, { native: false });
 					if (p) {
 						parts.push(p);
 					}
@@ -564,6 +615,17 @@ export function messagesRequestToCanonical(
 		messages,
 		stream: req.stream,
 	};
+	if (
+		messages.some(
+			(message) =>
+				Array.isArray(message.content) &&
+				message.content.some(
+					(part) => part.type === "file" && part.native !== undefined,
+				),
+		)
+	) {
+		u.requiresNativeWire = true;
+	}
 	u.maxTokens = req.max_tokens;
 	if (req.temperature !== undefined) {
 		u.temperature = req.temperature;
@@ -655,7 +717,13 @@ export function messagesRequestToCanonical(
 				cache_control?: Record<string, unknown>;
 			};
 			if (typeof tool.name === "string") {
-				if (typeof tool.type === "string" || tool.input_schema === undefined) {
+				if (
+					typeof tool.type === "string" ||
+					tool.input_schema === undefined ||
+					// input_examples, defer_loading, eager_input_streaming, allowed_callers...: fields a
+					// function tool has no form for, so the definitions travel as written.
+					Object.keys(tool).some((key) => !PORTABLE_TOOL_FIELDS.has(key))
+				) {
 					hasNativeTool = true;
 				}
 				const entry: NonNullable<CanonicalChatRequest["tools"]>[number] = {
@@ -918,31 +986,57 @@ export async function* canonicalChunksToMessagesEvents(
 	let textIndex = 0;
 	let thinkingIndex = 0;
 	const toolBlock = new Map<number, number>(); // canonical toolCall index -> anthropic block index
+	// Anthropic stops each block before the next one starts; at most one is open at a time.
+	let openTool: number | undefined;
+	function* closeOpenBlocks(): Generator<SSEEvent> {
+		if (thinkingOpen) {
+			yield sse("content_block_stop", { index: thinkingIndex });
+			thinkingOpen = false;
+		}
+		if (textOpen) {
+			yield sse("content_block_stop", { index: textIndex });
+			textOpen = false;
+		}
+		if (openTool !== undefined) {
+			yield sse("content_block_stop", { index: openTool });
+			openTool = undefined;
+		}
+	}
 	// Other providers' message-bound state, sealed into one trailing block once the turn is done.
 	let googleParts: Record<string, unknown>[] | undefined;
 	const openaiReasoning: OpenAIReasoningStateItem[] = [];
 
-	yield sse("message_start", {
-		message: {
-			id,
-			type: "message",
-			role: "assistant",
-			model: opts.publicModel,
-			content: [],
-			stop_reason: null,
-			stop_sequence: null,
-			usage: {
-				input_tokens: 0,
-				cache_creation_input_tokens: 0,
-				cache_read_input_tokens: 0,
-				output_tokens: 0,
+	// Opened on the first chunk, so the usage Anthropic reports up front (input tokens) is known.
+	let started = false;
+	const messageStart = (initial: Usage | undefined): SSEEvent[] => [
+		sse("message_start", {
+			message: {
+				id,
+				type: "message",
+				role: "assistant",
+				model: opts.publicModel,
+				content: [],
+				stop_reason: null,
+				stop_sequence: null,
+				usage: initial
+					? usageToAnthropic(initial)
+					: {
+							input_tokens: 0,
+							cache_creation_input_tokens: 0,
+							cache_read_input_tokens: 0,
+							output_tokens: 0,
+						},
 			},
-		},
-	});
-	// Anthropic emits a keep-alive ping after opening the stream.
-	yield sse("ping", {});
+		}),
+		// Anthropic emits a keep-alive ping after opening the stream.
+		sse("ping", {}),
+	];
 
 	for await (const chunk of chunks) {
+		if (!started) {
+			started = true;
+			yield* messageStart(chunk.initialUsage);
+		}
 		if (chunk.usage) {
 			finalUsage = chunk.usage;
 		}
@@ -965,14 +1059,7 @@ export async function* canonicalChunksToMessagesEvents(
 		);
 		if (streamBlock !== undefined) {
 			// A server-tool call or result, where Anthropic streamed it.
-			if (textOpen) {
-				yield sse("content_block_stop", { index: textIndex });
-				textOpen = false;
-			}
-			if (thinkingOpen) {
-				yield sse("content_block_stop", { index: thinkingIndex });
-				thinkingOpen = false;
-			}
+			yield* closeOpenBlocks();
 			const index = nextIndex++;
 			const { input } = streamBlock;
 			const streamedInput = "input" in streamBlock;
@@ -1015,13 +1102,13 @@ export async function* canonicalChunksToMessagesEvents(
 						delta: { type: "signature_delta", signature: block.signature },
 					});
 				}
+				// The signature ends its block: thinking that follows is a block of its own.
+				yield sse("content_block_stop", { index: thinkingIndex });
+				thinkingOpen = false;
 			} else if (block.type === "thinking") {
 				// Thinking without visible text (display "omitted") streams no deltas; the signature
 				// carries the reasoning and must still reach the client, in its place.
-				if (textOpen) {
-					yield sse("content_block_stop", { index: textIndex });
-					textOpen = false;
-				}
+				yield* closeOpenBlocks();
 				const index = nextIndex++;
 				yield sse("content_block_start", {
 					index,
@@ -1039,10 +1126,7 @@ export async function* canonicalChunksToMessagesEvents(
 				});
 				yield sse("content_block_stop", { index });
 			} else {
-				if (thinkingOpen) {
-					yield sse("content_block_stop", { index: thinkingIndex });
-					thinkingOpen = false;
-				}
+				yield* closeOpenBlocks();
 				const index = nextIndex++;
 				yield sse("content_block_start", {
 					index,
@@ -1053,11 +1137,8 @@ export async function* canonicalChunksToMessagesEvents(
 		}
 
 		if (delta.reasoning) {
-			if (textOpen) {
-				yield sse("content_block_stop", { index: textIndex });
-				textOpen = false;
-			}
 			if (!thinkingOpen) {
+				yield* closeOpenBlocks();
 				thinkingIndex = nextIndex++;
 				thinkingOpen = true;
 				yield sse("content_block_start", {
@@ -1072,11 +1153,8 @@ export async function* canonicalChunksToMessagesEvents(
 		}
 
 		if (delta.content) {
-			if (thinkingOpen) {
-				yield sse("content_block_stop", { index: thinkingIndex });
-				thinkingOpen = false;
-			}
 			if (!textOpen) {
+				yield* closeOpenBlocks();
 				textIndex = nextIndex++;
 				textOpen = true;
 				yield sse("content_block_start", {
@@ -1093,16 +1171,10 @@ export async function* canonicalChunksToMessagesEvents(
 		for (const tc of delta.toolCalls ?? []) {
 			let blockIndex = toolBlock.get(tc.index);
 			if (blockIndex === undefined) {
-				if (textOpen) {
-					yield sse("content_block_stop", { index: textIndex });
-					textOpen = false;
-				}
-				if (thinkingOpen) {
-					yield sse("content_block_stop", { index: thinkingIndex });
-					thinkingOpen = false;
-				}
+				yield* closeOpenBlocks();
 				blockIndex = nextIndex++;
 				toolBlock.set(tc.index, blockIndex);
+				openTool = blockIndex;
 				yield sse("content_block_start", {
 					index: blockIndex,
 					content_block: {
@@ -1129,15 +1201,10 @@ export async function* canonicalChunksToMessagesEvents(
 		}
 	}
 
-	if (thinkingOpen) {
-		yield sse("content_block_stop", { index: thinkingIndex });
+	if (!started) {
+		yield* messageStart(undefined);
 	}
-	if (textOpen) {
-		yield sse("content_block_stop", { index: textIndex });
-	}
-	for (const blockIndex of toolBlock.values()) {
-		yield sse("content_block_stop", { index: blockIndex });
-	}
+	yield* closeOpenBlocks();
 	const carrier = messageStateBlock(
 		mergeProviderFields(
 			googleParts === undefined

@@ -304,3 +304,8 @@ test("a replayed server-tool turn reaches Anthropic unchanged", () => {
 	);
 	assert.deepEqual(body.messages[1].content, turn);
 });
+
+test("the stream's opening chunk carries the input usage of message_start", async () => {
+	const [first] = await streamedChunks();
+	assert.equal(first?.initialUsage?.promptTokens, 10);
+});

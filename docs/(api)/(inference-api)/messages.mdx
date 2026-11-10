@@ -43,7 +43,9 @@ Messages-capable deployment instead of being silently dropped.
 sent, and a request that carries one is only routed to Anthropic. The `anthropic-beta` header is
 forwarded to Anthropic deployments together with the betas the gateway adds itself; each name must
 follow Anthropic's `feature-name-YYYY-MM-DD` form. Any other top-level field the API does not define
-is rejected with `400 unknown_parameter` rather than dropped.
+is rejected with `400 unknown_parameter` rather than dropped. The same goes for content: documents
+with citations or a text source, images by `file_id`, search results and tool definitions with
+Anthropic-only fields reach Anthropic as written, and only Anthropic.
 
 ## Prompt-caching breakpoints
 
