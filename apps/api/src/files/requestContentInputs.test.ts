@@ -157,7 +157,8 @@ test("content resolver materializes Responses image URLs for Gemini and memoizes
 	const first = await resolver.resolveForCandidate(google, "generate_content");
 	const second = await resolver.resolveForCandidate(google, "generate_content");
 	assert.equal(fetches, 6);
-	assert.equal(peakFetches, 4);
+	// Each remote image may be up to 20 MB, so the 50 MB request budget holds two at once.
+	assert.equal(peakFetches, 2);
 	assert.deepEqual(first.metadata, {
 		pdfEngine: "auto",
 		materializedFiles: 0,
@@ -585,4 +586,51 @@ test("content resolver refuses a request with more file and image parts than the
 		(error: unknown) =>
 			(error as { code?: string }).code === "too_many_content_inputs",
 	);
+});
+
+test("content resolver stops sibling downloads once one fetch fails", async () => {
+	let aborted = 0;
+	let started = 0;
+	const imageUrls = [
+		"https://assets.example/broken.png",
+		"https://assets.example/slow-1.png",
+		"https://assets.example/slow-2.png",
+	];
+	const resolver = createContentInputResolver(
+		{
+			callType: "chat",
+			publicWire: "chat_completions",
+			model: "public-model",
+			messages: [
+				{
+					role: "user",
+					content: imageUrls.map((url) => ({ type: "image" as const, url })),
+				},
+			],
+			stream: false,
+		},
+		new AbortController().signal,
+		{
+			resolveHostname: async () => [{ address: "93.184.216.34", family: 4 }],
+			fetch: ((url: URL | string, init?: RequestInit) => {
+				if (String(url).includes("broken")) {
+					return Promise.resolve(new Response("nope", { status: 404 }));
+				}
+				started += 1;
+				return new Promise<Response>((_, reject) => {
+					init?.signal?.addEventListener("abort", () => {
+						aborted += 1;
+						reject(new Error("aborted"));
+					});
+				});
+			}) as typeof fetch,
+		},
+	);
+	const google = candidate(googleAdapter);
+	await assert.rejects(
+		resolver.resolveForCandidate(google, "generate_content"),
+	);
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	assert.ok(started >= 1);
+	assert.equal(aborted, started);
 });

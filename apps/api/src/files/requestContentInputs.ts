@@ -696,6 +696,7 @@ async function fetchInput(
 	maxBytes = MAX_MATERIALIZED_INPUT_BYTES,
 	errorParam = "messages",
 ): Promise<MaterializedInput> {
+	signal.throwIfAborted();
 	let current = value;
 	for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
 		const validated = await assertPublicUrl(
@@ -705,6 +706,7 @@ async function fetchInput(
 			errorParam,
 		);
 		const { url, addresses } = validated;
+		signal.throwIfAborted();
 		let response: Response;
 		try {
 			response = await dependencies.fetch(
@@ -1083,6 +1085,56 @@ function portableTextPart(
 	};
 }
 
+/**
+ * The bytes one request may download, shared by its remote inputs. Each fetch reserves what it may
+ * read before it starts and is capped to that, so concurrent downloads cannot together pass the
+ * limit before any of them is counted. A fetch that does not fit waits for another to settle and
+ * return what it did not use; only when nothing is in flight does it get the true remainder, and a
+ * request with none left is refused.
+ */
+class ByteBudget {
+	#remaining: number;
+	#inFlight = 0;
+	readonly #waiters: Array<() => void> = [];
+
+	constructor(limit: number) {
+		this.#remaining = limit;
+	}
+
+	async run<T extends { bytes: Uint8Array }>(
+		maxBytes: number,
+		param: string,
+		fetch: (grant: number) => Promise<T>,
+	): Promise<T> {
+		while (this.#remaining < maxBytes && this.#inFlight > 0) {
+			await new Promise<void>((resolve) => this.#waiters.push(resolve));
+		}
+		const grant = Math.min(maxBytes, this.#remaining);
+		if (grant <= 0) {
+			throw requestError(
+				`Remote content inputs exceed the ${MAX_PORTABLE_CONTENT_INPUT_BYTES} byte request limit`,
+				"content_inputs_too_large",
+				"The combined content inputs are too large for portable processing.",
+				param,
+			);
+		}
+		this.#remaining -= grant;
+		this.#inFlight += 1;
+		let used = 0;
+		try {
+			const result = await fetch(grant);
+			used = result.bytes.byteLength;
+			return result;
+		} finally {
+			this.#remaining += grant - used;
+			this.#inFlight -= 1;
+			for (const wake of this.#waiters.splice(0)) {
+				wake();
+			}
+		}
+	}
+}
+
 class AsyncSemaphore {
 	#available: number;
 	readonly #waiters: Array<() => void> = [];
@@ -1127,6 +1179,9 @@ export class ContentInputResolver {
 	readonly #parsedText = new WeakMap<MaterializedInput, Promise<string>>();
 	readonly #accounted = new WeakSet<MaterializablePart>();
 	readonly #fetches = new AsyncSemaphore(MAX_CONCURRENT_FETCHES);
+	readonly #budget = new ByteBudget(MAX_PORTABLE_CONTENT_INPUT_BYTES);
+	/** Aborted on the first failed fetch, so its siblings stop downloading for a request that failed. */
+	readonly #fetchAbort = new AbortController();
 	#totalBytes = 0;
 
 	constructor(
@@ -1218,14 +1273,25 @@ export class ContentInputResolver {
 			pending = this.#materializedBySource.get(sourceKey);
 			if (pending === undefined) {
 				if (source.kind === "url") {
-					pending = this.#fetches.run(() =>
-						fetchInput(
-							source.value,
-							this.#signal,
-							this.#dependencies,
-							part.type,
-						),
-					);
+					pending = this.#fetches
+						.run(() =>
+							this.#budget.run(
+								MAX_MATERIALIZED_INPUT_BYTES,
+								"messages",
+								(grant) =>
+									fetchInput(
+										source.value,
+										AbortSignal.any([this.#signal, this.#fetchAbort.signal]),
+										this.#dependencies,
+										part.type,
+										grant,
+									),
+							),
+						)
+						.catch((error: unknown) => {
+							this.#fetchAbort.abort(error);
+							throw error;
+						});
 				} else if (source.kind === "data_url") {
 					pending = Promise.resolve(
 						decodeDataUrl(source.value, filename, part.type),
@@ -1574,6 +1640,8 @@ export class VideoInputResolver {
 	readonly #parts: VideoMediaPart[];
 	readonly #materialized = new Map<string, Promise<MaterializedInput>>();
 	readonly #fetches = new AsyncSemaphore(MAX_CONCURRENT_FETCHES);
+	readonly #budget = new ByteBudget(MAX_PORTABLE_CONTENT_INPUT_BYTES);
+	readonly #fetchAbort = new AbortController();
 
 	constructor(
 		request: CanonicalVideoRequest,
@@ -1610,16 +1678,26 @@ export class VideoInputResolver {
 		if (pending === undefined) {
 			pending =
 				source.kind === "url"
-					? this.#fetches.run(() =>
-							fetchInput(
-								source.value,
-								this.#signal,
-								this.#dependencies,
-								part.kind,
-								MAX_PORTABLE_CONTENT_INPUT_BYTES,
-								part.param,
-							),
-						)
+					? this.#fetches
+							.run(() =>
+								this.#budget.run(
+									MAX_PORTABLE_CONTENT_INPUT_BYTES,
+									part.param,
+									(grant) =>
+										fetchInput(
+											source.value,
+											AbortSignal.any([this.#signal, this.#fetchAbort.signal]),
+											this.#dependencies,
+											part.kind,
+											grant,
+											part.param,
+										),
+								),
+							)
+							.catch((error: unknown) => {
+								this.#fetchAbort.abort(error);
+								throw error;
+							})
 					: Promise.resolve(
 							decodeDataUrl(
 								source.value,
