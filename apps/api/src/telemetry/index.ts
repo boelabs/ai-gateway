@@ -66,6 +66,9 @@ interface Instruments {
 	messageStateDiscards: ReturnType<
 		ReturnType<typeof metrics.getMeter>["createCounter"]
 	>;
+	unhandledRejections: ReturnType<
+		ReturnType<typeof metrics.getMeter>["createCounter"]
+	>;
 	activeOperations: ReturnType<
 		ReturnType<typeof metrics.getMeter>["createUpDownCounter"]
 	>;
@@ -141,6 +144,13 @@ function createInstruments(): Instruments {
 					"Client-replayed provider state the gateway could not restore, by reason.",
 			},
 		),
+		unhandledRejections: meter.createCounter(
+			"ai_gateway_unhandled_rejections_total",
+			{
+				description:
+					"Promise rejections that reached the process with no handler.",
+			},
+		),
 		activeOperations: meter.createUpDownCounter(
 			"ai_gateway_active_operations",
 			{
@@ -213,6 +223,10 @@ export function recordPersistenceLoss(kind: "dropped" | "failed"): void {
 
 export function recordMessageStateDiscard(reason: string): void {
 	inst?.messageStateDiscards.add(1, { reason });
+}
+
+export function recordUnhandledRejection(): void {
+	inst?.unhandledRejections.add(1);
 }
 
 export interface OperationChildTelemetrySpan {

@@ -19,6 +19,7 @@ import "./adapters/index.ts"; // registers the adapters (side-effect)
 
 import { messagesCountTokensHandler } from "./endpoints/messagesCountTokens.ts";
 import { publicizeManagementError, isManagementPath } from "./admin/errors.ts";
+import { installProcessErrorHandlers } from "./runtime/processErrors.ts";
 import { startResponseStateGcJob } from "./db/repos/responseStates.ts";
 import { requestContextMiddleware } from "./http/requestContext.ts";
 import { lifecyclePhase, isDraining } from "./runtime/lifecycle.ts";
@@ -85,6 +86,7 @@ import {
 	listModelsHandler,
 } from "./endpoints/models.ts";
 
+installProcessErrorHandlers();
 startTelemetry();
 
 // Before anything touches a table. The extension runtime, the background jobs and readiness itself
