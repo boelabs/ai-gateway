@@ -90,6 +90,8 @@ export interface CanonicalMessage extends CanonicalCacheControlled {
 	toolResultError?: boolean;
 	/** Responses assistant-message phase; preserved across continuation and native transports. */
 	phase?: "commentary" | "final_answer";
+	/** Only on assistant messages: the model's refusal, which is not content. */
+	refusal?: string;
 	/**
 	 * Opaque provider-namespaced per-message state that must round-trip with the assistant message
 	 * (e.g. OpenAI encrypted reasoning items as `providerFields.openai.reasoning`). Filled and

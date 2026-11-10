@@ -84,6 +84,10 @@ Estado opaco del proveedor ligado a un turno del asistente y no a una de sus lla
 
 `Usage` marcado con `estimated: true`: los recuentos que el gateway liquida cuando un upstream aceptó una solicitud pero no informó el uso, la entrada reservada más la salida observada. Consulta [Contabilidad de costos](/docs/cost-accounting#when-the-provider-reports-no-usage).
 
+## Refusal [#refusal]
+
+La negativa del modelo a responder, que viaja separada del contenido en los mensajes, respuestas y deltas de streaming canonical: el `refusal` de Chat, una parte de contenido `refusal` y los eventos `response.refusal.*` en Responses. Una negativa servida por un wire llega a los clientes del otro como negativa.
+
 ## Server Tool [#server-tool]
 
 Una herramienta que el proveedor ejecuta por su cuenta durante un turno, como la búsqueda web, web fetch o la ejecución de código de Anthropic. Sus bloques de llamada y de resultado no tienen forma canonical, así que viajan como contenido nativo del proveedor: `/v1/messages` los devuelve y los emite en streaming donde el modelo los produjo, y un cliente que reenvía el turno llega al proveedor con ellos intactos. `Usage.serverToolCalls` cuenta las llamadas por herramienta (`server_tool_use` en el wire de Messages).

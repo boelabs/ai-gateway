@@ -339,11 +339,16 @@ export function buildResponsesRequestBody(
 				[]) {
 				input.push(reasoningItemForRequest(item));
 			}
-			if (m.content) {
+			if (m.content || m.refusal !== undefined) {
 				input.push({
 					type: "message",
 					role: "assistant",
-					content: contentToInput(m.content, "assistant"),
+					content: [
+						...(m.content ? contentToInput(m.content, "assistant") : []),
+						...(m.refusal === undefined
+							? []
+							: [{ type: "refusal", refusal: m.refusal }]),
+					],
 					...(m.phase === undefined ? {} : { phase: m.phase }),
 				});
 			}
@@ -557,7 +562,7 @@ export function parseResponsesUsage(
 interface RWOutputItem {
 	[key: string]: unknown;
 	type?: string;
-	content?: Array<{ type?: string; text?: string }>;
+	content?: Array<{ type?: string; text?: string; refusal?: string }>;
 	summary?: Array<{ type?: string; text?: string } | string>;
 	call_id?: string;
 	id?: string;
@@ -648,6 +653,7 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 		});
 	}
 	let content = "";
+	let refusal = "";
 	const reasoning: string[] = [];
 	const reasoningState: OpenAIReasoningStateItem[] = [];
 	const toolCalls: NonNullable<
@@ -661,6 +667,8 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 			for (const c of item.content ?? []) {
 				if (c.type === "output_text") {
 					content += c.text ?? "";
+				} else if (c.type === "refusal") {
+					refusal += c.refusal ?? "";
 				}
 			}
 		} else if (item.type === "reasoning") {
@@ -683,6 +691,7 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 	const message: CanonicalChatResponse["choices"][number]["message"] = {
 		role: "assistant",
 		content: content.length > 0 ? content : null,
+		...(refusal.length > 0 ? { refusal } : {}),
 	};
 	const responseMessage = output.find(
 		(item) => item.type === "message" && item.phase !== undefined,
@@ -827,6 +836,19 @@ export async function* responsesEventsToCanonicalChunks(
 			if (resp?.model) {
 				({ model } = resp);
 			}
+			continue;
+		}
+
+		if (type === "response.refusal.delta") {
+			const delta: CanonicalChatStreamChunk["choices"][number]["delta"] = {
+				providerFields: providerFieldsWithOpenAIResponsesStreamEvent(type, d),
+			};
+			if (!roleSent) {
+				delta.role = "assistant";
+				roleSent = true;
+			}
+			delta.refusal = String(d.delta ?? "");
+			yield { ...base(), choices: [{ index: 0, delta, finishReason: null }] };
 			continue;
 		}
 

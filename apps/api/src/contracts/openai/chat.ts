@@ -449,22 +449,59 @@ function mapContentPart(
 	}
 }
 
+/** An assistant turn's refusal parts, which are the model's refusal rather than its content. */
+function assistantRefusal(m: z.infer<typeof messageSchema>): {
+	content: z.infer<typeof messageSchema>["content"];
+	refusal?: string;
+} {
+	const refusals: string[] = typeof m.refusal === "string" ? [m.refusal] : [];
+	let { content } = m;
+	if (Array.isArray(content)) {
+		refusals.push(
+			...content
+				.filter((part) => part.type === "refusal")
+				.map((part) => (part as { refusal: string }).refusal),
+		);
+		const rest = content.filter((part) => part.type !== "refusal");
+		content = rest.length > 0 ? (rest as typeof content) : null;
+	}
+	return refusals.length > 0
+		? { content, refusal: refusals.join("") }
+		: { content };
+}
+
 function mapMessage(m: z.infer<typeof messageSchema>): CanonicalMessage {
+	const raw = m as unknown as Record<string, unknown>;
+	if (raw.function_call !== undefined) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "unsupported_parameter",
+			param: "messages",
+			message:
+				"Legacy function_call messages are not supported; send tool_calls instead",
+		});
+	}
+	const refusal = m.role === "assistant" ? assistantRefusal(m) : undefined;
 	const msg: CanonicalMessage = {
 		role: m.role,
-		content: mapContent(m.content),
+		content: mapContent(refusal ? refusal.content : m.content),
 	};
+	if (refusal?.refusal !== undefined) {
+		msg.refusal = refusal.refusal;
+	}
 	if (m.name !== undefined) {
 		msg.name = m.name;
 	}
 	if (m.tool_calls !== undefined) {
 		msg.toolCalls = m.tool_calls.map((tc) => {
-			const raw = tc as unknown as Record<string, unknown>;
+			const rawCall = tc as unknown as Record<string, unknown>;
 			const decoded = decodeThoughtSignatureId(tc.id);
 			const extra = mergeProviderExtraContent(
 				decoded.extraContent,
-				extraContentFromProviderSpecificFields(raw.provider_specific_fields),
-				extraContent(raw.extra_content),
+				extraContentFromProviderSpecificFields(
+					rawCall.provider_specific_fields,
+				),
+				extraContent(rawCall.extra_content),
 			);
 			return {
 				id: decoded.id,
@@ -478,12 +515,18 @@ function mapMessage(m: z.infer<typeof messageSchema>): CanonicalMessage {
 		msg.toolCallId = stripThoughtSignatureId(m.tool_call_id);
 	}
 	if (m.role === "assistant") {
-		const raw = m as unknown as Record<string, unknown>;
 		const providerFields = extraContent(raw.provider_specific_fields);
 		const reasoning = openaiReasoningFromProviderFields(providerFields);
+		// A previous audio answer, referenced by id; only Chat Completions can resolve it.
+		const audio = raw.audio as { id?: unknown } | null | undefined;
 		const mergedProviderFields = mergeProviderFields(
-			providerFields,
-			reasoning === undefined ? undefined : { openai: { reasoning } },
+			mergeProviderFields(
+				providerFields,
+				reasoning === undefined ? undefined : { openai: { reasoning } },
+			),
+			typeof audio?.id === "string"
+				? { openai: { audio: { id: audio.id } } }
+				: undefined,
 		);
 		if (mergedProviderFields !== undefined) {
 			msg.providerFields = mergedProviderFields;
@@ -608,6 +651,11 @@ export function toCanonicalChatRequest(
 	}
 	const requiresNativeChatTransport =
 		req.audio !== undefined ||
+		req.messages.some(
+			(message) =>
+				message.role === "assistant" &&
+				typeof (message as { audio?: { id?: unknown } }).audio?.id === "string",
+		) ||
 		req.logprobs === true ||
 		(req.top_logprobs ?? 0) > 0 ||
 		Object.keys(req.logit_bias ?? {}).length > 0 ||

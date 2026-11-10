@@ -183,6 +183,9 @@ function mapInputPart(
 		case "output_text":
 		case "text":
 			return { type: "text", text: String(part.text ?? "") };
+		case "refusal":
+			// The model's refusal, collected onto the assistant message by the caller.
+			return null;
 		case "input_image": {
 			const url = part.image_url;
 			if (typeof url === "string") {
@@ -591,10 +594,25 @@ export function responsesRequestToCanonical(
 						role,
 						content: mapMessageContent(item.content),
 					};
+					const refusals = Array.isArray(item.content)
+						? item.content.filter(
+								(part) =>
+									(part as { type?: unknown } | null)?.type === "refusal",
+							)
+						: [];
+					if (role === "assistant" && refusals.length > 0) {
+						message.refusal = refusals
+							.map((part) =>
+								String((part as { refusal?: unknown }).refusal ?? ""),
+							)
+							.join("");
+					}
 					if (
 						Array.isArray(item.content) &&
 						Array.isArray(message.content) &&
-						message.content.length !== item.content.length
+						message.content.length +
+							(role === "assistant" ? refusals.length : 0) !==
+							item.content.length
 					) {
 						requiresNativeInput = true;
 					}
@@ -1023,6 +1041,7 @@ function messageItem(
 	id: string,
 	phase?: "commentary" | "final_answer",
 	providerFields?: Record<string, unknown>,
+	refusal?: string,
 ): Record<string, unknown> {
 	return {
 		type: "message",
@@ -1033,7 +1052,12 @@ function messageItem(
 		...(providerFields === undefined
 			? {}
 			: { provider_specific_fields: providerFields }),
-		content: [{ type: "output_text", text: content, annotations: [] }],
+		content: [
+			...(content || refusal === undefined
+				? [{ type: "output_text", text: content, annotations: [] }]
+				: []),
+			...(refusal === undefined ? [] : [{ type: "refusal", refusal }]),
+		],
 	};
 }
 
@@ -1262,7 +1286,9 @@ export function canonicalToResponsesResponse(
 				reasoningItem(choice.message.reasoning, `rs_${randomUUID()}`),
 			);
 		}
-		const messageId = content ? `msg_${randomUUID()}` : undefined;
+		const refusal = choice?.message.refusal ?? undefined;
+		const messageId =
+			content || refusal !== undefined ? `msg_${randomUUID()}` : undefined;
 		if (messageId !== undefined) {
 			output.push(
 				messageItem(
@@ -1270,6 +1296,7 @@ export function canonicalToResponsesResponse(
 					messageId,
 					choice?.message.phase,
 					withoutOpenAIResponsesReasoningState(choice?.message.providerFields),
+					refusal,
 				),
 			);
 		}
@@ -1427,6 +1454,11 @@ export async function* canonicalChunksToResponsesEvents(
 	let nextOutputIndex = 0;
 
 	let messageStarted = false;
+	// Content parts of the message item, numbered as they open: its text and its refusal.
+	let nextContentIndex = 0;
+	let textPart: number | undefined;
+	let refusalPart: number | undefined;
+	let refusal = "";
 	let msgIndex = 0;
 	const msgId = `msg_${randomUUID()}`;
 
@@ -1706,27 +1738,30 @@ export async function* canonicalChunksToResponsesEvents(
 		)) {
 			nativeOutput.push(item);
 		}
+		if ((delta.content || delta.refusal) && !messageStarted) {
+			if (reasoningOpen) {
+				yield* reasoningSummaryDone();
+			}
+			messageStarted = true;
+			msgIndex = nextOutputIndex++;
+			yield sse("response.output_item.added", next(), {
+				output_index: msgIndex,
+				item: {
+					type: "message",
+					id: msgId,
+					status: "in_progress",
+					role: "assistant",
+					content: [],
+				},
+			});
+		}
 		if (delta.content) {
-			if (!messageStarted) {
-				if (reasoningOpen) {
-					yield* reasoningSummaryDone();
-				}
-				messageStarted = true;
-				msgIndex = nextOutputIndex++;
-				yield sse("response.output_item.added", next(), {
-					output_index: msgIndex,
-					item: {
-						type: "message",
-						id: msgId,
-						status: "in_progress",
-						role: "assistant",
-						content: [],
-					},
-				});
+			if (textPart === undefined) {
+				textPart = nextContentIndex++;
 				yield sse("response.content_part.added", next(), {
 					item_id: msgId,
 					output_index: msgIndex,
-					content_index: 0,
+					content_index: textPart,
 					part: { type: "output_text", text: "", annotations: [] },
 				});
 			}
@@ -1734,8 +1769,26 @@ export async function* canonicalChunksToResponsesEvents(
 			yield sse("response.output_text.delta", next(), {
 				item_id: msgId,
 				output_index: msgIndex,
-				content_index: 0,
+				content_index: textPart,
 				delta: delta.content,
+			});
+		}
+		if (delta.refusal) {
+			if (refusalPart === undefined) {
+				refusalPart = nextContentIndex++;
+				yield sse("response.content_part.added", next(), {
+					item_id: msgId,
+					output_index: msgIndex,
+					content_index: refusalPart,
+					part: { type: "refusal", refusal: "" },
+				});
+			}
+			refusal += delta.refusal;
+			yield sse("response.refusal.delta", next(), {
+				item_id: msgId,
+				output_index: msgIndex,
+				content_index: refusalPart,
+				delta: delta.refusal,
 			});
 		}
 
@@ -1807,19 +1860,41 @@ export async function* canonicalChunksToResponsesEvents(
 	}
 
 	if (messageStarted) {
-		yield sse("response.output_text.done", next(), {
-			item_id: msgId,
-			output_index: msgIndex,
-			content_index: 0,
-			text: content,
-		});
-		yield sse("response.content_part.done", next(), {
-			item_id: msgId,
-			output_index: msgIndex,
-			content_index: 0,
-			part: { type: "output_text", text: content, annotations: [] },
-		});
-		const item = messageItem(content, msgId, undefined, messageProviderFields);
+		if (textPart !== undefined) {
+			yield sse("response.output_text.done", next(), {
+				item_id: msgId,
+				output_index: msgIndex,
+				content_index: textPart,
+				text: content,
+			});
+			yield sse("response.content_part.done", next(), {
+				item_id: msgId,
+				output_index: msgIndex,
+				content_index: textPart,
+				part: { type: "output_text", text: content, annotations: [] },
+			});
+		}
+		if (refusalPart !== undefined) {
+			yield sse("response.refusal.done", next(), {
+				item_id: msgId,
+				output_index: msgIndex,
+				content_index: refusalPart,
+				refusal,
+			});
+			yield sse("response.content_part.done", next(), {
+				item_id: msgId,
+				output_index: msgIndex,
+				content_index: refusalPart,
+				part: { type: "refusal", refusal },
+			});
+		}
+		const item = messageItem(
+			content,
+			msgId,
+			undefined,
+			messageProviderFields,
+			refusalPart === undefined ? undefined : refusal,
+		);
 		output.push(item);
 		yield sse("response.output_item.done", next(), {
 			output_index: msgIndex,

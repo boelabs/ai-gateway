@@ -135,6 +135,12 @@ replay it and nothing is stored. See [Provider-specific fields](/docs/provider-s
 but reported no usage — the reserved input plus the observed output. See
 [Cost accounting](/docs/cost-accounting#when-the-provider-reports-no-usage).
 
+## Refusal
+
+The model declining to answer, carried apart from content on canonical messages, responses and
+stream deltas: Chat's `refusal`, a `refusal` content part and `response.refusal.*` events on
+Responses. A refusal served through one wire reaches clients of the other as a refusal.
+
 ## Server Tool
 
 A tool the provider runs itself during a turn, such as Anthropic's web search, web fetch or code

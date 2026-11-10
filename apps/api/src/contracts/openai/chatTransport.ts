@@ -171,6 +171,14 @@ function toTransportMessage(
 	if (m.toolCallId !== undefined) {
 		out.tool_call_id = m.toolCallId;
 	}
+	if (m.role === "assistant" && m.refusal !== undefined) {
+		out.refusal = m.refusal;
+	}
+	const audio = (m.providerFields?.openai as { audio?: unknown } | undefined)
+		?.audio;
+	if (m.role === "assistant" && audio !== undefined) {
+		out.audio = structuredClone(audio);
+	}
 	return out;
 }
 
