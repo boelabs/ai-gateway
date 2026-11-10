@@ -16,6 +16,8 @@ deployment. Gateway and dashboard processes read separate environment files.
 | `ACTIVE_ENCRYPTION_KEY_ID` | Key id | Must exist in `ENCRYPTION_KEYRING`; encrypts every new envelope. |
 | `DATABASE_URL` | Postgres connection URL | TLS follows `sslmode` as in libpq; without it the connection is plaintext. |
 | `REDIS_URL` | Redis connection URL | |
+| `REDIS_TLS_CA` | — | CA that signs a `rediss://` server certificate (PEM, or `file:/path`). Verification is always on otherwise. |
+| `REDIS_TLS_INSECURE` | `false` | `true` skips `rediss://` certificate verification. |
 
 ## Server
 

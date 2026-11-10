@@ -107,6 +107,8 @@ Falla en **ClientHello**, antes de cualquier verificación de certificado, por l
 
 </Callout>
 
+`rediss://` verifica el certificado del servidor. Para uno autofirmado, pon la CA que lo firmó en `REDIS_TLS_CA` (texto PEM, o `file:/path/to/ca.pem`) en lugar de desactivar la verificación. `REDIS_TLS_INSECURE=true` la omite por completo; úsalo solo donde el enlace esté protegido de otra forma, porque sin ella cualquiera en el camino puede hacerse pasar por la cache que guarda los presupuestos.
+
 #### Nota de seguridad [#security-note]
 
 El texto sin formato es seguro **en una red privada**: el gateway y la base de datos comparten un puente aislado que nunca toca Internet. **No** es seguro en la Internet pública: las credenciales y los datos viajan sin cifrar y un atacante en el camino puede leerlos. Si solo se puede acceder a su base de datos a través de un puerto público, utiliza un proveedor administrado con un certificado de CA pública o un túnel Stunnel, en lugar de texto sin formato.

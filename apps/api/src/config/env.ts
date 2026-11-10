@@ -81,6 +81,16 @@ export const env = createEnv({
 		 */
 		DATABASE_POOL_MAX: z.coerce.number().int().min(2).max(200).default(20),
 		REDIS_URL: z.url(),
+		/**
+		 * A `rediss://` connection verifies the server certificate. REDIS_TLS_CA trusts a private CA
+		 * (PEM, inline or `file:/path`) for self-signed setups; REDIS_TLS_INSECURE skips verification
+		 * entirely and is for a link already protected some other way.
+		 */
+		REDIS_TLS_CA: z.string().min(1).optional(),
+		REDIS_TLS_INSECURE: z
+			.enum(["true", "false"])
+			.default("false")
+			.transform((value) => value === "true"),
 
 		/**
 		 * Who may read a retained request/response sample.

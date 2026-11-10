@@ -13,6 +13,8 @@ El gateway valida su entorno al inicio y sale si falta una variable requerida o 
 | `ACTIVE_ENCRYPTION_KEY_ID` | Identificación de clave | Debe existir en `ENCRYPTION_KEYRING`; cifra cada sobre nuevo. |
 | `DATABASE_URL` | URL de conexión de Postgres | TLS sigue `sslmode` como en libpq; sin él, la conexión va en texto plano. |
 | `REDIS_URL` | URL de conexión de Redis | |
+| `REDIS_TLS_CA` | — | CA que firma el certificado de un servidor `rediss://` (PEM, o `file:/path`). Si no, la verificación siempre está activa. |
+| `REDIS_TLS_INSECURE` | `false` | `true` omite la verificación del certificado de `rediss://`. |
 
 ## Servidor [#server]
 
