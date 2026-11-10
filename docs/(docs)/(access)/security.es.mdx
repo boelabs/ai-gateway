@@ -66,7 +66,7 @@ Nada amplía esto. El panel no llama en absoluto al gateway desde el navegador; 
 
 ### Registro de auditoría [#audit-trail]
 
-Cada llamada mutante `/admin` se agrega a `admin_audit` con la identidad de actuación (`master-key`, `root` o `user:<uuid>`), la ruta, el destino, la identificación de la solicitud y el estado resultante. Las lecturas no se auditan (constituyen la mayor parte del tráfico de un panel y enterrarían lo que importa), con una excepción deliberada en la otra dirección: leer una muestra de carga útil es un `GET` que revela contenido real, y `payload_access_audit` lo registra por separado.
+Cada llamada mutante `/admin` se agrega a `admin_audit` con la identidad de actuación (`master-key`, `root` o `user:<uuid>`), la ruta, el destino, la identificación de la solicitud y el estado resultante, incluido un rechazo `403`, porque un intento de cambiar lo que el rol no permite merece quedar registrado. Las lecturas no se auditan (constituyen la mayor parte del tráfico de un panel y enterrarían lo que importa), con una excepción deliberada en la otra dirección: leer una muestra de carga útil es un `GET` que revela contenido real, y `payload_access_audit` lo registra por separado.
 
 Ambos registros se pueden leer a través de `GET /admin/audit` (`audit:read`, es decir, master key o propietario), fusionados en una línea de tiempo y filtrables por actor, acción y tiempo. El recorrido se puede agregar únicamente: ninguna ruta actualiza ni elimina una entrada.
 

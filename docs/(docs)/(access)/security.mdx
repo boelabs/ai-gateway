@@ -122,7 +122,8 @@ server does, and relays the three calls that must be the browser's own request. 
 ### Audit trail
 
 Every mutating `/admin` call is appended to `admin_audit` with the acting identity (`master-key`,
-`root`, or `user:<uuid>`), the route, the target, the request id, and the resulting status. Reads are
+`root`, or `user:<uuid>`), the route, the target, the request id, and the resulting status — a
+`403` refusal included, since an attempt to change what one's role does not allow is worth a record. Reads are
 not audited — they are most of a dashboard's traffic and would bury what matters — with one deliberate
 exception in the other direction: reading a payload sample is a `GET` that reveals real content, and
 `payload_access_audit` records it separately.
