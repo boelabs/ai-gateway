@@ -468,6 +468,44 @@ export async function deleteExpiredVideoAssets(): Promise<number> {
 	return deletedIds.length;
 }
 
+/** Downloads of completed videos running in the background, beyond which new ones wait. */
+const MAX_BACKGROUND_INGESTIONS = 2;
+const ingestionQueue: VideoJobRow[] = [];
+let backgroundIngestions = 0;
+
+/**
+ * Stores a completed video's asset off the polling loop. A download takes as long as the file is
+ * large, and done inline it held every other job in the batch (and the next tick) behind it.
+ */
+function ingestInBackground(row: VideoJobRow): void {
+	ingestionQueue.push(row);
+	drainIngestions();
+}
+
+function startIngestion(row: VideoJobRow): void {
+	backgroundIngestions += 1;
+	void ensureVideoAsset(row, "video")
+		.catch((err: unknown) => {
+			log.warn("videos", "completed video asset ingestion failed", {
+				err,
+				videoId: row.id,
+			});
+		})
+		.finally(() => {
+			backgroundIngestions -= 1;
+			drainIngestions();
+		});
+}
+
+function drainIngestions(): void {
+	while (
+		backgroundIngestions < MAX_BACKGROUND_INGESTIONS &&
+		ingestionQueue.length > 0
+	) {
+		startIngestion(ingestionQueue.shift() as VideoJobRow);
+	}
+}
+
 export async function refreshDueVideoJobs(): Promise<number> {
 	const rows = await claimDueVideoJobs();
 	let refreshed = 0;
@@ -475,12 +513,7 @@ export async function refreshDueVideoJobs(): Promise<number> {
 		try {
 			const updated = await refreshVideoJob(row);
 			if (updated.status === "completed") {
-				await ensureVideoAsset(updated, "video").catch((err: unknown) => {
-					log.warn("videos", "completed video asset ingestion failed", {
-						err,
-						videoId: updated.id,
-					});
-				});
+				ingestInBackground(updated);
 			}
 			refreshed += 1;
 		} catch (err) {

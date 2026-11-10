@@ -294,7 +294,15 @@ export async function updateVideoJobState(
 				? {}
 				: { lastPolledAt: patch.lastPolledAt }),
 		})
-		.where(eq(videoJobs.id, id))
+		// Compare-and-set on the job still being live: a poller that read the job before another
+		// replica finished, failed or deleted it must not write its stale state back over that.
+		.where(
+			and(
+				eq(videoJobs.id, id),
+				isNull(videoJobs.deletedAt),
+				inArray(videoJobs.status, ["queued", "in_progress"]),
+			),
+		)
 		.returning();
 	return row;
 }
@@ -443,13 +451,17 @@ export async function claimDueVideoJobs(
 					or(isNull(videoJobs.nextPollAt), lte(videoJobs.nextPollAt, now)),
 				),
 			)
-			.orderBy(asc(videoJobs.createdAt))
+			// Most overdue first, so a backlog of new jobs cannot starve ones waiting longer to poll.
+			.orderBy(
+				sql`${videoJobs.nextPollAt} ASC NULLS FIRST`,
+				asc(videoJobs.createdAt),
+			)
 			.limit(limit)
 			.for("update", { skipLocked: true });
 		if (due.length === 0) {
 			return [];
 		}
-		return tx
+		const claimed = await tx
 			.update(videoJobs)
 			.set({ nextPollAt: new Date(now.getTime() + claimMs) })
 			.where(
@@ -459,6 +471,11 @@ export async function claimDueVideoJobs(
 				),
 			)
 			.returning();
+		// RETURNING has no order; keep the selection's, most overdue first.
+		const position = new Map(due.map((row, index) => [row.id, index]));
+		return claimed.sort(
+			(a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0),
+		);
 	});
 }
 
