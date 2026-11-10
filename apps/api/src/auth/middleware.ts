@@ -181,6 +181,27 @@ export function requirePermission(
 	};
 }
 
+/**
+ * The public API runs inference, so an operator session needs `inference:use` to call it. The
+ * master key and virtual keys are API credentials whose scope is enforced per request.
+ */
+export function requireInferenceAccess(): MiddlewareHandler<AppEnv> {
+	return async (c, next) => {
+		const auth = c.get("auth") as Auth | undefined;
+		if (
+			auth?.type === "session" &&
+			!roleHas(auth.session.role, "inference:use")
+		) {
+			throw new GatewayError({
+				class: "permission",
+				code: "insufficient_permission",
+				message: 'This operation requires the "inference:use" permission',
+			});
+		}
+		return next();
+	};
+}
+
 /** Requires the resolved auth to be the master key or a session (i.e. not a virtual key). */
 export function requireOperator(): MiddlewareHandler<AppEnv> {
 	return async (c, next) => {

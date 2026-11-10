@@ -19,6 +19,7 @@ import "./adapters/index.ts"; // registers the adapters (side-effect)
 
 import { messagesCountTokensHandler } from "./endpoints/messagesCountTokens.ts";
 import { publicizeManagementError, isManagementPath } from "./admin/errors.ts";
+import { authMiddleware, requireInferenceAccess } from "./auth/middleware.ts";
 import { installProcessErrorHandlers } from "./runtime/processErrors.ts";
 import { startResponseStateGcJob } from "./db/repos/responseStates.ts";
 import { startSpendLedgerGcJob } from "./ratelimit/spendLedgerGc.ts";
@@ -36,7 +37,6 @@ import { messagesHandler } from "./endpoints/messages.ts";
 import { docsExportHandler } from "./endpoints/docs.ts";
 import { getRequestId } from "./http/requestContext.ts";
 import { rerankHandler } from "./endpoints/rerank.ts";
-import { authMiddleware } from "./auth/middleware.ts";
 import { startTelemetry } from "./telemetry/index.ts";
 import { runMigrations } from "./db/migrations.ts";
 import { startVideoJobs } from "./videos/jobs.ts";
@@ -334,6 +334,7 @@ app.route("/admin", adminApp);
 
 // Public API - requires a master or virtual key.
 app.use("/v1/*", authMiddleware());
+app.use("/v1/*", requireInferenceAccess());
 app.post("/v1/chat/completions", chatCompletionsHandler);
 app.post("/v1/responses", responsesHandler);
 app.get("/v1/responses", responsesWebSocketHandler);

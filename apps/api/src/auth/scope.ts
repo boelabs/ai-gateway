@@ -1,5 +1,5 @@
+import { type Auth, actorOf } from "./types.ts";
 import { GatewayError } from "#core/errors.ts";
-import type { Auth } from "./types.ts";
 
 /**
  * Checks that the credential may use a public model.
@@ -23,5 +23,26 @@ export function assertModelAllowed(auth: Auth, publicModel: string): void {
 			class: "permission",
 			message: `The API key does not have access to public model "${publicModel}"`,
 		});
+	}
+}
+
+/**
+ * Who owns stored state (stored responses, video jobs). A virtual key owns its own; an operator
+ * session owns its user's, apart from the master key and from other operators; the master key owns
+ * what neither scope claims.
+ */
+export interface StateScope {
+	virtualKeyId: string | null;
+	ownerActor: string | null;
+}
+
+export function stateScopeOf(auth: Auth): StateScope {
+	switch (auth.type) {
+		case "virtual":
+			return { virtualKeyId: auth.key.id, ownerActor: null };
+		case "session":
+			return { virtualKeyId: null, ownerActor: actorOf(auth) };
+		default:
+			return { virtualKeyId: null, ownerActor: null };
 	}
 }

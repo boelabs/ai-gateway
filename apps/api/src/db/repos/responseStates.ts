@@ -1,4 +1,5 @@
 import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
+import type { StateScope } from "#auth/scope.ts";
 import { responseStates } from "#db/schema.ts";
 import { writtenRow } from "#db/returning.ts";
 import { log } from "#logging/log.ts";
@@ -9,7 +10,7 @@ export type ResponseStateRow = typeof responseStates.$inferSelect;
 
 export interface StoreResponseStateInput {
 	id: string;
-	virtualKeyId: string | null;
+	scope: StateScope;
 	publicModel: string;
 	deploymentId: string | null;
 	adapterKey: string | null;
@@ -75,6 +76,23 @@ export function startResponseStateGcJob(): () => void {
 	return () => clearInterval(timer);
 }
 
+/** Rows a scope owns. The master scope is what neither a key nor an operator session claims. */
+function scopeCondition(scope: StateScope) {
+	if (scope.virtualKeyId !== null) {
+		return eq(responseStates.virtualKeyId, scope.virtualKeyId);
+	}
+	if (scope.ownerActor !== null) {
+		return and(
+			isNull(responseStates.virtualKeyId),
+			eq(responseStates.ownerActor, scope.ownerActor),
+		);
+	}
+	return and(
+		isNull(responseStates.virtualKeyId),
+		isNull(responseStates.ownerActor),
+	);
+}
+
 export async function storeResponseState(
 	input: StoreResponseStateInput,
 ): Promise<ResponseStateRow> {
@@ -83,7 +101,8 @@ export async function storeResponseState(
 		.insert(responseStates)
 		.values({
 			id: input.id,
-			virtualKeyId: input.virtualKeyId,
+			virtualKeyId: input.scope.virtualKeyId,
+			ownerActor: input.scope.ownerActor,
 			publicModel: input.publicModel,
 			deploymentId: input.deploymentId,
 			adapterKey: input.adapterKey,
@@ -101,20 +120,17 @@ export async function storeResponseState(
 
 export async function getResponseStateForScope(
 	id: string,
-	virtualKeyId: string | null,
+	scope: StateScope,
 	now = new Date(),
 ): Promise<ResponseStateRow | undefined> {
-	const scope =
-		virtualKeyId === null
-			? isNull(responseStates.virtualKeyId)
-			: eq(responseStates.virtualKeyId, virtualKeyId);
+	const where = scopeCondition(scope);
 	const [row] = await db
 		.select()
 		.from(responseStates)
 		.where(
 			and(
 				eq(responseStates.id, id),
-				scope,
+				where,
 				eq(responseStates.store, true),
 				gt(responseStates.expiresAt, now),
 			),
@@ -134,13 +150,10 @@ export async function getResponseStateForScope(
  */
 export async function findResponseItemByIdForScope(
 	itemId: string,
-	virtualKeyId: string | null,
+	scope: StateScope,
 	now = new Date(),
 ): Promise<Record<string, unknown> | undefined> {
-	const scope =
-		virtualKeyId === null
-			? isNull(responseStates.virtualKeyId)
-			: eq(responseStates.virtualKeyId, virtualKeyId);
+	const where = scopeCondition(scope);
 	const needle = JSON.stringify([{ id: itemId }]);
 	const [row] = await db
 		.select({
@@ -150,7 +163,7 @@ export async function findResponseItemByIdForScope(
 		.from(responseStates)
 		.where(
 			and(
-				scope,
+				where,
 				eq(responseStates.store, true),
 				gt(responseStates.expiresAt, now),
 				sql`(${responseStates.output} @> ${needle}::jsonb OR ${responseStates.requestInput} @> ${needle}::jsonb)`,
@@ -168,16 +181,13 @@ export async function findResponseItemByIdForScope(
 /** Deletes a state within the key's scope. Returns true if it existed and was deleted. */
 export async function deleteResponseStateForScope(
 	id: string,
-	virtualKeyId: string | null,
+	scope: StateScope,
 ): Promise<boolean> {
-	const scope =
-		virtualKeyId === null
-			? isNull(responseStates.virtualKeyId)
-			: eq(responseStates.virtualKeyId, virtualKeyId);
+	const where = scopeCondition(scope);
 	const rows = await db
 		.delete(responseStates)
 		.where(
-			and(eq(responseStates.id, id), scope, eq(responseStates.store, true)),
+			and(eq(responseStates.id, id), where, eq(responseStates.store, true)),
 		)
 		.returning({ id: responseStates.id });
 	return rows.length > 0;

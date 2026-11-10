@@ -70,7 +70,7 @@ async function spend(keyId: string): Promise<number> {
 async function videoJob(keyId: string, billing: unknown, status = "queued") {
 	return createVideoJob({
 		id: `video_${randomUUID()}`,
-		virtualKeyId: keyId,
+		scope: { virtualKeyId: keyId, ownerActor: null },
 		publicModel: "video-model",
 		deploymentId: randomUUID(),
 		adapterKey: "openai",

@@ -9,6 +9,7 @@ import { resolveTransport } from "#router/transport.ts";
 import { settleVideoJobBilling } from "./billing.ts";
 import { getAdapter } from "#adapters/registry.ts";
 import type { Adapter } from "#adapters/types.ts";
+import type { StateScope } from "#auth/scope.ts";
 import { GatewayError } from "#core/errors.ts";
 import { decryptRecord } from "#db/crypto.ts";
 import { randomUUID } from "node:crypto";
@@ -417,7 +418,7 @@ export async function refreshDueVideoJobs(): Promise<number> {
 
 export async function loadAndRefreshVideo(
 	id: string,
-	virtualKeyId: string | null,
+	scope: StateScope,
 	signal?: AbortSignal,
 ): Promise<VideoJobRow> {
 	const row = await getVideoJobById(id);
@@ -428,8 +429,13 @@ export async function loadAndRefreshVideo(
 			message: `Video ${id} not found`,
 		});
 	}
-	// Virtual keys only see their own jobs; the master key (null) is the operator and sees all.
-	if (virtualKeyId !== null && row.virtualKeyId !== virtualKeyId) {
+	// Keys and operator sessions see their own jobs; the master key is the operator and sees all.
+	if (
+		(scope.virtualKeyId !== null && row.virtualKeyId !== scope.virtualKeyId) ||
+		(scope.virtualKeyId === null &&
+			scope.ownerActor !== null &&
+			(row.virtualKeyId !== null || row.ownerActor !== scope.ownerActor))
+	) {
 		throw new GatewayError({
 			class: "not_found",
 			code: "video_not_found",

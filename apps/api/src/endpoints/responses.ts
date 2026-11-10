@@ -14,6 +14,7 @@ import { reasoningLogInfo } from "#core/reasoning.ts";
 import { upgradeWebSocket } from "@hono/node-server";
 import { tapFirstToken } from "#gateway/ttft.ts";
 import { GatewayError } from "#core/errors.ts";
+import { stateScopeOf } from "#auth/scope.ts";
 import type { AppEnv } from "#auth/types.ts";
 import type { Usage } from "#core/usage.ts";
 import { streamSSE } from "hono/streaming";
@@ -109,10 +110,6 @@ interface PreparedResponsesRequest {
 	currentInput: ResponseInputItem[];
 }
 
-function authVirtualKeyId(auth: Auth): string | null {
-	return auth.type === "virtual" ? auth.key.id : null;
-}
-
 function outputItemsFromResponse(
 	response: Record<string, unknown>,
 ): ResponseInputItem[] {
@@ -136,7 +133,7 @@ async function prepareResponsesRequest(
 	auth: Auth,
 	connectionState?: ConnectionResponseState | null,
 ): Promise<PreparedResponsesRequest> {
-	const virtualKeyId = authVirtualKeyId(auth);
+	const scope = stateScopeOf(auth);
 	let previousItems: ResponseInputItem[] = [];
 
 	if (req.previous_response_id != null) {
@@ -148,7 +145,7 @@ async function prepareResponsesRequest(
 		} else {
 			const previous = await getResponseStateForScope(
 				req.previous_response_id,
-				virtualKeyId,
+				scope,
 			);
 			if (!previous) {
 				throw new GatewayError({
@@ -166,7 +163,7 @@ async function prepareResponsesRequest(
 	const currentInput = await expandInputReferences(
 		normalizeResponseInput(req.input),
 		previousItems,
-		(id) => findResponseItemByIdForScope(id, virtualKeyId),
+		(id) => findResponseItemByIdForScope(id, scope),
 	);
 	const effectiveInput = expandLocalCompactionItems([
 		...previousItems.map((item) => structuredClone(item)),
@@ -331,7 +328,7 @@ async function persistResponseState(opts: {
 	const id = responseId(opts.response);
 	await storeResponseState({
 		id,
-		virtualKeyId: authVirtualKeyId(opts.auth),
+		scope: stateScopeOf(opts.auth),
 		publicModel: opts.req.model,
 		deploymentId: opts.deploymentId,
 		adapterKey: opts.adapterKey,
@@ -820,7 +817,7 @@ async function loadStateOr404(c: Context<AppEnv>): Promise<{
 	row: NonNullable<Awaited<ReturnType<typeof getResponseStateForScope>>>;
 }> {
 	const id = requireId(c);
-	const row = await getResponseStateForScope(id, authVirtualKeyId(getAuth(c)));
+	const row = await getResponseStateForScope(id, stateScopeOf(getAuth(c)));
 	if (!row) {
 		throw new GatewayError({
 			class: "not_found",
@@ -848,7 +845,7 @@ export async function deleteResponseHandler(
 	const id = requireId(c);
 	const deleted = await deleteResponseStateForScope(
 		id,
-		authVirtualKeyId(getAuth(c)),
+		stateScopeOf(getAuth(c)),
 	);
 	if (!deleted) {
 		throw new GatewayError({

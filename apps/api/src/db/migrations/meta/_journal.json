@@ -50,6 +50,13 @@
       "when": 1794316007646,
       "tag": "0006_spend_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794317523167,
+      "tag": "0007_operator_state_scope",
+      "breakpoints": true
     }
   ]
 }

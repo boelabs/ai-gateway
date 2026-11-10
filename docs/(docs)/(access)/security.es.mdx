@@ -66,7 +66,7 @@ Cada llamada mutante `/admin` se agrega a `admin_audit` con la identidad de actu
 
 Ambos registros se pueden leer a través de `GET /admin/audit` (`audit:read`, es decir, master key o propietario), fusionados en una línea de tiempo y filtrables por actor, acción y tiempo. El recorrido se puede agregar únicamente: ninguna ruta actualiza ni elimina una entrada.
 
-Las operaciones de inferencia llevan la misma identidad en `gateway_operations.actor`, por lo que el tráfico del operador (un playground, una prueba manual) es atribuible y aparece en `GET /admin/usage?groupBy=actor` en lugar de aparecer como gasto no atribuido.
+Las operaciones de inferencia llevan la misma identidad en `gateway_operations.actor`, por lo que el tráfico del operador (un playground, una prueba manual) es atribuible y aparece en `GET /admin/usage?groupBy=actor` en lugar de aparecer como gasto no atribuido. Una sesión de operador llega a la API pública solo con `inference:use` (admin y owner); la sesión de un viewer se rechaza con `403 insufficient_permission`. Las respuestas almacenadas y los trabajos de video creados con una sesión pertenecen a su usuario: ni la master key ni otro operador los alcanzan por `/v1`.
 
 ## Virtual keys en reposo [#virtual-keys-at-rest]
 

@@ -1,5 +1,6 @@
 import { type VideoJobBilling, videoAssets, videoJobs } from "#db/schema.ts";
 import type { VideoAssetVariant, VideoStatus } from "#core/videos.ts";
+import type { StateScope } from "#auth/scope.ts";
 import { writtenRow } from "#db/returning.ts";
 import { env } from "#config/env.ts";
 import { db } from "#db/client.ts";
@@ -23,7 +24,7 @@ export type VideoAssetRow = typeof videoAssets.$inferSelect;
 
 export interface CreateVideoJobInput {
 	id: string;
-	virtualKeyId: string | null;
+	scope: StateScope;
 	publicModel: string;
 	deploymentId: string;
 	adapterKey: string;
@@ -64,13 +65,19 @@ export function videoAssetExpiresAt(now = new Date()): Date {
 }
 
 /**
- * Virtual keys only see their own jobs. The master key (null scope) is the operator and sees
- * every job, so it gets no filter.
+ * Virtual keys see their own jobs and operator sessions their user's. The master key (both null) is
+ * the operator of record and sees every job, so it gets no filter.
  */
-function scopeCondition(virtualKeyId: string | null) {
-	return virtualKeyId === null
-		? undefined
-		: eq(videoJobs.virtualKeyId, virtualKeyId);
+function scopeCondition(scope: StateScope) {
+	if (scope.virtualKeyId !== null) {
+		return eq(videoJobs.virtualKeyId, scope.virtualKeyId);
+	}
+	if (scope.ownerActor !== null) {
+		return and(
+			isNull(videoJobs.virtualKeyId),
+			eq(videoJobs.ownerActor, scope.ownerActor),
+		);
+	}
 }
 
 export async function createVideoJob(
@@ -81,7 +88,8 @@ export async function createVideoJob(
 		.insert(videoJobs)
 		.values({
 			id: input.id,
-			virtualKeyId: input.virtualKeyId,
+			virtualKeyId: input.scope.virtualKeyId,
+			ownerActor: input.scope.ownerActor,
 			publicModel: input.publicModel,
 			deploymentId: input.deploymentId,
 			adapterKey: input.adapterKey,
@@ -109,10 +117,10 @@ export async function createVideoJob(
 
 export async function getVideoJobForScope(
 	id: string,
-	virtualKeyId: string | null,
+	scope: StateScope,
 	opts: { includeDeleted?: boolean } = {},
 ): Promise<VideoJobRow | undefined> {
-	const conditions = [eq(videoJobs.id, id), scopeCondition(virtualKeyId)];
+	const conditions = [eq(videoJobs.id, id), scopeCondition(scope)];
 	if (!opts.includeDeleted) {
 		conditions.push(isNull(videoJobs.deletedAt));
 	}
@@ -136,17 +144,14 @@ export async function getVideoJobById(
 }
 
 export async function listVideosForScope(opts: {
-	virtualKeyId: string | null;
+	scope: StateScope;
 	limit: number;
 	after?: string;
 	order: "asc" | "desc";
 }): Promise<{ rows: VideoJobRow[]; hasMore: boolean }> {
-	const conditions = [
-		scopeCondition(opts.virtualKeyId),
-		isNull(videoJobs.deletedAt),
-	];
+	const conditions = [scopeCondition(opts.scope), isNull(videoJobs.deletedAt)];
 	if (opts.after) {
-		const after = await getVideoJobForScope(opts.after, opts.virtualKeyId);
+		const after = await getVideoJobForScope(opts.after, opts.scope);
 		if (after) {
 			// (createdAt, id) tuple comparison so createdAt ties cannot skip rows.
 			conditions.push(
@@ -350,7 +355,7 @@ export async function getVideoAsset(
 
 export async function markVideoDeletedForScope(
 	id: string,
-	virtualKeyId: string | null,
+	scope: StateScope,
 ): Promise<{
 	row: VideoJobRow | undefined;
 	/** The job's status before the delete, which decides how its reservation settles. */
@@ -365,7 +370,7 @@ export async function markVideoDeletedForScope(
 			.where(
 				and(
 					eq(videoJobs.id, id),
-					scopeCondition(virtualKeyId),
+					scopeCondition(scope),
 					isNull(videoJobs.deletedAt),
 				),
 			)
@@ -376,7 +381,7 @@ export async function markVideoDeletedForScope(
 			.where(
 				and(
 					eq(videoJobs.id, id),
-					scopeCondition(virtualKeyId),
+					scopeCondition(scope),
 					isNull(videoJobs.deletedAt),
 				),
 			)

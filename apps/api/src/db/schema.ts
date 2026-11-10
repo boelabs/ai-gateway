@@ -698,6 +698,8 @@ export const responseStates = pgTable(
 	{
 		id: text("id").primaryKey(),
 		virtualKeyId: uuid("virtual_key_id"),
+		/** The operator (`user:<uuid>`, `root`) that stored it through a session; null otherwise. */
+		ownerActor: text("owner_actor"),
 		publicModel: text("public_model").notNull(),
 		deploymentId: uuid("deployment_id"),
 		adapterKey: text("adapter_key"),
@@ -783,6 +785,8 @@ export const videoJobs = pgTable(
 	{
 		id: text("id").primaryKey(),
 		virtualKeyId: uuid("virtual_key_id"),
+		/** The operator (`user:<uuid>`, `root`) that created it through a session; null otherwise. */
+		ownerActor: text("owner_actor"),
 		publicModel: text("public_model").notNull(),
 		deploymentId: uuid("deployment_id"),
 		adapterKey: text("adapter_key").notNull(),

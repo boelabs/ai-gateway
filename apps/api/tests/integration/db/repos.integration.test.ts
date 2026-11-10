@@ -7,6 +7,7 @@
 import { gatewayOperations, upstreamAttempts } from "#db/schema.ts";
 import { operationSummary } from "#db/repos/operations.ts";
 import { pgAvailable } from "#test-support/infra.ts";
+import type { StateScope } from "#auth/scope.ts";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { db } from "#db/client.ts";
@@ -72,10 +73,10 @@ test("response_states: store/get and expired-row GC (cron base)", {
 	skip,
 }, async () => {
 	const id = `resp_itest_${randomUUID()}`;
-	const vkId: string | null = null;
+	const vkId: StateScope = { virtualKeyId: null, ownerActor: null };
 	await storeResponseState({
 		id,
-		virtualKeyId: vkId,
+		scope: vkId,
 		publicModel: "itest",
 		deploymentId: null,
 		adapterKey: "openai",
@@ -107,10 +108,10 @@ test("response_states: store=false rows are invisible to item lookup", {
 }, async () => {
 	const id = `resp_internal_itest_${randomUUID()}`;
 	const itemId = `fc_itest_${randomUUID()}`;
-	const vkId: string | null = null;
+	const vkId: StateScope = { virtualKeyId: null, ownerActor: null };
 	await storeResponseState({
 		id,
-		virtualKeyId: vkId,
+		scope: vkId,
 		publicModel: "itest",
 		deploymentId: null,
 		adapterKey: "googleaistudio",
@@ -173,5 +174,37 @@ test("observability summary counts operations with protocol failures", {
 		await db
 			.delete(gatewayOperations)
 			.where(eq(gatewayOperations.id, operationId));
+	}
+});
+
+test("response_states: an operator session's state is apart from the master key's", {
+	skip,
+}, async () => {
+	const id = `resp_scope_itest_${randomUUID()}`;
+	const master: StateScope = { virtualKeyId: null, ownerActor: null };
+	const operator: StateScope = { virtualKeyId: null, ownerActor: "user:itest" };
+	await storeResponseState({
+		id,
+		scope: operator,
+		publicModel: "itest",
+		deploymentId: null,
+		adapterKey: "openai",
+		previousResponseId: null,
+		requestInput: [],
+		output: [],
+		response: { id, object: "response" },
+	});
+	try {
+		assert.equal((await getResponseStateForScope(id, operator))?.id, id);
+		assert.equal(await getResponseStateForScope(id, master), undefined);
+		assert.equal(
+			await getResponseStateForScope(id, {
+				virtualKeyId: null,
+				ownerActor: "user:other",
+			}),
+			undefined,
+		);
+	} finally {
+		await deleteResponseStateForScope(id, operator);
 	}
 });

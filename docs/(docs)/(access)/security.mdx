@@ -117,7 +117,10 @@ updates or deletes an entry.
 
 Inference operations carry the same identity in `gateway_operations.actor`, so operator traffic
 (a playground, a manual test) is attributable and shows up in `GET /admin/usage?groupBy=actor` instead
-of appearing as unattributed spend.
+of appearing as unattributed spend. An operator session reaches the public API only with
+`inference:use` (admin and owner); a viewer's session is refused with `403 insufficient_permission`.
+Stored responses and video jobs created through a session belong to its user: neither the master key
+nor another operator reaches them through `/v1`.
 
 ## Virtual keys at rest
 
