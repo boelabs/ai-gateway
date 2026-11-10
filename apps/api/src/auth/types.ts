@@ -77,5 +77,7 @@ export interface AppEnv {
 		operationId: string | undefined;
 		turnRequestId: string | undefined;
 		turnSignal: AbortSignal | undefined;
+		/** The request body, once read through `readBodyBytes`; the stream itself is then spent. */
+		requestBody: Uint8Array | undefined;
 	};
 }

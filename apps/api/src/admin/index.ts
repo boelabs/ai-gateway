@@ -18,7 +18,6 @@ import { platformAdminApp } from "./platform.ts";
 import { GatewayError } from "#core/errors.ts";
 import { dashboardUsersApp } from "./users.ts";
 import { writtenRow } from "#db/returning.ts";
-import { parseJsonBody } from "#http/body.ts";
 import { env } from "#config/env.ts";
 import { z } from "zod/v4";
 
@@ -91,6 +90,12 @@ import {
 	advanceResponseCacheEpoch,
 	invalidateResponseCache,
 } from "#cache/responseCache.ts";
+
+import {
+	ADMIN_JSON_BODY_MAX_BYTES,
+	readBodyBytes,
+	parseJsonBody,
+} from "#http/body.ts";
 
 import {
 	createKeySchema,
@@ -438,7 +443,7 @@ adminApp.post("/keys/:id/rotate", async (c) => {
 	const existing = await requireKey(c.req.param("id"));
 	// The body is optional: a bare POST keeps the key exactly as private as it was.
 	const input =
-		c.req.raw.body === null || c.req.header("content-length") === "0"
+		(await readBodyBytes(c, ADMIN_JSON_BODY_MAX_BYTES)).byteLength === 0
 			? {}
 			: await parseJsonBody(c, rotateKeySchema);
 	const rotated = await rotateVirtualKey(

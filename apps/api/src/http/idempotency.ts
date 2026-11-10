@@ -1,4 +1,4 @@
-import { ADMIN_JSON_BODY_MAX_BYTES } from "./body.ts";
+import { ADMIN_JSON_BODY_MAX_BYTES, readBodyBytes } from "./body.ts";
 import { type AppEnv, actorOf } from "#auth/types.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { MiddlewareHandler } from "hono";
@@ -18,21 +18,14 @@ export const IDEMPOTENCY_REPLAY_HEADER = "idempotent-replay";
 export const IDEMPOTENCY_TTL_MS = 24 * 3_600_000;
 const MAX_KEY_LENGTH = 255;
 
-/**
- * The request, reduced to a value that changes whenever the request does.
- *
- * The body is read from a clone, so the handler still gets an untouched stream — the byte-capped
- * reader in `body.ts` runs exactly as it would without this middleware.
- */
-async function fingerprint(
-	request: Request,
-	method: string,
-	path: string,
-): Promise<string> {
-	const hash = createHash("sha256").update(`${method}\n${path}\n`);
-	const body = await request.clone().arrayBuffer();
-	hash.update(Buffer.from(body));
-	return hash.digest("hex");
+/** The request, reduced to a value that changes whenever the request does. */
+function fingerprint(body: Uint8Array, method: string, path: string): string {
+	return createHash("sha256")
+		.update(`${method}
+${path}
+`)
+		.update(body)
+		.digest("hex");
 }
 
 function replay(status: number, response: unknown): Response {
@@ -69,16 +62,11 @@ export function idempotencyMiddleware(): MiddlewareHandler<AppEnv> {
 			});
 		}
 
-		// An over-sized body is rejected by the handler's own reader; fingerprinting it here would
-		// buffer exactly what that limit exists to avoid.
-		const declared = Number(c.req.header("content-length") ?? 0);
-		if (Number.isFinite(declared) && declared > ADMIN_JSON_BODY_MAX_BYTES) {
-			return next();
-		}
-
+		// The one capped read of the body; the handler parses the same bytes from the context.
+		const requestBody = await readBodyBytes(c, ADMIN_JSON_BODY_MAX_BYTES);
 		const actor = actorOf(getAuth(c));
 		const { path } = c.req;
-		const print = await fingerprint(c.req.raw, c.req.method, path);
+		const print = fingerprint(requestBody, c.req.method, path);
 		const claim = await claimIdempotencyKey({
 			actor,
 			key,

@@ -31,15 +31,24 @@ function declaredContentLength(c: Context<AppEnv>): number | null {
 }
 
 /**
- * Reads a JSON body through a byte-counting stream. The reader is cancelled as soon as the hard
- * limit is crossed, including for chunked requests without Content-Length.
+ * Reads the request body once, through a byte-counting stream cancelled as soon as `maxBytes` is
+ * crossed (chunked requests without Content-Length included), and keeps the bytes on the context.
+ * Middleware that needs the body (idempotency fingerprints it) and the handler that parses it share
+ * that one bounded read; nothing buffers a body without the cap.
  */
-export async function readJsonBody(
+export async function readBodyBytes(
 	c: Context<AppEnv>,
 	maxBytes: number,
-): Promise<unknown> {
+): Promise<Uint8Array> {
 	if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
 		throw new Error("maxBytes must be a positive safe integer");
+	}
+	const cached = c.get("requestBody");
+	if (cached !== undefined) {
+		if (cached.byteLength > maxBytes) {
+			throw bodyTooLarge(maxBytes);
+		}
+		return cached;
 	}
 
 	const declared = declaredContentLength(c);
@@ -49,10 +58,9 @@ export async function readJsonBody(
 
 	const stream = c.req.raw.body;
 	if (stream === null) {
-		throw new GatewayError({
-			class: "bad_request",
-			message: "Invalid or missing JSON body",
-		});
+		const empty = new Uint8Array(0);
+		c.set("requestBody", empty);
+		return empty;
 	}
 
 	const reader = stream.getReader();
@@ -82,6 +90,22 @@ export async function readJsonBody(
 	for (const chunk of chunks) {
 		bytes.set(chunk, offset);
 		offset += chunk.byteLength;
+	}
+	c.set("requestBody", bytes);
+	return bytes;
+}
+
+/** Reads a JSON body through `readBodyBytes`. */
+export async function readJsonBody(
+	c: Context<AppEnv>,
+	maxBytes: number,
+): Promise<unknown> {
+	const bytes = await readBodyBytes(c, maxBytes);
+	if (bytes.byteLength === 0) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: "Invalid or missing JSON body",
+		});
 	}
 
 	try {
