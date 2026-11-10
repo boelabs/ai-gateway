@@ -1477,6 +1477,16 @@ export const anthropicAdapter: Adapter = {
 		},
 	},
 	transports: { chat: { supported: ["messages"], default: "messages" } },
+	// The Messages request has no sampling seed, no repetition penalties and no cache key (caching is
+	// marked per block with cache_control).
+	chatParameters: {
+		messages: {
+			seed: { mode: "unsupported" },
+			presence_penalty: { mode: "unsupported" },
+			frequency_penalty: { mode: "unsupported" },
+			prompt_cache_key: { mode: "unsupported" },
+		},
+	},
 };
 
 export const anthropicProvider: ProviderModule = { adapter: anthropicAdapter };

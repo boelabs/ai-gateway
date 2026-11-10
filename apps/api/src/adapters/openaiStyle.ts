@@ -7,6 +7,7 @@ import { type BaseCreds, requireApiKeyCreds } from "./creds.ts";
 import type { CanonicalChatRequest } from "#core/canonical.ts";
 import type { ReasoningControlKind } from "#core/reasoning.ts";
 import type { UpstreamTransport } from "#core/transport.ts";
+import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import { mapUpstreamHttpError } from "./upstreamError.ts";
 import type { ImageOperation } from "#core/images.ts";
 import { mergeExtraBody } from "#core/extraBody.ts";
@@ -256,6 +257,30 @@ interface ResolvedCreds {
 	base: string;
 	organization?: string;
 	headers?: Record<string, string>;
+}
+
+const TOP_K_UNSUPPORTED: ParameterSupportMap = {
+	top_k: {
+		mode: "unsupported",
+		notes: "Not part of the OpenAI Chat Completions or Responses request.",
+	},
+};
+
+/**
+ * What these transports cannot carry. OpenAI defines no `top_k` on either wire; Chat Completions
+ * emits the common extension only for providers that opt in with `supportsTopK`.
+ */
+function openAIStyleChatParameters(
+	transports: readonly ("chat_completions" | "responses")[],
+	supportsTopK: boolean,
+): NonNullable<Adapter["chatParameters"]> {
+	const parameters: NonNullable<Adapter["chatParameters"]> = {};
+	for (const transport of transports) {
+		if (transport === "responses" || !supportsTopK) {
+			parameters[transport] = TOP_K_UNSUPPORTED;
+		}
+	}
+	return parameters;
 }
 
 export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
@@ -1131,6 +1156,10 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 					}),
 				}
 			: {}),
+		chatParameters: openAIStyleChatParameters(
+			chatTransports,
+			config.supportsTopK === true,
+		),
 		// The chat_completions transport emits reasoning_effort (openai_effort), top-level thinking
 		// (openai_body), ignores fixed reasoners, and supports chat_template_kwargs.
 		reasoningKinds: new Set<ReasoningControlKind>([

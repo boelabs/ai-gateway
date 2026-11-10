@@ -1,7 +1,13 @@
 import type { OperationProfiles, TransportOverrides } from "#profiles/types.ts";
 import { publicTextCapabilities } from "#catalog/publicTextCapabilities.ts";
 import { enforcePublicModelRateLimit } from "./modelsRateLimit.ts";
-import { supportedParameterNames } from "#catalog/parameters.ts";
+import { resolveTransport } from "#router/transport.ts";
+import { getAdapter } from "#adapters/registry.ts";
+
+import {
+	supportedParameterNames,
+	withAdapterParameters,
+} from "#catalog/parameters.ts";
 import type { ResolvedModelMetadata } from "#catalog/types.ts";
 import type { DeploymentRow } from "#db/repos/deployments.ts";
 import { authMiddleware, getAuth } from "#auth/middleware.ts";
@@ -230,12 +236,40 @@ function publicOperations(metas: ResolvedModelMetadata[]): Array<{
 	}));
 }
 
-function aggregateSupportedParameters(
-	metas: ResolvedModelMetadata[],
+/**
+ * The parameters a deployment actually carries: the catalog's view with what its adapter declares
+ * for the deployment's chat transport underneath, the same view the parameter policy applies.
+ */
+function deploymentParameterNames(
+	row: DeploymentRow,
+	meta: ResolvedModelMetadata,
 ): string[] {
+	const adapter = getAdapter(row.adapterKey);
+	if (!adapter?.chatParameters) {
+		return supportedParameterNames(meta);
+	}
+	try {
+		const transport = resolveTransport(
+			{ row, adapter, upstreamModel: row.upstreamModel, meta },
+			"chat",
+		);
+		return supportedParameterNames(
+			withAdapterParameters(meta, adapter.chatParameters[transport]),
+		);
+	} catch {
+		// A misconfigured transport fails at routing time with its own error.
+		return supportedParameterNames(meta);
+	}
+}
+
+function aggregateSupportedParameters(group: PublicModelGroup): string[] {
 	const names = new Set<string>();
-	for (const meta of metas) {
-		for (const parameter of supportedParameterNames(meta)) {
+	for (const [index, row] of group.rows.entries()) {
+		const meta = group.metas[index];
+		if (!meta) {
+			continue;
+		}
+		for (const parameter of deploymentParameterNames(row, meta)) {
 			names.add(parameter);
 		}
 	}
@@ -266,7 +300,7 @@ function toModelObject(group: PublicModelGroup): Record<string, unknown> {
 		top_provider: topProvider(group.metas),
 		pricing: publicPricing(group.metas),
 		operations: publicOperations(group.metas),
-		supported_parameters: aggregateSupportedParameters(group.metas),
+		supported_parameters: aggregateSupportedParameters(group),
 		text_capabilities: publicTextCapabilities(group.metas),
 		endpoint_count: group.rows.length,
 	};
@@ -341,7 +375,7 @@ async function deploymentObjects(group: PublicModelGroup): Promise<object[]> {
 			top_provider: topProvider([meta]),
 			pricing: deploymentPricing(meta.pricing),
 			operations: publicOperations([meta]),
-			supported_parameters: supportedParameterNames(meta),
+			supported_parameters: deploymentParameterNames(row, meta),
 			transports: Object.fromEntries(
 				Object.entries(transportOverrides(row)).filter(([, value]) => value),
 			),

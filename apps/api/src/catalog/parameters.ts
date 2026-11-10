@@ -59,6 +59,46 @@ function textParameters(meta: ResolvedModelMetadata): ParameterSupportMap {
 	return meta.operations?.["text.generate"]?.parameters ?? {};
 }
 
+const mergedParameterMaps = new WeakMap<
+	ParameterSupportMap,
+	WeakMap<ParameterSupportMap, ParameterSupportMap>
+>();
+const NO_CATALOG_PARAMETERS: ParameterSupportMap = {};
+
+/**
+ * The model's metadata as the parameter policy sees it on one transport: what the adapter declares it
+ * does with each canonical field there (`Adapter.chatParameters`), overridden by whatever the catalog
+ * entry says about the model. Without the adapter's declaration a field the transport cannot express
+ * would be "unknown" for every model that does not repeat it, and pass through to be lost.
+ */
+export function withAdapterParameters(
+	meta: ResolvedModelMetadata,
+	adapterParameters: ParameterSupportMap | undefined,
+): ResolvedModelMetadata {
+	if (!adapterParameters) {
+		return meta;
+	}
+	const text = meta.operations?.["text.generate"];
+	const catalog = text?.parameters ?? NO_CATALOG_PARAMETERS;
+	let byAdapter = mergedParameterMaps.get(catalog);
+	if (!byAdapter) {
+		byAdapter = new WeakMap();
+		mergedParameterMaps.set(catalog, byAdapter);
+	}
+	let parameters = byAdapter.get(adapterParameters);
+	if (!parameters) {
+		parameters = { ...adapterParameters, ...catalog };
+		byAdapter.set(adapterParameters, parameters);
+	}
+	return {
+		...meta,
+		operations: {
+			...meta.operations,
+			"text.generate": { ...text, parameters },
+		},
+	};
+}
+
 /** Whether one catalog entry says the parameter reaches the provider at all. */
 function entrySupport(
 	entry: boolean | { mode?: string },

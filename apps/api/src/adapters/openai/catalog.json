@@ -2777,8 +2777,6 @@
 						"top_logprobs": true,
 						"response_format": true,
 						"structured_outputs": true,
-						"top_k": true,
-						"repetition_penalty": true,
 						"reasoning_effort": true
 					},
 					"capabilities": {
@@ -2803,7 +2801,6 @@
 						"tool_choice": true,
 						"reasoning": true,
 						"include_reasoning": true,
-						"top_k": true,
 						"top_p": true,
 						"structured_outputs": true,
 						"response_format": true,
@@ -2812,7 +2809,6 @@
 						"seed": true,
 						"frequency_penalty": true,
 						"presence_penalty": true,
-						"repetition_penalty": true,
 						"reasoning_effort": true
 					},
 					"capabilities": {

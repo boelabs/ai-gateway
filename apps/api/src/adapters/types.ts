@@ -2,6 +2,7 @@ import type { UpstreamTransport, AdapterTransports } from "#core/transport.ts";
 import type { AttemptWatchdog } from "#gateway/attemptWatchdog.ts";
 import type { ReasoningControlKind } from "#core/reasoning.ts";
 import type { ResolvedModelMetadata } from "#catalog/types.ts";
+import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import type { GatewayError } from "#core/errors.ts";
 import type { CallType } from "#core/callType.ts";
 
@@ -410,6 +411,13 @@ export interface Adapter {
 	 * request time). Absent = not validated.
 	 */
 	reasoningKinds?: ReadonlySet<ReasoningControlKind>;
+	/**
+	 * What each chat transport does with canonical request parameters it cannot carry, keyed by the
+	 * catalog's parameter names (`top_k`, `seed`, ...). An `unsupported` or `ignored` entry makes the
+	 * parameter policy drop the field and record it in `droppedParameters` (or reject it, per the
+	 * strategy) instead of the adapter losing it silently. A model's catalog entry overrides it.
+	 */
+	chatParameters?: Partial<Record<UpstreamTransport, ParameterSupportMap>>;
 }
 
 /** A provider as a self-contained upstream-protocol unit. The JSON catalog is mounted in the central registry. */

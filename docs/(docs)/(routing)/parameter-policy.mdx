@@ -32,6 +32,14 @@ A bare `true`/`false` means supported/unsupported. An object refines it: `mode` 
 provider-specific. A parameter absent from the map is treated as **unknown**, not unsupported — the
 gateway doesn't reject on missing catalog data, only on an *explicit* `unsupported`/`ignored` mode.
 
+Underneath the catalog, each provider declares the parameters its wire format cannot carry at all,
+per transport: `top_k` on the OpenAI Chat Completions and Responses transports, `seed`,
+`presence_penalty`, `frequency_penalty` and `prompt_cache_key` on Anthropic Messages, and `user`,
+`parallel_tool_calls` and `prompt_cache_key` on Gemini `generateContent`. Those count as
+`unsupported` for every model on that transport unless the model's own entry says otherwise, so the
+strategy below drops them (and records them in `droppedParameters`) or rejects them rather than
+letting them disappear. `supported_parameters` in `/v1/models` reflects the same view.
+
 ## The three strategies
 
 Set globally with `PUT /admin/router-settings` (`unsupportedParameterStrategy`); there is no per-model

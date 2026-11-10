@@ -2476,6 +2476,15 @@ export const googleAdapter: Adapter = {
 			},
 		},
 	},
+	// generateContent has no end-user identifier, no switch for parallel function calls and no cache
+	// key (explicit caching goes through cachedContent).
+	chatParameters: {
+		generate_content: {
+			user: { mode: "unsupported" },
+			parallel_tool_calls: { mode: "unsupported" },
+			prompt_cache_key: { mode: "unsupported" },
+		},
+	},
 	transports: {
 		chat: { supported: ["generate_content"], default: "generate_content" },
 		"images.generations": {

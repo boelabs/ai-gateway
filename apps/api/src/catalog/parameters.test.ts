@@ -8,6 +8,7 @@ import {
 	applyUnsupportedParameterPolicy,
 	assertSupportedChatParameters,
 	supportedParameterNames,
+	withAdapterParameters,
 } from "./parameters.ts";
 
 const meta: ResolvedModelMetadata = {
@@ -134,4 +135,25 @@ test("prompt-cache policies participate in explicit model parameter support", ()
 		applyUnsupportedParameterPolicy(req, metadata, "allow").request,
 		req,
 	);
+});
+
+test("an adapter's declaration drops what its transport cannot carry, under the catalog", () => {
+	const adapterParameters = {
+		seed: { mode: "unsupported" as const },
+		stop: { mode: "unsupported" as const },
+	};
+	const view = withAdapterParameters(meta, adapterParameters);
+	const req: CanonicalChatRequest = { ...request(), seed: 7 };
+	const result = applyUnsupportedParameterPolicy(req, view, "drop");
+	assert.equal(result.request.seed, undefined);
+	assert.ok(result.droppedParameters.includes("seed"));
+	// The catalog says stop reaches this model, which wins over the adapter-wide default.
+	assert.deepEqual(result.request.stop, ["done"]);
+	// The merged map is stable, so per-map caches stay effective.
+	assert.equal(
+		withAdapterParameters(meta, adapterParameters).operations?.["text.generate"]
+			?.parameters,
+		view.operations?.["text.generate"]?.parameters,
+	);
+	assert.equal(withAdapterParameters(meta, undefined), meta);
 });

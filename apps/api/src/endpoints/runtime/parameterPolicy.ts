@@ -7,6 +7,7 @@ import type { EffectiveSettings } from "#router/settings.ts";
 import type { ChatExecResult } from "#gateway/executor.ts";
 import type { AdapterContext } from "#adapters/types.ts";
 import { resolveTransport } from "#router/transport.ts";
+import type { UpstreamTransport } from "#core/transport.ts";
 import { usageQuotaForRequest } from "./pipeline.ts";
 import { executeChat } from "#gateway/executor.ts";
 import { GatewayError } from "#core/errors.ts";
@@ -19,6 +20,7 @@ import {
 	applyUnsupportedParameterPolicy,
 	assertSupportedChatParameters,
 	type ParameterPolicyResult,
+	withAdapterParameters,
 } from "#catalog/parameters.ts";
 
 import {
@@ -46,16 +48,36 @@ export function parameterEligibility(
 	if (strategy !== "error") {
 		return undefined;
 	}
-	return (candidate) => assertSupportedChatParameters(req, candidate.meta);
+	return (candidate) =>
+		assertSupportedChatParameters(
+			req,
+			candidateParameterMeta(candidate, resolveTransport(candidate, "chat")),
+		);
+}
+
+/** The candidate's metadata with its adapter's per-transport parameter declarations underneath. */
+export function candidateParameterMeta(
+	candidate: DeploymentCandidate,
+	transport: UpstreamTransport,
+) {
+	return withAdapterParameters(
+		candidate.meta,
+		candidate.adapter.chatParameters?.[transport],
+	);
 }
 
 export function requestForCandidate(
 	req: CanonicalChatRequest,
 	candidate: DeploymentCandidate,
+	transport: UpstreamTransport,
 	strategy: UnsupportedParameterStrategy,
 	record: ParameterPolicyRecorder,
 ): CanonicalChatRequest {
-	const result = applyUnsupportedParameterPolicy(req, candidate.meta, strategy);
+	const result = applyUnsupportedParameterPolicy(
+		req,
+		candidateParameterMeta(candidate, transport),
+		strategy,
+	);
 	record(result);
 	return result.request;
 }
@@ -169,6 +191,7 @@ export async function routeChat(
 				const candidateRequest = requestForCandidate(
 					resolved.request,
 					cand,
+					ctx.transport,
 					settings.unsupportedParameterStrategy,
 					(result) => {
 						parameterPolicy = result;
