@@ -93,6 +93,17 @@ export async function authenticateRequest(c: Context): Promise<Auth> {
 			? getCookie(c, SESSION_COOKIE)
 			: undefined;
 		if (sessionToken) {
+			// A browser attaches cookies to a cross-site WebSocket handshake, and an upgrade is a GET,
+			// so CSRF protection never runs on it. No browser here opens sockets to the gateway (the
+			// dashboard relays every browser call), so a cookie never authenticates an upgrade.
+			if (c.req.header("upgrade")?.toLowerCase() === "websocket") {
+				throw new GatewayError({
+					class: "auth",
+					code: "session_websocket_refused",
+					message:
+						"A session cookie cannot open a WebSocket; authenticate with an API key",
+				});
+			}
 			const session = await resolveSession(sessionToken);
 			if (!session) {
 				throw new GatewayError({

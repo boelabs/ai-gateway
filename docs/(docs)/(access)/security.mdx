@@ -62,6 +62,11 @@ A user flagged **must change password** (the default when an owner sets someone'
 request answers `403 password_change_required`. The dashboard sends them to a change-password screen
 before anything else renders.
 
+A session cookie never authenticates a WebSocket handshake (`401 session_websocket_refused`): a
+browser sends cookies on a cross-site upgrade, which is a `GET` the CSRF check does not cover, and no
+browser opens sockets to the gateway directly. Realtime and Responses WebSockets take an API key or a
+realtime client secret.
+
 **Failed logins** are counted three ways, each attempt reserved before the password is checked so
 concurrent guesses cannot slip past the limit. The username and client IP *pair* locks after the
 configured attempts; that is the lock a person meets, and nobody at another address can trip it for
