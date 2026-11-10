@@ -1,10 +1,11 @@
 import { objectStorage, type ObjectStorageConfig } from "./config.ts";
+import { mkdir, rename, stat, unlink } from "node:fs/promises";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, stat, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { GatewayError } from "#core/errors.ts";
 import { Upload } from "@aws-sdk/lib-storage";
+import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 
 import {
@@ -173,7 +174,7 @@ class DisabledObjectStore implements ObjectStore {
 	}
 }
 
-class LocalObjectStore implements ObjectStore {
+export class LocalObjectStore implements ObjectStore {
 	readonly backend = "local" as const;
 	private readonly root: string;
 
@@ -193,10 +194,21 @@ class LocalObjectStore implements ObjectStore {
 		return path;
 	}
 
+	/**
+	 * Writes to a temporary file beside the target and renames it into place, so a reader never sees
+	 * a half-written object and a failed upload leaves nothing at the key.
+	 */
 	async put(input: PutObjectInput): Promise<{ etag?: string }> {
 		const path = this.pathFor(input.key);
 		await mkdir(dirname(path), { recursive: true });
-		await pipeline(toNodeReadable(input.body), createWriteStream(path));
+		const partial = `${path}.${randomUUID()}.partial`;
+		try {
+			await pipeline(toNodeReadable(input.body), createWriteStream(partial));
+			await rename(partial, path);
+		} catch (error) {
+			await unlink(partial).catch(() => undefined);
+			throw error;
+		}
 		return {};
 	}
 

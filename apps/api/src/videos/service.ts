@@ -13,6 +13,7 @@ import type { StateScope } from "#auth/scope.ts";
 import { GatewayError } from "#core/errors.ts";
 import { decryptRecord } from "#db/crypto.ts";
 import { randomUUID } from "node:crypto";
+import { redis } from "#cache/redis.ts";
 import { log } from "#logging/log.ts";
 import { env } from "#config/env.ts";
 
@@ -286,7 +287,80 @@ function makeObjectKey(
 	]);
 }
 
-export async function ensureVideoAsset(
+/** Ingestions running in this process, so concurrent requests for one asset share one download. */
+const ingesting = new Map<string, Promise<VideoAssetRow>>();
+/** How long an ingestion may hold the cross-replica lock; a crashed holder frees it after this. */
+const INGEST_LOCK_MS = 10 * 60_000;
+const INGEST_WAIT_MS = 30_000;
+const INGEST_POLL_MS = 500;
+
+/**
+ * The stored asset for a completed job, downloading it from the provider the first time. One
+ * download per (video, variant) at a time across every replica: the first caller takes a Redis
+ * lock and ingests, the others wait for its row instead of fetching the same file again.
+ */
+export function ensureVideoAsset(
+	inputRow: VideoJobRow,
+	variant: VideoAssetVariant,
+	signal?: AbortSignal,
+): Promise<VideoAssetRow> {
+	const key = `${inputRow.id}:${variant}`;
+	const running = ingesting.get(key);
+	if (running) {
+		return running;
+	}
+	const task = ensureVideoAssetOnce(inputRow, variant, signal).finally(() => {
+		ingesting.delete(key);
+	});
+	ingesting.set(key, task);
+	return task;
+}
+
+async function ensureVideoAssetOnce(
+	inputRow: VideoJobRow,
+	variant: VideoAssetVariant,
+	signal?: AbortSignal,
+): Promise<VideoAssetRow> {
+	const lockKey = `video-ingest:${inputRow.id}:${variant}`;
+	const token = randomUUID();
+	const deadline = Date.now() + INGEST_WAIT_MS;
+	while (
+		(await redis.set(lockKey, token, "PX", INGEST_LOCK_MS, "NX")) !== "OK"
+	) {
+		const stored = await getVideoAsset(inputRow.id, variant);
+		if (stored) {
+			return stored;
+		}
+		if (Date.now() >= deadline) {
+			throw new GatewayError({
+				class: "server",
+				status: 503,
+				code: "video_ingest_in_progress",
+				message: `Video ${inputRow.id} is being stored by another replica`,
+				publicMessage: "The video is still being prepared. Retry shortly.",
+				retryAfterMs: 5000,
+			});
+		}
+		signal?.throwIfAborted();
+		await new Promise((resolve) => setTimeout(resolve, INGEST_POLL_MS));
+	}
+	try {
+		return await ingestVideoAsset(inputRow, variant, signal);
+	} finally {
+		// Released only by its holder: compare-and-delete, so an expired lock taken over by another
+		// replica is never released from under it.
+		await redis
+			.eval(
+				"if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0",
+				1,
+				lockKey,
+				token,
+			)
+			.catch(() => undefined);
+	}
+}
+
+async function ingestVideoAsset(
 	inputRow: VideoJobRow,
 	variant: VideoAssetVariant,
 	signal?: AbortSignal,
