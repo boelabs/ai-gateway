@@ -396,6 +396,8 @@ class ExtensionRuntime {
 	private instances: LoadedInstance[] = [];
 	private loaded = false;
 	private loadedRegistryVersion = 0;
+	/** Reloads run one at a time: two interleaved swaps could each tear down what the other kept. */
+	private reloading: Promise<void> = Promise.resolve();
 
 	/** Loads the current database state and records the registry version it corresponds to. */
 	async loadFromDb(): Promise<void> {
@@ -431,7 +433,15 @@ class ExtensionRuntime {
 	 * success — a failure leaves the running state untouched. Definitions that were removed or replaced
 	 * by a different code version are torn down afterwards so reloads do not leak resources.
 	 */
-	private async buildAndSwap(source: ExtensionInstanceSource): Promise<void> {
+	private buildAndSwap(source: ExtensionInstanceSource): Promise<void> {
+		const next = this.reloading.then(() => this.buildAndSwapNow(source));
+		this.reloading = next.catch(() => undefined);
+		return next;
+	}
+
+	private async buildAndSwapNow(
+		source: ExtensionInstanceSource,
+	): Promise<void> {
 		const previous = this.definitions;
 		await this.loadFromSource(source, EXTENSIONS_CACHE_DIR);
 		await this.teardownReplaced(previous);
@@ -521,15 +531,20 @@ class ExtensionRuntime {
 				});
 				continue;
 			}
+			// The same key at the same content-addressed path is the same code, already set up:
+			// running setup again (without a teardown) would double whatever it acquired.
+			const unchanged = this.definitions.get(definition.key);
 			definitions.set(definition.key, {
 				definition,
 				modulePath,
 				order,
-				setupDone: false,
+				setupDone:
+					unchanged?.modulePath === modulePath ? unchanged.setupDone : false,
 			});
 		}
 
 		const instances = buildInstances(manifest.instances, definitions);
+		carryRuntimeState(this.instances, instances, this.definitions, definitions);
 		await setupDefinitions(definitions, instances);
 
 		this.definitions = definitions;
@@ -915,11 +930,48 @@ function validateInstance(
 	return null;
 }
 
+/**
+ * Keeps what the circuit breaker learned across a reload. An instance with the same id, definition
+ * code and configuration is the same instance: a reload triggered by some other change must not
+ * revive one the breaker tripped, nor forget the failures counted towards tripping it.
+ */
+function carryRuntimeState(
+	previous: LoadedInstance[],
+	next: LoadedInstance[],
+	previousDefinitions: Map<string, LoadedDefinition>,
+	nextDefinitions: Map<string, LoadedDefinition>,
+): void {
+	const byId = new Map(previous.map((instance) => [instance.id, instance]));
+	for (const instance of next) {
+		const old = byId.get(instance.id);
+		if (
+			!old ||
+			old.definitionKey !== instance.definitionKey ||
+			previousDefinitions.get(old.definitionKey)?.modulePath !==
+				nextDefinitions.get(instance.definitionKey)?.modulePath ||
+			JSON.stringify(old.config) !== JSON.stringify(instance.config) ||
+			instance.status !== "active"
+		) {
+			continue;
+		}
+		instance.failureCount = old.failureCount;
+		instance.lastError = old.lastError;
+		if (old.disabledKind === "breaker") {
+			instance.status = old.status;
+			instance.disabledReason = old.disabledReason;
+			instance.disabledKind = old.disabledKind;
+		}
+	}
+}
+
 async function setupDefinitions(
 	definitions: Map<string, LoadedDefinition>,
 	instances: LoadedInstance[],
 ): Promise<void> {
 	for (const loaded of definitions.values()) {
+		if (loaded.setupDone) {
+			continue;
+		}
 		const activeInstances = instances.filter(
 			(instance) =>
 				instance.definitionKey === loaded.definition.key &&

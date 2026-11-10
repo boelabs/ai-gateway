@@ -516,3 +516,43 @@ test("extensions: a realtime session on a targeted model is refused, others pass
 		extensionRuntime.assertNoInstanceTargets(scope("other-model")),
 	);
 });
+
+test("extensions: a reload keeps an unchanged definition's setup and breaker state", async (t) => {
+	await resetRuntime();
+	t.after(resetRuntime);
+	const counter = `__extSetup_${Date.now()}`;
+	const { source, dir } = await moduleSource(
+		{
+			"flaky.mjs": `
+				export default {
+					key: "flaky",
+					setup() { globalThis.${counter} = (globalThis.${counter} ?? 0) + 1; },
+					hooks: { onCanonicalRequest() { throw new Error("boom"); } }
+				};
+			`,
+		},
+		[{ id: "flaky-default", definition: "flaky", critical: false }],
+	);
+	await extensionRuntime.loadFromSource(source, dir);
+	for (let i = 0; i < 3; i += 1) {
+		await assert.rejects(
+			extensionRuntime.runCanonicalRequest(scope(), {
+				callType: "chat",
+				model: "demo-model",
+				messages: [],
+				stream: false,
+			}),
+		);
+	}
+	assert.equal(
+		extensionRuntime.status().instances[0]!.status,
+		"runtime_disabled",
+	);
+
+	await extensionRuntime.loadFromSource(source, dir);
+	assert.equal((globalThis as Record<string, unknown>)[counter], 1);
+	assert.equal(
+		extensionRuntime.status().instances[0]!.status,
+		"runtime_disabled",
+	);
+});
