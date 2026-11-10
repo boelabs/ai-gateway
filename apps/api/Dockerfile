@@ -11,7 +11,9 @@
 # via a managed provider with a public-CA certificate. See the docs "Known errors" section.
 
 # ---- deps: production dependencies only, with Bun ----
-FROM oven/bun:1.4 AS deps
+# The base is pinned by digest, so a release rebuilds on exactly the base CI tested rather than on
+# whatever the floating tag points at that day. Bump the tag and digest together.
+FROM oven/bun:1.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS deps
 WORKDIR /app
 ENV NODE_ENV=production
 # Copy only the manifests + lockfile first so this layer caches until dependencies change.
@@ -21,7 +23,7 @@ COPY packages/tsconfig/package.json ./packages/tsconfig/package.json
 RUN bun install --frozen-lockfile --production --filter @boelabs/ai-gateway-api
 
 # ---- runtime: Bun ----
-FROM oven/bun:1.4 AS runtime
+FROM oven/bun:1.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS runtime
 WORKDIR /app/apps/api
 ENV NODE_ENV=production \
     PORT=4000

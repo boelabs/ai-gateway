@@ -21,7 +21,9 @@
 #   DOCS_URL      where operators read the documentation, linked from the sidebar.
 
 # ---- deps: full install (the build needs devDependencies) ----
-FROM oven/bun:1.4 AS deps
+# The base is pinned by digest, so a release rebuilds on exactly the base CI tested rather than on
+# whatever the floating tag points at that day. Bump the tag and digest together.
+FROM oven/bun:1.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY apps/dashboard/package.json ./apps/dashboard/package.json
@@ -30,7 +32,7 @@ COPY packages/tsconfig/package.json ./packages/tsconfig/package.json
 RUN bun install --frozen-lockfile --filter @boelabs/dashboard
 
 # ---- build: next build under Bun; emits .next/standalone ----
-FROM oven/bun:1.4 AS build
+FROM oven/bun:1.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS build
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json bun.lock ./
@@ -47,7 +49,7 @@ RUN cd apps/dashboard && bun run build
 # There is no separate production-dependency install: `output: "standalone"` traces exactly the
 # modules the server actually imports and writes them into the bundle, which is also why nothing
 # here can resolve a package from npm at boot.
-FROM oven/bun:1.4 AS runtime
+FROM oven/bun:1.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS runtime
 WORKDIR /app/apps/dashboard
 ENV NODE_ENV=production \
     PORT=3001 \
