@@ -443,22 +443,35 @@ export async function loadAndRefreshVideo(
 }
 
 /**
- * Best-effort upstream delete/cancel after a local delete. Failures are logged, never surfaced:
- * the local soft-delete already succeeded and not every provider has a delete endpoint.
+ * Upstream delete/cancel after a local delete, then the job's terminal billing transition. The
+ * provider call is best effort: a failure is logged, never surfaced, because the local soft-delete
+ * already succeeded and not every provider has a delete endpoint. A job that was still running is
+ * released only when the provider confirmed the cancellation; otherwise it may still be generated
+ * and billed upstream, so its reservation settles at the profile's estimate.
  */
-export async function removeUpstreamVideo(row: VideoJobRow): Promise<void> {
+export async function removeUpstreamVideo(
+	row: VideoJobRow,
+	previousStatus: VideoJobRow["status"] | undefined,
+): Promise<void> {
+	let cancelConfirmed = false;
+	let meta: ResolvedModelMetadata | undefined;
 	try {
 		const { candidate, ctx, cleanup } = await candidateFromJob(row);
+		({ meta } = candidate);
 		try {
-			await candidate.adapter.videoGeneration?.remove?.(
-				{
-					upstreamJobId: row.upstreamJobId,
-					upstreamGenerationId: row.upstreamGenerationId,
-					upstreamPollingUrl: row.upstreamPollingUrl,
-					providerState: row.providerState,
-				},
-				ctx,
-			);
+			const remove = candidate.adapter.videoGeneration?.remove;
+			if (remove) {
+				await remove(
+					{
+						upstreamJobId: row.upstreamJobId,
+						upstreamGenerationId: row.upstreamGenerationId,
+						upstreamPollingUrl: row.upstreamPollingUrl,
+						providerState: row.providerState,
+					},
+					ctx,
+				);
+				cancelConfirmed = true;
+			}
 		} finally {
 			cleanup();
 		}
@@ -466,6 +479,12 @@ export async function removeUpstreamVideo(row: VideoJobRow): Promise<void> {
 		log.warn("videos", "best-effort upstream video delete failed", {
 			err,
 			videoId: row.id,
+		});
+	}
+	if (previousStatus !== undefined && !TERMINAL_STATUSES.has(previousStatus)) {
+		await settleVideoJobBilling(row, "deleted", {
+			cancelConfirmed,
+			...(meta ? { meta } : {}),
 		});
 	}
 }

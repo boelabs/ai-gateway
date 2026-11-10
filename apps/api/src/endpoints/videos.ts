@@ -429,7 +429,7 @@ export async function videoDeleteHandler(
 		}
 	}
 	await markVideoAssetsDeleted(deletedAssetIds);
-	await removeUpstreamVideo(deleted.row);
+	await removeUpstreamVideo(deleted.row, deleted.previousStatus);
 	return c.json(toOpenAIVideoDeleted(id));
 }
 
