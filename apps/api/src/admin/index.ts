@@ -2,6 +2,7 @@ import { EXECUTION_POLICY_MAX_TOTAL_MS } from "#core/executionPolicy.ts";
 import { keySecretAccessIsOpen, revealKeySecret } from "./keySecrets.ts";
 import { invalidateRouterSettingsCache } from "#router/settings.ts";
 import { auditRevealMiddleware, auditMiddleware } from "./audit.ts";
+import { MIN_SESSION_IDLE_MINUTES } from "#auth/sessionPolicy.ts";
 import { Hono, type MiddlewareHandler, type Context } from "hono";
 import { invalidateResponseCache } from "#cache/responseCache.ts";
 import { invalidateVirtualKey } from "#auth/virtualKeyCache.ts";
@@ -1018,7 +1019,11 @@ adminApp.put("/router-settings", async (c) => {
 const dashboardSettingsSchema = z
 	.object({
 		sessionTtlMinutes: z.coerce.number().int().min(5).max(43_200),
-		sessionIdleMinutes: z.coerce.number().int().min(1).max(43_200),
+		sessionIdleMinutes: z.coerce
+			.number()
+			.int()
+			.min(MIN_SESSION_IDLE_MINUTES)
+			.max(43_200),
 		loginMaxAttempts: z.coerce.number().int().min(1).max(100),
 		loginLockoutMinutes: z.coerce.number().int().min(1).max(1440),
 	})

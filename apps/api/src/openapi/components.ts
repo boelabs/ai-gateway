@@ -1,4 +1,5 @@
 import { PUBLIC_QUALITY_VALUES, QUALITY_ORDER } from "#core/quality.ts";
+import { MIN_SESSION_IDLE_MINUTES } from "#auth/sessionPolicy.ts";
 import { cacheUsage } from "#admin/metricsSchema.ts";
 
 import {
@@ -1354,7 +1355,11 @@ export const FallbackPolicy = z
 export const DashboardSettings = z
 	.object({
 		sessionTtlMinutes: z.int().min(5).max(43_200).optional(),
-		sessionIdleMinutes: z.int().min(1).max(43_200).optional(),
+		sessionIdleMinutes: z
+			.int()
+			.min(MIN_SESSION_IDLE_MINUTES)
+			.max(43_200)
+			.optional(),
 		loginMaxAttempts: z.int().min(1).max(100).optional(),
 		loginLockoutMinutes: z.int().min(1).max(1440).optional(),
 	})
