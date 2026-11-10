@@ -57,6 +57,11 @@ immediately rather than waiting for expiry. The same change bumps the user's ses
 session only resolves while its epoch matches, so even a sign-in that raced the change cannot keep
 the old role or password; a session's role is always read from the user row.
 
+A user flagged **must change password** (the default when an owner sets someone's password) can read
+`GET /auth/session` and call `POST /auth/password` with their session, and nothing else: every other
+request answers `403 password_change_required`. The dashboard sends them to a change-password screen
+before anything else renders.
+
 **Failed logins** are counted three ways, each attempt reserved before the password is checked so
 concurrent guesses cannot slip past the limit. The username and client IP *pair* locks after the
 configured attempts; that is the lock a person meets, and nobody at another address can trip it for

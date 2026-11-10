@@ -166,6 +166,10 @@ dashboardUsersApp.patch("/:id", async (c) => {
 		input.enabled === false
 	) {
 		await revokeAll(user.id);
+	} else if (input.mustChangePassword !== undefined) {
+		// Live sessions read the flag from the row; drop their cached copies so it applies now.
+		const sessions = await listSessionsForUser(user.id);
+		await invalidateSessionCaches(sessions.map((session) => session.tokenHash));
 	}
 	return ok(c, publicUser(writtenRow(row, "dashboard user update")));
 });

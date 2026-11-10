@@ -8,6 +8,7 @@ import { Hono } from "hono";
 
 import {
 	requireInferenceAccess,
+	passwordChangeGate,
 	requirePermission,
 	requireOperator,
 	authMiddleware,
@@ -101,7 +102,13 @@ test("permissions follow the session role, and the master key satisfies all of t
 		instance.use("*", async (c, next) => {
 			c.set("auth", {
 				type: "session",
-				session: { sessionId: "s", userId: "u", role, isRoot: false },
+				session: {
+					sessionId: "s",
+					userId: "u",
+					role,
+					isRoot: false,
+					mustChangePassword: false,
+				},
 			});
 			return next();
 		});
@@ -173,7 +180,13 @@ test("the public API needs inference:use from a session, and nothing extra from 
 	}
 	const session = (role: "owner" | "admin" | "viewer") => ({
 		type: "session",
-		session: { sessionId: "s", userId: "u", role, isRoot: false },
+		session: {
+			sessionId: "s",
+			userId: "u",
+			role,
+			isRoot: false,
+			mustChangePassword: false,
+		},
 	});
 	const call = (auth: unknown) =>
 		withAuth(auth).request("http://gateway.test/v1/chat/completions", {
@@ -182,4 +195,31 @@ test("the public API needs inference:use from a session, and nothing extra from 
 	assert.equal((await call(session("viewer"))).status, 403);
 	assert.equal((await call(session("admin"))).status, 200);
 	assert.equal((await call({ type: "master" })).status, 200);
+});
+
+test("a session that must change its password may only read itself and change it", () => {
+	const session = {
+		sessionId: "s",
+		userId: "u",
+		role: "admin" as const,
+		isRoot: false,
+		mustChangePassword: true,
+	};
+	assert.doesNotThrow(() =>
+		passwordChangeGate("GET", "/auth/session", session),
+	);
+	assert.doesNotThrow(() =>
+		passwordChangeGate("POST", "/auth/password", session),
+	);
+	assert.throws(
+		() => passwordChangeGate("GET", "/admin/deployments", session),
+		(error: unknown) =>
+			GatewayError.is(error) && error.code === "password_change_required",
+	);
+	assert.doesNotThrow(() =>
+		passwordChangeGate("GET", "/admin/deployments", {
+			...session,
+			mustChangePassword: false,
+		}),
+	);
 });

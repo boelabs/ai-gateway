@@ -24,6 +24,8 @@ export interface SessionAuth {
 	userId: string | null;
 	role: DashboardRole;
 	isRoot: boolean;
+	/** The user must set a new password before the session may do anything else. */
+	mustChangePassword: boolean;
 }
 
 /**

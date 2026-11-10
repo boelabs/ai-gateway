@@ -30,6 +30,7 @@ interface CachedSession {
 	sessionId: string;
 	userId: string | null;
 	role: DashboardRole;
+	mustChangePassword: boolean;
 	/** Epoch ms. */
 	expiresAt: number;
 	/** Epoch ms. */
@@ -106,6 +107,7 @@ export async function resolveSession(
 	// live. Each of those bumps the user's epoch in the same UPDATE, so a session issued before it -
 	// even one whose login raced the change - no longer matches, and the role comes from the row.
 	let { role } = row;
+	let mustChangePassword = false;
 	if (row.userId !== null) {
 		const user = await getDashboardUserById(row.userId);
 		if (!user?.enabled || (row.userEpoch ?? 0) !== user.sessionEpoch) {
@@ -113,13 +115,14 @@ export async function resolveSession(
 			await redis.set(ck, "null", "EX", CACHE_TTL_SECONDS);
 			return null;
 		}
-		({ role } = user);
+		({ role, mustChangePassword } = user);
 	}
 
 	const entry: CachedSession = {
 		sessionId: row.id,
 		userId: row.userId,
 		role,
+		mustChangePassword,
 		expiresAt: row.expiresAt.getTime(),
 		lastSeenAt: row.lastSeenAt.getTime(),
 	};
@@ -139,6 +142,8 @@ function hydrate(entry: CachedSession): SessionAuth {
 		userId: entry.userId,
 		role: entry.role,
 		isRoot: entry.userId === null,
+		// Entries cached before this field existed carry no flag.
+		mustChangePassword: entry.mustChangePassword === true,
 	};
 }
 

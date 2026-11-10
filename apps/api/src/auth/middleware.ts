@@ -1,4 +1,4 @@
-import type { AppEnv, Auth, VirtualKeyAuth } from "./types.ts";
+import type { AppEnv, Auth, SessionAuth, VirtualKeyAuth } from "./types.ts";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Context, MiddlewareHandler } from "hono";
 import { type Permission, roleHas } from "./roles.ts";
@@ -57,6 +57,32 @@ function extractKey(c: Context): string | undefined {
 	return offered ? offered.slice(INSECURE_KEY_PROTOCOL.length) : undefined;
 }
 
+/**
+ * A session whose user must set a new password may read who it is and change the password, and
+ * nothing else: the account was handed a password someone else knows. Signing out needs no session.
+ */
+export function passwordChangeGate(
+	method: string,
+	path: string,
+	session: SessionAuth,
+): void {
+	if (!session.mustChangePassword) {
+		return;
+	}
+	if (
+		(method === "GET" && path === "/auth/session") ||
+		(method === "POST" && path === "/auth/password")
+	) {
+		return;
+	}
+	throw new GatewayError({
+		class: "permission",
+		code: "password_change_required",
+		message: "This account must change its password before doing anything else",
+		publicMessage: "Change your password to continue.",
+	});
+}
+
 /** Resolves and revalidates request credentials. WebSocket sessions call this before every turn. */
 export async function authenticateRequest(c: Context): Promise<Auth> {
 	const key = extractKey(c);
@@ -80,6 +106,7 @@ export async function authenticateRequest(c: Context): Promise<Auth> {
 				getCookie(c, CSRF_COOKIE),
 				c.req.header(CSRF_HEADER),
 			);
+			passwordChangeGate(c.req.method, c.req.path, session);
 			return { type: "session", session };
 		}
 		throw new GatewayError({

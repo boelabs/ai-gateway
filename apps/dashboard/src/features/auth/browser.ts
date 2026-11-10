@@ -53,6 +53,23 @@ export async function login(
 	return ((await response.json()) as { data: OperatorIdentity }).data;
 }
 
+/**
+ * Sets a new password for the signed-in operator. The gateway ends every other session and answers
+ * with fresh cookies for this one, which is why this is the browser's own request.
+ */
+export async function changePassword(
+	currentPassword: string,
+	newPassword: string,
+): Promise<void> {
+	const response = await post("/api/auth/password", {
+		currentPassword,
+		newPassword,
+	});
+	if (!response.ok) {
+		throw await failure(response);
+	}
+}
+
 export async function logout(): Promise<void> {
 	const headers = new Headers();
 	const token = csrfTokenFromDocument();

@@ -62,7 +62,13 @@ test("each credential gets its own stored-state scope", () => {
 	assert.deepEqual(
 		stateScopeOf({
 			type: "session",
-			session: { sessionId: "s", userId: "u-1", role: "admin", isRoot: false },
+			session: {
+				sessionId: "s",
+				userId: "u-1",
+				role: "admin",
+				isRoot: false,
+				mustChangePassword: false,
+			},
 		}),
 		{ virtualKeyId: null, ownerActor: "user:u-1" },
 	);
