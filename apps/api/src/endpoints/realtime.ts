@@ -18,6 +18,23 @@ import type { Context } from "hono";
 import { z } from "zod/v4";
 
 import {
+	assertRealtimeSocketCapacity,
+	type RealtimeSocketEntry,
+	unregisterRealtimeSocket,
+	assertWebSocketUpgrade,
+	registerRealtimeSocket,
+	eventQueueLimitError,
+	revalidateConnection,
+	sessionExpiredError,
+	realtimeMessageJson,
+	capacityLimitError,
+	sendRealtimeEvent,
+	MAX_QUEUED_EVENTS,
+	REALTIME_MAX_MS,
+	watchCredential,
+} from "./realtimeSockets.ts";
+
+import {
 	realtimeTranscriptionSessionSchema,
 	type RealtimeSessionUpdate,
 	type RealtimeSessionState,
@@ -31,20 +48,6 @@ import {
 	renderSession,
 	eventId,
 } from "#contracts/openai/realtime.ts";
-
-import {
-	type RealtimeSocketEntry,
-	unregisterRealtimeSocket,
-	registerRealtimeSocket,
-	eventQueueLimitError,
-	revalidateConnection,
-	sessionExpiredError,
-	realtimeMessageJson,
-	sendRealtimeEvent,
-	MAX_QUEUED_EVENTS,
-	REALTIME_MAX_MS,
-	watchCredential,
-} from "./realtimeSockets.ts";
 
 import {
 	assertRealtimeExtensionsSupported,
@@ -493,7 +496,7 @@ function realtimeTranscriptionSocket(
 		busy: () => connection.run !== null,
 		close: () => closeConnection(connection),
 	};
-	registerRealtimeSocket(entry);
+	assertRealtimeSocketCapacity(scopeKey);
 	connection = {
 		c,
 		entry,
@@ -510,6 +513,12 @@ function realtimeTranscriptionSocket(
 	return {
 		onOpen(_event, ws) {
 			entry.socket = ws;
+			if (!registerRealtimeSocket(entry)) {
+				sendError(connection, capacityLimitError());
+				connection.closed = true;
+				ws.close(1013, "connection limit");
+				return;
+			}
 			send(connection, {
 				type: "session.created",
 				event_id: eventId(),
@@ -564,6 +573,7 @@ function parseSecretSession(
 
 export const realtimeWebSocketHandler = upgradeWebSocket(
 	(c) => {
+		assertWebSocketUpgrade(c);
 		const auth = getAuth(c);
 		const scopeKey = auth.type === "virtual" ? auth.key.id : "master";
 		// A client secret's session applies unless the URL says otherwise, as with OpenAI.

@@ -6,6 +6,7 @@ import { hasContentInputs } from "#files/requestContentInputs.ts";
 import type { CanonicalChatRequest } from "#core/canonical.ts";
 import { OperationLogDraft } from "./runtime/operationLog.ts";
 import { messageStateCodec } from "./runtime/messageState.ts";
+import { assertWebSocketUpgrade } from "./realtimeSockets.ts";
 import type { EffectiveSettings } from "#router/settings.ts";
 import { RouteLifecycle } from "./runtime/routeLifecycle.ts";
 import { getEffectiveSettings } from "#router/settings.ts";
@@ -888,7 +889,7 @@ interface ActiveResponsesWebSocket {
 	upstreams: ResponsesWebSocketUpstreams;
 	queue: Promise<void>;
 	activeAbort: AbortController | null;
-	timer: ReturnType<typeof setTimeout>;
+	timer: ReturnType<typeof setTimeout> | undefined;
 	socket: WSContext | null;
 	preferredDeploymentId: string | null;
 	scopeKey: string;
@@ -1266,24 +1267,34 @@ async function executeResponsesWebSocketTurn(
  * GET /v1/responses with Upgrade: websocket. Each connection owns one previous-response cache and a
  * sequential turn queue. The endpoint deliberately uses the same public resource as POST.
  */
+function responsesSocketsAtCapacity(scopeKey: string): boolean {
+	const connectionsForScope = [...activeResponsesWebSockets].filter(
+		(active) => active.scopeKey === scopeKey,
+	).length;
+	return (
+		activeResponsesWebSockets.size >= env.RESPONSES_WEBSOCKET_MAX_CONNECTIONS ||
+		connectionsForScope >= env.RESPONSES_WEBSOCKET_MAX_CONNECTIONS_PER_KEY
+	);
+}
+
+function responsesSocketLimitError(): GatewayError {
+	return new GatewayError({
+		class: "rate_limit",
+		code: "websocket_connection_limit_exceeded",
+		message: "Responses WebSocket connection concurrency limit exceeded",
+		publicMessage: "Responses WebSocket connection limit exceeded.",
+	});
+}
+
 export const responsesWebSocketHandler = upgradeWebSocket(
 	(c) => {
+		// Hono builds these handlers before it checks for the upgrade; nothing that needs releasing is
+		// created until the socket is open (`onOpen`), because a failed handshake never closes.
+		assertWebSocketUpgrade(c);
 		const auth = getAuth(c);
 		const scopeKey = auth.type === "virtual" ? auth.key.id : "master";
-		const connectionsForScope = [...activeResponsesWebSockets].filter(
-			(active) => active.scopeKey === scopeKey,
-		).length;
-		if (
-			activeResponsesWebSockets.size >=
-				env.RESPONSES_WEBSOCKET_MAX_CONNECTIONS ||
-			connectionsForScope >= env.RESPONSES_WEBSOCKET_MAX_CONNECTIONS_PER_KEY
-		) {
-			throw new GatewayError({
-				class: "rate_limit",
-				code: "websocket_connection_limit_exceeded",
-				message: "Responses WebSocket connection concurrency limit exceeded",
-				publicMessage: "Responses WebSocket connection limit exceeded.",
-			});
+		if (responsesSocketsAtCapacity(scopeKey)) {
+			throw responsesSocketLimitError();
 		}
 		const session: ActiveResponsesWebSocket = {
 			state: null,
@@ -1294,32 +1305,41 @@ export const responsesWebSocketHandler = upgradeWebSocket(
 			preferredDeploymentId: null,
 			scopeKey,
 			queuedTurns: 0,
-			timer: setTimeout(() => undefined, RESPONSES_WEBSOCKET_MAX_MS),
+			timer: undefined,
 		};
-		clearTimeout(session.timer);
-		session.timer = setTimeout(() => {
-			const ws = session.socket;
-			if (!ws) {
-				return;
-			}
-			void sendWebSocketJson(
-				ws,
-				websocketError(
-					new GatewayError({
-						class: "bad_request",
-						code: "websocket_connection_limit_reached",
-						message: "Responses WebSocket connection reached 60 minutes",
-						publicMessage:
-							"Responses websocket connection limit reached (60 minutes). Create a new websocket connection to continue.",
-					}),
-				),
-			);
-			ws.close(1000, "60 minute connection limit");
-		}, RESPONSES_WEBSOCKET_MAX_MS);
-		activeResponsesWebSockets.add(session);
+		const startTimer = () =>
+			setTimeout(() => {
+				const ws = session.socket;
+				if (!ws) {
+					return;
+				}
+				void sendWebSocketJson(
+					ws,
+					websocketError(
+						new GatewayError({
+							class: "bad_request",
+							code: "websocket_connection_limit_reached",
+							message: "Responses WebSocket connection reached 60 minutes",
+							publicMessage:
+								"Responses websocket connection limit reached (60 minutes). Create a new websocket connection to continue.",
+						}),
+					),
+				);
+				ws.close(1000, "60 minute connection limit");
+			}, RESPONSES_WEBSOCKET_MAX_MS);
 		return {
 			onOpen(_event, ws) {
 				session.socket = ws;
+				if (responsesSocketsAtCapacity(scopeKey)) {
+					void sendWebSocketJson(
+						ws,
+						websocketError(responsesSocketLimitError()),
+					);
+					ws.close(1013, "connection limit");
+					return;
+				}
+				activeResponsesWebSockets.add(session);
+				session.timer = startTimer();
 			},
 			onMessage(event) {
 				if (session.queuedTurns >= env.RESPONSES_WEBSOCKET_MAX_QUEUED_TURNS) {

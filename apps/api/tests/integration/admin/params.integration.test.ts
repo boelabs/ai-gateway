@@ -13,7 +13,9 @@ const skip = (await Promise.all([pgAvailable(), redisAvailable()])).every(
 	? false
 	: "Postgres/Redis unavailable";
 
-test("malformed admin paging and ids are the caller's error, not a 500", { skip }, async () => {
+test("malformed admin paging and ids are the caller's error, not a 500", {
+	skip,
+}, async () => {
 	const app = makeGatewayTestApp((a) => {
 		a.route("/admin", adminApp);
 	});

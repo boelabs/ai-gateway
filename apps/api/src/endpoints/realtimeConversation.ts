@@ -14,6 +14,22 @@ import type { WSEvents } from "hono/ws";
 import type { Context } from "hono";
 
 import {
+	assertRealtimeSocketCapacity,
+	type RealtimeSocketEntry,
+	unregisterRealtimeSocket,
+	registerRealtimeSocket,
+	eventQueueLimitError,
+	revalidateConnection,
+	sessionExpiredError,
+	realtimeMessageJson,
+	capacityLimitError,
+	sendRealtimeEvent,
+	MAX_QUEUED_EVENTS,
+	REALTIME_MAX_MS,
+	watchCredential,
+} from "./realtimeSockets.ts";
+
+import {
 	type RealtimeConversationSessionUpdate,
 	type RealtimeConversationClientEvent,
 	applyConversationSessionUpdate,
@@ -23,20 +39,6 @@ import {
 	renderConversationSession,
 	conversationConfigOf,
 } from "#contracts/openai/realtimeConversation.ts";
-
-import {
-	type RealtimeSocketEntry,
-	unregisterRealtimeSocket,
-	registerRealtimeSocket,
-	eventQueueLimitError,
-	revalidateConnection,
-	sessionExpiredError,
-	realtimeMessageJson,
-	sendRealtimeEvent,
-	MAX_QUEUED_EVENTS,
-	REALTIME_MAX_MS,
-	watchCredential,
-} from "./realtimeSockets.ts";
 
 import {
 	assertRealtimeExtensionsSupported,
@@ -577,7 +579,7 @@ export function realtimeConversationSocket(
 		busy: () => connection.run !== null,
 		close: () => closeConnection(connection),
 	};
-	registerRealtimeSocket(entry);
+	assertRealtimeSocketCapacity(scopeKey);
 	const tracker = new RealtimeConversationTracker({
 		state: () => connection?.state ?? state,
 		emit: (event) => send(connection, event),
@@ -598,6 +600,12 @@ export function realtimeConversationSocket(
 	return {
 		onOpen(_event, ws) {
 			entry.socket = ws;
+			if (!registerRealtimeSocket(entry)) {
+				sendError(connection, capacityLimitError());
+				connection.closed = true;
+				ws.close(1013, "connection limit");
+				return;
+			}
 			send(connection, {
 				type: "session.created",
 				event_id: eventId(),

@@ -56,23 +56,64 @@ export interface RealtimeSocketEntry {
 
 const activeRealtimeSockets = new Set<RealtimeSocketEntry>();
 
-/** Registers a socket, or refuses it when the process or the key is at its connection limit. */
-export function registerRealtimeSocket(entry: RealtimeSocketEntry): void {
+export function capacityLimitError(): GatewayError {
+	return new GatewayError({
+		class: "rate_limit",
+		code: "websocket_connection_limit_exceeded",
+		message: "Realtime WebSocket connection concurrency limit exceeded",
+		publicMessage: "Realtime WebSocket connection limit exceeded.",
+	});
+}
+
+function atCapacity(scopeKey: string): boolean {
 	const forScope = [...activeRealtimeSockets].filter(
-		(active) => active.scopeKey === entry.scopeKey,
+		(active) => active.scopeKey === scopeKey,
 	).length;
-	if (
+	return (
 		activeRealtimeSockets.size >= env.REALTIME_WEBSOCKET_MAX_CONNECTIONS ||
 		forScope >= env.REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY
-	) {
+	);
+}
+
+/**
+ * Refuses a request that is not a WebSocket handshake. Hono builds the socket's handlers before it
+ * checks for the upgrade, so state built for a plain GET would never be released.
+ */
+export function assertWebSocketUpgrade(c: {
+	req: { header: (name: string) => string | undefined };
+}): void {
+	if (c.req.header("upgrade")?.toLowerCase() !== "websocket") {
 		throw new GatewayError({
-			class: "rate_limit",
-			code: "websocket_connection_limit_exceeded",
-			message: "Realtime WebSocket connection concurrency limit exceeded",
-			publicMessage: "Realtime WebSocket connection limit exceeded.",
+			class: "bad_request",
+			status: 426,
+			code: "upgrade_required",
+			message: "This endpoint only accepts WebSocket connections",
+			publicMessage: "This endpoint only accepts WebSocket connections.",
 		});
 	}
+}
+
+/**
+ * Checks the connection limits before the handshake, so a refused client gets an HTTP error. The
+ * socket only takes a slot once it is open (`registerRealtimeSocket` in `onOpen`): a handshake that
+ * fails never opens, never reaches `onClose`, and so must never have held one.
+ */
+export function assertRealtimeSocketCapacity(scopeKey: string): void {
+	if (atCapacity(scopeKey)) {
+		throw capacityLimitError();
+	}
+}
+
+/**
+ * Takes a slot for an open socket. Returns false when concurrent handshakes filled the limit after
+ * the pre-check; the caller closes the socket.
+ */
+export function registerRealtimeSocket(entry: RealtimeSocketEntry): boolean {
+	if (atCapacity(entry.scopeKey)) {
+		return false;
+	}
 	activeRealtimeSockets.add(entry);
+	return true;
 }
 
 export function unregisterRealtimeSocket(entry: RealtimeSocketEntry): void {
