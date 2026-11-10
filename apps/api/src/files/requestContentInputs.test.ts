@@ -11,6 +11,7 @@ import { test } from "node:test";
 import {
 	createContentInputResolver,
 	createVideoInputResolver,
+	MAX_CONTENT_INPUT_PARTS,
 } from "./requestContentInputs.ts";
 
 import type {
@@ -561,5 +562,27 @@ test("video resolver enforces the 50 MB decoded-media limit before reading a bod
 				"videos_async",
 			),
 		(error: unknown) => (error as { code?: string }).code === "video_too_large",
+	);
+});
+
+test("content resolver refuses a request with more file and image parts than the cap", () => {
+	const parts = Array.from({ length: MAX_CONTENT_INPUT_PARTS + 1 }, () => ({
+		type: "image" as const,
+		url: `data:image/png;base64,${PNG_BASE64}`,
+	}));
+	assert.throws(
+		() =>
+			createContentInputResolver(
+				{
+					callType: "chat",
+					publicWire: "chat_completions",
+					model: "public-model",
+					messages: [{ role: "user", content: parts }],
+					stream: false,
+				},
+				new AbortController().signal,
+			),
+		(error: unknown) =>
+			(error as { code?: string }).code === "too_many_content_inputs",
 	);
 });

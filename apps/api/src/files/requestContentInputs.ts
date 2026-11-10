@@ -5,8 +5,8 @@ import { fetchPinnedHttps, type ResolvedAddress } from "./pinnedHttpsFetch.ts";
 import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
 import type { ContentPartInputSupport } from "#adapters/types.ts";
 import type { UpstreamTransport } from "#core/transport.ts";
+import { pdfWorkerPool } from "./pdfWorkerPool.ts";
 import { GatewayError } from "#core/errors.ts";
-import { Worker } from "node:worker_threads";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
@@ -26,6 +26,13 @@ const MAX_PDF_PAGES = 200;
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
 const MAX_CONCURRENT_FETCHES = 4;
+/**
+ * Upper bound on file and image parts in one request, across every message. It matches the largest
+ * per-request image count a supported provider documents (OpenAI: 1,500 images per request), so no
+ * request a provider would accept is refused, and it bounds the work one request can queue on the
+ * shared fetch and parser capacity.
+ */
+export const MAX_CONTENT_INPUT_PARTS = 1500;
 const SIGNATURED_IMAGE_MIME_TYPES = new Set([
 	"image/avif",
 	"image/bmp",
@@ -995,7 +1002,14 @@ async function extractPortableText(
 	assertPdfSignature(file);
 	let text: string;
 	if (file.mimeType === "application/pdf") {
-		const result = await extractPdfText(file.bytes, signal);
+		const result = await pdfWorkerPool().run(
+			{
+				bytes: file.bytes,
+				maxCharacters: MAX_TEXT_CHARACTERS,
+				maxPages: MAX_PDF_PAGES,
+			},
+			signal,
+		);
 		if (!result.ok) {
 			if (
 				result.code === "too_many_pages" ||
@@ -1049,71 +1063,6 @@ async function extractPortableText(
 	}
 	signal.throwIfAborted();
 	return text;
-}
-
-type PdfTextResult =
-	| { ok: true; text: string; totalPages: number }
-	| {
-			ok: false;
-			code: "too_many_characters" | "too_many_pages" | "parse_failed";
-			message: string;
-	  };
-
-/** Runs PDF parsing off the event loop and terminates it immediately when the request is aborted. */
-async function extractPdfText(
-	bytes: Uint8Array,
-	signal: AbortSignal,
-): Promise<PdfTextResult> {
-	signal.throwIfAborted();
-	const worker = new Worker(new URL("./pdfTextWorker.ts", import.meta.url));
-	const transferred = bytes.slice().buffer;
-	return new Promise<PdfTextResult>((resolve, reject) => {
-		let settled = false;
-		const cleanup = () => {
-			signal.removeEventListener("abort", onAbort);
-			void worker.terminate();
-		};
-		const finish = (result: PdfTextResult) => {
-			if (settled) {
-				return;
-			}
-			settled = true;
-			cleanup();
-			resolve(result);
-		};
-		const onAbort = () => {
-			if (settled) {
-				return;
-			}
-			settled = true;
-			cleanup();
-			reject(signal.reason);
-		};
-		worker.once("message", (result: PdfTextResult) => finish(result));
-		worker.once("error", (error: Error) =>
-			finish({ ok: false, code: "parse_failed", message: error.message }),
-		);
-		worker.once("exit", (code) => {
-			finish({
-				ok: false,
-				code: "parse_failed",
-				message: `PDF parser worker exited before replying (code ${code})`,
-			});
-		});
-		signal.addEventListener("abort", onAbort, { once: true });
-		if (signal.aborted) {
-			onAbort();
-			return;
-		}
-		worker.postMessage(
-			{
-				bytes: transferred,
-				maxCharacters: MAX_TEXT_CHARACTERS,
-				maxPages: MAX_PDF_PAGES,
-			},
-			[transferred],
-		);
-	});
 }
 
 function portableTextPart(
@@ -1189,6 +1138,13 @@ export class ContentInputResolver {
 		this.#signal = signal;
 		this.#dependencies = dependencies;
 		this.#parts = inputParts(request);
+		if (this.#parts.length > MAX_CONTENT_INPUT_PARTS) {
+			throw requestError(
+				`Request contains ${this.#parts.length} file and image parts, above the ${MAX_CONTENT_INPUT_PARTS} part limit`,
+				"too_many_content_inputs",
+				`A request may contain at most ${MAX_CONTENT_INPUT_PARTS} file and image parts.`,
+			);
+		}
 		this.#engine = request.fileParser?.pdfEngine ?? "auto";
 		for (const part of this.#parts) {
 			const source =
