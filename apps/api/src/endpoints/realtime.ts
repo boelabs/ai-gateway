@@ -477,10 +477,12 @@ async function closeConnection(connection: RealtimeConnection): Promise<void> {
 	clearTimeout(connection.timer);
 	connection.stopCredentialWatch?.();
 	unregisterRealtimeSocket(connection.entry);
-	await connection.queue.catch(() => undefined);
+	// End the provider run first: that aborts whatever a queued client event is waiting on and
+	// settles the session's usage. Waiting for the queue first could hang on that very event.
 	if (connection.run) {
 		await endRun(connection, connection.run, null);
 	}
+	await connection.queue.catch(() => undefined);
 }
 
 /** Builds the socket handlers for a transcription session. Throws when the socket is refused. */

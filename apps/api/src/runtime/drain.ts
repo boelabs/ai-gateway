@@ -21,7 +21,7 @@
 
 /**
  * Budget for each teardown step that follows the drain: stopping jobs, flushing buffered operation
- * logs, closing dependencies. Not configurable — it is bounded work against things that are either
+ * logs, releasing connections, closing dependencies. Not an operator setting — it is bounded work against things that are either
  * responsive or already gone, and a knob for it would only ever be tuned wrong.
  */
 export const TEARDOWN_TIMEOUT_MS = 10_000;
@@ -32,6 +32,8 @@ export const WATCHDOG_SLACK_MS = 5000;
 export interface DrainTimings {
 	/** Time spent unready but still serving, so the load balancer can deregister this instance. */
 	drainDelayMs: number;
+	/** Deadline of each teardown phase; TEARDOWN_TIMEOUT_MS unless a test shortens it. */
+	teardownTimeoutMs?: number;
 	/** Grace given to in-flight requests once the listener is closed. */
 	drainTimeoutMs: number;
 }
@@ -67,6 +69,7 @@ export type DrainEvent =
 	| "requests-timeout"
 	| "flush-timeout"
 	| "dependencies-timeout"
+	| "release-timeout"
 	| "failed"
 	| "complete";
 
@@ -109,7 +112,7 @@ export function drainBudgetMs(timings: DrainTimings): number {
 	return (
 		timings.drainDelayMs +
 		timings.drainTimeoutMs +
-		TEARDOWN_TIMEOUT_MS * 3 +
+		(timings.teardownTimeoutMs ?? TEARDOWN_TIMEOUT_MS) * 4 +
 		WATCHDOG_SLACK_MS
 	);
 }
@@ -129,6 +132,7 @@ export async function runDrainSequence(
 		return;
 	}
 	const fail = (err: unknown) => effects.onEvent("failed", { err });
+	const teardown = timings.teardownTimeoutMs ?? TEARDOWN_TIMEOUT_MS;
 	effects.onEvent("started", { ...timings });
 
 	await withTimeout(
@@ -136,7 +140,7 @@ export async function runDrainSequence(
 			guard(effects.stopJobs(), fail),
 			guard(effects.releaseConnections({ idleOnly: true }), fail),
 		]).then(() => undefined),
-		TEARDOWN_TIMEOUT_MS,
+		teardown,
 		() => effects.onEvent("jobs-timeout"),
 	);
 
@@ -157,17 +161,20 @@ export async function runDrainSequence(
 		() => effects.onEvent("requests-timeout", { ...timings }),
 	);
 
-	// Whether the drain finished or timed out, nothing may hold a socket past this point.
-	await guard(effects.releaseConnections({ idleOnly: false }), fail);
+	// Whether the drain finished or timed out, nothing may hold a socket past this point - and one
+	// socket that will not let go must not hold the process either.
+	await withTimeout(
+		guard(effects.releaseConnections({ idleOnly: false }), fail),
+		teardown,
+		() => effects.onEvent("release-timeout"),
+	);
 	effects.closeAllConnections();
 
-	await withTimeout(guard(effects.flushLogs(), fail), TEARDOWN_TIMEOUT_MS, () =>
+	await withTimeout(guard(effects.flushLogs(), fail), teardown, () =>
 		effects.onEvent("flush-timeout"),
 	);
-	await withTimeout(
-		guard(effects.closeDependencies(), fail),
-		TEARDOWN_TIMEOUT_MS,
-		() => effects.onEvent("dependencies-timeout"),
+	await withTimeout(guard(effects.closeDependencies(), fail), teardown, () =>
+		effects.onEvent("dependencies-timeout"),
 	);
 	effects.onEvent("complete");
 }
