@@ -187,11 +187,17 @@ export async function listVideosForScope(opts: {
  */
 export async function claimVideoJobBilling(
 	id: string,
+	outcome: NonNullable<VideoJobBilling["outcome"]>,
 ): Promise<VideoJobBilling | undefined> {
+	const claim = {
+		state: "settling",
+		claimedAt: new Date().toISOString(),
+		outcome,
+	};
 	const [row] = await db
 		.update(videoJobs)
 		.set({
-			billing: sql`jsonb_set(${videoJobs.billing}, '{state}', '"settling"')`,
+			billing: sql`${videoJobs.billing} || ${JSON.stringify(claim)}::jsonb`,
 		})
 		.where(
 			and(
@@ -210,6 +216,35 @@ export async function finishVideoJobBilling(
 	billing: VideoJobBilling,
 ): Promise<void> {
 	await db.update(videoJobs).set({ billing }).where(eq(videoJobs.id, id));
+}
+
+/**
+ * Jobs whose settling claim is older than `before`: the claimant died between taking the claim and
+ * finishing it. Claims taken before `claimedAt` existed are judged by the row's last update.
+ */
+export async function listStaleVideoBillingClaims(
+	before: Date,
+	limit = 100,
+): Promise<Array<{ id: string; billing: VideoJobBilling }>> {
+	const rows = await db
+		.select({ id: videoJobs.id, billing: videoJobs.billing })
+		.from(videoJobs)
+		.where(
+			and(
+				sql`${videoJobs.billing}->>'state' = 'settling'`,
+				or(
+					sql`(${videoJobs.billing}->>'claimedAt')::timestamptz < ${before.toISOString()}::timestamptz`,
+					and(
+						sql`${videoJobs.billing}->>'claimedAt' IS NULL`,
+						lte(videoJobs.updatedAt, before),
+					),
+				),
+			),
+		)
+		.limit(limit);
+	return rows.flatMap((row) =>
+		row.billing ? [{ id: row.id, billing: row.billing }] : [],
+	);
 }
 
 export async function updateVideoJobState(
@@ -316,9 +351,25 @@ export async function getVideoAsset(
 export async function markVideoDeletedForScope(
 	id: string,
 	virtualKeyId: string | null,
-): Promise<{ row: VideoJobRow | undefined; assets: VideoAssetRow[] }> {
+): Promise<{
+	row: VideoJobRow | undefined;
+	/** The job's status before the delete, which decides how its reservation settles. */
+	previousStatus: VideoJobRow["status"] | undefined;
+	assets: VideoAssetRow[];
+}> {
 	return db.transaction(async (tx) => {
 		const now = new Date();
+		const [previous] = await tx
+			.select({ status: videoJobs.status })
+			.from(videoJobs)
+			.where(
+				and(
+					eq(videoJobs.id, id),
+					scopeCondition(virtualKeyId),
+					isNull(videoJobs.deletedAt),
+				),
+			)
+			.for("update");
 		const [row] = await tx
 			.update(videoJobs)
 			.set({ status: "deleted", deletedAt: now, updatedAt: now })
@@ -331,7 +382,7 @@ export async function markVideoDeletedForScope(
 			)
 			.returning();
 		if (!row) {
-			return { row: undefined, assets: [] };
+			return { row: undefined, previousStatus: undefined, assets: [] };
 		}
 		const assets = await tx
 			.update(videoAssets)
@@ -340,7 +391,7 @@ export async function markVideoDeletedForScope(
 			.set({ expiresAt: now })
 			.where(and(eq(videoAssets.videoId, id), isNull(videoAssets.deletedAt)))
 			.returning();
-		return { row, assets };
+		return { row, previousStatus: previous?.status, assets };
 	});
 }
 

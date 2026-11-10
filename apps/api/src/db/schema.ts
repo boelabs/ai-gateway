@@ -720,6 +720,27 @@ export const responseStates = pgTable(
 	],
 );
 
+/* ------------------------------------------------------------ spend_ledger */
+
+/**
+ * One row per spend applied to a virtual key, keyed by the charge's own id (a usage lease's
+ * settlement or one of its incremental charges). Inserting the row and adding the spend happen in
+ * one transaction, so a retried or reconciled write applies the spend exactly once. Rows are only
+ * needed while a write can still be retried and are pruned after a retention window.
+ */
+export const spendLedger = pgTable(
+	"spend_ledger",
+	{
+		id: text("id").primaryKey(),
+		virtualKeyId: uuid("virtual_key_id").notNull(),
+		cents: numeric("cents", { precision: 20, scale: 10 }).notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [index("spend_ledger_created_at_idx").on(t.createdAt)],
+);
+
 /* -------------------------------------------------------------- video_jobs */
 
 /** Budget lifecycle of one video job; `settling` is the claim a poller holds while it settles. */
@@ -727,6 +748,20 @@ export interface VideoJobBilling {
 	state: "reserved" | "settling" | "settled" | "released";
 	/** Present while the reservation is outstanding. */
 	lease?: VirtualKeyUsageLeaseSnapshot;
+	/** When the settling claim was taken; a stale claim is completed by the reconciler. */
+	claimedAt?: string;
+	/**
+	 * The settlement the claimant decided on, persisted with the claim so the reconciler can apply it
+	 * if the claimant dies before finishing. Spend writes are idempotent, so applying it twice is safe.
+	 */
+	outcome?:
+		| {
+				kind: "settle";
+				totalTokens: number;
+				costCents: number;
+				usage: Record<string, unknown>;
+		  }
+		| { kind: "release" };
 	/** Final cost in USD cents, once settled. */
 	costCents?: number;
 	/** Canonical usage the settlement was computed from, or null when it came from an estimate. */

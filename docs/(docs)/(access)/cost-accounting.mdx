@@ -48,7 +48,9 @@ resolved pricing and:
 - **Redis** is the hot-path counter: virtual-key TPM windows and the running budget total are checked
   and incremented here, on the request's critical path, because it needs to be fast and atomic.
 - **Postgres** (`spend_cents` on the virtual key, plus consumer and estimated upstream cost in `gateway_operations`)
-  is the durable source of truth, updated on every billed request.
+  is the durable source of truth, updated on every billed request. Each write goes through the
+  `spend_ledger` table keyed by the charge's id, so a retried write (three retries with backoff) or a
+  reconciled one is applied exactly once; ledger rows are pruned after seven days.
 
 ### When the provider reports no usage
 

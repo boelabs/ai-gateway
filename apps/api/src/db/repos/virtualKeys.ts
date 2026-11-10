@@ -1,9 +1,9 @@
 import { type EncEnvelope, encryptJson } from "#db/crypto.ts";
 import type { Page, PageResult } from "./deployments.ts";
+import { virtualKeys, spendLedger } from "#db/schema.ts";
 import { createHash, randomBytes } from "node:crypto";
 import { nextResetAt } from "#ratelimit/period.ts";
 import { writtenRow } from "#db/returning.ts";
-import { virtualKeys } from "#db/schema.ts";
 import { db } from "#db/client.ts";
 
 import {
@@ -322,6 +322,55 @@ export async function addVirtualKeySpend(
 			updatedAt: new Date(),
 		})
 		.where(eq(virtualKeys.id, id));
+}
+
+/**
+ * Adds spend exactly once per `entryId`: the ledger row and the key's spend change in one
+ * transaction, so a retried or reconciled write is a no-op. Returns whether the spend was applied now.
+ */
+export async function recordVirtualKeySpend(
+	entryId: string,
+	id: string,
+	cents: number,
+): Promise<boolean> {
+	if (!(cents > 0)) {
+		return false;
+	}
+	return db.transaction(async (tx) => {
+		const inserted = await tx
+			.insert(spendLedger)
+			.values({ id: entryId, virtualKeyId: id, cents: cents.toFixed(10) })
+			.onConflictDoNothing()
+			.returning({ id: spendLedger.id });
+		if (inserted.length === 0) {
+			return false;
+		}
+		await tx
+			.update(virtualKeys)
+			.set({
+				spendCents: drizzleSql`${virtualKeys.spendCents} + ${cents.toFixed(10)}`,
+				updatedAt: new Date(),
+			})
+			.where(eq(virtualKeys.id, id));
+		return true;
+	});
+}
+
+/** Deletes up to `limit` ledger rows older than `before`; returns how many. */
+export async function pruneSpendLedger(
+	before: Date,
+	limit = 1000,
+): Promise<number> {
+	const deleted = await db.execute(drizzleSql`
+		DELETE FROM ${spendLedger}
+		WHERE ${spendLedger.id} IN (
+			SELECT ${spendLedger.id} FROM ${spendLedger}
+			WHERE ${spendLedger.createdAt} < ${before}
+			ORDER BY ${spendLedger.createdAt}
+			LIMIT ${limit}
+		)
+		RETURNING ${spendLedger.id}`);
+	return deleted.length;
 }
 
 export async function resetVirtualKeySpend(

@@ -43,6 +43,13 @@
       "when": 1794087707027,
       "tag": "0005_outstanding_surge",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794316007646,
+      "tag": "0006_spend_ledger",
+      "breakpoints": true
     }
   ]
 }

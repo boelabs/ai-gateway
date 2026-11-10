@@ -1,4 +1,5 @@
 import { deleteExpiredVideoAssets, refreshDueVideoJobs } from "./service.ts";
+import { reconcileVideoBilling } from "./billing.ts";
 import { log } from "#logging/log.ts";
 import { env } from "#config/env.ts";
 
@@ -23,6 +24,17 @@ export function startVideoJobs(): () => void {
 				})
 				.catch((err: unknown) => {
 					log.error("videos", "asset gc failed", { err });
+				});
+			await reconcileVideoBilling()
+				.then((finished) => {
+					if (finished > 0) {
+						log.warn("videos", "finished stale video billing claims", {
+							finished,
+						});
+					}
+				})
+				.catch((err: unknown) => {
+					log.error("videos", "billing reconciliation failed", { err });
 				});
 		} finally {
 			running = false;

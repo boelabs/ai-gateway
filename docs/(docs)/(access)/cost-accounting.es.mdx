@@ -15,7 +15,7 @@ Los niveles de servicio tienen sus propias tarifas en `serviceTiers`, con el nom
 En cada solicitud con uso (tokens y/o unidades de búsqueda de reranking realmente consumidas), el gateway calcula el costo a partir del precio resuelto y:
 
 - **Redis** es el contador de rutas activas: las ventanas de TPM de virtual key y el presupuesto total en ejecución se verifican e incrementan aquí, en la ruta crítica de la solicitud, porque debe ser rápida y atómica.
-- **Postgres** (`spend_cents` en la virtual key, más el costo de consumo y el costo upstream estimado en `gateway_operations`) es la fuente duradera de verdad, actualizada en cada solicitud facturada.
+- **Postgres** (`spend_cents` en la virtual key, más el costo de consumo y el costo upstream estimado en `gateway_operations`) es la fuente duradera de verdad, actualizada en cada solicitud facturada. Cada escritura pasa por la tabla `spend_ledger` con el id del cargo como clave, así que una escritura reintentada (tres reintentos con espera creciente) o reconciliada se aplica exactamente una vez; las filas del ledger se eliminan a los siete días.
 
 ### Cuando el proveedor no informa el uso [#when-the-provider-reports-no-usage]
 

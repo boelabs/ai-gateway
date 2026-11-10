@@ -21,6 +21,7 @@ import { messagesCountTokensHandler } from "./endpoints/messagesCountTokens.ts";
 import { publicizeManagementError, isManagementPath } from "./admin/errors.ts";
 import { installProcessErrorHandlers } from "./runtime/processErrors.ts";
 import { startResponseStateGcJob } from "./db/repos/responseStates.ts";
+import { startSpendLedgerGcJob } from "./ratelimit/spendLedgerGc.ts";
 import { requestContextMiddleware } from "./http/requestContext.ts";
 import { lifecyclePhase, isDraining } from "./runtime/lifecycle.ts";
 import { usesAnthropicErrorDialect } from "./http/errorDialect.ts";
@@ -125,6 +126,7 @@ const stopExtensionReload = startExtensionReloadJob();
 const stopVideoJobs = startVideoJobs();
 const stopDashboardSessionGc = startDashboardSessionGcJob();
 const stopIdempotencyGc = startIdempotencyGcJob();
+const stopSpendLedgerGc = startSpendLedgerGcJob();
 
 app.use("*", requestContextMiddleware());
 app.use("*", async (c, next) => {
@@ -383,5 +385,6 @@ installGracefulShutdown({
 		stopVideoJobs,
 		stopDashboardSessionGc,
 		stopIdempotencyGc,
+		stopSpendLedgerGc,
 	],
 });

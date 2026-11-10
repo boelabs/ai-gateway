@@ -3,10 +3,11 @@ import type { VirtualKeyAuth } from "#auth/types.ts";
 import { GatewayError } from "#core/errors.ts";
 import { randomUUID } from "node:crypto";
 import { redis } from "#cache/redis.ts";
+import { log } from "#logging/log.ts";
 
 import {
 	resetVirtualKeySpendIfDue,
-	addVirtualKeySpend,
+	recordVirtualKeySpend,
 	getVirtualKeyById,
 } from "#db/repos/virtualKeys.ts";
 
@@ -466,6 +467,46 @@ export interface VirtualKeyUsageLeaseSnapshot {
 	counters: CounterLease[];
 	/** The budget limit in cents, when the key has one. */
 	budgetLimitCents?: number;
+	/**
+	 * Idempotency key of this lease's spend writes. Snapshots persisted before it existed fall back
+	 * to their first counter's id, which is equally unique.
+	 */
+	ledgerId?: string;
+}
+
+const SPEND_WRITE_DELAYS_MS = [200, 1000, 5000];
+
+/**
+ * Writes spend to Postgres through the idempotent ledger, retrying transient failures. Redis already
+ * holds the spend for enforcement; Postgres is the durable record a Redis flush is reseeded from.
+ */
+async function writeSpend(
+	entryId: string,
+	keyId: string,
+	cents: number,
+): Promise<void> {
+	for (let attempt = 0; ; attempt += 1) {
+		try {
+			await recordVirtualKeySpend(entryId, keyId, cents);
+			return;
+		} catch (err) {
+			const delay = SPEND_WRITE_DELAYS_MS[attempt];
+			if (delay === undefined) {
+				log.error("ratelimit", "failed to persist virtual key spend", {
+					err,
+					keyId,
+					entryId,
+					cents,
+				});
+				throw err;
+			}
+			await new Promise((resolve) => setTimeout(resolve, delay));
+		}
+	}
+}
+
+function ledgerIdOf(snapshot: VirtualKeyUsageLeaseSnapshot): string {
+	return snapshot.ledgerId ?? snapshot.counters[0]?.id ?? randomUUID();
 }
 
 function buildUsageLease(
@@ -474,6 +515,8 @@ function buildUsageLease(
 	let settled = false;
 	let chargedTokens = 0;
 	let chargedCents = 0;
+	let charges = 0;
+	const ledgerId = ledgerIdOf(snapshot);
 	const budgetLease = snapshot.counters.at(snapshot.tpmFirst ? 1 : 0);
 	return {
 		charge: async (totalTokens, costCents) => {
@@ -501,7 +544,10 @@ function buildUsageLease(
 						),
 					);
 				}
-				operations.push(addVirtualKeySpend(snapshot.keyId, cents));
+				charges += 1;
+				operations.push(
+					writeSpend(`${ledgerId}:charge:${charges}`, snapshot.keyId, cents),
+				);
 			}
 			await Promise.all(operations);
 			const spent = spend ? redisCounter(await spend, "budget") : 0;
@@ -522,7 +568,9 @@ function buildUsageLease(
 				settleCounter(lease, index === 0 && snapshot.tpmFirst ? tokens : cents),
 			);
 			if (cents > 0) {
-				operations.push(addVirtualKeySpend(snapshot.keyId, cents));
+				operations.push(
+					writeSpend(`${ledgerId}:settle`, snapshot.keyId, cents),
+				);
 			}
 			await Promise.all(operations);
 		},
@@ -606,6 +654,7 @@ export async function reserveVirtualKeyUsage(
 		keyId: key.id,
 		tpmFirst: key.tpm != null,
 		counters: leases,
+		ledgerId: randomUUID(),
 		...(key.maxBudgetCents == null
 			? {}
 			: { budgetLimitCents: key.maxBudgetCents }),
