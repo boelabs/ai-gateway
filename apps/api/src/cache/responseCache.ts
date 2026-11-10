@@ -34,6 +34,21 @@ export async function advanceResponseCacheEpoch(): Promise<string> {
 	return String(await redis.incr(CACHE_EPOCH_KEY));
 }
 
+/**
+ * Runs a change to state that decides what a cached response would be (deployments, fallbacks,
+ * router settings, extensions) and invalidates the cache around it. The epoch moves before the
+ * change, so no request that read the old state can store under the new epoch, and again after it,
+ * so nothing written while it ran survives.
+ */
+export async function invalidatingResponseCache<T>(
+	change: () => Promise<T>,
+): Promise<T> {
+	await advanceResponseCacheEpoch();
+	const result = await change();
+	await advanceResponseCacheEpoch();
+	return result;
+}
+
 /** Reads the cache config from the x-unified-cache / x-unified-cache-ttl headers. */
 export function cacheConfigFromHeaders(
 	get: (name: string) => string | undefined,

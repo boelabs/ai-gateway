@@ -1,6 +1,7 @@
 import { resolveModelMetadata, getCatalogEntry } from "#catalog/index.ts";
 import type { ExecutionPolicyOverrides } from "#core/executionPolicy.ts";
 import { invalidatePublicModelGroups } from "#catalog/publicModels.ts";
+import { invalidatingResponseCache } from "#cache/responseCache.ts";
 import type { TransportOverrides } from "#profiles/types.ts";
 import type { RuntimeModelMetadata } from "#db/schema.ts";
 import { declaredTransportFor } from "#catalog/types.ts";
@@ -285,7 +286,7 @@ export async function previewDeployment(
 	};
 }
 
-export async function createDeployment(
+async function createDeploymentUnchanged(
 	input: CreateDeploymentInput,
 ): Promise<{ row: DeploymentRow; preview: DeploymentPreview }> {
 	const preview = await previewDeployment(input);
@@ -320,7 +321,7 @@ export async function createDeployment(
 	return { row, preview };
 }
 
-export async function updateDeployment(
+async function updateDeploymentUnchanged(
 	id: string,
 	patch: UpdateDeploymentInput,
 ): Promise<{ row: DeploymentRow; preview: DeploymentPreview }> {
@@ -416,7 +417,24 @@ export async function updateDeployment(
 	return { row, preview };
 }
 
-export async function deleteDeployment(id: string): Promise<void> {
+async function deleteDeploymentUnchanged(id: string): Promise<void> {
 	await removeDeployment(id);
 	invalidatePublicModelGroups();
+}
+
+export function createDeployment(
+	input: CreateDeploymentInput,
+): Promise<{ row: DeploymentRow; preview: DeploymentPreview }> {
+	return invalidatingResponseCache(() => createDeploymentUnchanged(input));
+}
+
+export function updateDeployment(
+	id: string,
+	patch: UpdateDeploymentInput,
+): Promise<{ row: DeploymentRow; preview: DeploymentPreview }> {
+	return invalidatingResponseCache(() => updateDeploymentUnchanged(id, patch));
+}
+
+export function deleteDeployment(id: string): Promise<void> {
+	return invalidatingResponseCache(() => deleteDeploymentUnchanged(id));
 }

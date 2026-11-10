@@ -3,6 +3,7 @@ import { keySecretAccessIsOpen, revealKeySecret } from "./keySecrets.ts";
 import { invalidateRouterSettingsCache } from "#router/settings.ts";
 import { auditRevealMiddleware, auditMiddleware } from "./audit.ts";
 import { Hono, type MiddlewareHandler, type Context } from "hono";
+import { invalidateResponseCache } from "#cache/responseCache.ts";
 import { invalidateVirtualKey } from "#auth/virtualKeyCache.ts";
 import { idempotencyMiddleware } from "#http/idempotency.ts";
 import { clearVirtualKeyBudget } from "#ratelimit/index.ts";
@@ -85,11 +86,6 @@ import {
 	updateDashboardSettings,
 	getDashboardSettings,
 } from "#db/repos/dashboardSettings.ts";
-
-import {
-	advanceResponseCacheEpoch,
-	invalidateResponseCache,
-} from "#cache/responseCache.ts";
 
 import {
 	ADMIN_JSON_BODY_MAX_BYTES,
@@ -334,24 +330,6 @@ adminApp.use(
 	}),
 );
 adminApp.route("/users", dashboardUsersApp);
-adminApp.use("*", async (c, next) => {
-	const mutatesConfiguration = ["POST", "PUT", "PATCH", "DELETE"].includes(
-		c.req.method,
-	);
-	const managesCacheDirectly = c.req.path === "/admin/cache";
-	if (mutatesConfiguration && !managesCacheDirectly) {
-		await advanceResponseCacheEpoch();
-	}
-	await next();
-	if (
-		mutatesConfiguration &&
-		!managesCacheDirectly &&
-		c.res.status >= 200 &&
-		c.res.status < 400
-	) {
-		await advanceResponseCacheEpoch();
-	}
-});
 // Model CRUD (with inline CatalogEntry for custom models) and adapter introspection.
 adminApp.route("/", platformAdminApp);
 

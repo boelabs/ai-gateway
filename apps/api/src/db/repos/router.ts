@@ -1,3 +1,4 @@
+import { invalidatingResponseCache } from "#cache/responseCache.ts";
 import { fallbackPolicies, routerSettings } from "#db/schema.ts";
 import { invalidateRoutingConfig } from "./deployments.ts";
 import { writtenRow } from "#db/returning.ts";
@@ -69,7 +70,13 @@ export interface RouterSettingsPatch {
 	retryAfterSeconds?: number | undefined;
 }
 
-export async function updateRouterSettings(
+export function updateRouterSettings(
+	patch: RouterSettingsPatch,
+): Promise<RouterSettingsRow> {
+	return invalidatingResponseCache(() => writeRouterSettings(patch));
+}
+
+async function writeRouterSettings(
 	patch: RouterSettingsPatch,
 ): Promise<RouterSettingsRow> {
 	const { executionPolicies, ...rest } = patch;
@@ -97,7 +104,13 @@ export interface UpsertFallbackPolicyInput {
 	reason?: FallbackReason;
 }
 
-export async function upsertFallbackPolicy(
+export function upsertFallbackPolicy(
+	input: UpsertFallbackPolicyInput,
+): Promise<FallbackPolicyRow> {
+	return invalidatingResponseCache(() => writeFallbackPolicy(input));
+}
+
+async function writeFallbackPolicy(
 	input: UpsertFallbackPolicyInput,
 ): Promise<FallbackPolicyRow> {
 	const reason = input.reason ?? "general";
@@ -117,7 +130,16 @@ export async function upsertFallbackPolicy(
 	return writtenRow(row, "upsertFallbackPolicy");
 }
 
-export async function deleteFallbackPolicy(
+export function deleteFallbackPolicy(
+	primaryModel: string,
+	reason: FallbackReason,
+): Promise<void> {
+	return invalidatingResponseCache(() =>
+		removeFallbackPolicy(primaryModel, reason),
+	);
+}
+
+async function removeFallbackPolicy(
 	primaryModel: string,
 	reason: FallbackReason,
 ): Promise<void> {

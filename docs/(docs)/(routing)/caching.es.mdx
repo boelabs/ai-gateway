@@ -50,6 +50,8 @@ DELETE /admin/cache?callType=chat&namespace=<virtual-key-id>
 
 Ambos filtros son opcionales; omitirlos amplíal alcance del borrado. La respuesta indica cuántas entradas se eliminaron. Las entradas también caducan al cumplirse su TTL.
 
+La cache también se invalida sola cada vez que cambia algo que decide una respuesta: crear, actualizar o eliminar un deployment, los ajustes del router, una política de fallback o cualquier extensión. Los demás cambios de administración (virtual keys, usuarios, ajustes que no afectan al enrutamiento) no la tocan.
+
 ## Cuándo usarlo [#when-to-use-it]
 
 Úsalo para prompts deterministas o de baja temperatura, consultas repetidas de embeddings, reintentos idempotentes y endpoints con muchas lecturas repetidas. Para contenido personalizado o cuando cada generación deba ser nueva, omite el header de cache.

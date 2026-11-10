@@ -1,3 +1,4 @@
+import { invalidatingResponseCache } from "#cache/responseCache.ts";
 import { decryptString, encryptJson } from "#db/crypto.ts";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { writtenRow } from "#db/returning.ts";
@@ -33,7 +34,12 @@ export async function getRegistryVersion(): Promise<number> {
 }
 
 /** Atomically increments (or seeds) the registry version. Returns the new value. */
-export async function bumpRegistryVersion(): Promise<number> {
+export function bumpRegistryVersion(): Promise<number> {
+	// Every extension change bumps this version, and extensions shape responses.
+	return invalidatingResponseCache(writeRegistryVersion);
+}
+
+async function writeRegistryVersion(): Promise<number> {
 	const [row] = await db
 		.insert(extensionRegistry)
 		.values({ id: 1, version: 1 })
