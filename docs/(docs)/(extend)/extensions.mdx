@@ -17,7 +17,9 @@ Extensions are split into two concepts:
 <Callout>
 
 **Trust model.** Extension code runs **in-process with full privileges**: it can read and rewrite
-every request and response. Uploading is therefore restricted to the **master key**, code is
+every request and response, and importing an upload runs its top-level code on the host. Uploading
+therefore takes `extensions:manage`: the **master key** or an **owner** session, which makes an owner
+account equivalent to code execution on the gateway host — grant the role accordingly. Code is
 encrypted at rest, and every artifact is integrity-checked (sha256) before it is loaded. Treat an
 extension upload with the same care as a deploy.
 
@@ -51,7 +53,7 @@ provision.
 
 ## Managing extensions (Admin API)
 
-All routes require the master key. The management envelope is `{ "data": ... }`.
+All routes require `extensions:manage` (the master key or an owner session). The management envelope is `{ "data": ... }`.
 
 | Method & path | Purpose |
 |---|---|

@@ -11,7 +11,7 @@ Las extensiones se dividen en dos conceptos:
 
 <Callout>
 
-**Modelo de confianza.** El código de extensión se ejecuta **en proceso con privilegios completos**: puede leer y reescribir cada solicitud y respuesta. Por lo tanto, la carga está restringida a la **master key**, el código se cifra en reposo y se verifica la integridad de cada artefacto (sha256) antes de cargarlo. Trate la carga de una extensión con el mismo cuidado que un deployment.
+**Modelo de confianza.** El código de extensión se ejecuta **en proceso con privilegios completos**: puede leer y reescribir cada solicitud y respuesta. Además, importar una carga ejecuta su código de nivel superior en el host. Por lo tanto, la carga requiere `extensions:manage`: la **master key** o una sesión **owner**, lo que hace que una cuenta owner equivalga a ejecutar código en el host del gateway; asigna ese rol en consecuencia. El código se cifra en reposo y se verifica la integridad de cada artefacto (sha256) antes de cargarlo. Trate la carga de una extensión con el mismo cuidado que un deployment.
 
 </Callout>
 
@@ -35,7 +35,7 @@ Las extensiones solo requieren Postgres, del que ya depende el gateway. No hay n
 
 ## Administrar extensiones (API de administración) [#managing-extensions-admin-api]
 
-Todas las rutas requieren la master key. La envolvente de gestión es `{ "data": ... }`.
+Todas las rutas requieren `extensions:manage` (la master key o una sesión owner). La envolvente de gestión es `{ "data": ... }`.
 
 | Método y ruta | Propósito |
 |---|---|

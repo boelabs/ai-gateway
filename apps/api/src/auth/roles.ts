@@ -4,8 +4,9 @@
  *
  * The three capabilities that separate `admin` from `owner` are the ones that are dangerous rather
  * than merely destructive:
- *  - `extensions`: uploaded modules run IN-PROCESS with no sandbox. It is remote code execution by
- *    design (see docs/extensions).
+ *  - `extensions`: uploaded modules run IN-PROCESS with no sandbox, and importing one at upload runs
+ *    its top-level code. An owner session is therefore code execution on the gateway host, by design
+ *    (see docs/extensions); grant the role as you would shell access.
  *  - `payloads`: retained request/response samples are real prompts and completions — the most
  *    sensitive data the gateway holds, which is why reading one is itself audited.
  *  - `users`: whoever manages roles can grant themselves the other two.

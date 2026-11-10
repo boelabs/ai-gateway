@@ -138,7 +138,8 @@ interface ProbeResult {
 /**
  * Validates uploaded module source before it is persisted: it stages the file (so the SDK subpath
  * import resolves), imports it, and asserts it exports a definition whose `key` matches. Importing
- * executes the module's top-level code — extensions are trusted, master-only code by design. Throws a
+ * executes the module's top-level code on this host — an upload takes `extensions:manage` (the master
+ * key or an owner session), so an owner account is code execution here by design. Throws a
  * plain Error (the admin layer maps it to a 400) on any failure, so a bad upload never reaches the
  * database or the boot path.
  */
