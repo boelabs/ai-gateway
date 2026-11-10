@@ -372,6 +372,9 @@ function buildContext(
 	opts: RouteOptions,
 	totalDeadlineAt: number,
 ): { ctx: AdapterContext; cleanup: () => void } {
+	// Resolved before anything is armed: a credential that fails to decrypt must not leave a
+	// watchdog, a deadline timer and a client-abort listener behind with no cleanup to release them.
+	const credentials = decryptDeploymentCredentials(candidate);
 	const mode = opts.executionMode ?? "json";
 	const policy = resolveExecutionPolicy(
 		settings.executionPolicies[callType][mode],
@@ -402,7 +405,7 @@ function buildContext(
 	return {
 		ctx: {
 			upstreamModel: candidate.upstreamModel,
-			credentials: decryptDeploymentCredentials(candidate),
+			credentials,
 			meta: candidate.meta,
 			transport: resolveTransport(candidate, callType),
 			requestId: opts.requestId,
