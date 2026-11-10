@@ -93,3 +93,27 @@ test("a native field that contradicts the model's own setting is rejected", () =
 		(error) => GatewayError.is(error) && error.param === "speed",
 	);
 });
+
+test("effort with thinking disabled keeps thinking off and reaches Anthropic", () => {
+	const req = canonical({
+		thinking: { type: "disabled" },
+		output_config: { effort: "high" },
+	});
+	assert.equal(req.reasoning?.effort, "none");
+	const body = jsonBody(
+		must(anthropicAdapter, "chat").buildRequest(req, {
+			...ctx,
+			upstreamModel: "claude-opus-4-6",
+			meta: {
+				...ctx.meta,
+				capabilities: { ...ctx.meta.capabilities, reasoning: true },
+				reasoning: {
+					kind: "anthropic_adaptive",
+					levels: ["none", "low", "medium", "high", "max"],
+				},
+			},
+		}),
+	);
+	assert.deepEqual(body.thinking, { type: "disabled" });
+	assert.deepEqual(body.output_config, { effort: "high" });
+});

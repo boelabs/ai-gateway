@@ -169,6 +169,11 @@ interface CanonicalMessagesTransportOptions {
 	metadata?: Record<string, unknown>;
 	/** Exact Anthropic tool definitions when built-in tools cannot be represented as functions. */
 	rawTools?: Record<string, unknown>[];
+	/**
+	 * `output_config.effort` sent with thinking disabled: the effort of the response itself (text and
+	 * tool calls), with no reasoning. Canonical reasoning is then off (`effort: "none"`).
+	 */
+	outputEffort?: string;
 	/** The client's `anthropic-beta` features, sent to a Messages upstream with the adapter's own. */
 	betas?: string[];
 	/**

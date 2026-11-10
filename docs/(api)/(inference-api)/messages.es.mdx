@@ -43,6 +43,8 @@ El bloque `thinking` de Anthropic se obtiene de los mismos campos canonical `rea
 
 Un `thinking.budget_tokens` que envíes se conserva tal cual: los modelos basados en presupuesto (`anthropic_budget` de Anthropic, `gemini_budget` de Gemini) reciben ese número exacto, y Anthropic lo valida frente a `max_tokens`. Los modelos controlados por nivel reciben su nivel de esfuerzo equivalente. Cuando el gateway elige el presupuesto de un nivel, lo ajusta por debajo de `max_tokens`, como exige Anthropic, y responde `400 invalid_reasoning_budget` si `max_tokens` no deja espacio para el mínimo de 1.024 tokens.
 
+`output_config.effort` con `thinking: { "type": "disabled" }` mantiene thinking desactivado: el esfuerzo solo orienta la respuesta, como documenta Anthropic, y se envía a Anthropic tal cual. Los demás proveedores ven el reasoning desactivado.
+
 Los bloques de thinking firmados y los bloques ocultos son estado opaco del proveedor. El gateway conserva y reenvía los bloques completos, incluidas las firmas y los datos ocultos. Si otro proveedor solo devuelve un resumen visible de reasoning, AI Gateway no fabrica bloques firmados.
 
 ## Formato de los errores [#error-shape]

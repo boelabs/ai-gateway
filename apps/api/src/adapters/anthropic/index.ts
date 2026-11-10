@@ -477,6 +477,13 @@ function applyReasoning(
 		"anthropic_adaptive",
 		"anthropic_budget",
 	]);
+	const outputEffort = req.messagesTransport?.outputEffort;
+	if (outputEffort !== undefined) {
+		// The response's own effort with thinking off, as the client sent it.
+		body.thinking = { type: "disabled" };
+		body.output_config = { effort: outputEffort };
+		return;
+	}
 	if (resolved === undefined) {
 		return;
 	}

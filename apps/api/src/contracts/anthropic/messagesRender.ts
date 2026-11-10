@@ -380,6 +380,11 @@ function reasoningEffortFromMessages(
 	req: MessagesRequest,
 ): ReasoningEffort | undefined {
 	const outputEffort = req.output_config?.effort;
+	if (outputEffort !== undefined && req.thinking?.type === "disabled") {
+		// Effort applies with or without thinking; with thinking off it steers only the response,
+		// which travels as messagesTransport.outputEffort while reasoning stays off.
+		return "none";
+	}
 	if (outputEffort !== undefined) {
 		if (!isReasoningEffort(outputEffort)) {
 			throw new GatewayError({
@@ -572,6 +577,17 @@ export function messagesRequestToCanonical(
 			cacheControl: req.cache_control,
 		};
 		u.requiresNativeWire = true;
+	}
+	const outputEffort = req.output_config?.effort;
+	if (outputEffort !== undefined && req.thinking?.type === "disabled") {
+		if (!isReasoningEffort(outputEffort)) {
+			throw new GatewayError({
+				class: "bad_request",
+				message: `Unsupported output_config.effort: ${String(outputEffort)}`,
+				param: "output_config.effort",
+			});
+		}
+		u.messagesTransport = { ...u.messagesTransport, outputEffort };
 	}
 	const nativeFields = nativeTopLevelFields(req);
 	if (nativeFields !== undefined) {

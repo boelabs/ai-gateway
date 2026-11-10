@@ -72,6 +72,10 @@ it against `max_tokens`. Models controlled by level receive its effort bucket in
 picks the budget for an effort, it fits it below `max_tokens`, as Anthropic requires, and answers
 `400 invalid_reasoning_budget` when `max_tokens` leaves no room for the 1,024-token minimum.
 
+`output_config.effort` with `thinking: { "type": "disabled" }` keeps thinking off: effort then steers
+only the response itself, as Anthropic documents, and is sent to Anthropic as given. Other providers
+see reasoning off.
+
 Signed thinking and redacted thinking blocks are opaque provider state. The gateway preserves and
 replays the complete blocks, including signatures and redacted data, but does not fabricate signed
 blocks when a different provider only returns a visible reasoning summary.
