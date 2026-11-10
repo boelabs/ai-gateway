@@ -159,6 +159,12 @@ interface CanonicalResponsesTransportOptions {
 	instructions?: string;
 	/** Exact wire tools retained for native Responses transports. */
 	rawTools?: Record<string, unknown>[];
+	/**
+	 * The exact `tool_choice` when it names something the canonical choice cannot (a hosted tool, an
+	 * MCP server's tool, a custom tool, an allowed list with non-function tools). Sent as given; the
+	 * request requires the native wire.
+	 */
+	rawToolChoice?: Record<string, unknown>;
 }
 
 interface CanonicalChatTransportOptions {

@@ -265,35 +265,51 @@ function mapMessageContent(
 	return null;
 }
 
+/**
+ * A Responses tool choice in canonical form, or `native` when it names something only the Responses
+ * API knows (a hosted tool, an MCP or custom tool, an allowed list with such tools), which then
+ * travels as written.
+ */
 function mapToolChoice(
 	tc: ResponsesRequest["tool_choice"],
-): CanonicalToolChoice | undefined {
+): CanonicalToolChoice | "native" | undefined {
 	if (tc === undefined) {
 		return undefined;
 	}
 	if (typeof tc === "string") {
-		return tc === "auto" || tc === "none" || tc === "required" ? tc : "auto";
+		if (tc === "auto" || tc === "none" || tc === "required") {
+			return tc;
+		}
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_request_error",
+			param: "tool_choice",
+			message: `Unsupported tool_choice: ${tc}`,
+		});
 	}
-	const { name } = tc as { name?: string };
-	if (name) {
-		return { name };
-	}
-	const allowed = tc as {
+	const choice = tc as {
 		type?: string;
+		name?: string;
 		mode?: string;
 		tools?: Array<{ type?: string; name?: string }>;
 	};
-	if (allowed.type === "allowed_tools" && Array.isArray(allowed.tools)) {
+	if (choice.type === "function" && typeof choice.name === "string") {
+		return { name: choice.name };
+	}
+	if (choice.type === "allowed_tools" && Array.isArray(choice.tools)) {
+		if (
+			!choice.tools.every(
+				(tool) => tool.type === "function" && typeof tool.name === "string",
+			)
+		) {
+			return "native";
+		}
 		return {
-			allowedTools: allowed.tools.flatMap((tool) =>
-				tool.type === "function" && typeof tool.name === "string"
-					? [tool.name]
-					: [],
-			),
-			mode: allowed.mode === "required" ? "required" : "auto",
+			allowedTools: choice.tools.map((tool) => String(tool.name)),
+			mode: choice.mode === "required" ? "required" : "auto",
 		};
 	}
-	return "auto";
+	return "native";
 }
 
 export type ResponseInputItem = Record<string, unknown>;
@@ -980,7 +996,16 @@ export function responsesRequestToCanonical(
 		u.requiresNativeWire = true;
 	}
 	const tc = mapToolChoice(req.tool_choice);
-	if (tc !== undefined) {
+	if (tc === "native") {
+		u.responsesTransport = {
+			...u.responsesTransport,
+			rawToolChoice: structuredClone(req.tool_choice) as Record<
+				string,
+				unknown
+			>,
+		};
+		u.requiresNativeWire = true;
+	} else if (tc !== undefined) {
 		u.toolChoice = tc;
 	}
 

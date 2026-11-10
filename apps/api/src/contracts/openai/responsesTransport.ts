@@ -426,7 +426,9 @@ export function buildResponsesRequestBody(
 			...(t.strict === undefined ? {} : { strict: t.strict }),
 		}));
 	}
-	if (req.toolChoice !== undefined) {
+	if (req.responsesTransport?.rawToolChoice !== undefined) {
+		body.tool_choice = structuredClone(req.responsesTransport.rawToolChoice);
+	} else if (req.toolChoice !== undefined) {
 		if (typeof req.toolChoice === "string") {
 			body.tool_choice = req.toolChoice;
 		} else if ("name" in req.toolChoice) {
