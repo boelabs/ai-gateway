@@ -7,6 +7,7 @@ import { Hono, type MiddlewareHandler, type Context } from "hono";
 import { invalidateResponseCache } from "#cache/responseCache.ts";
 import { invalidateVirtualKey } from "#auth/virtualKeyCache.ts";
 import { idempotencyMiddleware } from "#http/idempotency.ts";
+import { isUuid, pageParams, uuidParam } from "./params.ts";
 import { clearVirtualKeyBudget } from "#ratelimit/index.ts";
 import { configureFallback } from "#fallbacks/service.ts";
 import { aggregateMetrics } from "#db/repos/metrics.ts";
@@ -243,15 +244,7 @@ function parsePage(c: import("hono").Context): {
 	limit: number;
 	offset: number;
 } {
-	const rawLimit = Number(c.req.query("limit") ?? DEFAULT_LIMIT);
-	const rawOffset = Number(c.req.query("offset") ?? 0);
-	const limit =
-		Number.isFinite(rawLimit) && rawLimit > 0
-			? Math.min(Math.trunc(rawLimit), MAX_LIMIT)
-			: DEFAULT_LIMIT;
-	const offset =
-		Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.trunc(rawOffset) : 0;
-	return { limit, offset };
+	return pageParams(c, { defaultLimit: DEFAULT_LIMIT, maxLimit: MAX_LIMIT });
 }
 
 /** Reads are viewer-visible for a resource; writes need the corresponding :write permission. */
@@ -489,7 +482,8 @@ adminApp.patch("/keys/:id", async (c) => {
 });
 
 adminApp.delete("/keys/:id", async (c) => {
-	const row = await getVirtualKeyById(c.req.param("id"));
+	const id = c.req.param("id");
+	const row = isUuid(id) ? await getVirtualKeyById(id) : undefined;
 	if (row) {
 		await deleteVirtualKey(row.id);
 		await invalidateVirtualKey(row.keyHash);
@@ -754,7 +748,7 @@ adminApp.get("/logs", async (c) => {
 });
 
 adminApp.get("/logs/:id/payload", async (c) => {
-	const id = c.req.param("id");
+	const id = uuidParam(c, "id", "Gateway operation");
 	const read = await getPayloadSample(id, {
 		requestId: getRequestId(c),
 		actor: actorOf(getAuth(c)),
@@ -794,7 +788,9 @@ adminApp.get("/logs/:id/payload", async (c) => {
 });
 
 adminApp.get("/logs/:id", async (c) => {
-	const detail = await getOperationDetail(c.req.param("id"));
+	const detail = await getOperationDetail(
+		uuidParam(c, "id", "Gateway operation"),
+	);
 	if (detail === null) {
 		throw new GatewayError({
 			class: "not_found",

@@ -2,6 +2,7 @@ import { hashPassword, MIN_PASSWORD_LENGTH } from "#auth/password.ts";
 import { requirePermission, getAuth } from "#auth/middleware.ts";
 import { invalidateSessionCaches } from "#auth/session.ts";
 import { type AppEnv, actorOf } from "#auth/types.ts";
+import { isUuid, pageParams } from "./params.ts";
 import { DASHBOARD_ROLES } from "#auth/roles.ts";
 import { ok, paginated } from "#http/respond.ts";
 import { GatewayError } from "#core/errors.ts";
@@ -60,7 +61,7 @@ function publicUser(row: DashboardUserRow) {
 }
 
 async function requireUser(id: string): Promise<DashboardUserRow> {
-	const row = await getDashboardUserById(id);
+	const row = isUuid(id) ? await getDashboardUserById(id) : undefined;
 	if (!row) {
 		throw new GatewayError({
 			class: "not_found",
@@ -82,14 +83,10 @@ export const dashboardUsersApp = new Hono<AppEnv>();
 dashboardUsersApp.use("*", requirePermission("users:manage"));
 
 dashboardUsersApp.get("/", async (c) => {
-	const rawLimit = Number(c.req.query("limit") ?? DEFAULT_LIMIT);
-	const rawOffset = Number(c.req.query("offset") ?? 0);
-	const limit =
-		Number.isFinite(rawLimit) && rawLimit > 0
-			? Math.min(Math.trunc(rawLimit), MAX_LIMIT)
-			: DEFAULT_LIMIT;
-	const offset =
-		Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.trunc(rawOffset) : 0;
+	const { limit, offset } = pageParams(c, {
+		defaultLimit: DEFAULT_LIMIT,
+		maxLimit: MAX_LIMIT,
+	});
 	const role = c.req.query("role");
 	if (role !== undefined && !DASHBOARD_ROLES.includes(role as never)) {
 		throw new GatewayError({
