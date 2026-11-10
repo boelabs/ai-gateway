@@ -57,6 +57,12 @@ depth, driven by `output_config.effort`) and `anthropic_budget` (an explicit `bu
 level) — see [Reasoning](/docs/reasoning) for the exact wire shape of each and which models use which.
 For adaptive models, `output_config.effort: "max"` stays distinct from `"xhigh"` end to end.
 
+A `thinking.budget_tokens` you send is kept as given: budget-based models (Anthropic
+`anthropic_budget`, Gemini `gemini_budget`) receive that exact number, and Anthropic itself validates
+it against `max_tokens`. Models controlled by level receive its effort bucket instead. When the gateway
+picks the budget for an effort, it fits it below `max_tokens`, as Anthropic requires, and answers
+`400 invalid_reasoning_budget` when `max_tokens` leaves no room for the 1,024-token minimum.
+
 Signed thinking and redacted thinking blocks are opaque provider state. The gateway preserves and
 replays the complete blocks, including signatures and redacted data, but does not fabricate signed
 blocks when a different provider only returns a visible reasoning summary.

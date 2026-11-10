@@ -512,11 +512,19 @@ export function messagesRequestToCanonical(
 	const display = displayFromThinking(req.thinking);
 	const summary =
 		display === "omitted" ? "none" : summaryForEffort(effort, undefined);
+	// The exact budget travels beside its effort bucket, so a budget-controlled model gets the number
+	// the client asked for rather than the bucket's configured budget.
+	const budgetTokens =
+		req.thinking?.type === "enabled" &&
+		typeof req.thinking.budget_tokens === "number"
+			? req.thinking.budget_tokens
+			: undefined;
 	if (effort !== undefined || display !== undefined) {
 		u.reasoning = {
 			...(effort === undefined ? {} : { effort }),
 			...(summary === undefined ? {} : { summary }),
 			...(display === undefined ? {} : { display }),
+			...(budgetTokens === undefined ? {} : { budgetTokens }),
 		};
 	}
 	const outputFormat = req.output_config?.format;

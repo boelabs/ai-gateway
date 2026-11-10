@@ -1,4 +1,8 @@
-import { summaryVisible, toUpstreamReasoningEffort } from "#core/reasoning.ts";
+import {
+	toUpstreamReasoningEffort,
+	summaryVisible,
+	thinkingBudget,
+} from "#core/reasoning.ts";
 import { type BaseCreds, requireApiKeyCreds } from "#adapters/creds.ts";
 import { mapUpstreamHttpError } from "#adapters/upstreamError.ts";
 import { assertNoPrefixCachePolicy } from "#core/promptCache.ts";
@@ -493,9 +497,11 @@ function applyReasoning(
 		body.thinking = { type: "disabled" };
 		return;
 	}
-	const budget =
+	const budget = thinkingBudget(
+		req.reasoning,
 		spec.budgets?.[effort] ??
-		(effort === "max" ? undefined : DEFAULT_ANTHROPIC_BUDGETS[effort]);
+			(effort === "max" ? undefined : DEFAULT_ANTHROPIC_BUDGETS[effort]),
+	);
 	if (budget === undefined) {
 		throw new Error(
 			'Anthropic budget-based reasoning requires an explicit budget for effort "max"',
@@ -503,9 +509,35 @@ function applyReasoning(
 	}
 	body.thinking = {
 		type: "enabled",
-		budget_tokens: budget,
+		budget_tokens: budget.fromClient
+			? budget.tokens
+			: fitThinkingBudget(budget.tokens, Number(body.max_tokens)),
 		display,
 	};
+}
+
+/** Anthropic's floor for `thinking.budget_tokens`. */
+const MIN_THINKING_BUDGET = 1024;
+
+/**
+ * Fits a budget the gateway chose for an effort into the request: Anthropic requires
+ * `budget_tokens` of at least 1024 and below `max_tokens`, which thinking counts against. A budget
+ * the client set is sent as given, for Anthropic to judge.
+ */
+function fitThinkingBudget(budget: number, maxTokens: number): number {
+	if (budget < maxTokens) {
+		return budget;
+	}
+	const fitted = maxTokens - 1;
+	if (fitted < MIN_THINKING_BUDGET) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_reasoning_budget",
+			param: "max_tokens",
+			message: `Thinking on this model needs max_tokens above ${MIN_THINKING_BUDGET}; raise max_tokens or turn reasoning off`,
+		});
+	}
+	return fitted;
 }
 
 function applyResponseFormat(

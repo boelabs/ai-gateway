@@ -53,6 +53,30 @@ export interface CanonicalReasoning {
 	summary?: ReasoningSummary;
 	/** Visibility of the returned reasoning (when the model/contract allows it). */
 	display?: "omitted" | "summarized";
+	/**
+	 * Explicit thinking-token budget the client asked for (Anthropic `thinking.budget_tokens`).
+	 * `effort` still carries its bucket for models controlled by level; models controlled by a budget
+	 * receive this number unchanged instead of the budget configured for the bucket.
+	 */
+	budgetTokens?: number;
+}
+
+/**
+ * The token budget a budget-controlled model should receive: the client's own when it gave one,
+ * otherwise the one configured for the resolved effort. `fromClient` tells the two apart, since only
+ * a budget the gateway chose may be adjusted to fit the request.
+ */
+export function thinkingBudget(
+	reasoning: CanonicalReasoning | undefined,
+	configured: number | undefined,
+): { tokens: number; fromClient: boolean } | undefined {
+	const requested = reasoning?.budgetTokens;
+	if (requested !== undefined && requested > 0) {
+		return { tokens: requested, fromClient: true };
+	}
+	return configured === undefined
+		? undefined
+		: { tokens: configured, fromClient: false };
 }
 
 export function summaryForEffort(

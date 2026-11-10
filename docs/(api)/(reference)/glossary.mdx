@@ -84,6 +84,12 @@ mechanisms — `openai_effort`, `openai_body`, `anthropic_adaptive`, `anthropic_
 `none < minimal < low < medium < high < xhigh < max` ladder it accepts), and kind-specific config
 (`bodyField`, `chatTemplateFlag`, `budgets`, `upstreamEffortMap`). See [Reasoning](/docs/reasoning).
 
+## Reasoning Budget
+
+`reasoning.budgetTokens`: an explicit thinking-token budget (Anthropic `thinking.budget_tokens`),
+carried beside the effort it falls into. Budget-controlled models receive the number unchanged;
+level-controlled models receive the effort.
+
 ## Parameter Policy
 
 The operator-configured behavior (`unsupportedParameterStrategy`: `drop`, `error`, or `allow`) for a

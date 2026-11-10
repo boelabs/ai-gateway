@@ -52,6 +52,10 @@ Una descripción declarativa 1:1 de un modelo upstream: operaciones, perfiles, r
 
 Declaración de una entrada de catálogo de *cómo* un modelo controla el reasoning: `kind` (uno de los ocho mecanismos del protocolo: `openai_effort`, `openai_body`, `anthropic_adaptive`, `anthropic_budget`, `gemini_level`, `gemini_budget`, `chat_template_flag`, `fixed`), `levels` (los niveles admitidos de la escala canonical `none < minimal < low < medium < high < xhigh < max` que acepta) y configuración específica del tipo (`bodyField`, `chatTemplateFlag`, `budgets`, `upstreamEffortMap`). Consulta [Reasoning](/docs/reasoning).
 
+## Reasoning Budget [#reasoning-budget]
+
+`reasoning.budgetTokens`: un presupuesto explícito de tokens de thinking (`thinking.budget_tokens` de Anthropic), que viaja junto al nivel de esfuerzo en que cae. Los modelos controlados por presupuesto reciben el número sin cambios; los controlados por nivel reciben el esfuerzo.
+
 ## Parameter Policy [#parameter-policy]
 
 El comportamiento configurado por el operador (`unsupportedParameterStrategy`: `drop`, `error` o `allow`) para un parámetro de solicitud que la entrada del catálogo de un deployment de destino declara no compatible. Global, vía `PUT /admin/router-settings`; Se aplica solo a los endpoints con forma de chat. Consulta [Política de parámetros](/docs/parameter-policy).

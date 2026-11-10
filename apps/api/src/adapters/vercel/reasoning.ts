@@ -7,6 +7,7 @@ import {
 	type ReasoningSpec,
 	resolveReasoning,
 	summaryVisible,
+	thinkingBudget,
 } from "#core/reasoning.ts";
 
 function recordValue(value: unknown): Record<string, unknown> | undefined {
@@ -166,7 +167,9 @@ export function applyVercelNativeReasoning(
 				});
 				return;
 			}
-			const budgetTokens = requiredBudget(spec, effort);
+			const budgetTokens =
+				thinkingBudget(req.reasoning, undefined)?.tokens ??
+				requiredBudget(spec, effort);
 			mergeGeneratedProviderOptions(body, {
 				anthropic: {
 					thinking: { type: "enabled", budgetTokens },
@@ -193,9 +196,14 @@ export function applyVercelNativeReasoning(
 		case "gemini_budget": {
 			delete body.reasoning;
 			delete body.reasoning_effort;
-			const thinkingBudget =
-				effort === "none" ? 0 : requiredBudget(spec, effort);
-			const thinkingConfig = { thinkingBudget, includeThoughts };
+			const thinkingConfig = {
+				thinkingBudget:
+					effort === "none"
+						? 0
+						: (thinkingBudget(req.reasoning, undefined)?.tokens ??
+							requiredBudget(spec, effort)),
+				includeThoughts,
+			};
 			mergeGeneratedProviderOptions(body, {
 				google: { thinkingConfig },
 				vertex: { thinkingConfig },
