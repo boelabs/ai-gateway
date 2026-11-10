@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { leaveFor, login } from "./browser.ts";
 import { Input } from "#/components/ui/input";
 import { Form } from "#/components/ui/form";
+import { safeNextPath } from "./common.ts";
 
 /**
  * `next` comes from the page, which read it out of the URL — the same value `src/proxy.ts` put there
@@ -36,7 +37,7 @@ export function SignInForm({ next }: { next: string }) {
 			}
 			// The gateway's Set-Cookie has landed, so the document this asks for carries the session.
 			// It never comes back — see `leaveFor` for why a session boundary is a document load.
-			await leaveFor(next);
+			await leaveFor(safeNextPath(next));
 		});
 	}
 
