@@ -94,6 +94,8 @@ const kBudgetLeases = (id: string) => `${KEY_PREFIX}:budget-leases:${id}`;
 const kBudgetAmounts = (id: string) => `${KEY_PREFIX}:budget-amounts:${id}`;
 
 const LEASE_TTL_SECONDS = 2 * 60 * 60;
+/** Lifetime of a per-minute TPM window's keys: its minute plus one for late settlements. */
+const TPM_BUCKET_TTL_SECONDS = 120;
 const LEASE_TTL_MS = LEASE_TTL_SECONDS * 1000;
 
 export async function clearVirtualKeyBudget(id: string): Promise<void> {
@@ -531,7 +533,11 @@ function buildUsageLease(
 			if (snapshot.tpmFirst && tokens > 0) {
 				const key = kTpm(snapshot.keyId, minuteBucket());
 				operations.push(
-					redis.multi().incrby(key, Math.ceil(tokens)).expire(key, 120).exec(),
+					redis
+						.multi()
+						.incrby(key, Math.ceil(tokens))
+						.expire(key, TPM_BUCKET_TTL_SECONDS)
+						.exec(),
 				);
 			}
 			let spend: Promise<string | null> | null = null;
@@ -610,8 +616,10 @@ export async function reserveVirtualKeyUsage(
 			amountsKey: kTpmAmounts(key.id, b),
 			limit: key.tpm,
 			amount: reservedTokens,
-			leaseTtlSeconds: LEASE_TTL_SECONDS,
-			actualTtlSeconds: 120,
+			// A TPM window is one minute: its reservation keys need outlive it only as long as the
+			// counter does, not the two hours a budget lease may stay open.
+			leaseTtlSeconds: TPM_BUCKET_TTL_SECONDS,
+			actualTtlSeconds: TPM_BUCKET_TTL_SECONDS,
 		});
 		if (!reservation.accepted) {
 			throw new GatewayError({

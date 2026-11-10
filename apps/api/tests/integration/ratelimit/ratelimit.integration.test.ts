@@ -219,3 +219,24 @@ test("a long session is charged as it runs, then settles only the rest", {
 		);
 	}
 });
+
+test("a TPM reservation's keys expire with their minute", {
+	skip,
+}, async () => {
+	const k = key({ tpm: 100_000 });
+	const bucket = Math.floor(Date.now() / 60_000);
+	try {
+		const lease = await reserveVirtualKeyUsage(k, 50, 0);
+		for (const name of ["tpm-reserved", "tpm-leases", "tpm-amounts"]) {
+			const ttl = await redis.ttl(`ratelimit:v2:${name}:${k.id}:${bucket}`);
+			assert.ok(ttl > 0 && ttl <= 120, `${name} ttl ${ttl}`);
+		}
+		await lease.release();
+	} finally {
+		await redis.del(
+			...["tpm", "tpm-reserved", "tpm-leases", "tpm-amounts"].map(
+				(name) => `ratelimit:v2:${name}:${k.id}:${bucket}`,
+			),
+		);
+	}
+});
