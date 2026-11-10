@@ -134,6 +134,45 @@ test("tiered pricing: tier cache read applies and is subtracted from input", () 
 	assert.ok(Math.abs(c.cacheReadCents - (50_000 * 40) / 1e6) < 1e-9);
 });
 
+test("tiered pricing: cached tokens without their own rate follow the tier's input rate", () => {
+	const pricing = {
+		inputCentsPerMTokens: 200,
+		outputCentsPerMTokens: 1200,
+		tiers: [{ aboveInputTokens: 200_000, inputCentsPerMTokens: 400 }],
+	};
+	const c = computeCost(
+		{ pricing },
+		{
+			promptTokens: 250_000,
+			completionTokens: 0,
+			totalTokens: 250_000,
+			cacheReadTokens: 50_000,
+			cacheWriteTokens: 10_000,
+		},
+	);
+	assert.ok(Math.abs(c.cacheReadCents - (50_000 * 400) / 1e6) < 1e-9);
+	assert.ok(Math.abs(c.cacheWriteCents - (10_000 * 400) / 1e6) < 1e-9);
+});
+
+test("tiered pricing: an explicit base cache rate still wins over the tier input rate", () => {
+	const pricing = {
+		inputCentsPerMTokens: 200,
+		cacheReadCentsPerMTokens: 20,
+		outputCentsPerMTokens: 1200,
+		tiers: [{ aboveInputTokens: 200_000, inputCentsPerMTokens: 400 }],
+	};
+	const c = computeCost(
+		{ pricing },
+		{
+			promptTokens: 250_000,
+			completionTokens: 0,
+			totalTokens: 250_000,
+			cacheReadTokens: 50_000,
+		},
+	);
+	assert.ok(Math.abs(c.cacheReadCents - (50_000 * 20) / 1e6) < 1e-9);
+});
+
 test("without pricing cost is 0", () => {
 	const c = computeCost(
 		{},

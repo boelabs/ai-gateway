@@ -27,13 +27,14 @@ type PricingShape = NonNullable<ResolvedModelMetadata["pricing"]>;
 /**
  * Effective rates (cents per 1M) based on the prompt size. Starts from the base rate and applies the
  * highest `aboveInputTokens` tier that `promptTokens` exceeds (a step function over the WHOLE request).
- * cache read/write fall back to the input rate if they have no own rate at that level.
+ * Cache read/write without an explicit rate (base or tier) fall back to the EFFECTIVE input rate, so a
+ * tier that only changes the input rate also moves cached tokens with it.
  */
 function effectiveRates(p: PricingShape, promptTokens: number): PricingShape {
 	let input = p.inputCentsPerMTokens ?? 0;
 	let output = p.outputCentsPerMTokens ?? 0;
-	let cacheRead = p.cacheReadCentsPerMTokens ?? p.inputCentsPerMTokens ?? 0;
-	let cacheWrite = p.cacheWriteCentsPerMTokens ?? p.inputCentsPerMTokens ?? 0;
+	let cacheRead = p.cacheReadCentsPerMTokens;
+	let cacheWrite = p.cacheWriteCentsPerMTokens;
 	let cacheWriteByTtl = p.cacheWriteCentsPerMTokensByTtl;
 	// Image and audio rates are explicit or follow the effective text rates, tier by tier.
 	let imageInput = p.imageInputCentsPerMTokens;
@@ -75,8 +76,8 @@ function effectiveRates(p: PricingShape, promptTokens: number): PricingShape {
 	return {
 		inputCentsPerMTokens: input,
 		outputCentsPerMTokens: output,
-		cacheReadCentsPerMTokens: cacheRead,
-		cacheWriteCentsPerMTokens: cacheWrite,
+		cacheReadCentsPerMTokens: cacheRead ?? input,
+		cacheWriteCentsPerMTokens: cacheWrite ?? input,
 		imageInputCentsPerMTokens: imageInput ?? input,
 		imageOutputCentsPerMTokens: imageOutput ?? output,
 		audioInputCentsPerMTokens: audioInput ?? input,
