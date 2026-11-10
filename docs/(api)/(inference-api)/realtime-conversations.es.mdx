@@ -175,3 +175,6 @@ Gemini termina de generarlo y se factura.
   `audioOutputCentsPerMTokens` en el catálogo). Si el proveedor no informa uso, el gateway lo estima
   (25 tokens por segundo de audio, unos 4 caracteres por token de texto) y marca la operación con
   `usageEstimated`.
+- La virtual key se cobra mientras la sesión transcurre, en cada `response.done`, y no solo al cerrar:
+  el gasto y la ventana de TPM están al día durante una sesión larga. Cuando se agota el presupuesto
+  de la key, el gateway envía un `error` con código `budget_exceeded` y cierra el socket con 1008.

@@ -174,3 +174,6 @@ generating it, and it is billed.
   `audioOutputCentsPerMTokens` in the catalog). If the provider reports no usage, the gateway
   estimates it (25 tokens per second of audio, about 4 characters per text token) and marks the
   operation `usageEstimated`.
+- A virtual key is charged as the session runs, at every `response.done`, not only when it closes:
+  the spend and the TPM window are current while a long session is open. Once the key's budget is
+  spent the gateway sends an `error` with code `budget_exceeded` and closes the socket with 1008.

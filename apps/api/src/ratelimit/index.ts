@@ -444,6 +444,15 @@ async function settleCounter(
 }
 
 export interface VirtualKeyUsageLease {
+	/**
+	 * Records usage that has already happened while the lease stays open (a long realtime session),
+	 * in the current minute's TPM window and in the spend. `settle` later charges only what exceeds
+	 * the amounts charged here. Resolves to whether the budget is now exhausted.
+	 */
+	charge: (
+		totalTokens: number,
+		costCents: number,
+	) => Promise<{ budgetExhausted: boolean }>;
 	settle: (totalTokens: number, costCents: number) => Promise<void>;
 	release: () => Promise<void>;
 	/** Plain-data form of the lease, so another process can settle it after the request ends. */
@@ -455,26 +464,65 @@ export interface VirtualKeyUsageLeaseSnapshot {
 	/** True when the first counter is the TPM one, which settles in tokens rather than cents. */
 	tpmFirst: boolean;
 	counters: CounterLease[];
+	/** The budget limit in cents, when the key has one. */
+	budgetLimitCents?: number;
 }
 
 function buildUsageLease(
 	snapshot: VirtualKeyUsageLeaseSnapshot,
 ): VirtualKeyUsageLease {
 	let settled = false;
+	let chargedTokens = 0;
+	let chargedCents = 0;
+	const budgetLease = snapshot.counters.at(snapshot.tpmFirst ? 1 : 0);
 	return {
+		charge: async (totalTokens, costCents) => {
+			const tokens = finiteNonNegative(totalTokens, "Charged usage");
+			const cents = finiteNonNegative(costCents, "Charged cost");
+			if (settled || (tokens === 0 && cents === 0)) {
+				return { budgetExhausted: false };
+			}
+			chargedTokens += tokens;
+			chargedCents += cents;
+			const operations: Promise<unknown>[] = [];
+			if (snapshot.tpmFirst && tokens > 0) {
+				const key = kTpm(snapshot.keyId, minuteBucket());
+				operations.push(
+					redis.multi().incrby(key, Math.ceil(tokens)).expire(key, 120).exec(),
+				);
+			}
+			let spend: Promise<string | null> | null = null;
+			if (budgetLease && cents > 0) {
+				spend = redis.incrbyfloat(budgetLease.actualKey, cents);
+				if (budgetLease.actualTtlSeconds > 0) {
+					operations.push(
+						spend.then(() =>
+							redis.expire(budgetLease.actualKey, budgetLease.actualTtlSeconds),
+						),
+					);
+				}
+				operations.push(addVirtualKeySpend(snapshot.keyId, cents));
+			}
+			await Promise.all(operations);
+			const spent = spend ? redisCounter(await spend, "budget") : 0;
+			return {
+				budgetExhausted:
+					snapshot.budgetLimitCents !== undefined &&
+					spent >= snapshot.budgetLimitCents,
+			};
+		},
 		settle: async (totalTokens, costCents) => {
 			if (settled) {
 				return;
 			}
 			settled = true;
+			const tokens = Math.max(0, totalTokens - chargedTokens);
+			const cents = Math.max(0, costCents - chargedCents);
 			const operations = snapshot.counters.map((lease, index) =>
-				settleCounter(
-					lease,
-					index === 0 && snapshot.tpmFirst ? totalTokens : costCents,
-				),
+				settleCounter(lease, index === 0 && snapshot.tpmFirst ? tokens : cents),
 			);
-			if (costCents > 0) {
-				operations.push(addVirtualKeySpend(snapshot.keyId, costCents));
+			if (cents > 0) {
+				operations.push(addVirtualKeySpend(snapshot.keyId, cents));
 			}
 			await Promise.all(operations);
 		},
@@ -558,5 +606,8 @@ export async function reserveVirtualKeyUsage(
 		keyId: key.id,
 		tpmFirst: key.tpm != null,
 		counters: leases,
+		...(key.maxBudgetCents == null
+			? {}
+			: { budgetLimitCents: key.maxBudgetCents }),
 	});
 }

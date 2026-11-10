@@ -86,6 +86,8 @@ interface ConversationRun {
 	configKey: string;
 	downstream: DownstreamWriteObservation;
 	ended: boolean;
+	/** Completed responses already charged against the key, so each one is charged once. */
+	chargedResponses: number;
 }
 
 interface ConversationConnection {
@@ -169,6 +171,13 @@ async function pump(connection: ConversationConnection, run: ConversationRun) {
 		for await (const event of run.session.events) {
 			run.log.progress();
 			connection.tracker.provider(event);
+			if (await budgetExhaustedAfterCharge(connection, run)) {
+				const exhausted = budgetExceededError();
+				sendError(connection, exhausted);
+				await endRun(connection, run, exhausted);
+				connection.entry.socket?.close(1008, "budget exceeded");
+				return;
+			}
 		}
 		await endRun(connection, run, null);
 	} catch (error) {
@@ -180,6 +189,50 @@ async function pump(connection: ConversationConnection, run: ConversationRun) {
 		await endRun(connection, run, gatewayError);
 		connection.entry.socket?.close(1011, "upstream session failed");
 	}
+}
+
+/** The session's usage so far: the provider's figures, or the gateway's estimate without them. */
+function sessionUsage(tracker: RealtimeConversationTracker): {
+	usage: RealtimeUsage | null;
+	estimated: boolean;
+} {
+	if (tracker.usage) {
+		return { usage: tracker.usage, estimated: false };
+	}
+	const usage = estimatedUsage(tracker);
+	return { usage, estimated: usage !== null };
+}
+
+/**
+ * Charges every newly completed response as it completes, so a long session is billed as it runs
+ * (in the current TPM window, and not lost if the process dies) and is stopped once the budget is
+ * spent rather than only checked when it opened.
+ */
+async function budgetExhaustedAfterCharge(
+	connection: ConversationConnection,
+	run: ConversationRun,
+): Promise<boolean> {
+	const { tracker } = connection;
+	if (tracker.completedResponses === run.chargedResponses) {
+		return false;
+	}
+	run.chargedResponses = tracker.completedResponses;
+	const core = realtimeUsageToCore(sessionUsage(tracker).usage);
+	if (!core) {
+		return false;
+	}
+	const { budgetExhausted } = await run.routing.charge(core);
+	return budgetExhausted;
+}
+
+function budgetExceededError(): GatewayError {
+	return new GatewayError({
+		class: "rate_limit",
+		code: "budget_exceeded",
+		message: "Budget exhausted for this API key during the realtime session",
+		failureKind: "request",
+		deploymentHealth: "neutral",
+	});
 }
 
 async function endRun(
@@ -195,12 +248,7 @@ async function endRun(
 	tracker.finish();
 	run.session.close();
 	run.abort.abort();
-	let { usage } = tracker;
-	let estimated = false;
-	if (!usage) {
-		usage = estimatedUsage(tracker);
-		estimated = usage !== null;
-	}
+	const { usage, estimated } = sessionUsage(tracker);
 	const core = realtimeUsageToCore(usage);
 	const terminal = error ? null : completedTerminal(core);
 	await run.routing.finish(core, undefined, error, terminal, run.downstream);
@@ -279,6 +327,7 @@ async function startRun(
 			configKey: JSON.stringify(config),
 			downstream: newDownstreamWriteObservation(log.operationId),
 			ended: false,
+			chargedResponses: 0,
 		};
 	} catch (error) {
 		const gatewayError = toGatewayError(error);

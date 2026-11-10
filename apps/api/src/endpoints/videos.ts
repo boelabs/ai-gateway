@@ -206,6 +206,7 @@ async function handleVideoCreate(
 		reserve: async (candidate, reservedTokens) => {
 			const inner = await baseQuota.reserve(candidate, reservedTokens);
 			return {
+				...(inner.charge === undefined ? {} : { charge: inner.charge }),
 				settle: inner.settle,
 				// The router releases at submit (no usage yet); the job settles the lease at its end.
 				release: () => (leaseAdopted ? Promise.resolve() : inner.release()),

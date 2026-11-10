@@ -99,6 +99,9 @@ interface UpstreamRun {
 	tracker: RealtimeTranscriptTracker;
 	downstream: DownstreamWriteObservation;
 	ended: boolean;
+	/** Completed transcript items and usage reports already charged against the key. */
+	chargedItems: number;
+	chargedUsage: RealtimeUsage | null;
 }
 
 interface RealtimeConnection {
@@ -153,6 +156,20 @@ async function pump(connection: RealtimeConnection, run: UpstreamRun) {
 				run.usage = addRealtimeUsage(run.usage, event.usage);
 			}
 			run.tracker.provider(event);
+			if (await budgetExhaustedAfterCharge(run)) {
+				const exhausted = new GatewayError({
+					class: "rate_limit",
+					code: "budget_exceeded",
+					message:
+						"Budget exhausted for this API key during the realtime session",
+					failureKind: "request",
+					deploymentHealth: "neutral",
+				});
+				sendError(connection, exhausted);
+				await endRun(connection, run, exhausted);
+				connection.entry.socket?.close(1008, "budget exceeded");
+				return;
+			}
 		}
 		await endRun(connection, run, null);
 	} catch (error) {
@@ -164,6 +181,51 @@ async function pump(connection: RealtimeConnection, run: UpstreamRun) {
 		await endRun(connection, run, gatewayError);
 		connection.entry.socket?.close(1011, "upstream session failed");
 	}
+}
+
+/** The run's usage so far: the provider's reports, or an estimate from the audio received. */
+function runUsage(run: UpstreamRun): {
+	usage: RealtimeUsage | null;
+	estimated: boolean;
+} {
+	const seconds = runSeconds(run);
+	if (run.usage || seconds <= 0) {
+		return { usage: run.usage, estimated: false };
+	}
+	const audioTokens = Math.ceil(seconds * ESTIMATED_AUDIO_TOKENS_PER_SECOND);
+	const outputTokens = Math.ceil(
+		run.tracker.transcriptCharacters / ESTIMATED_CHARACTERS_PER_OUTPUT_TOKEN,
+	);
+	return {
+		usage: {
+			inputTokens: audioTokens,
+			outputTokens,
+			totalTokens: audioTokens + outputTokens,
+			audioTokens,
+		},
+		estimated: true,
+	};
+}
+
+/**
+ * Charges the run as it goes, at each usage report or completed transcript, so a long session is
+ * billed in the current TPM window and stopped once the budget is spent.
+ */
+async function budgetExhaustedAfterCharge(run: UpstreamRun): Promise<boolean> {
+	if (
+		run.usage === run.chargedUsage &&
+		run.tracker.completedItems === run.chargedItems
+	) {
+		return false;
+	}
+	run.chargedUsage = run.usage;
+	run.chargedItems = run.tracker.completedItems;
+	const core = realtimeUsageToCore(runUsage(run).usage);
+	if (!core) {
+		return false;
+	}
+	const { budgetExhausted } = await run.routing.charge(core);
+	return budgetExhausted;
 }
 
 async function endRun(
@@ -182,22 +244,8 @@ async function endRun(
 	connection.lastItemId = run.tracker.lastItemId;
 	run.session.close();
 	run.abort.abort();
-	let { usage } = run;
-	let estimated = false;
 	const seconds = runSeconds(run);
-	if (!usage && seconds > 0) {
-		const audioTokens = Math.ceil(seconds * ESTIMATED_AUDIO_TOKENS_PER_SECOND);
-		const outputTokens = Math.ceil(
-			run.tracker.transcriptCharacters / ESTIMATED_CHARACTERS_PER_OUTPUT_TOKEN,
-		);
-		usage = {
-			inputTokens: audioTokens,
-			outputTokens,
-			totalTokens: audioTokens + outputTokens,
-			audioTokens,
-		};
-		estimated = true;
-	}
+	const { usage, estimated } = runUsage(run);
 	const core = realtimeUsageToCore(usage);
 	const terminal = error ? null : completedTerminal(core);
 	await run.routing.finish(core, undefined, error, terminal, run.downstream);
@@ -281,6 +329,8 @@ async function startRun(
 			usage: null,
 			downstream,
 			ended: false,
+			chargedItems: 0,
+			chargedUsage: null,
 			tracker: new RealtimeTranscriptTracker({
 				turnDetection: config.turnDetection,
 				previousItemId: connection.lastItemId,

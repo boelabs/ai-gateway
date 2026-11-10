@@ -114,6 +114,11 @@ export interface RouteOptions {
 const NO_RESERVATION: TokenReservation = { inputTokens: 0, outputTokens: 0 };
 
 export interface UsageQuotaLease {
+	/**
+	 * Charges the usage of a long-lived exchange so far (cumulative, not a delta) before it ends.
+	 * `settle` then charges only the rest. Resolves to whether the key's budget is now exhausted.
+	 */
+	charge?: (usage: Usage) => Promise<{ budgetExhausted: boolean }>;
 	settle: (usage: Usage) => Promise<void>;
 	release: () => Promise<void>;
 }
@@ -206,6 +211,12 @@ export interface RouteResult<T> {
 	 * request but reported none (or only an adapter estimate), a conservative estimate flagged
 	 * `estimated: true`. Callers record that, not their own copy, so the log and the budget agree.
 	 */
+	/**
+	 * Charges a long-lived exchange's cumulative usage so far, without ending it (realtime sessions
+	 * call it after every completed response). Resolves to whether the budget is now exhausted, so
+	 * the caller can end the session.
+	 */
+	charge: (usage: Usage) => Promise<{ budgetExhausted: boolean }>;
 	finish: (
 		usage: Usage | null,
 		finishedAt?: number,
@@ -846,6 +857,12 @@ export async function route<T>(
 							fallbackUsed,
 							upstreamStartedAt: startedAt,
 							attemptLog,
+							charge: async (usage) => {
+								if (settled !== null || !usageQuotaLease?.charge) {
+									return { budgetExhausted: false };
+								}
+								return usageQuotaLease.charge(usage);
+							},
 							finish: (
 								usage,
 								finishedAt,

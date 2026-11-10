@@ -66,6 +66,7 @@ test("only a lease that holds counters becomes a billing record", () => {
 	const empty = { keyId: "k", tpmFirst: false, counters: [] };
 	assert.equal(
 		reservedBilling({
+			charge: async () => ({ budgetExhausted: false }),
 			settle: async () => undefined,
 			release: async () => undefined,
 			snapshot: () => empty,
@@ -74,6 +75,7 @@ test("only a lease that holds counters becomes a billing record", () => {
 	);
 	const held = { keyId: "k", tpmFirst: false, counters: [{ id: "x" }] };
 	const billing = reservedBilling({
+		charge: async () => ({ budgetExhausted: false }),
 		settle: async () => undefined,
 		release: async () => undefined,
 		snapshot: () => held as never,

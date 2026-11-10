@@ -131,6 +131,7 @@ export function usageQuotaForRequest(
 				/* intentionally empty */
 			},
 			reserve: async () => ({
+				charge: async () => ({ budgetExhausted: false }),
 				settle: async () => {
 					/* intentionally empty */
 				},
@@ -167,7 +168,18 @@ export function usageQuotaForRequest(
 				reservedCost,
 			);
 			options.onReserve?.(lease);
+			// `charge` receives cumulative usage; the lease records only what is new since the last call.
+			let chargedTokens = 0;
+			let chargedCents = 0;
 			return {
+				charge: (usage) => {
+					const cents = computeCost(candidate.meta, usage).totalCents;
+					const tokens = Math.max(0, usage.totalTokens - chargedTokens);
+					const newCents = Math.max(0, cents - chargedCents);
+					chargedTokens = Math.max(chargedTokens, usage.totalTokens);
+					chargedCents = Math.max(chargedCents, cents);
+					return lease.charge(tokens, newCents);
+				},
 				settle: async (usage) => {
 					const cost = computeCost(candidate.meta, usage);
 					await lease.settle(usage.totalTokens, cost.totalCents);
