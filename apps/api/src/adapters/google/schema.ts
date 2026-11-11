@@ -97,14 +97,22 @@ function translate(
 			out.enum = [value];
 			continue;
 		}
+		// allOf is an intersection: its subschemas merge into this one. Rewriting it as anyOf, a
+		// union, would accept arguments that match only one of them.
+		if (key === "allOf" && Array.isArray(value)) {
+			for (const part of value) {
+				mergeInto(out, translate(part, scope, seen, dialect));
+			}
+			continue;
+		}
 		if (key === "examples" && Array.isArray(value)) {
 			if (value.length > 0) {
 				out.example = value[0];
 			}
 			continue;
 		}
-		// Gemini has no oneOf/allOf; anyOf is the closest expressible union.
-		if (key === "oneOf" || key === "allOf") {
+		// Gemini has no oneOf; anyOf is the closest expressible union.
+		if (key === "oneOf") {
 			out.anyOf = translate(value, scope, seen, dialect);
 			continue;
 		}
@@ -158,6 +166,20 @@ function translate(
 		}
 	}
 
+	// Gemini's Schema enum lists strings for a string type. Values of another type keep their type
+	// (turning 1 into "1" would change what the model sends back) and move into the description.
+	if (
+		dialect === "openapi" &&
+		Array.isArray(out.enum) &&
+		!out.enum.every((value) => typeof value === "string")
+	) {
+		const allowed = out.enum.map((value) => JSON.stringify(value)).join(", ");
+		out.description = `${
+			typeof out.description === "string" ? `${out.description} ` : ""
+		}Allowed values: ${allowed}.`;
+		delete out.enum;
+	}
+
 	// Drop `format` values Gemini does not recognise for the resolved type (e.g. "uri", "uuid").
 	if (typeof out.format === "string") {
 		const t = out.type;
@@ -172,6 +194,26 @@ function translate(
 	}
 
 	return out;
+}
+
+/** Merges one allOf subschema into the schema being built: properties and required lists join. */
+function mergeInto(target: Record<string, unknown>, part: unknown): void {
+	if (part === null || typeof part !== "object" || Array.isArray(part)) {
+		return;
+	}
+	for (const [key, value] of Object.entries(part as Record<string, unknown>)) {
+		if (key === "properties" && typeof value === "object" && value !== null) {
+			target.properties = {
+				...(target.properties as Record<string, unknown> | undefined),
+				...(value as Record<string, unknown>),
+			};
+		} else if (key === "required" && Array.isArray(value)) {
+			const required = Array.isArray(target.required) ? target.required : [];
+			target.required = [...new Set([...required, ...value])];
+		} else if (target[key] === undefined) {
+			target[key] = value;
+		}
+	}
 }
 
 export function toGeminiSchema(

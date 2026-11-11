@@ -197,3 +197,38 @@ test("toGeminiJsonSchema: keeps JSON Schema nullability and formats", () => {
 		},
 	);
 });
+
+test("allOf merges its subschemas instead of becoming a union", () => {
+	const out = toGeminiSchema({
+		allOf: [
+			{
+				type: "object",
+				properties: { a: { type: "string" } },
+				required: ["a"],
+			},
+			{ properties: { b: { type: "integer" } }, required: ["b"] },
+		],
+	});
+	assert.equal(out.anyOf, undefined);
+	assert.deepEqual(Object.keys(out.properties as object), ["a", "b"]);
+	assert.deepEqual(out.required, ["a", "b"]);
+});
+
+test("non-string enum and const keep their type and move into the description", () => {
+	const out = toGeminiSchema({
+		type: "object",
+		properties: {
+			level: { type: "integer", enum: [1, 2, 3] },
+			flag: { type: "boolean", const: true, description: "Must be on." },
+			mode: { type: "string", const: "fast" },
+		},
+	}) as { properties: Record<string, Record<string, unknown>> };
+	assert.equal(out.properties.level?.type, "integer");
+	assert.equal(out.properties.level?.enum, undefined);
+	assert.equal(out.properties.level?.description, "Allowed values: 1, 2, 3.");
+	assert.equal(
+		out.properties.flag?.description,
+		"Must be on. Allowed values: true.",
+	);
+	assert.deepEqual(out.properties.mode?.enum, ["fast"]);
+});
