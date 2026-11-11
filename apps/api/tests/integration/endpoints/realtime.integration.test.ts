@@ -784,6 +784,23 @@ test("POST /v1/realtime/client_secrets mints a key that only opens realtime sess
 			txCreated.session.audio.input.transcription.model,
 			transcriptionModel,
 		);
+		// Audio sent straight away starts the preset session: no session.update is needed first.
+		const setupsBefore = stub.received.filter(
+			(message) => message.setup,
+		).length;
+		txSocket.send(
+			JSON.stringify({
+				type: "input_audio_buffer.append",
+				audio: Buffer.alloc(9600).toString("base64"),
+			}),
+		);
+		await eventually(
+			() =>
+				stub.received.filter((message) => message.setup).length > setupsBefore
+					? true
+					: null,
+			{ description: "transcription provider session" },
+		);
 		txSocket.close();
 	} finally {
 		if (virtualKey) {

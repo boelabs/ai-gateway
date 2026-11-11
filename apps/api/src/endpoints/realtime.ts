@@ -403,6 +403,29 @@ async function updateSession(
 	});
 }
 
+/** Opens the provider run for the session as it is already configured, if it is. */
+async function ensureConfiguredRun(
+	connection: RealtimeConnection,
+): Promise<UpstreamRun | null> {
+	const config = realtimeConfigOf(connection.state);
+	if (!config) {
+		return null;
+	}
+	const run = await startRun(
+		connection,
+		config,
+		JSON.stringify(config),
+		connection.state,
+	);
+	if (connection.closed) {
+		await endRun(connection, run, null);
+		return null;
+	}
+	connection.run = run;
+	void pump(connection, run);
+	return run;
+}
+
 async function handleMessage(
 	connection: RealtimeConnection,
 	rawMessage: unknown,
@@ -418,7 +441,14 @@ async function handleMessage(
 			);
 			return;
 		}
-		const { run } = connection;
+		// A session configured before the socket opened (a client secret's preset) starts its provider
+		// run on first use, as a conversation does; one configured by session.update already has it.
+		const run =
+			connection.run ??
+			(event.type === "input_audio_buffer.append" ||
+			event.type === "input_audio_buffer.commit"
+				? await ensureConfiguredRun(connection)
+				: null);
 		if (!run) {
 			throw new RealtimeClientEventError(
 				event.type === "input_audio_buffer.commit"
