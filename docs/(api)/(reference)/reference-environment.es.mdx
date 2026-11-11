@@ -49,6 +49,8 @@ El gateway valida su entorno al inicio y sale si falta una variable requerida o 
 | `REALTIME_WEBSOCKET_MAX_CONNECTIONS` | `500` | Sesiones de transcripción `/v1/realtime` en vivo máximas por proceso de gateway. |
 | `REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY` | `20` | Sesiones de transcripción `/v1/realtime` en vivo máximas para una virtual key (la master key tiene su propio alcance). |
 | `RESPONSES_WEBSOCKET_MAX_QUEUED_TURNS` | `64` | Giros máximos de `response.create` en cola por conexión; se procesa un turno a la vez. |
+| `WEBSOCKET_HEARTBEAT_INTERVAL_MS` | `30000` | Cada cuánto se envía un ping a cada WebSocket público (`/v1/realtime`, `/v1/responses`); un socket que no respondió al ping anterior se cierra. |
+| `WEBSOCKET_IDLE_TIMEOUT_MS` | `600000` | Un WebSocket público sin mensajes del cliente durante este tiempo se cierra. |
 | `RESPONSE_STATE_GC_INTERVAL_MS` | `3600000` (1h) | Con qué frecuencia el trabajo en proceso elimina el estado de respuesta caducado. |
 
 ## Extensiones de runtime [#runtime-extensions]

@@ -1,3 +1,4 @@
+import { MAX_BUFFERED_SEND_BYTES } from "./socketServer.ts";
 import { RealtimeClientEventError } from "#contracts/openai/realtime.ts";
 import type { DownstreamWriteObservation } from "./runtime/sse.ts";
 import { getAuth, revalidateAuth } from "#auth/middleware.ts";
@@ -193,6 +194,13 @@ export function sendRealtimeEvent(
 	downstream?: DownstreamWriteObservation,
 ): void {
 	if (socket?.readyState !== 1) {
+		return;
+	}
+	// Realtime events cannot wait (audio keeps arriving), so a client that stops reading is not
+	// waited for: past the ceiling of unsent bytes it is disconnected rather than buffered forever.
+	const raw = socket.raw as { bufferedAmount?: number } | undefined;
+	if ((raw?.bufferedAmount ?? 0) > MAX_BUFFERED_SEND_BYTES) {
+		socket.close(1008, "client is not reading");
 		return;
 	}
 	const serialized = JSON.stringify(value);

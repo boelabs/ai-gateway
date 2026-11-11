@@ -52,6 +52,8 @@ deployment. Gateway and dashboard processes read separate environment files.
 | `REALTIME_WEBSOCKET_MAX_CONNECTIONS` | `500` | Maximum live `/v1/realtime` transcription sessions per gateway process. |
 | `REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY` | `20` | Maximum live `/v1/realtime` transcription sessions for one virtual key (the master key has its own scope). |
 | `RESPONSES_WEBSOCKET_MAX_QUEUED_TURNS` | `64` | Maximum queued `response.create` turns per connection; one turn is processed at a time. |
+| `WEBSOCKET_HEARTBEAT_INTERVAL_MS` | `30000` | How often every public WebSocket (`/v1/realtime`, `/v1/responses`) is pinged; a socket that missed the previous pong is dropped. |
+| `WEBSOCKET_IDLE_TIMEOUT_MS` | `600000` | A public WebSocket with no client message for this long is closed. |
 | `RESPONSE_STATE_GC_INTERVAL_MS` | `3600000` (1h) | How often the in-process job deletes expired response state. |
 
 ## Runtime extensions

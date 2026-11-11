@@ -172,6 +172,7 @@ Gemini termina de generarlo y se factura.
 - `REALTIME_WEBSOCKET_MAX_CONNECTIONS` y `REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY` limitan las
   sesiones abiertas por proceso y por key.
 - Un evento del cliente puede ocupar como máximo 4 MiB. Los eventos en espera de procesarse pueden ocupar como máximo 32 MiB por conexión (y 512 MiB en todo el proceso): un cliente que envía más rápido de lo que se le atiende recibe un `error` con código `websocket_queue_bytes_exceeded` y el socket se cierra con `1008`.
+- El gateway envía pings a cada socket (`WEBSOCKET_HEARTBEAT_INTERVAL_MS`) y descarta el que no responde, cierra el que no recibe mensajes del cliente durante `WEBSOCKET_IDLE_TIMEOUT_MS` y cierra con `1008` al cliente que deja de leer los eventos que se le envían. El subprotocolo con el que responde nunca es el que lleva tu key.
 - Cada conexión se registra como una operación `realtime.conversation` con el uso que informó Gemini
   y su costo. Los modelos Live cobran distinto el audio y el texto (`audioInputCentsPerMTokens`,
   `audioOutputCentsPerMTokens` en el catálogo). Si el proveedor no informa uso, el gateway lo estima

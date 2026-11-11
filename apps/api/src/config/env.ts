@@ -218,6 +218,18 @@ export const env = createEnv({
 			.int()
 			.positive()
 			.default(64),
+		/** Every public WebSocket is pinged this often; one that missed the last pong is dropped. */
+		WEBSOCKET_HEARTBEAT_INTERVAL_MS: z.coerce
+			.number()
+			.int()
+			.min(1000)
+			.default(30_000),
+		/** A public WebSocket with no client message for this long is closed. */
+		WEBSOCKET_IDLE_TIMEOUT_MS: z.coerce
+			.number()
+			.int()
+			.min(10_000)
+			.default(600_000),
 		/** Live `/v1/realtime` transcription sessions, per gateway process and per key. */
 		REALTIME_WEBSOCKET_MAX_CONNECTIONS: z.coerce
 			.number()

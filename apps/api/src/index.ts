@@ -7,7 +7,7 @@ import { Hono, type Context } from "hono";
 import { pingDb } from "./db/client.ts";
 import { log } from "./logging/log.ts";
 import { env } from "./config/env.ts";
-import { WebSocketServer } from "ws";
+import { createSocketServer } from "#endpoints/socketServer.ts";
 
 import {
 	DEPENDENCY_RETRY_AFTER_SECONDS,
@@ -357,11 +357,8 @@ app.post("/v1/audio/transcriptions", transcriptionsHandler);
 app.post("/v1/embeddings", embeddingsHandler);
 app.post("/v1/rerank", rerankHandler);
 
-const webSocketServer = new WebSocketServer({
-	noServer: true,
-	maxPayload: 16 * 1024 * 1024,
-	perMessageDeflate: false,
-});
+const { server: webSocketServer, stop: stopSocketHeartbeat } =
+	createSocketServer();
 const server = serve(
 	{
 		fetch: app.fetch,
@@ -386,6 +383,7 @@ installGracefulShutdown({
 		stopVideoJobs,
 		stopDashboardSessionGc,
 		stopIdempotencyGc,
+		stopSocketHeartbeat,
 		stopSpendLedgerGc,
 	],
 });

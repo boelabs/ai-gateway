@@ -3,6 +3,7 @@ import { abortGatewayError } from "./abortReason.ts";
 import WebSocket, { type ClientOptions } from "ws";
 
 const MAX_REDIRECTS = 5;
+const UPSTREAM_HANDSHAKE_TIMEOUT_MS = 15_000;
 /** Headers that carry nothing secret, the only ones a redirect to another origin keeps. */
 const CROSS_ORIGIN_HEADERS = new Set([
 	"accept",
@@ -111,7 +112,12 @@ export function upstreamWebSocket(
 	url: string,
 	options: ClientOptions,
 ): WebSocket {
-	const socket = new WebSocket(url, options);
+	// Every upstream open is bounded: a provider that accepts the TCP connection and never answers
+	// the handshake would otherwise hold the session open forever.
+	const socket = new WebSocket(url, {
+		handshakeTimeout: UPSTREAM_HANDSHAKE_TIMEOUT_MS,
+		...options,
+	});
 	ctx.transportStats ??= { upstreamBytes: 0 };
 	const stats = ctx.transportStats;
 	socket.on("message", (data) => {

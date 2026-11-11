@@ -49,6 +49,10 @@ const CHUNK_BYTES = (REALTIME_AUDIO_SAMPLE_RATE / 25) * 2;
 const ROTATE_EARLY_MS = 30_000;
 /** A rotation waits for a resumable moment at most this long before `goAway` runs out. */
 const FORCE_BEFORE_GO_AWAY_MS = 3000;
+/** How long a new Live connection may take to answer its setup. */
+const SETUP_TIMEOUT_MS = 30_000;
+/** Input held while a connection is replaced; about a minute of 16 kHz audio as base64 JSON. */
+const MAX_HELD_BYTES = 4 * 1024 * 1024;
 /**
  * Translation streams without turns (no `generationComplete`/`turnComplete`): a pause this long in
  * its output ends one response.
@@ -638,8 +642,22 @@ export function makeGeminiRealtimeConversationHandler(
 				queue.fail(error);
 			};
 
+			let heldBytes = 0;
 			const send = (message: Record<string, unknown>) => {
 				if (held) {
+					// What arrives while the connection is replaced waits for the new one, within a bound:
+					// a switch that takes too long must not hold a client's audio without limit.
+					heldBytes += JSON.stringify(message).length;
+					if (heldBytes > MAX_HELD_BYTES) {
+						fail(
+							new GatewayError({
+								class: "server",
+								message:
+									"Gemini Live: too much input arrived while the connection was being replaced",
+							}),
+						);
+						return;
+					}
 					held.push(message);
 				} else {
 					current.send(message);
@@ -679,6 +697,20 @@ export function makeGeminiRealtimeConversationHandler(
 						},
 					};
 					let ready = false;
+					// The handshake has its own deadline; this one bounds the wait for setupComplete.
+					const setupTimer = setTimeout(() => {
+						if (!ready) {
+							socket.terminate();
+							reject(
+								new GatewayError({
+									class: "timeout",
+									message: "Gemini Live did not complete its setup in time",
+								}),
+							);
+						}
+					}, SETUP_TIMEOUT_MS);
+					setupTimer.unref?.();
+					socket.once("close", () => clearTimeout(setupTimer));
 					socket.once("open", () => connection.send(setup));
 					socket.on("message", (data) => {
 						let raw: unknown;
@@ -703,6 +735,7 @@ export function makeGeminiRealtimeConversationHandler(
 						});
 						if (message.setupComplete && !ready) {
 							ready = true;
+							clearTimeout(setupTimer);
 							resolve(connection);
 						}
 						if (connection.retired && connection !== current) {
@@ -893,6 +926,7 @@ export function makeGeminiRealtimeConversationHandler(
 				wanted = null;
 				flushAudio();
 				held = [];
+				heldBytes = 0;
 				const previous = current;
 				// A new configuration needs a new session; the same one resumes with its handle.
 				const resumeFrom =

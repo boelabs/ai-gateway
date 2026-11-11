@@ -176,6 +176,10 @@ generating it, and it is billed.
 - A client event may be at most 4 MiB. Events waiting to be handled may hold at most 32 MiB per
   connection (and 512 MiB across the process): a client that sends faster than it is served gets an
   `error` with code `websocket_queue_bytes_exceeded` and the socket is closed with `1008`.
+- The gateway pings every socket (`WEBSOCKET_HEARTBEAT_INTERVAL_MS`) and drops one that misses a pong,
+  closes one with no client message for `WEBSOCKET_IDLE_TIMEOUT_MS`, and closes with `1008` a client
+  that stops reading the events sent to it. The subprotocol it answers with is never the one carrying
+  your key.
 - Each connection is logged as one `realtime.conversation` operation with the usage Gemini reported
   and its cost. Live models price audio and text separately (`audioInputCentsPerMTokens`,
   `audioOutputCentsPerMTokens` in the catalog). If the provider reports no usage, the gateway
