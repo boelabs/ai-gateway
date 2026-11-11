@@ -292,3 +292,61 @@ test("responses websocket sessions: generate:false stays local for providers wit
 	}
 	sessions.close();
 });
+
+test("responses websocket sessions: the upstream socket outlives the turn that opened it", async () => {
+	let connectSignal: AbortSignal | undefined;
+	let closed = 0;
+	const adapter = {
+		key: "fake",
+		credentials: { required: [] },
+		supportedCallTypes: new Set(["chat"]),
+		responsesWebSocket: {
+			async connect(ctx: AdapterContext) {
+				connectSignal = ctx.signal;
+				return {
+					closed: false,
+					async create() {
+						return {
+							chunks: completedTurn(),
+							upstreamResponseId: Promise.resolve("upstream_1"),
+						};
+					},
+					close() {
+						closed += 1;
+					},
+				};
+			},
+		},
+	} as unknown as Adapter;
+	const candidate = {
+		row: { id: "deployment_1" },
+		adapter,
+	} as DeploymentCandidate;
+	const turn = new AbortController();
+	const upstreams = new ResponsesWebSocketUpstreams();
+	const result = await upstreams.execute(
+		candidate,
+		{
+			transport: "responses",
+			upstreamModel: "gpt-5.6",
+			meta: {},
+			credentials: {},
+			requestId: "req_1",
+			signal: turn.signal,
+		} as AdapterContext,
+		{ callType: "chat", model: "m", messages: [], stream: true },
+		{ currentRawInput: [], previousPublicResponseId: null, generate: true },
+	);
+	if (result.kind === "stream") {
+		for await (const _ of result.chunks) {
+			// drain the turn
+		}
+	}
+	// The router aborts the turn's signal when the turn ends.
+	turn.abort();
+	assert.equal(connectSignal?.aborted, false);
+	assert.equal(closed, 0);
+	upstreams.close();
+	assert.equal(connectSignal?.aborted, true);
+	assert.equal(closed, 1);
+});
