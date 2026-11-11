@@ -30,7 +30,69 @@ const RETURNED = [
 	"retry-after",
 ];
 
-export async function relay(request: Request, path: string): Promise<Response> {
+/**
+ * The gateway calls the dashboard relays, by path pattern and method. Nothing else is relayed: the
+ * relay forwards the operator's session cookie, so an open path would let a page on this origin
+ * reach any gateway route (the Admin API included) as the operator.
+ */
+const RELAYED: readonly { path: RegExp; methods: readonly string[] }[] = [
+	{ path: /^\/v1\/chat\/completions$/u, methods: ["POST"] },
+	{ path: /^\/v1\/responses$/u, methods: ["POST"] },
+	{ path: /^\/v1\/messages$/u, methods: ["POST"] },
+	{ path: /^\/v1\/images\/(?:generations|edits)$/u, methods: ["POST"] },
+	{ path: /^\/v1\/videos$/u, methods: ["POST"] },
+	{ path: /^\/v1\/videos\/[^/]+(?:\/content)?$/u, methods: ["GET"] },
+	{ path: /^\/v1\/audio\/transcriptions$/u, methods: ["POST"] },
+	{ path: /^\/v1\/(?:embeddings|rerank)$/u, methods: ["POST"] },
+	{ path: /^\/v1\/models$/u, methods: ["GET"] },
+	{ path: /^\/auth\/session$/u, methods: ["POST", "DELETE"] },
+	{ path: /^\/auth\/password$/u, methods: ["POST"] },
+];
+
+/**
+ * A relay path built from decoded URL segments, or null when a segment could change which route it
+ * names (`.`, `..`, or one hiding a slash or backslash once decoded) or empty.
+ */
+export function relayPath(
+	prefix: string,
+	segments: readonly string[],
+): string | null {
+	if (
+		segments.length === 0 ||
+		segments.some(
+			(segment) =>
+				segment === "" ||
+				segment === "." ||
+				segment === ".." ||
+				segment.includes("/") ||
+				segment.includes("\\"),
+		)
+	) {
+		return null;
+	}
+	return `${prefix}/${segments.map(encodeURIComponent).join("/")}`;
+}
+
+function relayed(method: string, path: string): boolean {
+	return RELAYED.some(
+		(route) => route.path.test(path) && route.methods.includes(method),
+	);
+}
+
+export async function relay(
+	request: Request,
+	path: string | null,
+): Promise<Response> {
+	if (path === null || !relayed(request.method.toUpperCase(), path)) {
+		return Response.json(
+			{
+				error: {
+					message: "This gateway route is not available from the dashboard.",
+				},
+			},
+			{ status: 404 },
+		);
+	}
 	const headers = gatewayClientHeaders(request.headers);
 	for (const name of FORWARDED) {
 		const value = request.headers.get(name);
@@ -53,6 +115,10 @@ export async function relay(request: Request, path: string): Promise<Response> {
 				...(request.body ? { duplex: "half" } : {}),
 				redirect: "manual",
 				cache: "no-store",
+				// The browser leaving cancels the gateway call, which cancels the upstream one: a closed
+				// playground tab must not keep generating (and billing) a response nobody reads. No
+				// deadline of its own: the gateway's execution policy bounds the call.
+				signal: request.signal,
 			},
 		);
 	} catch {
