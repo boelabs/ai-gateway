@@ -245,3 +245,49 @@ export function mapUpstreamHttpError(
 		cause: err,
 	});
 }
+
+const STREAM_ERROR_CLASSES: readonly [RegExp, ErrorClass][] = [
+	[
+		/context.?length|context.?window|too.?many.?tokens|max.?tokens/iu,
+		"context_window",
+	],
+	[/rate.?limit|quota|overloaded|too.?many.?requests|throttl/iu, "rate_limit"],
+	[/content.?(filter|policy)|safety|moderation/iu, "content_policy"],
+	[/auth|api.?key|unauthori[sz]ed/iu, "auth"],
+	[/permission|forbidden/iu, "permission"],
+	[/invalid|bad.?request|not.?supported|unsupported/iu, "bad_request"],
+	[/timeout|timed.?out/iu, "timeout"],
+];
+
+/**
+ * An error object an upstream sent inside a stream it had already answered with 200. There is no
+ * HTTP status to go by, so the class comes from the body: a numeric `code` some aggregators copy
+ * from the provider's HTTP status, else the error's `type` or `code` words. Nothing recognisable
+ * stays a server error. No status is invented for it.
+ */
+export function mapUpstreamStreamError(
+	body: Record<string, unknown>,
+	label: string,
+): GatewayError {
+	const error = record(body.error) ?? {};
+	const detail = upstreamDetail(body);
+	let numericCode: number | undefined;
+	if (typeof error.code === "number") {
+		numericCode = error.code;
+	} else if (typeof error.code === "string" && /^\d{3}$/u.test(error.code)) {
+		numericCode = Number(error.code);
+	}
+	const words = [error.type, error.code, detail.message]
+		.filter((value): value is string => typeof value === "string")
+		.join(" ");
+	const cls: ErrorClass =
+		numericCode !== undefined && numericCode >= 400
+			? classifyStatus(numericCode)
+			: (STREAM_ERROR_CLASSES.find(([pattern]) => pattern.test(words))?.[1] ??
+				"server");
+	return new GatewayError({
+		class: cls,
+		message: detail.message ?? `${label} reported an error in its stream`,
+		provider: { body },
+	});
+}

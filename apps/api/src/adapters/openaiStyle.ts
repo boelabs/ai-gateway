@@ -1,3 +1,4 @@
+import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { makeOpenAIResponsesWebSocketHandler } from "./openaiResponsesWebSocket.ts";
 import { makeOpenAIRealtimeConversationHandler } from "./openaiRealtime.ts";
 import { upstreamFetch } from "#gateway/instrumentedTransport.ts";
@@ -447,8 +448,17 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 					cause,
 				});
 			}
-			if (json !== null && typeof json === "object" && "error" in json) {
-				throw mapError({ status: 502, body: json }, ctx);
+			// `error: null` is a field some compatible servers send on every chunk; only an actual
+			// error object ends the stream.
+			if (
+				json !== null &&
+				typeof json === "object" &&
+				(json as { error?: unknown }).error != null
+			) {
+				throw mapUpstreamStreamError(
+					json as Record<string, unknown>,
+					config.label,
+				);
 			}
 			if (
 				json === null ||

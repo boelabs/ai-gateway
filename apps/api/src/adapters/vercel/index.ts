@@ -1,3 +1,4 @@
+import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { parseOpenAIChatChunk } from "#contracts/openai/chatTransport.ts";
 import { mergeProviderFields } from "#core/providerSpecificFields.ts";
 import { makeOpenAIStyleAdapter } from "#adapters/openaiStyle.ts";
@@ -264,8 +265,12 @@ export const vercelAdapter = {
 						cause,
 					});
 				}
-				if (recordValue(raw)?.error !== undefined) {
-					throw openAIStyleChat.mapError({ status: 502, body: raw }, ctx);
+				// Only an actual error object ends the stream; `error: null` is no error.
+				if (recordValue(raw)?.error != null) {
+					throw mapUpstreamStreamError(
+						raw as Record<string, unknown>,
+						"Vercel AI Gateway",
+					);
 				}
 				const record = recordValue(raw);
 				if (
