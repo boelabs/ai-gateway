@@ -65,6 +65,7 @@ import {
 } from "#contracts/openai/audioTransport.ts";
 
 import {
+	type BuildChatBodyOptions,
 	parseOpenAIChatResponse,
 	parseOpenAIChatChunk,
 	buildOpenAIChatBody,
@@ -107,6 +108,8 @@ export interface OpenAIStyleConfig {
 	supportsTopK?: boolean;
 	/** Send assistant `reasoning_content` back (see BuildChatBodyOptions.replayReasoningContent). */
 	replayReasoningContent?: boolean;
+	/** See BuildChatBodyOptions.assistantMessageFields. */
+	assistantMessageFields?: BuildChatBodyOptions["assistantMessageFields"];
 	/** OpenAI uses Bearer; Azure v1 with a key uses the api-key header. */
 	authScheme?: "bearer" | "api-key";
 	/** Base-URL-specific normalization/validation. */
@@ -583,6 +586,9 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 							: "system",
 						supportsTopK: config.supportsTopK === true,
 						replayReasoningContent: config.replayReasoningContent === true,
+						...(config.assistantMessageFields
+							? { assistantMessageFields: config.assistantMessageFields }
+							: {}),
 						...(ctx.meta.reasoning === undefined
 							? {}
 							: { reasoningSpec: ctx.meta.reasoning }),

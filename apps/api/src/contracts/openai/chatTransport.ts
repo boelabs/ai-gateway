@@ -151,8 +151,9 @@ function transportContent(
 function toTransportMessage(
 	m: CanonicalMessage,
 	developerRole: "developer" | "system",
-	replayReasoningContent = false,
+	opts: BuildChatBodyOptions = {},
 ): Record<string, unknown> {
+	const replayReasoningContent = opts.replayReasoningContent === true;
 	const content =
 		m.toolResultError === true ? markContentFailure(m.content) : m.content;
 	const out: Record<string, unknown> = {
@@ -182,6 +183,9 @@ function toTransportMessage(
 	if (reasoningContent !== undefined) {
 		out.reasoning_content = reasoningContent;
 	}
+	if (m.role === "assistant") {
+		Object.assign(out, opts.assistantMessageFields?.(m) ?? {});
+	}
 	const audio = (m.providerFields?.openai as { audio?: unknown } | undefined)
 		?.audio;
 	if (m.role === "assistant" && audio !== undefined) {
@@ -201,7 +205,7 @@ const TOOL_MEDIA_PLACEHOLDER =
 function toTransportMessages(
 	messages: CanonicalMessage[],
 	developerRole: "developer" | "system",
-	replayReasoningContent = false,
+	opts: BuildChatBodyOptions = {},
 ): Record<string, unknown>[] {
 	const out: Record<string, unknown>[] = [];
 	let toolMedia: CanonicalContentPart[] = [];
@@ -214,17 +218,13 @@ function toTransportMessages(
 	for (const message of messages) {
 		if (message.role !== "tool") {
 			flushToolMedia();
-			out.push(
-				toTransportMessage(message, developerRole, replayReasoningContent),
-			);
+			out.push(toTransportMessage(message, developerRole, opts));
 			continue;
 		}
 		const parts = Array.isArray(message.content) ? message.content : [];
 		const media = parts.filter((part) => part.type !== "text");
 		if (media.length === 0) {
-			out.push(
-				toTransportMessage(message, developerRole, replayReasoningContent),
-			);
+			out.push(toTransportMessage(message, developerRole, opts));
 			continue;
 		}
 		const text = parts.filter((part) => part.type === "text");
@@ -284,6 +284,14 @@ export interface BuildChatBodyOptions {
 	 * defines no such field, so it is off unless the adapter says otherwise.
 	 */
 	replayReasoningContent?: boolean;
+	/**
+	 * Provider fields to add to an assistant message as it is written, from that message's own
+	 * provider state (Vercel's `reasoning_details`). The transport owns the mapping because only it
+	 * knows which wire message a canonical message became.
+	 */
+	assistantMessageFields?: (
+		message: CanonicalMessage,
+	) => Record<string, unknown> | undefined;
 	reasoningSpec?: ReasoningSpec;
 }
 
@@ -345,11 +353,7 @@ export function buildOpenAIChatBody(
 	const developerRole = opts.developerRole ?? "developer";
 	const body: Record<string, unknown> = {
 		model: upstreamModel,
-		messages: toTransportMessages(
-			req.messages,
-			developerRole,
-			opts.replayReasoningContent === true,
-		),
+		messages: toTransportMessages(req.messages, developerRole, opts),
 		stream: req.stream,
 	};
 	// We ALWAYS request usage in streaming so we can account for it (TPM/budget/cost). If the client
