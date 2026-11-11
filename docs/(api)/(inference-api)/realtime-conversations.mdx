@@ -167,6 +167,10 @@ generating it, and it is billed.
 - A connection lasts at most 60 minutes. Gemini ends each provider connection after about ten
   minutes; the gateway resumes the session on a new one behind the same socket. The translation
   model has no resumption and reconnects without context.
+- Gemini takes its configuration only when a connection opens. A `session.update` that changes it is
+  answered with `session.updated` at once and applied at the next moment nothing is in flight (the
+  current turn has ended): a new session seeded with the conversation. A connection the gateway
+  rotates meanwhile keeps the new configuration waiting rather than reopening with the old one.
 - `REALTIME_WEBSOCKET_MAX_CONNECTIONS` and `REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY` cap open
   sessions per process and per key.
 - Each connection is logged as one `realtime.conversation` operation with the usage Gemini reported

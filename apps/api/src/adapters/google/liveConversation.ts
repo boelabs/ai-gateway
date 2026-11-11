@@ -825,7 +825,9 @@ export function makeGeminiRealtimeConversationHandler(
 				waiter?: { resolve: () => void; reject: (e: unknown) => void },
 			) {
 				wanted = {
-					config: next,
+					// A rotation (goAway, the connection cap) only replaces the connection: it must never
+					// replace a configuration change that is still waiting with the configuration in use.
+					config: reconfigure ? next : (wanted?.config ?? next),
 					reconfigure: reconfigure || (wanted?.reconfigure ?? false),
 					waiters: [...(wanted?.waiters ?? []), ...(waiter ? [waiter] : [])],
 				};
@@ -1036,9 +1038,13 @@ export function makeGeminiRealtimeConversationHandler(
 							}),
 						);
 					}
-					return new Promise<void>((resolve, reject) =>
-						wantReconnect(next, true, { resolve, reject }),
-					);
+					// Gemini takes the configuration only in a connection's setup, so the change waits for
+					// the next point where nothing is in flight. Waiting for it here would block the client
+					// events that end the turn in flight (the commit, the end of activity), which nothing
+					// else can deliver: the change is accepted now and applied there. A failure to apply
+					// it ends the session like any other upstream failure.
+					wantReconnect(next, true);
+					return Promise.resolve();
 				},
 				events: queue.iterate(),
 				close() {

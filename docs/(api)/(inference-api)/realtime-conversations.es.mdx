@@ -168,6 +168,7 @@ Gemini termina de generarlo y se factura.
 - Una conexión dura como máximo 60 minutos. Gemini termina cada conexión con el proveedor a los diez
   minutos aproximadamente; el gateway reanuda la sesión en una nueva detrás del mismo socket. El
   modelo de traducción no tiene reanudación y se reconecta sin contexto.
+- Gemini solo toma su configuración al abrir una conexión. Un `session.update` que la cambia se responde con `session.updated` de inmediato y se aplica en el siguiente momento en que no hay nada en curso (cuando termina el turno actual): una sesión nueva sembrada con la conversación. Una conexión que el gateway rota entretanto conserva la configuración nueva pendiente en lugar de reabrirse con la anterior.
 - `REALTIME_WEBSOCKET_MAX_CONNECTIONS` y `REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY` limitan las
   sesiones abiertas por proceso y por key.
 - Cada conexión se registra como una operación `realtime.conversation` con el uso que informó Gemini

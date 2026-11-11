@@ -452,18 +452,19 @@ test("gemini live conversation: a new configuration opens a new session seeded w
 			}),
 		);
 		await until(() => events.length === 2, "model audio");
-		const switched = session.reconfigure(
-			config({ instructions: "Now in Spanish." }),
-		);
+		// Accepted at once: waiting for the switch would block the client events that end the turn.
+		await session.reconfigure(config({ instructions: "Now in Spanish." }));
 		await new Promise((resolve) => setTimeout(resolve, 50));
 		assert.equal(connections.length, 1);
+		// A goAway while the change waits must not replace it with the configuration in use.
+		first.socket.send(JSON.stringify({ goAway: { timeLeft: "20s" } }));
 		first.socket.send(
 			JSON.stringify({
 				serverContent: { turnComplete: true },
 				sessionResumptionUpdate: { newHandle: "h3", resumable: true },
 			}),
 		);
-		await switched;
+		await until(() => connections.length === 2, "second connection");
 		const [, second] = connections;
 		assert.ok(second);
 		// A resumed session would keep its old setup: this is a new one, seeded with the conversation.
