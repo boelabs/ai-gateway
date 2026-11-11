@@ -41,23 +41,28 @@ export function isClientAbortSignal(signal: AbortSignal): boolean {
 	return reason === null || reason.owner === "client";
 }
 
+/** The client went away before the request completed. */
+export function clientClosedRequestError(): GatewayError {
+	return new GatewayError({
+		class: "bad_request",
+		status: 499,
+		code: "client_closed_request",
+		message: "Client closed the request before completion",
+		failureKind: "request",
+		deploymentHealth: "neutral",
+		routingScope: "request",
+		retryable: false,
+		phase: "client",
+	});
+}
+
 export function abortGatewayError(
 	signal: AbortSignal,
 	fallbackPhase = "streaming",
 ): GatewayError {
 	const reason = typedReason(signal);
 	if (reason?.owner === "client" || reason?.type === "cancelled") {
-		return new GatewayError({
-			class: "bad_request",
-			status: 499,
-			code: "client_closed_request",
-			message: "Client closed the request before completion",
-			failureKind: "request",
-			deploymentHealth: "neutral",
-			routingScope: "request",
-			retryable: false,
-			phase: "client",
-		});
+		return clientClosedRequestError();
 	}
 	if (reason?.type === "downstream_backpressure") {
 		return new GatewayError({

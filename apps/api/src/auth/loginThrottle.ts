@@ -1,6 +1,6 @@
 import { getDashboardSettings } from "#db/repos/dashboardSettings.ts";
 import { GatewayError } from "#core/errors.ts";
-import { redis } from "#cache/redis.ts";
+import { redis, runScript } from "#cache/redis.ts";
 
 /**
  * Failed-login lockout. Three counters, all reserved atomically before the password is checked:
@@ -123,7 +123,7 @@ export async function reserveLoginAttempt(
 		counters.push([ipKey(ip), ceiling, false]);
 	}
 	if (counters.length > 0) {
-		const [blocked, retryAfter] = (await redis.eval(
+		const [blocked, retryAfter] = (await runScript(
 			RESERVE_LUA,
 			counters.length,
 			...counters.map(([key]) => key),

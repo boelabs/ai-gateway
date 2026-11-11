@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { log } from "#logging/log.ts";
 import { env } from "#config/env.ts";
@@ -77,5 +78,32 @@ export async function closeRedis(): Promise<void> {
 		await redis.quit();
 	} catch {
 		redis.disconnect();
+	}
+}
+
+const scriptShas = new Map<string, string>();
+
+/**
+ * Runs a Lua script by its SHA1 (EVALSHA), sending the text only when the server does not have it
+ * yet (NOSCRIPT, after a restart or a flush). The scripts are sent once per server instead of on
+ * every call, which matters on the request path where several run per request.
+ */
+export async function runScript(
+	script: string,
+	numKeys: number,
+	...args: (string | number)[]
+): Promise<unknown> {
+	let sha = scriptShas.get(script);
+	if (sha === undefined) {
+		sha = createHash("sha1").update(script).digest("hex");
+		scriptShas.set(script, sha);
+	}
+	try {
+		return await redis.evalsha(sha, numKeys, ...args);
+	} catch (error) {
+		if (!String((error as Error | null)?.message ?? "").includes("NOSCRIPT")) {
+			throw error;
+		}
+		return redis.eval(script, numKeys, ...args);
 	}
 }

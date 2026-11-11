@@ -2,7 +2,7 @@ import { periodSeconds, secondsUntilReset } from "./period.ts";
 import type { VirtualKeyAuth } from "#auth/types.ts";
 import { GatewayError } from "#core/errors.ts";
 import { randomUUID } from "node:crypto";
-import { redis } from "#cache/redis.ts";
+import { redis, runScript } from "#cache/redis.ts";
 import { log } from "#logging/log.ts";
 
 import {
@@ -296,7 +296,7 @@ export async function enforceVirtualKey(
 	let budgetResetSeconds: number | undefined;
 
 	if (key.rpm != null) {
-		const res = (await redis.eval(
+		const res = (await runScript(
 			RPM_LUA,
 			1,
 			kRpm(key.id, b),
@@ -398,7 +398,7 @@ async function reserveCounter(options: {
 	}
 	const amount = finiteNonNegative(options.amount, "Reservation amount");
 	const result = evalArray(
-		await redis.eval(
+		await runScript(
 			RESERVE_LUA,
 			4,
 			options.actualKey,
@@ -432,7 +432,7 @@ async function settleCounter(
 	actual: number,
 ): Promise<void> {
 	const settledActual = finiteNonNegative(actual, "Settled usage");
-	await redis.eval(
+	await runScript(
 		SETTLE_LUA,
 		4,
 		lease.actualKey,

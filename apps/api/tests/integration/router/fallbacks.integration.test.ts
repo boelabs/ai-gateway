@@ -595,6 +595,38 @@ test("router: an upstream 402 fails over to a sibling instead of ending the requ
 	}
 });
 
+test("router: a client that leaves during a retry backoff ends the request without another attempt", {
+	skip,
+}, async () => {
+	await updateRouterSettings({ retryAfterSeconds: 2 });
+	const publicModel = modelName("backoff");
+	const deployments = [await deployment(publicModel)];
+	const client = new AbortController();
+	let calls = 0;
+	try {
+		setTimeout(() => client.abort(), 300);
+		const started = Date.now();
+		await assert.rejects(
+			route(
+				publicModel,
+				"chat",
+				{ clientSignal: client.signal, requestId: randomUUID() },
+				async () => {
+					calls += 1;
+					return fail("server");
+				},
+			),
+			(error: unknown) =>
+				GatewayError.is(error) && error.code === "client_closed_request",
+		);
+		assert.equal(calls, 1);
+		assert.ok(Date.now() - started < 1500);
+	} finally {
+		await updateRouterSettings({ retryAfterSeconds: 0 });
+		await cleanupDeployments(deployments);
+	}
+});
+
 test("router: a transient failure moves to an untried sibling without waiting", {
 	skip,
 }, async () => {

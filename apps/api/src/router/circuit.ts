@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { CooldownCause } from "./state.ts";
-import { redis } from "#cache/redis.ts";
+import { redis, runScript } from "#cache/redis.ts";
 
 export interface CircuitSubject {
 	kind: "deployment" | "capacity";
@@ -277,7 +277,7 @@ export async function acquireCircuitPermit(
 	const deploymentKeys = keys(deployment);
 	const capacityKeys = keys(capacity);
 	const result = evalNumbers(
-		await redis.eval(
+		await runScript(
 			ACQUIRE_SCRIPT,
 			8,
 			deploymentKeys.cooldown,
@@ -362,7 +362,7 @@ async function recordFailure(
 	const subjectKeys = keys(subject);
 	const effectiveMode = permitMode === "half_open" ? "half_open" : mode;
 	const result = evalNumbers(
-		await redis.eval(
+		await runScript(
 			RECORD_FAILURE_SCRIPT,
 			6,
 			subjectKeys.cooldown,
@@ -510,7 +510,7 @@ async function closeSubject(
 		await resetCircuits([subject]);
 		return;
 	}
-	await redis.eval(
+	await runScript(
 		CLOSE_SCRIPT,
 		5,
 		subjectKeys.cooldown,
@@ -539,7 +539,7 @@ async function releaseSubject(
 		return;
 	}
 	const subjectKeys = keys(subject);
-	await redis.eval(RELEASE_SCRIPT, 1, subjectKeys.probe, token);
+	await runScript(RELEASE_SCRIPT, 1, subjectKeys.probe, token);
 }
 
 /** Releases half-open ownership when an attempt produced no health signal (for example cancellation). */

@@ -120,7 +120,7 @@ test("effective reasoning disabled suppresses stale reasoning spec and non-text 
 	);
 });
 
-test("built-in catalog remains the effective source over an inline entry", () => {
+test("a deployment's inline entry stays its source when the catalog later knows the model", () => {
 	const meta = resolveModelMetadata("openai", "gpt-5.5", {
 		operations: {
 			"text.generate": {
@@ -131,8 +131,8 @@ test("built-in catalog remains the effective source over an inline entry", () =>
 	});
 	const result = publicTextCapabilities([meta]);
 	assert.ok(result);
-	assert.notEqual(result.max_output_tokens, 1);
-	assert.deepEqual(result.reasoning_efforts, meta.reasoning?.levels);
+	assert.equal(result.max_output_tokens, 1);
+	assert.equal(meta.reasoning, undefined);
 });
 
 test("disjoint enums and non-reasoning members cannot advertise optional pool controls", () => {

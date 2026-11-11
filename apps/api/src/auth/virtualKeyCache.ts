@@ -1,5 +1,5 @@
 import type { VirtualKeyAuth } from "./types.ts";
-import { redis } from "#cache/redis.ts";
+import { redis, runScript } from "#cache/redis.ts";
 
 import {
 	getVirtualKeyByHash,
@@ -67,7 +67,7 @@ export async function getCachedVirtualKeyByHash(
 	const generation = (await redis.get(generationKey(hash))) ?? "0";
 	const row = await getVirtualKeyByHash(hash);
 	const info = row ? toAuth(row) : null;
-	await redis.eval(
+	await runScript(
 		SET_IF_CURRENT_LUA,
 		2,
 		ck,

@@ -312,9 +312,21 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 				message: `${config.label}: missing 'baseUrl' in credentials`,
 			});
 		}
-		const normalizedBase = config.normalizeBaseUrl
-			? config.normalizeBaseUrl(base)
-			: base.replace(/\/+$/u, "");
+		let normalizedBase: string;
+		try {
+			normalizedBase = config.normalizeBaseUrl
+				? config.normalizeBaseUrl(base)
+				: base.replace(/\/+$/u, "");
+		} catch (cause) {
+			// A stored base URL that no longer passes is the deployment's configuration, not the
+			// client's request: it fails over and quarantines like bad credentials.
+			throw new GatewayError({
+				class: "server",
+				failureKind: "configuration",
+				message: `${config.label}: the deployment's credentials.baseUrl is invalid: ${cause instanceof Error ? cause.message : String(cause)}`,
+				cause,
+			});
+		}
 		const resolved: ResolvedCreds = { apiKey: c.apiKey, base: normalizedBase };
 		if (c.organization !== undefined) {
 			resolved.organization = c.organization;
@@ -1185,6 +1197,15 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 							return mapError(err, ctx);
 						},
 					}),
+				}
+			: {}),
+		...(config.normalizeBaseUrl
+			? {
+					validateCredentials(credentials: Record<string, unknown>) {
+						if (typeof credentials.baseUrl === "string") {
+							config.normalizeBaseUrl?.(credentials.baseUrl);
+						}
+					},
 				}
 			: {}),
 		chatParameters: openAIStyleChatParameters(

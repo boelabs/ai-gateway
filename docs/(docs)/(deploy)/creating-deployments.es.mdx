@@ -23,7 +23,7 @@ Authorization: Bearer $MASTER_KEY
 | `adapterKey` | si | El adapter de primera clase para ejecutar (`openai`, `googleaistudio`, `openaicompatible`, etc.). |
 | `upstreamModel` | si | La identificación real del proveedor (clave de catálogo o el nombre del deployment en Azure). |
 | `credentials` | si | `{ apiKey, baseUrl?, ... }` dependiendo del adapter (ver tabla). Cifrado en reposo. En `PATCH`, el objeto se **fusiona** con el almacenado: envía solo los campos que está cambiando y `null` para eliminar uno. |
-| `catalogEntry` | solo personalizado | Entrada de catálogo en línea para un modelo **no** presente en el catálogo. Utiliza la misma forma que `catalog.json`; para los modelos de catálogo **debe omitirse**. |
+| `catalogEntry` | solo personalizado | Entrada de catálogo en línea para un modelo **no** presente en el catálogo. Utiliza la misma forma que `catalog.json`; para los modelos de catálogo **debe omitirse**. Si una versión posterior añade el modelo al catálogo, un deployment existente sigue usando su propia entrada. |
 | `pricing` | no | `{ inputCentsPerMTokens?, outputCentsPerMTokens?, cacheReadCentsPerMTokens?, cacheWriteCentsPerMTokens?, imageInputCentsPerMTokens?, imageOutputCentsPerMTokens?, audioInputCentsPerMTokens?, audioOutputCentsPerMTokens?, searchUnitCents? }`. |
 | `transportOverrides` | no | Anulación de transport por operación. El valor predeterminado del adapter se aplica a todos los endpoints públicos. |
 | `label` | no | Identificador humano para diferenciar los deployments del mismo `publicModel` (por ejemplo, qué clave API). Tomado una instantánea en cada registro de operación para que pueda ver *qué* deployment atendió una solicitud. `null` lo borra. |

@@ -55,8 +55,13 @@ const finalizationQueue: Array<{
 }> = [];
 let queuedBytes = 0;
 let drainingFinalizations = false;
+/**
+ * Keys whose values are credentials. "token" only as the end of a name (`access_token`, `idToken`,
+ * `x-auth-token`), so token counts (`max_tokens`, `prompt_tokens`, `usage.input_tokens`) stay
+ * readable in the logs.
+ */
 const SENSITIVE_KEY =
-	/authorization|api[-_]?key|token|secret|password|cookie/iu;
+	/authorization|api[-_]?key|token$|secret|password|cookie/iu;
 const OPERATION_LEASE_TTL_SECONDS =
 	Math.ceil(EXECUTION_POLICY_MAX_TOTAL_MS / 1000) + 300;
 const operationLeaseKey = (operationId: string) =>
@@ -266,7 +271,7 @@ function safeSummary(
 	return summary;
 }
 
-function redact(value: unknown): unknown {
+export function redact(value: unknown): unknown {
 	if (Array.isArray(value)) {
 		return value.map(redact);
 	}

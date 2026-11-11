@@ -387,3 +387,22 @@ test("unknown models default to no structured outputs; declared through text.gen
 		true,
 	);
 });
+
+test("a deployment's own catalog entry wins over a catalog model added later", () => {
+	const custom = {
+		operations: {
+			"text.generate": {
+				maxOutputTokens: 1234,
+				capabilities: {
+					tools: false,
+					vision: false,
+					reasoning: false,
+					structuredOutputs: false,
+				},
+			},
+		},
+	};
+	const meta = resolveModelMetadata("openai", "gpt-5.4", custom);
+	assert.equal(meta.maxOutputTokens, 1234);
+	assert.equal(meta.capabilities.tools, false);
+});

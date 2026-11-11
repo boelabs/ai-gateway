@@ -419,6 +419,11 @@ export interface Adapter {
 	 */
 	chatParameters?: Partial<Record<UpstreamTransport, ParameterSupportMap>>;
 	/**
+	 * Checks a deployment's credentials when they are saved (create or patch), so a malformed value
+	 * is the operator's error at that moment instead of every request's later. Throws a GatewayError.
+	 */
+	validateCredentials?: (credentials: Record<string, unknown>) => void;
+	/**
 	 * Parameters this request makes unsupported on top of the model's declarations, for constraints
 	 * that depend on the request itself (Anthropic rejects temperature while thinking is on). The
 	 * parameter policy applies them like any other declaration: dropped and recorded, or rejected.

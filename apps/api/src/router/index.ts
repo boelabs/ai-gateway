@@ -39,6 +39,7 @@ import {
 	onAttemptCancel,
 	onSuccessFinish,
 	onAttemptStart,
+	type DeploymentMetrics,
 	fetchMetrics,
 } from "./state.ts";
 
@@ -69,6 +70,7 @@ import {
 import {
 	type GatewayAbortReason,
 	isClientAbortSignal,
+	clientClosedRequestError,
 } from "#gateway/abortReason.ts";
 
 export interface RouteOptions {
@@ -254,7 +256,31 @@ function fallbackReasonForFailures(
 	return only ?? "general";
 }
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/**
+ * A retry backoff that ends when the client leaves: waiting on would only start another attempt
+ * (charging the deployment's RPM and opening an upstream call) for nobody.
+ */
+const STRATEGIES_WITHOUT_METRICS: ReadonlySet<string> = new Set([
+	"simple-shuffle",
+	"price-based",
+]);
+
+function backoff(ms: number, clientSignal: AbortSignal): Promise<void> {
+	if (clientSignal.aborted) {
+		return Promise.reject(clientClosedRequestError());
+	}
+	return new Promise<void>((resolve, reject) => {
+		const onAbort = () => {
+			clearTimeout(timer);
+			reject(clientClosedRequestError());
+		};
+		const timer = setTimeout(() => {
+			clientSignal.removeEventListener("abort", onAbort);
+			resolve();
+		}, ms);
+		clientSignal.addEventListener("abort", onAbort, { once: true });
+	});
+}
 
 /** What an attempt record keeps of a failure: enough to answer "what did the upstream say". */
 function failureDetail(
@@ -713,9 +739,10 @@ export async function route<T>(
 
 				// Metrics guide balancing only. The authoritative RPM/TPM decision is an atomic reservation
 				// after circuit admission, eliminating the read-then-increment race between replicas.
-				const metrics = await fetchMetrics(
-					withAttemptsLeft.map((c) => c.row.id),
-				);
+				// Weighted and price-based picks read no metric, so they skip the Redis round-trip.
+				const metrics = STRATEGIES_WITHOUT_METRICS.has(settings.routingStrategy)
+					? new Map<string, DeploymentMetrics>()
+					: await fetchMetrics(withAttemptsLeft.map((c) => c.row.id));
 
 				const chosen =
 					withAttemptsLeft.find(
@@ -1394,7 +1421,7 @@ export async function route<T>(
 							reason = "deadline";
 							break;
 						}
-						await sleep(delay);
+						await backoff(delay, opts.clientSignal);
 					}
 				}
 			}
@@ -1486,7 +1513,7 @@ export async function route<T>(
 					lastReason = "deadline";
 					break;
 				}
-				await sleep(delay);
+				await backoff(delay, opts.clientSignal);
 			}
 
 			const roundStartedAt = attempts;
