@@ -128,13 +128,26 @@ export function responseForClient(
 	}
 	const copy = structuredClone(response);
 	if (Array.isArray(copy.output)) {
-		copy.output = copy.output.map((item) =>
-			item !== null && typeof item === "object" && !Array.isArray(item)
-				? stripEncryptedReasoningItem(item as Record<string, unknown>)
-				: item,
-		);
+		// Gateway state carriers exist only for the stored copy when the client did not ask for them.
+		copy.output = copy.output
+			.filter((item) => !isGatewayStateItem(item))
+			.map((item) =>
+				item !== null && typeof item === "object" && !Array.isArray(item)
+					? stripEncryptedReasoningItem(item as Record<string, unknown>)
+					: item,
+			);
 	}
 	return copy;
+}
+
+/** Whether a stream event is about a gateway state carrier, which the client did not ask for. */
+export function isGatewayStateEvent(event: SSEEvent): boolean {
+	try {
+		const data = JSON.parse(event.data) as { item?: unknown };
+		return isGatewayStateItem(data.item);
+	} catch {
+		return false;
+	}
 }
 
 export function responseEventForClient(
@@ -437,10 +450,28 @@ function isGatewayStateItem(item: unknown): boolean {
 	);
 }
 
-/** Client input as forwarded verbatim: no gateway state carriers, no mirrored reasoning content. */
+/**
+ * A reasoning item with no encrypted content can only be resolved from an upstream store, and the
+ * gateway always calls the upstream with `store: false`, so OpenAI would answer that the item was not
+ * found. Its summary carries no state the model needs.
+ */
+function isUnresolvableReasoningItem(item: unknown): boolean {
+	const record = extraContent(item);
+	return (
+		record?.type === "reasoning" && typeof record.encrypted_content !== "string"
+	);
+}
+
+/**
+ * Client input as forwarded verbatim: no gateway state carriers, no reasoning items the stateless
+ * upstream cannot resolve, no mirrored reasoning content.
+ */
 export function withoutGatewayStateItems<T>(items: T[]): T[] {
 	return items
-		.filter((item) => !isGatewayStateItem(item))
+		.filter(
+			(item) =>
+				!(isGatewayStateItem(item) || isUnresolvableReasoningItem(item)),
+		)
 		.map(reasoningInputForUpstream);
 }
 
@@ -1017,6 +1048,12 @@ export function responsesRequestToCanonical(
 export interface RenderOptions {
 	/** Original request (for echoing fields: instructions, tools, etc.). */
 	req: ResponsesRequest;
+	/**
+	 * Render message-bound state carriers even when the client did not ask for encrypted reasoning:
+	 * the stored copy needs them for `previous_response_id`, and `responseForClient` removes them
+	 * from what the client sees.
+	 */
+	retainState?: boolean;
 	/** Public model selected by the router. */
 	publicModel: string;
 	/**
@@ -1102,7 +1139,8 @@ function messageStateItem(
 ): Record<string, unknown> | undefined {
 	if (
 		opts.messageState === undefined ||
-		opts.req.include?.includes(ENCRYPTED_REASONING_INCLUDE) !== true
+		(opts.retainState !== true &&
+			opts.req.include?.includes(ENCRYPTED_REASONING_INCLUDE) !== true)
 	) {
 		return undefined;
 	}

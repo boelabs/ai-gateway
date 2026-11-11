@@ -287,6 +287,84 @@ test("Claude thinking survives a standard Responses client's tool loop", {
 	}
 });
 
+test("stored Claude thinking survives previous_response_id without include", {
+	skip,
+}, async () => {
+	const row = await createDeployment({
+		publicModel: `message-state-${randomUUID()}`,
+		adapterKey: "anthropic",
+		upstreamModel: "claude-sonnet-4-5",
+		credentials: { apiKey: "test-key" },
+	});
+	const upstreamBodies: Item[] = [];
+	try {
+		await withStubbedFetch(
+			(_url, init) => {
+				upstreamBodies.push(JSON.parse(String(init?.body)) as Item);
+				return claudeToolStream();
+			},
+			async () => {
+				const request = {
+					model: row.publicModel,
+					stream: true,
+					store: true,
+					reasoning: { effort: "high" },
+					tools: [
+						{
+							type: "function",
+							name: "search",
+							parameters: { type: "object", properties: {} },
+						},
+					],
+				};
+				const response = await app.request("/v1/responses", {
+					method: "POST",
+					headers: {
+						authorization: `Bearer ${env.MASTER_KEY}`,
+						"content-type": "application/json",
+					},
+					body: JSON.stringify({ ...request, input: "find x" }),
+				});
+				const wire = await response.text();
+				assert.equal(response.status, 200, wire);
+				const completed = wire
+					.split("\n")
+					.filter((line) => line.startsWith("data: {"))
+					.map((line) => JSON.parse(line.slice(6)) as Item)
+					.find((event) => event.type === "response.completed");
+				const first = completed?.response as Item;
+				// The client did not ask for encrypted state, so it sees no carrier.
+				assert.ok(
+					!(first.output as Item[]).some(
+						(item) =>
+							typeof item.encrypted_content === "string" &&
+							item.encrypted_content.startsWith("bfrs_"),
+					),
+				);
+				await send({
+					...request,
+					previous_response_id: first.id,
+					input: [
+						{
+							type: "function_call_output",
+							call_id: "toolu_1",
+							output: "found",
+						},
+					],
+				});
+			},
+		);
+		const messages = upstreamBodies[1]?.messages as Item[];
+		assert.deepEqual((messages[1]?.content as Item[])[0], {
+			type: "thinking",
+			thinking: "Search first.",
+			signature: "sig-claude",
+		});
+	} finally {
+		await deleteDeployment(row.id);
+	}
+});
+
 test("Gemini text signatures round-trip through an Anthropic Messages client", {
 	skip,
 }, async () => {

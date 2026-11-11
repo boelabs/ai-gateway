@@ -31,6 +31,7 @@ import {
 	responsesRequestToCanonical,
 	withoutGatewayStateItems,
 	responseEventForClient,
+	isGatewayStateEvent,
 	normalizeResponseInput,
 	type ResponseInputItem,
 	expandInputReferences,
@@ -109,6 +110,11 @@ interface PreparedResponsesRequest {
 	req: ResponsesRequest;
 	effectiveInput: ResponseInputItem[];
 	currentInput: ResponseInputItem[];
+	/**
+	 * The deployment that served the previous response. Its encrypted reasoning only decrypts on the
+	 * same account, so the continuation goes back to it while it is healthy and eligible.
+	 */
+	previousDeploymentId: string | null;
 }
 
 function outputItemsFromResponse(
@@ -136,6 +142,7 @@ async function prepareResponsesRequest(
 ): Promise<PreparedResponsesRequest> {
 	const scope = stateScopeOf(auth);
 	let previousItems: ResponseInputItem[] = [];
+	let previousDeploymentId: string | null = null;
 
 	if (req.previous_response_id != null) {
 		if (connectionState?.id === req.previous_response_id) {
@@ -158,6 +165,7 @@ async function prepareResponsesRequest(
 				});
 			}
 			previousItems = [...previous.requestInput, ...previous.output];
+			previousDeploymentId = previous.deploymentId ?? null;
 		}
 	}
 
@@ -176,6 +184,7 @@ async function prepareResponsesRequest(
 		req: { ...req, input: effectiveInput, store },
 		effectiveInput,
 		currentInput,
+		previousDeploymentId,
 	};
 }
 
@@ -397,6 +406,7 @@ function streamResponses(
 				publicModel: routing.candidate.row.publicModel,
 				reasoningEffort: reasoning?.effective ?? null,
 				messageState: messageStateCodec,
+				retainState: pipelineReq.store === true,
 			};
 			metadata = {
 				...candidateMetadata(routing.candidate),
@@ -452,6 +462,13 @@ function streamResponses(
 			for await (const ev of withSSEHeartbeats(events, () =>
 				writeSSEHeartbeat(stream, downstream),
 			)) {
+				// A state carrier rendered only for the stored copy is not the client's to see.
+				if (
+					!pipelineReq.include?.includes("reasoning.encrypted_content") &&
+					isGatewayStateEvent(ev)
+				) {
+					continue;
+				}
 				const clientEvent = responseEventForClient(ev, pipelineReq.include);
 				let eventData = clientEvent.data;
 				try {
@@ -680,6 +697,9 @@ export async function responsesHandler(c: Context<AppEnv>): Promise<Response> {
 			const routePromise = routeChat(c, canonical, log.requestId, settings, {
 				signal: log.clientSignal,
 				operationId: log.operationId,
+				...(prepared.previousDeploymentId
+					? { preferredDeploymentId: prepared.previousDeploymentId }
+					: {}),
 			});
 			await settleBeforeCommit(routePromise);
 			return streamResponses(
@@ -697,6 +717,9 @@ export async function responsesHandler(c: Context<AppEnv>): Promise<Response> {
 			await routeChat(c, canonical, log.requestId, settings, {
 				signal: log.clientSignal,
 				operationId: log.operationId,
+				...(prepared.previousDeploymentId
+					? { preferredDeploymentId: prepared.previousDeploymentId }
+					: {}),
 			});
 		log.applyRouting(routing);
 		lifecycle.attach(routing);
@@ -714,6 +737,7 @@ export async function responsesHandler(c: Context<AppEnv>): Promise<Response> {
 			publicModel: routing.candidate.row.publicModel,
 			reasoningEffort: reasoning?.effective ?? null,
 			messageState: messageStateCodec,
+			retainState: pipelineReq.store === true,
 		};
 		const metadata: Record<string, unknown> = {
 			...candidateMetadata(routing.candidate),
@@ -1080,6 +1104,7 @@ async function executeResponsesWebSocketTurn(
 			publicModel: routing.candidate.row.publicModel,
 			reasoningEffort: reasoning?.effective ?? null,
 			messageState: messageStateCodec,
+			retainState: pipelineReq.store === true,
 		};
 		const metadata: Record<string, unknown> = {
 			...candidateMetadata(routing.candidate),
@@ -1147,6 +1172,13 @@ async function executeResponsesWebSocketTurn(
 		);
 		try {
 			for await (const event of events) {
+				// A state carrier rendered only for the stored copy is not the client's to see.
+				if (
+					!pipelineReq.include?.includes("reasoning.encrypted_content") &&
+					isGatewayStateEvent(event)
+				) {
+					continue;
+				}
 				const clientEvent = responseEventForClient(event, pipelineReq.include);
 				let data: Record<string, unknown>;
 				try {
