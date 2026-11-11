@@ -321,7 +321,11 @@ export async function previewDeployment(
 	};
 }
 
-async function createDeploymentUnchanged(
+/**
+ * Validation runs before the response cache is touched: a rejected change moves no cache epoch,
+ * and does not depend on Redis to answer its 4xx.
+ */
+export async function createDeployment(
 	input: CreateDeploymentInput,
 ): Promise<{ row: DeploymentRow; preview: DeploymentPreview }> {
 	const preview = await previewDeployment(input);
@@ -334,29 +338,31 @@ async function createDeploymentUnchanged(
 		});
 	}
 	validateRequiredCredentials(adapter, input.credentials);
-	const row = await insertDeployment({
-		publicModel: input.publicModel,
-		adapterKey: input.adapterKey,
-		upstreamModel: input.upstreamModel,
-		credentials: input.credentials,
-		label: input.label ?? null,
-		failureDomain: input.failureDomain ?? null,
-		metadata: input.metadata ?? {},
-		catalogEntry:
-			preview.source === "custom" ? (input.catalogEntry ?? null) : null,
-		pricing: input.pricing ?? null,
-		transportOverrides: input.transportOverrides ?? {},
-		executionPolicyOverrides: input.executionPolicyOverrides ?? {},
-		...(input.enabled === undefined ? {} : { enabled: input.enabled }),
-		...(input.weight === undefined ? {} : { weight: input.weight }),
-		...(input.tpmLimit === undefined ? {} : { tpmLimit: input.tpmLimit }),
-		...(input.rpmLimit === undefined ? {} : { rpmLimit: input.rpmLimit }),
-	});
+	const row = await invalidatingResponseCache(() =>
+		insertDeployment({
+			publicModel: input.publicModel,
+			adapterKey: input.adapterKey,
+			upstreamModel: input.upstreamModel,
+			credentials: input.credentials,
+			label: input.label ?? null,
+			failureDomain: input.failureDomain ?? null,
+			metadata: input.metadata ?? {},
+			catalogEntry:
+				preview.source === "custom" ? (input.catalogEntry ?? null) : null,
+			pricing: input.pricing ?? null,
+			transportOverrides: input.transportOverrides ?? {},
+			executionPolicyOverrides: input.executionPolicyOverrides ?? {},
+			...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+			...(input.weight === undefined ? {} : { weight: input.weight }),
+			...(input.tpmLimit === undefined ? {} : { tpmLimit: input.tpmLimit }),
+			...(input.rpmLimit === undefined ? {} : { rpmLimit: input.rpmLimit }),
+		}),
+	);
 	invalidatePublicModelGroups();
 	return { row, preview };
 }
 
-async function updateDeploymentUnchanged(
+export async function updateDeployment(
 	id: string,
 	patch: UpdateDeploymentInput,
 ): Promise<{ row: DeploymentRow; preview: DeploymentPreview }> {
@@ -409,29 +415,32 @@ async function updateDeploymentUnchanged(
 	}
 	let row: DeploymentRow | undefined;
 	try {
-		row = await persistDeployment(id, {
-			upstreamModel: input.upstreamModel,
-			publicModel: input.publicModel,
-			catalogEntry: preview.source === "custom" ? (catalogEntry ?? null) : null,
-			transportOverrides: input.transportOverrides ?? {},
-			executionPolicyOverrides:
-				patch.executionPolicyOverrides ?? existing.executionPolicyOverrides,
-			enabled: patch.enabled ?? existing.enabled,
-			weight: patch.weight ?? existing.weight,
-			tpmLimit:
-				patch.tpmLimit === undefined ? existing.tpmLimit : patch.tpmLimit,
-			rpmLimit:
-				patch.rpmLimit === undefined ? existing.rpmLimit : patch.rpmLimit,
-			...(patch.pricing === undefined ? {} : { pricing: patch.pricing }),
-			...(mergedCredentials === undefined
-				? {}
-				: { credentials: mergedCredentials }),
-			...(patch.label === undefined ? {} : { label: patch.label }),
-			...(patch.failureDomain === undefined
-				? {}
-				: { failureDomain: patch.failureDomain }),
-			...(patch.metadata === undefined ? {} : { metadata: patch.metadata }),
-		});
+		row = await invalidatingResponseCache(() =>
+			persistDeployment(id, {
+				upstreamModel: input.upstreamModel,
+				publicModel: input.publicModel,
+				catalogEntry:
+					preview.source === "custom" ? (catalogEntry ?? null) : null,
+				transportOverrides: input.transportOverrides ?? {},
+				executionPolicyOverrides:
+					patch.executionPolicyOverrides ?? existing.executionPolicyOverrides,
+				enabled: patch.enabled ?? existing.enabled,
+				weight: patch.weight ?? existing.weight,
+				tpmLimit:
+					patch.tpmLimit === undefined ? existing.tpmLimit : patch.tpmLimit,
+				rpmLimit:
+					patch.rpmLimit === undefined ? existing.rpmLimit : patch.rpmLimit,
+				...(patch.pricing === undefined ? {} : { pricing: patch.pricing }),
+				...(mergedCredentials === undefined
+					? {}
+					: { credentials: mergedCredentials }),
+				...(patch.label === undefined ? {} : { label: patch.label }),
+				...(patch.failureDomain === undefined
+					? {}
+					: { failureDomain: patch.failureDomain }),
+				...(patch.metadata === undefined ? {} : { metadata: patch.metadata }),
+			}),
+		);
 	} catch (error) {
 		if (error instanceof PublicModelReferencedError) {
 			throw new GatewayError({
@@ -455,19 +464,6 @@ async function updateDeploymentUnchanged(
 async function deleteDeploymentUnchanged(id: string): Promise<void> {
 	await removeDeployment(id);
 	invalidatePublicModelGroups();
-}
-
-export function createDeployment(
-	input: CreateDeploymentInput,
-): Promise<{ row: DeploymentRow; preview: DeploymentPreview }> {
-	return invalidatingResponseCache(() => createDeploymentUnchanged(input));
-}
-
-export function updateDeployment(
-	id: string,
-	patch: UpdateDeploymentInput,
-): Promise<{ row: DeploymentRow; preview: DeploymentPreview }> {
-	return invalidatingResponseCache(() => updateDeploymentUnchanged(id, patch));
 }
 
 export function deleteDeployment(id: string): Promise<void> {
