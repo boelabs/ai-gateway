@@ -34,7 +34,10 @@ text, image, audio, file), `stream`, `stream_options.include_usage`, `temperatur
 `user`, `tools`, `tool_choice`, `parallel_tool_calls`, `response_format`, `reasoning_effort`,
 `prompt_cache_key`, `audio`, `logprobs`, `top_logprobs`, `logit_bias`, `metadata`, `modalities`,
 `prediction`, `service_tier`, `safety_identifier`, `store`, `verbosity`, `web_search_options`, and
-`extra_body` for provider-specific fields the gateway doesn't manage itself.
+`extra_body` for provider-specific fields the gateway doesn't manage itself. `top_k`, the common
+extension of compatible APIs, is mapped too. Any other top-level field joins `extra_body` and reaches
+the upstream, which accepts or rejects it; the deprecated `functions`/`function_call` are rejected
+with `400 unsupported_parameter` (send `tools` and `tool_choice`).
 
 Whether a given deployment actually **supports** a field you send is a per-model catalog declaration —
 see [Parameter policy](/docs/parameter-policy) for what happens when it doesn't (`drop`, `error`, or
