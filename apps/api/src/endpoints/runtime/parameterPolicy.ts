@@ -162,6 +162,8 @@ export async function routeChat(
 	);
 	const publicWire = canonical.publicWire ?? "chat_completions";
 	const preferredTransport = preferredChatTransport(canonical);
+	// The request's own input bound is the same for every candidate: computed once.
+	const requestInputTokens = estimateTokenReservation(canonical).inputTokens;
 	const transportForCandidate = (candidate: DeploymentCandidate) =>
 		resolveTransport(candidate, "chat", preferredTransport);
 	const candidateEligibility: NonNullable<
@@ -214,15 +216,18 @@ export async function routeChat(
 				...(preferredTransport === undefined
 					? {}
 					: { preferredTransport: () => preferredTransport }),
-				tokenReservation: (candidate) =>
-					estimateTokenReservation(canonical, {
-						maxOutputTokens:
-							canonical.maxTokens ?? candidate.meta.maxOutputTokens ?? 0,
-						additionalInputTokens: contentInputResolver.hasOpaqueInputs
+				tokenReservation: (candidate) => ({
+					inputTokens:
+						requestInputTokens +
+						(contentInputResolver.hasOpaqueInputs
 							? (candidate.meta.maxInputTokens ??
 								MAX_PORTABLE_CONTENT_INPUT_BYTES)
-							: 0,
-					}),
+							: 0),
+					outputTokens: Math.max(
+						0,
+						canonical.maxTokens ?? candidate.meta.maxOutputTokens ?? 0,
+					),
+				}),
 				usageQuota: usageQuotaForRequest(c),
 			},
 			async (cand, ctx) => {

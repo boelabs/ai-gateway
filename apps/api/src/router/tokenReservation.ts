@@ -1,3 +1,4 @@
+import { withoutInlineMedia } from "#core/mediaTokens.ts";
 import type { Usage } from "#core/usage.ts";
 
 /**
@@ -11,8 +12,9 @@ export interface TokenReservation {
 }
 
 /**
- * One token per UTF-8 byte is deliberately conservative across unknown tokenizers; requested output
- * and materialized input bounds are added explicitly.
+ * One token per UTF-8 byte of text is deliberately conservative across unknown tokenizers. Inline
+ * media is not text: it counts by the per-modality bound of what it renders to (`mediaTokens.ts`),
+ * not by its base64 characters. Requested output and materialized input bounds are added explicitly.
  */
 export function estimateTokenReservation(
 	payload: unknown,
@@ -21,8 +23,9 @@ export function estimateTokenReservation(
 		additionalInputTokens?: number;
 	} = {},
 ): TokenReservation {
-	const serialized = JSON.stringify(payload) ?? "";
-	const input = Buffer.byteLength(serialized, "utf8");
+	const { value, tokens: mediaTokens } = withoutInlineMedia(payload);
+	const serialized = JSON.stringify(value) ?? "";
+	const input = Buffer.byteLength(serialized, "utf8") + mediaTokens;
 	const additional = positiveInteger(options.additionalInputTokens ?? 0);
 	return {
 		inputTokens: Math.min(Number.MAX_SAFE_INTEGER, input + additional),

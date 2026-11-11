@@ -69,7 +69,9 @@ resolved pricing and:
 A stream can end before its final usage frame (the client disconnects, the upstream fails or times
 out) and some OpenAI-compatible upstreams never send usage at all. Once the upstream has accepted the
 request it may already bill it, so the gateway does not treat that as free: it charges a conservative
-estimate — the input it reserved at admission (one token per UTF-8 byte of the request) plus the
+estimate — the input it reserved at admission (one token per UTF-8 byte of the request's text, and
+for inline media a bound by modality: about 2,500 tokens per image, 5,500 per PDF page, one per
+1,000 bytes of audio) plus the
 output it actually saw, counted the same way. The estimate settles the budget and TPM like reported
 usage, and the operation records it with `metadata.usageEstimated: true`. A reranking upstream that
 omits search units is charged one unit per `documentsPerSearchUnit` documents. Only a request the
