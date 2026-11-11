@@ -563,6 +563,11 @@ function mapMessage(m: z.infer<typeof messageSchema>): CanonicalMessage {
 	if (m.role === "assistant") {
 		const providerFields = extraContent(raw.provider_specific_fields);
 		const reasoning = openaiReasoningFromProviderFields(providerFields);
+		// The provider's own reasoning for the turn, which some compatible providers need back.
+		const reasoningContent = raw.reasoning_content ?? raw.reasoning;
+		if (typeof reasoningContent === "string" && reasoningContent.length > 0) {
+			msg.providerFields = { chat: { reasoning_content: reasoningContent } };
+		}
 		// A previous audio answer, referenced by id; only Chat Completions can resolve it.
 		const audio = raw.audio as { id?: unknown } | null | undefined;
 		const mergedProviderFields = mergeProviderFields(
@@ -575,7 +580,9 @@ function mapMessage(m: z.infer<typeof messageSchema>): CanonicalMessage {
 				: undefined,
 		);
 		if (mergedProviderFields !== undefined) {
-			msg.providerFields = mergedProviderFields;
+			msg.providerFields =
+				mergeProviderFields(msg.providerFields, mergedProviderFields) ??
+				mergedProviderFields;
 		}
 	}
 	return msg;

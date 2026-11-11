@@ -104,6 +104,8 @@ export interface OpenAIStyleConfig {
 	supportsDeveloperRole?: boolean;
 	/** Emit top_k on Chat Completions. Defaults to false because OpenAI does not define it. */
 	supportsTopK?: boolean;
+	/** Send assistant `reasoning_content` back (see BuildChatBodyOptions.replayReasoningContent). */
+	replayReasoningContent?: boolean;
 	/** OpenAI uses Bearer; Azure v1 with a key uses the api-key header. */
 	authScheme?: "bearer" | "api-key";
 	/** Base-URL-specific normalization/validation. */
@@ -570,6 +572,7 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 							? "developer"
 							: "system",
 						supportsTopK: config.supportsTopK === true,
+						replayReasoningContent: config.replayReasoningContent === true,
 						...(ctx.meta.reasoning === undefined
 							? {}
 							: { reasoningSpec: ctx.meta.reasoning }),

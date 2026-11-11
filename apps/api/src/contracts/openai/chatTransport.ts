@@ -151,6 +151,7 @@ function transportContent(
 function toTransportMessage(
 	m: CanonicalMessage,
 	developerRole: "developer" | "system",
+	replayReasoningContent = false,
 ): Record<string, unknown> {
 	const content =
 		m.toolResultError === true ? markContentFailure(m.content) : m.content;
@@ -174,6 +175,13 @@ function toTransportMessage(
 	if (m.role === "assistant" && m.refusal !== undefined) {
 		out.refusal = m.refusal;
 	}
+	const reasoningContent =
+		m.role === "assistant" && replayReasoningContent
+			? assistantReasoningContent(m)
+			: undefined;
+	if (reasoningContent !== undefined) {
+		out.reasoning_content = reasoningContent;
+	}
 	const audio = (m.providerFields?.openai as { audio?: unknown } | undefined)
 		?.audio;
 	if (m.role === "assistant" && audio !== undefined) {
@@ -193,6 +201,7 @@ const TOOL_MEDIA_PLACEHOLDER =
 function toTransportMessages(
 	messages: CanonicalMessage[],
 	developerRole: "developer" | "system",
+	replayReasoningContent = false,
 ): Record<string, unknown>[] {
 	const out: Record<string, unknown>[] = [];
 	let toolMedia: CanonicalContentPart[] = [];
@@ -205,13 +214,17 @@ function toTransportMessages(
 	for (const message of messages) {
 		if (message.role !== "tool") {
 			flushToolMedia();
-			out.push(toTransportMessage(message, developerRole));
+			out.push(
+				toTransportMessage(message, developerRole, replayReasoningContent),
+			);
 			continue;
 		}
 		const parts = Array.isArray(message.content) ? message.content : [];
 		const media = parts.filter((part) => part.type !== "text");
 		if (media.length === 0) {
-			out.push(toTransportMessage(message, developerRole));
+			out.push(
+				toTransportMessage(message, developerRole, replayReasoningContent),
+			);
 			continue;
 		}
 		const text = parts.filter((part) => part.type === "text");
@@ -265,7 +278,25 @@ export interface BuildChatBodyOptions {
 	developerRole?: "developer" | "system";
 	/** Emit the non-OpenAI top_k sampling extension. */
 	supportsTopK?: boolean;
+	/**
+	 * Send an assistant turn's `reasoning_content` back, for providers whose thinking models need
+	 * it in later requests (DeepSeek with tools, Kimi, GLM preserved thinking, MiniMax). OpenAI
+	 * defines no such field, so it is off unless the adapter says otherwise.
+	 */
+	replayReasoningContent?: boolean;
 	reasoningSpec?: ReasoningSpec;
+}
+
+/** An assistant turn's reasoning as the provider returned it, kept for the next request. */
+export function assistantReasoningContent(
+	message: CanonicalMessage,
+): string | undefined {
+	const chat = message.providerFields?.chat as
+		| { reasoning_content?: unknown }
+		| undefined;
+	return typeof chat?.reasoning_content === "string"
+		? chat.reasoning_content
+		: undefined;
 }
 
 function openAIReasoningEffort(
@@ -314,7 +345,11 @@ export function buildOpenAIChatBody(
 	const developerRole = opts.developerRole ?? "developer";
 	const body: Record<string, unknown> = {
 		model: upstreamModel,
-		messages: toTransportMessages(req.messages, developerRole),
+		messages: toTransportMessages(
+			req.messages,
+			developerRole,
+			opts.replayReasoningContent === true,
+		),
 		stream: req.stream,
 	};
 	// We ALWAYS request usage in streaming so we can account for it (TPM/budget/cost). If the client

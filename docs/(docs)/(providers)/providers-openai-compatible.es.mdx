@@ -27,6 +27,8 @@ Envía este cuerpo a `POST /admin/deployments` con credencial de operador. Reemp
 - **Agregadores y API compatibles alojadas** usan este mismo adapter con un `baseUrl` explícito. Si una operación necesita una forma de transport específica del proveedor, establece `transportOverrides` explícitamente, como `image.generate: "chat_completions"` o `video.generate: "videos_async"`.
 - Si el objetivo habla controles de pensamiento de estilo vLLM/SGLang (`chat_template_kwargs`), declare `reasoning.kind: "chat_template_flag"` en la entrada del catálogo personalizado; consulta [Reasoning](/docs/reasoning).
 
+- **Razonamiento en turnos posteriores**: el `reasoning_content` (o `reasoning`) de un turno de asistente que el cliente reenvía se envía como `reasoning_content` a DeepSeek, Moonshot, Z.AI y MiniMax, cuyos modelos de thinking lo necesitan, y no a este adapter genérico, porque OpenAI no define ese campo.
+
 ## Próximos pasos [#next-steps]
 
 - [Crear deployments](/docs/creating-deployments): el ejemplo completo del modelo personalizado.
