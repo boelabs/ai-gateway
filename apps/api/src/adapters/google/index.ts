@@ -477,6 +477,15 @@ function buildGeminiBody(
 	const systemParts: Record<string, unknown>[] = [];
 	// Map toolCallId -> function name (to map tool results).
 	const toolNameById = new Map<string, string>();
+	// Position of each call in the latest model turn, and the user turn its results are joining.
+	const callOrder = new Map<string, number>();
+	let toolTurn:
+		| {
+				content: { role: "user"; parts: Record<string, unknown>[] };
+				responses: { order: number; part: Record<string, unknown> }[];
+				siblings: Record<string, unknown>[];
+		  }
+		| undefined;
 
 	// Only leading system/developer messages form `systemInstruction`. Responses API clients also send
 	// developer messages mid-conversation (context updates, local compaction summaries); folding them
@@ -493,6 +502,9 @@ function buildGeminiBody(
 	};
 
 	for (const m of req.messages) {
+		if (m.role !== "tool") {
+			toolTurn = undefined;
+		}
 		if (m.role === "system" || m.role === "developer") {
 			const parts = contentToParts(m.content);
 			if (conversationStarted) {
@@ -523,7 +535,12 @@ function buildGeminiBody(
 			if (nativeParts === undefined && m.content) {
 				parts.push(...contentToParts(m.content));
 			}
+			// /v1/responses sends one model turn as several items, which rejoin it below.
+			if (body.contents.at(-1)?.role !== "model") {
+				callOrder.clear();
+			}
 			for (const tc of m.toolCalls ?? []) {
+				callOrder.set(tc.id, callOrder.size);
 				toolNameById.set(tc.id, tc.name);
 				let args: unknown = {};
 				try {
@@ -583,20 +600,35 @@ function buildGeminiBody(
 				? media.filter(isFunctionResponseMedia)
 				: [];
 			const siblings = media.filter((part) => !nested.includes(part));
-			body.contents.push({
-				role: "user",
-				parts: [
-					{
-						functionResponse: {
-							name,
-							response,
-							...(nested.length > 0 ? { parts: nested } : {}),
-							...(m.toolCallId ? { id: m.toolCallId } : {}),
-						},
-					},
-					...siblings,
-				],
+			const functionResponse = {
+				functionResponse: {
+					name,
+					response,
+					...(nested.length > 0 ? { parts: nested } : {}),
+					...(m.toolCallId ? { id: m.toolCallId } : {}),
+				},
+			};
+			// Gemini wants every response to a turn's parallel calls in one content, in the order
+			// of the calls, so consecutive tool results join the same turn.
+			if (toolTurn === undefined) {
+				toolTurn = {
+					content: { role: "user", parts: [] },
+					responses: [],
+					siblings: [],
+				};
+				body.contents.push(toolTurn.content);
+			}
+			toolTurn.responses.push({
+				order: callOrder.get(m.toolCallId ?? "") ?? Number.MAX_SAFE_INTEGER,
+				part: functionResponse,
 			});
+			toolTurn.siblings.push(...siblings);
+			toolTurn.content.parts = [
+				...[...toolTurn.responses]
+					.sort((left, right) => left.order - right.order)
+					.map((entry) => entry.part),
+				...toolTurn.siblings,
+			];
 			continue;
 		}
 		// user

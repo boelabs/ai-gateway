@@ -1461,16 +1461,24 @@ test("google.buildRequest: Responses parallel calls return as one model turn", a
 			name: "weather",
 			arguments: '{"city":"Rome"}',
 		},
+		// Results in the other order than the calls: they still go back in call order.
+		{ type: "function_call_output", call_id: "c2", output: "{}" },
 		{
 			type: "function_call_output",
 			call_id: "c1__thought__sig-1",
 			output: "{}",
 		},
-		{ type: "function_call_output", call_id: "c2", output: "{}" },
 	]);
+	// Every result of the parallel calls returns in one user turn.
 	assert.deepEqual(
 		body.contents.map((content: { role: string }) => content.role),
-		["user", "model", "user", "user"],
+		["user", "model", "user"],
+	);
+	assert.deepEqual(
+		body.contents[2].parts.map(
+			(part: { functionResponse: { id: string } }) => part.functionResponse.id,
+		),
+		["c1", "c2"],
 	);
 	assert.deepEqual(body.contents[1].parts, [
 		{
