@@ -1,6 +1,7 @@
 import { getRegistryVersion } from "#db/repos/extensions.ts";
 import type { CallType } from "#core/callType.ts";
-import { GatewayError } from "#core/errors.ts";
+import { GatewayError, type ErrorClass } from "#core/errors.ts";
+import { ExtensionRejection, type ExtensionRejectionStatus } from "./sdk.ts";
 import { pathToFileURL } from "node:url";
 import { log } from "#logging/log.ts";
 import { env } from "#config/env.ts";
@@ -327,6 +328,44 @@ function hookError(
 	});
 }
 
+const REJECTION_CLASS: Record<ExtensionRejectionStatus, ErrorClass> = {
+	400: "bad_request",
+	403: "permission",
+	413: "bad_request",
+	422: "bad_request",
+	429: "rate_limit",
+};
+
+/**
+ * What a hook's thrown error means. A deliberate rejection passes through as the client's 4xx and
+ * leaves the breaker alone; so does a hook interrupted because the client went away, which says
+ * nothing about the extension. Anything else is the extension failing.
+ */
+function hookFailure(
+	instance: LoadedInstance,
+	hook: ExtensionHookName,
+	err: unknown,
+	requestSignal: AbortSignal,
+): GatewayError | unknown {
+	if (ExtensionRejection.is(err)) {
+		return new GatewayError({
+			class: REJECTION_CLASS[err.status],
+			status: err.status,
+			message: `Extension "${instance.definitionKey}" instance "${instance.id}" rejected the request in ${hook}: ${err.message}`,
+			publicMessage: err.message,
+			code: err.code,
+			failureKind: "request",
+			deploymentHealth: "neutral",
+			routingScope: "request",
+		});
+	}
+	if (requestSignal.aborted) {
+		return err;
+	}
+	recordFailure(instance, hook, err);
+	return hookError(instance, hook, err);
+}
+
 function disabledError(instance: LoadedInstance): GatewayError {
 	return new GatewayError({
 		class: "server",
@@ -634,8 +673,7 @@ class ExtensionRuntime {
 				}
 				recordSuccess(instance);
 			} catch (err) {
-				recordFailure(instance, "onCanonicalRequest", err);
-				throw hookError(instance, "onCanonicalRequest", err);
+				throw hookFailure(instance, "onCanonicalRequest", err, scope.signal);
 			}
 		}
 		return current as T;
@@ -663,8 +701,7 @@ class ExtensionRuntime {
 				}
 				recordSuccess(instance);
 			} catch (err) {
-				recordFailure(instance, "onCanonicalResponse", err);
-				throw hookError(instance, "onCanonicalResponse", err);
+				throw hookFailure(instance, "onCanonicalResponse", err, scope.signal);
 			}
 		}
 		return current as T;
@@ -689,8 +726,7 @@ class ExtensionRuntime {
 				}
 				recordSuccess(instance);
 			} catch (err) {
-				recordFailure(instance, "onStreamEvent", err);
-				throw hookError(instance, "onStreamEvent", err);
+				throw hookFailure(instance, "onStreamEvent", err, scope.signal);
 			}
 		}
 		return current as T;
@@ -714,8 +750,7 @@ class ExtensionRuntime {
 				}
 				recordSuccess(instance);
 			} catch (err) {
-				recordFailure(instance, "onImageOutput", err);
-				throw hookError(instance, "onImageOutput", err);
+				throw hookFailure(instance, "onImageOutput", err, scope.signal);
 			}
 		}
 		return current;

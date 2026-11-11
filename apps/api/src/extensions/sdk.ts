@@ -149,3 +149,47 @@ export function defineExtension<Config = unknown, Match = unknown>(
 ): ExtensionDefinition<Config, Match> {
 	return definition;
 }
+
+/** Statuses an extension may reject a request with: the request's own problem, not the gateway's. */
+export type ExtensionRejectionStatus = 400 | 403 | 413 | 422 | 429;
+
+const REJECTION = Symbol.for("ai-gateway.extension-rejection");
+
+/**
+ * A hook's deliberate refusal of the request (a firewall blocking it, a policy denying it). Throw it
+ * from any request-scoped hook: the client gets `status` with the message and code given here, and
+ * the extension is not counted as failing, so a busy block rule never trips its circuit breaker.
+ */
+export class ExtensionRejection extends Error {
+	readonly [REJECTION] = true;
+	readonly status: ExtensionRejectionStatus;
+	readonly code: string;
+
+	constructor(options: {
+		message: string;
+		code?: string;
+		status?: ExtensionRejectionStatus;
+	}) {
+		super(options.message);
+		this.name = "ExtensionRejection";
+		this.status = options.status ?? 400;
+		this.code = options.code ?? "request_rejected";
+	}
+
+	static is(value: unknown): value is ExtensionRejection {
+		return (
+			typeof value === "object" &&
+			value !== null &&
+			(value as { [REJECTION]?: unknown })[REJECTION] === true
+		);
+	}
+}
+
+/** Shorthand for `throw new ExtensionRejection(...)`. */
+export function rejectRequest(options: {
+	message: string;
+	code?: string;
+	status?: ExtensionRejectionStatus;
+}): never {
+	throw new ExtensionRejection(options);
+}

@@ -1,4 +1,4 @@
-import { defineExtension } from "#extensions/sdk.ts";
+import { defineExtension, rejectRequest } from "#extensions/sdk.ts";
 
 /*
  * Prompt-injection firewall.
@@ -11,7 +11,7 @@ import { defineExtension } from "#extensions/sdk.ts";
  * every public wire at once: /v1/chat/completions, /v1/responses and /v1/messages.
  *
  * Why this is interesting: it shows a hook that can MUTATE the request in place and a hook that can
- * ABORT it. Throwing from a hook fails the request — see the note on status codes in the README.
+ * REJECT it: `rejectRequest` answers the client with a 4xx and is not counted as a hook failure.
  */
 
 // Curated default heuristics. These are intentionally conservative (high precision, low recall): a
@@ -182,11 +182,11 @@ export default defineExtension({
 			}
 
 			if (action === "block") {
-				// NOTE: today this surfaces to the client as a 500 (the runtime wraps hook errors as
-				// server errors). It still blocks the call. See the README "Blocking" caveat.
-				throw new Error(
-					`prompt-firewall blocked ${total} injection pattern(s) in the request`,
-				);
+				rejectRequest({
+					status: 400,
+					code: "prompt_injection_blocked",
+					message: `The request was blocked: ${total} prompt-injection pattern(s) found.`,
+				});
 			}
 
 			ctx.log.warn("neutralized prompt-injection attempt", {

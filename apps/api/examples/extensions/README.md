@@ -47,9 +47,10 @@ neutralizes the span (`action: "sanitize"`, default) or rejects the whole reques
 ```
 
 - `extraPatterns` are regex strings, validated at startup (a bad regex fails fast).
-- **Blocking caveat:** today a thrown hook error surfaces to the client as HTTP 500 with a generic
-  message — the runtime wraps every hook error as a server error. The call is still blocked. If you
-  need a clean 4xx, prefer `sanitize`, or front the gateway with a dedicated WAF.
+- **Blocking:** the hook calls `rejectRequest` from the extension SDK, so the client gets a `400`
+  with code `prompt_injection_blocked` and the firewall's message. A rejection is not a failure: it
+  never counts towards the instance's circuit breaker, however often the rule fires. Any other error
+  a hook throws is still the extension failing (a generic `500`, counted by the breaker).
 
 ## 2. `pii-vault.mjs` — tokenize in, restore out
 
