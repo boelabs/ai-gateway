@@ -683,7 +683,22 @@ function buildGeminiBody(
 			} else {
 				fc.mode = strictToolDecoding ? "VALIDATED" : "AUTO";
 			}
-			fc.allowedFunctionNames = toolChoice.allowedTools;
+			if (fc.mode === "AUTO") {
+				// allowedFunctionNames is only for ANY and VALIDATED; under AUTO the allowed subset is
+				// expressed by declaring only those functions.
+				const allowed = new Set(toolChoice.allowedTools);
+				for (const tool of (body.tools ?? []) as {
+					functionDeclarations?: { name: string }[];
+				}[]) {
+					if (tool.functionDeclarations) {
+						tool.functionDeclarations = tool.functionDeclarations.filter(
+							(declaration) => allowed.has(declaration.name),
+						);
+					}
+				}
+			} else {
+				fc.allowedFunctionNames = toolChoice.allowedTools;
+			}
 		}
 		body.toolConfig = { functionCallingConfig: fc };
 	}

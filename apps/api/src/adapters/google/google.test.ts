@@ -1516,3 +1516,37 @@ test("google.buildRequest: a replayed native turn does not repeat its function c
 		},
 	]);
 });
+
+test("google: an allowed subset under auto is expressed by the declarations, not allowedFunctionNames", () => {
+	const base: CanonicalChatRequest = {
+		callType: "chat",
+		model: "g",
+		stream: false,
+		messages: [{ role: "user", content: "hi" }],
+		tools: [
+			{ name: "a", parameters: { type: "object" } },
+			{ name: "b", parameters: { type: "object" } },
+		],
+	};
+	const auto = jsonBody(
+		must(googleAdapter, "chat").buildRequest(
+			{ ...base, toolChoice: { allowedTools: ["a"], mode: "auto" } },
+			ctx,
+		),
+	);
+	assert.deepEqual(auto.toolConfig.functionCallingConfig, { mode: "AUTO" });
+	assert.deepEqual(
+		auto.tools[0].functionDeclarations.map((d: { name: string }) => d.name),
+		["a"],
+	);
+	const required = jsonBody(
+		must(googleAdapter, "chat").buildRequest(
+			{ ...base, toolChoice: { allowedTools: ["a"], mode: "required" } },
+			ctx,
+		),
+	);
+	assert.deepEqual(required.toolConfig.functionCallingConfig, {
+		mode: "ANY",
+		allowedFunctionNames: ["a"],
+	});
+});
