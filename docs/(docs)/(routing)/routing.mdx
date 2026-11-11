@@ -94,7 +94,7 @@ The remaining fields are advanced safety controls:
 | `failureWindowSeconds` | `60` | Fixed (non-sliding) failure-counting window |
 | `maxCooldownSeconds` | `300` | Maximum exponential cooldown after failed recovery probes |
 | `halfOpenProbeSeconds` | `30` | Ownership TTL for the single half-open recovery probe |
-| `configurationCooldownSeconds` | `300` | Immediate quarantine for invalid credentials/model access |
+| `configurationCooldownSeconds` | `300` | Immediate quarantine for invalid credentials/model access, or an upstream `402` (the account cannot pay) |
 | `throttleCooldownSeconds` | `5` | Minimum shared-capacity cooldown for provider `429` responses |
 
 ### How long the gateway waits

@@ -216,3 +216,42 @@ test("upstream errors: provider permission failures are public gateway errors", 
 	assert.equal(error.param, null);
 	assert.equal(error.code, null);
 });
+
+test("an upstream 402 fails over as configuration with a generic public message", () => {
+	const error = mapUpstreamHttpError(
+		{
+			status: 402,
+			body: {
+				error: { message: "Your credit balance is too low", code: "billing" },
+			},
+		},
+		{ label: "P" },
+	);
+	assert.equal(error.failureKind, "configuration");
+	assert.equal(error.httpStatus, 502);
+	assert.equal(error.code === "billing", false);
+	assert.doesNotMatch(error.publicMessage, /credit/u);
+});
+
+test("only 400, 413 and 422 expose the upstream's request detail", () => {
+	for (const [status, exposed] of [
+		[400, true],
+		[422, true],
+		[409, false],
+		[451, false],
+	] as const) {
+		const error = mapUpstreamHttpError(
+			{
+				status,
+				body: { error: { message: "detail from upstream", param: "p" } },
+			},
+			{ label: "P" },
+		);
+		assert.equal(
+			error.publicMessage === "detail from upstream",
+			exposed,
+			String(status),
+		);
+		assert.equal(error.param === "p", exposed, String(status));
+	}
+});

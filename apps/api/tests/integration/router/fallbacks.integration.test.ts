@@ -1,3 +1,4 @@
+import { mapUpstreamHttpError } from "#adapters/upstreamError.ts";
 import { normalizeExecutionPolicies } from "#core/executionPolicy.ts";
 import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
@@ -553,6 +554,42 @@ test("router: a request the upstream rejects ends after one attempt, as the prov
 				(error.attempts?.length ?? 0) === 1,
 		);
 		assert.equal(calls, 1);
+	} finally {
+		await cleanupDeployments(deployments);
+	}
+});
+
+test("router: an upstream 402 fails over to a sibling instead of ending the request", {
+	skip,
+}, async () => {
+	const publicModel = modelName("payment");
+	const deployments = [
+		await deployment(publicModel),
+		await deployment(publicModel),
+	];
+	const tried: string[] = [];
+	try {
+		const result = await route(
+			publicModel,
+			"chat",
+			{ clientSignal: new AbortController().signal, requestId: randomUUID() },
+			async (candidate) => {
+				tried.push(candidate.row.id);
+				if (tried.length === 1) {
+					throw mapUpstreamHttpError(
+						{
+							status: 402,
+							body: { error: { message: "Insufficient credits" } },
+						},
+						{ label: "P" },
+					);
+				}
+				return candidate.row.id;
+			},
+		);
+		assert.equal(result.attempts, 2);
+		assert.notEqual(tried[0], tried[1]);
+		await result.finish(null);
 	} finally {
 		await cleanupDeployments(deployments);
 	}

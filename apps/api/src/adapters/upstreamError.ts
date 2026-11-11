@@ -156,10 +156,16 @@ function publicProviderField(
 	return safe.length <= maxChars ? safe : `${safe.slice(0, maxChars - 1)}…`;
 }
 
+/**
+ * Statuses whose detail describes the client's own request: a malformed request, an oversized
+ * body, unprocessable content. Every other 4xx (payment, conflicts, legal blocks...) is about the
+ * deployment or its account, and its wording stays private.
+ */
+const REQUEST_DETAIL_STATUSES = new Set([400, 413, 422]);
+
 function exposesRequestDetail(cls: ErrorClass, status: number): boolean {
 	return (
-		status >= 400 &&
-		status < 500 &&
+		REQUEST_DETAIL_STATUSES.has(status) &&
 		(cls === "bad_request" ||
 			cls === "context_window" ||
 			cls === "content_policy")
@@ -197,11 +203,13 @@ export function mapUpstreamHttpError(
 		const headerRetryAfterMs = parseRetryAfter(up.headers?.["retry-after"]);
 		const retryAfterMs =
 			headerRetryAfterMs ?? mapping.retryAfterMs?.(up.status, up.body);
-		const upstreamCredentialFailure = up.status === 401 || up.status === 403;
+		// The deployment's credentials or account failed, not the client: a generic server error.
+		const upstreamCredentialFailure =
+			up.status === 401 || up.status === 403 || up.status === 402;
 		const exposeDetail =
 			!upstreamCredentialFailure && exposesRequestDetail(cls, up.status);
 		const exposeFields =
-			!upstreamCredentialFailure && up.status >= 400 && up.status < 500;
+			!upstreamCredentialFailure && REQUEST_DETAIL_STATUSES.has(up.status);
 		return new GatewayError({
 			class: cls,
 			...(upstreamCredentialFailure ? { publicClass: "server" as const } : {}),
