@@ -14,8 +14,75 @@ import type { Context } from "hono";
  */
 
 export const REALTIME_MAX_MS = 60 * 60 * 1000;
-export const MAX_MESSAGE_BYTES = 16 * 1024 * 1024;
+/**
+ * A realtime client event: an audio chunk is a few kilobytes, an image item a few megabytes. The
+ * cap keeps one frame from holding a process's memory.
+ */
+export const MAX_MESSAGE_BYTES = 4 * 1024 * 1024;
 export const MAX_QUEUED_EVENTS = 2000;
+/** Bytes of client messages one socket may have waiting to be handled. */
+export const MAX_QUEUED_BYTES_PER_CONNECTION = 32 * 1024 * 1024;
+/** Bytes of waiting client messages across every socket of the process. */
+export const MAX_QUEUED_BYTES_PER_PROCESS = 512 * 1024 * 1024;
+
+let processQueuedBytes = 0;
+
+/** Size of a raw WebSocket message as received. */
+export function messageBytes(data: unknown): number {
+	if (typeof data === "string") {
+		return Buffer.byteLength(data, "utf8");
+	}
+	if (data instanceof ArrayBuffer) {
+		return data.byteLength;
+	}
+	if (ArrayBuffer.isView(data)) {
+		return data.byteLength;
+	}
+	if (data instanceof Blob) {
+		return data.size;
+	}
+	return 0;
+}
+
+/**
+ * Admits a client message to a socket's queue by its bytes, per connection and per process; false
+ * means the caller closes the socket, since a client that sends faster than it is served would
+ * otherwise grow memory without bound. `release` returns the bytes once the message is handled.
+ */
+export function admitQueuedBytes(
+	queue: { queuedBytes: number },
+	bytes: number,
+	perConnection = MAX_QUEUED_BYTES_PER_CONNECTION,
+): { release: () => void } | null {
+	if (
+		queue.queuedBytes + bytes > perConnection ||
+		processQueuedBytes + bytes > MAX_QUEUED_BYTES_PER_PROCESS
+	) {
+		return null;
+	}
+	queue.queuedBytes += bytes;
+	processQueuedBytes += bytes;
+	let released = false;
+	return {
+		release: () => {
+			if (released) {
+				return;
+			}
+			released = true;
+			queue.queuedBytes -= bytes;
+			processQueuedBytes -= bytes;
+		},
+	};
+}
+
+export function queuedBytesError(): GatewayError {
+	return new GatewayError({
+		class: "rate_limit",
+		code: "websocket_queue_bytes_exceeded",
+		message: "Realtime WebSocket queued-bytes limit exceeded",
+		publicMessage: "Client messages arrive faster than they can be handled.",
+	});
+}
 /** How often an open socket's credential is re-checked between provider runs. */
 export const CREDENTIAL_CHECK_MS = 60_000;
 

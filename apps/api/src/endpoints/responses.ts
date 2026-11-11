@@ -1,3 +1,8 @@
+import {
+	admitQueuedBytes,
+	queuedBytesError,
+	messageBytes,
+} from "./realtimeSockets.ts";
 import { ResponsesWebSocketUpstreams } from "#gateway/responsesWebSocketSessions.ts";
 import type { GatewayError as GatewayErrorType } from "#core/errors.ts";
 import { authenticateRequest, getAuth } from "#auth/middleware.ts";
@@ -968,6 +973,9 @@ export async function listResponseInputItemsHandler(
 
 const RESPONSES_WEBSOCKET_MAX_MS = 60 * 60 * 1000;
 const RESPONSES_WEBSOCKET_MAX_MESSAGE_BYTES = 16 * 1024 * 1024;
+/** A turn carries a whole input; a few may wait behind the one running. */
+const RESPONSES_WEBSOCKET_MAX_QUEUED_BYTES =
+	4 * RESPONSES_WEBSOCKET_MAX_MESSAGE_BYTES;
 
 interface ActiveResponsesWebSocket {
 	state: ConnectionResponseState | null;
@@ -979,6 +987,7 @@ interface ActiveResponsesWebSocket {
 	preferredDeploymentId: string | null;
 	scopeKey: string;
 	queuedTurns: number;
+	queuedBytes: number;
 }
 
 const activeResponsesWebSockets = new Set<ActiveResponsesWebSocket>();
@@ -1398,6 +1407,7 @@ export const responsesWebSocketHandler = upgradeWebSocket(
 			preferredDeploymentId: null,
 			scopeKey,
 			queuedTurns: 0,
+			queuedBytes: 0,
 			timer: undefined,
 		};
 		const startTimer = () =>
@@ -1451,6 +1461,21 @@ export const responsesWebSocketHandler = upgradeWebSocket(
 					}
 					return;
 				}
+				const admitted = admitQueuedBytes(
+					session,
+					messageBytes(event.data),
+					RESPONSES_WEBSOCKET_MAX_QUEUED_BYTES,
+				);
+				if (!admitted) {
+					if (session.socket) {
+						void sendWebSocketJson(
+							session.socket,
+							websocketError(queuedBytesError()),
+						);
+						session.socket.close(1008, "too much queued data");
+					}
+					return;
+				}
 				session.queuedTurns += 1;
 				session.queue = session.queue
 					.then(() => executeResponsesWebSocketTurn(c, session, event.data))
@@ -1465,6 +1490,7 @@ export const responsesWebSocketHandler = upgradeWebSocket(
 					})
 					.finally(() => {
 						session.queuedTurns -= 1;
+						admitted.release();
 					});
 			},
 			onClose() {

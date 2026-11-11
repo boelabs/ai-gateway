@@ -171,6 +171,7 @@ Gemini termina de generarlo y se factura.
 - Gemini solo toma su configuración al abrir una conexión. Un `session.update` que la cambia se responde con `session.updated` de inmediato y se aplica en el siguiente momento en que no hay nada en curso (cuando termina el turno actual): una sesión nueva sembrada con la conversación. Una conexión que el gateway rota entretanto conserva la configuración nueva pendiente en lugar de reabrirse con la anterior.
 - `REALTIME_WEBSOCKET_MAX_CONNECTIONS` y `REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY` limitan las
   sesiones abiertas por proceso y por key.
+- Un evento del cliente puede ocupar como máximo 4 MiB. Los eventos en espera de procesarse pueden ocupar como máximo 32 MiB por conexión (y 512 MiB en todo el proceso): un cliente que envía más rápido de lo que se le atiende recibe un `error` con código `websocket_queue_bytes_exceeded` y el socket se cierra con `1008`.
 - Cada conexión se registra como una operación `realtime.conversation` con el uso que informó Gemini
   y su costo. Los modelos Live cobran distinto el audio y el texto (`audioInputCentsPerMTokens`,
   `audioOutputCentsPerMTokens` en el catálogo). Si el proveedor no informa uso, el gateway lo estima

@@ -173,6 +173,9 @@ generating it, and it is billed.
   rotates meanwhile keeps the new configuration waiting rather than reopening with the old one.
 - `REALTIME_WEBSOCKET_MAX_CONNECTIONS` and `REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY` cap open
   sessions per process and per key.
+- A client event may be at most 4 MiB. Events waiting to be handled may hold at most 32 MiB per
+  connection (and 512 MiB across the process): a client that sends faster than it is served gets an
+  `error` with code `websocket_queue_bytes_exceeded` and the socket is closed with `1008`.
 - Each connection is logged as one `realtime.conversation` operation with the usage Gemini reported
   and its cost. Live models price audio and text separately (`audioInputCentsPerMTokens`,
   `audioOutputCentsPerMTokens` in the catalog). If the provider reports no usage, the gateway

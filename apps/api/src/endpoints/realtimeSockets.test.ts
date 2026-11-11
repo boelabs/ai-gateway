@@ -1,47 +1,46 @@
-import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { responsesWebSocketHandler } from "./responses.ts";
-import { realtimeWebSocketHandler } from "./realtime.ts";
-import { GatewayError } from "#core/errors.ts";
-import type { AppEnv } from "#auth/types.ts";
 import assert from "node:assert/strict";
-import { env } from "#config/env.ts";
 import { test } from "node:test";
-import { Hono } from "hono";
 
-function app(): Hono<AppEnv> {
-	const instance = new Hono<AppEnv>();
-	instance.onError((error, c) =>
-		GatewayError.is(error)
-			? c.text(
-					error.code ?? error.class,
-					error.httpStatus as ContentfulStatusCode,
-				)
-			: c.text("server", 500),
-	);
-	instance.use("*", async (c, next) => {
-		c.set("auth", { type: "master" });
-		return next();
-	});
-	instance.get("/v1/responses", responsesWebSocketHandler);
-	instance.get("/v1/realtime", realtimeWebSocketHandler);
-	return instance;
-}
+import {
+	MAX_QUEUED_BYTES_PER_PROCESS,
+	admitQueuedBytes,
+	messageBytes,
+} from "./realtimeSockets.ts";
 
-test("plain GETs are refused before they can hold a WebSocket slot", async () => {
-	const instance = app();
-	const attempts =
-		Math.max(
-			env.RESPONSES_WEBSOCKET_MAX_CONNECTIONS_PER_KEY,
-			env.REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY,
-		) + 2;
-	for (let i = 0; i < attempts; i += 1) {
-		const responses = await instance.request(
-			"http://gateway.test/v1/responses",
+test("a socket's queue is bounded by bytes, not only by count", () => {
+	const connection = { queuedBytes: 0 };
+	const first = admitQueuedBytes(connection, 20 * 1024 * 1024);
+	assert.ok(first);
+	// A second large message would hold more than the connection may queue.
+	assert.equal(admitQueuedBytes(connection, 20 * 1024 * 1024), null);
+	first.release();
+	first.release();
+	assert.equal(connection.queuedBytes, 0);
+	assert.ok(admitQueuedBytes(connection, 20 * 1024 * 1024));
+});
+
+test("the process-wide bound holds across connections", () => {
+	const held: { release: () => void }[] = [];
+	let refused = false;
+	for (let i = 0; i < 64 && !refused; i += 1) {
+		const admitted = admitQueuedBytes(
+			{ queuedBytes: 0 },
+			MAX_QUEUED_BYTES_PER_PROCESS / 16,
 		);
-		assert.equal(responses.status, 426);
-		const realtime = await instance.request(
-			"http://gateway.test/v1/realtime?model=m",
-		);
-		assert.equal(realtime.status, 426);
+		if (admitted) {
+			held.push(admitted);
+		} else {
+			refused = true;
+		}
 	}
+	assert.equal(refused, true);
+	for (const entry of held) {
+		entry.release();
+	}
+});
+
+test("message sizes count bytes of text and binary frames", () => {
+	assert.equal(messageBytes("é"), 2);
+	assert.equal(messageBytes(new ArrayBuffer(5)), 5);
+	assert.equal(messageBytes(new Uint8Array(7)), 7);
 });

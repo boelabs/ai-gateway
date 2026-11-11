@@ -25,6 +25,9 @@ import {
 	capacityLimitError,
 	sendRealtimeEvent,
 	MAX_QUEUED_EVENTS,
+	admitQueuedBytes,
+	queuedBytesError,
+	messageBytes,
 	REALTIME_MAX_MS,
 	watchCredential,
 } from "./realtimeSockets.ts";
@@ -103,6 +106,7 @@ interface ConversationConnection {
 	decoder: AudioInputDecoder;
 	queue: Promise<void>;
 	queued: number;
+	queuedBytes: number;
 	run: ConversationRun | null;
 	/**
 	 * The provider session failed to open. Later events report it instead of retrying (and logging)
@@ -594,6 +598,7 @@ export function realtimeConversationSocket(
 		decoder: createAudioInputDecoder(state.inputFormat),
 		queue: Promise.resolve(),
 		queued: 0,
+		queuedBytes: 0,
 		run: null,
 		failed: null,
 		timer: undefined,
@@ -628,11 +633,18 @@ export function realtimeConversationSocket(
 				sendError(connection, eventQueueLimitError());
 				return;
 			}
+			const admitted = admitQueuedBytes(connection, messageBytes(event.data));
+			if (!admitted) {
+				sendError(connection, queuedBytesError());
+				connection.entry.socket?.close(1008, "too much queued data");
+				return;
+			}
 			connection.queued += 1;
 			connection.queue = connection.queue
 				.then(() => handleMessage(connection, event.data))
 				.finally(() => {
 					connection.queued -= 1;
+					admitted.release();
 				});
 		},
 		onClose() {
