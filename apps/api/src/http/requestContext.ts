@@ -2,11 +2,15 @@ import type { Context, MiddlewareHandler } from "hono";
 import type { AppEnv } from "#auth/types.ts";
 import { randomUUID } from "node:crypto";
 
-const MAX_REQUEST_ID_LENGTH = 128;
+/**
+ * A client's own request id is kept only when it is a plain token: it is echoed in headers, written
+ * to logs and exported to CSV, where markup, spaces or a leading "=" would be someone else's input.
+ */
+const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
 function incomingRequestId(c: Context): string | null {
 	const raw = c.req.header("x-request-id")?.trim();
-	if (!raw || raw.length > MAX_REQUEST_ID_LENGTH) {
+	if (!(raw && REQUEST_ID.test(raw))) {
 		return null;
 	}
 	return raw;
