@@ -855,12 +855,27 @@ async function loadStateOr404(c: Context<AppEnv>): Promise<{
 	return { id, row };
 }
 
-/** GET /v1/responses/{id} - returns the stored canonical `response` object. */
+/** The `include[]` values of a retrieval request (`include` and `include[]` both accepted). */
+function includeQuery(c: Context<AppEnv>): string[] {
+	return [
+		...(c.req.queries("include") ?? []),
+		...(c.req.queries("include[]") ?? []),
+	];
+}
+
+/**
+ * GET /v1/responses/{id} - the stored response. Its output is the stored copy, which keeps every
+ * item, shown as `include` asks: encrypted reasoning and gateway state only when requested.
+ */
 export async function retrieveResponseHandler(
 	c: Context<AppEnv>,
 ): Promise<Response> {
 	const { row } = await loadStateOr404(c);
-	return c.json(row.response as object);
+	const response = {
+		...(row.response as Record<string, unknown>),
+		output: row.output,
+	};
+	return c.json(responseForClient(response, includeQuery(c)));
 }
 
 /** DELETE /v1/responses/{id} - deletes the saved state. */
@@ -884,22 +899,68 @@ export async function deleteResponseHandler(
 	return c.json({ id, object: "response.deleted", deleted: true });
 }
 
-/** GET /v1/responses/{id}/input_items - lists the stored input items. */
+const INPUT_ITEMS_DEFAULT_LIMIT = 20;
+const INPUT_ITEMS_MAX_LIMIT = 100;
+
+/**
+ * GET /v1/responses/{id}/input_items - the stored input items, paginated as OpenAI does (`limit`
+ * 1-100, default 20; `order` desc by default; `after` an item id), without gateway state and with
+ * encrypted reasoning only when `include` asks for it. Items the client sent without an id get one
+ * derived from the response and their position, so every item can be a cursor.
+ */
 export async function listResponseInputItemsHandler(
 	c: Context<AppEnv>,
 ): Promise<Response> {
-	const { row } = await loadStateOr404(c);
-	const items = row.requestInput;
-	const [first] = items;
-	const last = items.at(-1);
-	const idOf = (it: Record<string, unknown>): string | null =>
-		typeof it.id === "string" ? it.id : null;
+	const { id, row } = await loadStateOr404(c);
+	const limitParam = c.req.query("limit");
+	const limit =
+		limitParam === undefined ? INPUT_ITEMS_DEFAULT_LIMIT : Number(limitParam);
+	if (!Number.isInteger(limit) || limit < 1 || limit > INPUT_ITEMS_MAX_LIMIT) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_request_error",
+			param: "limit",
+			message: `limit must be an integer between 1 and ${INPUT_ITEMS_MAX_LIMIT}`,
+		});
+	}
+	const order = c.req.query("order") ?? "desc";
+	if (order !== "asc" && order !== "desc") {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_request_error",
+			param: "order",
+			message: "order must be asc or desc",
+		});
+	}
+	const visible = (
+		responseForClient({ output: row.requestInput }, includeQuery(c))
+			.output as Record<string, unknown>[]
+	).map((item, index) =>
+		typeof item.id === "string"
+			? item
+			: { ...item, id: `${id}_input_${index}` },
+	);
+	const ordered = order === "asc" ? visible : [...visible].reverse();
+	const after = c.req.query("after");
+	const start =
+		after === undefined
+			? 0
+			: ordered.findIndex((item) => item.id === after) + 1;
+	if (after !== undefined && start === 0) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_request_error",
+			param: "after",
+			message: `No input item with id ${after}`,
+		});
+	}
+	const data = ordered.slice(start, start + limit);
 	return c.json({
 		object: "list",
-		data: items,
-		first_id: first ? idOf(first) : null,
-		last_id: last ? idOf(last) : null,
-		has_more: false,
+		data,
+		first_id: (data[0]?.id as string | undefined) ?? null,
+		last_id: (data.at(-1)?.id as string | undefined) ?? null,
+		has_more: start + limit < ordered.length,
 	});
 }
 

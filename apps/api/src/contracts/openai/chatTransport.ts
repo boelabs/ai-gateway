@@ -672,8 +672,11 @@ function unreportedResponseUsage(
 }
 
 export function parseOpenAIChatResponse(raw: unknown): CanonicalChatResponse {
-	const r = (raw ?? {}) as TransportResponse;
+	const r = (raw ?? {}) as TransportResponse & { system_fingerprint?: unknown };
 	const response = {
+		...(typeof r.system_fingerprint === "string"
+			? { systemFingerprint: r.system_fingerprint }
+			: {}),
 		id: r.id ?? "",
 		created: r.created ?? Math.floor(Date.now() / 1000),
 		model: r.model ?? "",
@@ -746,8 +749,11 @@ interface TransportChunk {
 }
 
 export function parseOpenAIChatChunk(raw: unknown): CanonicalChatStreamChunk {
-	const r = (raw ?? {}) as TransportChunk;
+	const r = (raw ?? {}) as TransportChunk & { system_fingerprint?: unknown };
 	const chunk: CanonicalChatStreamChunk = {
+		...(typeof r.system_fingerprint === "string"
+			? { systemFingerprint: r.system_fingerprint }
+			: {}),
 		id: r.id ?? "",
 		created: r.created ?? Math.floor(Date.now() / 1000),
 		model: r.model ?? "",

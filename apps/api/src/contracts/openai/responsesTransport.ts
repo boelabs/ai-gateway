@@ -11,6 +11,7 @@
  * reasoning content for unstored responses.
  */
 
+import { chatAnnotationFromResponses, chatLogprobs } from "./outputText.ts";
 import { writePromptCachePolicy, writeCacheBreakpoint } from "./promptCache.ts";
 import { completionTokensWithReasoning } from "./chatTransport.ts";
 import { mergeExtraBody } from "#core/extraBody.ts";
@@ -574,7 +575,13 @@ export function parseResponsesUsage(
 interface RWOutputItem {
 	[key: string]: unknown;
 	type?: string;
-	content?: Array<{ type?: string; text?: string; refusal?: string }>;
+	content?: Array<{
+		type?: string;
+		text?: string;
+		refusal?: string;
+		annotations?: Record<string, unknown>[];
+		logprobs?: unknown[];
+	}>;
 	summary?: Array<{ type?: string; text?: string } | string>;
 	call_id?: string;
 	id?: string;
@@ -631,6 +638,20 @@ function servedResponsesUsage(r: RWResponse): Usage {
 		: usage;
 }
 
+/** An annotation of a later output_text part, with its offsets moved into the joined text. */
+function shiftAnnotation(
+	annotation: Record<string, unknown>,
+	offset: number,
+): Record<string, unknown> {
+	const shifted = { ...annotation };
+	for (const key of ["start_index", "end_index"]) {
+		if (typeof shifted[key] === "number") {
+			shifted[key] = (shifted[key] as number) + offset;
+		}
+	}
+	return shifted;
+}
+
 function finishFrom(
 	r: RWResponse,
 	hasToolCalls: boolean,
@@ -666,6 +687,8 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 	}
 	let content = "";
 	let refusal = "";
+	const annotations: Record<string, unknown>[] = [];
+	const logprobs: unknown[] = [];
 	const reasoning: string[] = [];
 	const reasoningState: OpenAIReasoningStateItem[] = [];
 	const toolCalls: NonNullable<
@@ -678,6 +701,16 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 		if (item.type === "message") {
 			for (const c of item.content ?? []) {
 				if (c.type === "output_text") {
+					// Annotation offsets are relative to their part; the parts become one text.
+					const offset = content.length;
+					for (const annotation of c.annotations ?? []) {
+						annotations.push(
+							chatAnnotationFromResponses(
+								offset === 0 ? annotation : shiftAnnotation(annotation, offset),
+							),
+						);
+					}
+					logprobs.push(...(c.logprobs ?? []));
 					content += c.text ?? "";
 				} else if (c.type === "refusal") {
 					refusal += c.refusal ?? "";
@@ -704,6 +737,7 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 		role: "assistant",
 		content: content.length > 0 ? content : null,
 		...(refusal.length > 0 ? { refusal } : {}),
+		...(annotations.length > 0 ? { annotations } : {}),
 	};
 	const responseMessage = output.find(
 		(item) => item.type === "message" && item.phase !== undefined,
@@ -734,7 +768,12 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 		created: r.created_at ?? Math.floor(Date.now() / 1000),
 		model: r.model ?? "",
 		choices: [
-			{ index: 0, finishReason: finishFrom(r, toolCalls.length > 0), message },
+			{
+				index: 0,
+				finishReason: finishFrom(r, toolCalls.length > 0),
+				...(logprobs.length > 0 ? { logprobs: chatLogprobs(logprobs) } : {}),
+				message,
+			},
 		],
 		usage: servedResponsesUsage(r),
 	};
@@ -873,7 +912,45 @@ export async function* responsesEventsToCanonicalChunks(
 				roleSent = true;
 			}
 			delta.content = String(d.delta ?? "");
-			yield { ...base(), choices: [{ index: 0, delta, finishReason: null }] };
+			const tokens = Array.isArray(d.logprobs) ? d.logprobs : [];
+			yield {
+				...base(),
+				choices: [
+					{
+						index: 0,
+						delta,
+						finishReason: null,
+						...(tokens.length > 0 ? { logprobs: chatLogprobs(tokens) } : {}),
+					},
+				],
+			};
+			continue;
+		}
+
+		if (type === "response.output_text.annotation.added") {
+			const { annotation } = d;
+			if (annotation !== null && typeof annotation === "object") {
+				yield {
+					...base(),
+					choices: [
+						{
+							index: 0,
+							delta: {
+								annotations: [
+									chatAnnotationFromResponses(
+										annotation as Record<string, unknown>,
+									),
+								],
+								providerFields: providerFieldsWithOpenAIResponsesStreamEvent(
+									type,
+									d,
+								),
+							},
+							finishReason: null,
+						},
+					],
+				};
+			}
 			continue;
 		}
 
@@ -942,6 +1019,11 @@ export async function* responsesEventsToCanonicalChunks(
 				providerFields: providerFieldsWithOpenAIResponsesStreamEvent(type, d),
 			};
 			if (item?.type === "function_call") {
+				// A turn that only calls tools still opens with the assistant role, as Chat does.
+				if (!roleSent) {
+					delta.role = "assistant";
+					roleSent = true;
+				}
 				const idx = toolCallOrdinal(d.output_index);
 				delta.toolCalls = [
 					{

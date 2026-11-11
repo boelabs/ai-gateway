@@ -267,7 +267,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description `reasoning.encrypted_content` returns encrypted reasoning and the gateway's message-state items. */
+                    "include[]"?: string[];
+                };
                 header?: never;
                 path: {
                     /** @description OpenResponses response id (resp_...) */
@@ -329,7 +332,14 @@ export interface paths {
         /** List input items for a stored response */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    limit?: number;
+                    order?: "asc" | "desc";
+                    /** @description An item id; the page starts after it. */
+                    after?: string;
+                    /** @description `reasoning.encrypted_content` returns encrypted reasoning and the gateway's message-state items. */
+                    "include[]"?: string[];
+                };
                 header?: never;
                 path: {
                     /** @description OpenResponses response id (resp_...) */

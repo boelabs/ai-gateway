@@ -47,9 +47,12 @@ Unlike Chat Completions, a Response can be **stored** and referenced later:
   client only sends the new turn. Returns `400 previous_response_not_found` if the referenced id
   doesn't exist **or belongs to a different virtual key** — stored state is scoped per key, the same
   way rate limits and budgets are.
-- **`GET /v1/responses/:id`** — retrieve a previously stored response.
+- **`GET /v1/responses/:id`** — retrieve a previously stored response. Encrypted reasoning comes
+  back only with `include[]=reasoning.encrypted_content`.
 - **`GET /v1/responses/:id/input_items`** — list the resolved input items (including anything
-  inherited via `previous_response_id`).
+  inherited via `previous_response_id`), paginated as OpenAI does: `limit` (1–100, default 20),
+  `order` (`desc` by default) and `after` (an item id). Items sent without an id get one derived
+  from the response, so any item can be a cursor.
 - **`DELETE /v1/responses/:id`** — delete stored state early, before its retention window
   (`RESPONSES_STATE_RETENTION_DAYS`) expires it automatically.
 

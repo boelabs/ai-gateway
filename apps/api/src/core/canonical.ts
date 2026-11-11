@@ -299,6 +299,8 @@ export interface CanonicalChatResponse {
 	model: string;
 	choices: CanonicalChatResponseChoice[];
 	usage: Usage;
+	/** The backend configuration fingerprint the provider reported (OpenAI `system_fingerprint`). */
+	systemFingerprint?: string;
 }
 
 export interface CanonicalChatStreamChunk {
@@ -330,6 +332,8 @@ export interface CanonicalChatStreamChunk {
 	}>;
 	/** Only present in the final chunk if includeUsage. */
 	usage?: Usage | null;
+	/** See CanonicalChatResponse.systemFingerprint. */
+	systemFingerprint?: string;
 	/**
 	 * Usage the provider reported as the stream opened (its input tokens, before any output).
 	 * Provisional: the final chunk's `usage` replaces it.

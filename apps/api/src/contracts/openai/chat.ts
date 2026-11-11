@@ -963,6 +963,13 @@ export function toOpenAIChatResponse(
 			};
 		}),
 		usage: toOpenAIUsage(resp.usage),
+		// The tier the request actually ran at, and the backend fingerprint, as OpenAI reports them.
+		...(resp.usage.serviceTier === undefined
+			? {}
+			: { service_tier: resp.usage.serviceTier }),
+		...(resp.systemFingerprint === undefined
+			? {}
+			: { system_fingerprint: resp.systemFingerprint }),
 	};
 }
 
@@ -1060,5 +1067,11 @@ export function toOpenAIChatChunk(
 		...(chunk.usage === undefined
 			? {}
 			: { usage: chunk.usage ? toOpenAIUsage(chunk.usage) : null }),
+		...(chunk.usage?.serviceTier === undefined
+			? {}
+			: { service_tier: chunk.usage.serviceTier }),
+		...(chunk.systemFingerprint === undefined
+			? {}
+			: { system_fingerprint: chunk.systemFingerprint }),
 	};
 }

@@ -1,3 +1,4 @@
+import { responsesAnnotationFromChat, logprobTokens } from "./outputText.ts";
 import { fileParserOptionsFromPlugins } from "#contracts/fileParser.ts";
 import { assertNoManagedExtraBodyKeys } from "#core/extraBody.ts";
 import type { ResponsesRequest } from "./responses.ts";
@@ -1101,12 +1102,30 @@ function statusFor(finish: CanonicalFinishReason | null): {
 	return { status: "completed", incomplete: null };
 }
 
+/** The output_text part, with the annotations and log probabilities the canonical text carries. */
+function outputTextPart(
+	text: string,
+	annotations: Record<string, unknown>[] | undefined,
+	logprobs: unknown[] | undefined,
+): Record<string, unknown> {
+	return {
+		type: "output_text",
+		text,
+		annotations: (annotations ?? []).map(responsesAnnotationFromChat),
+		...(logprobs === undefined ? {} : { logprobs }),
+	};
+}
+
 function messageItem(
 	content: string,
 	id: string,
 	phase?: "commentary" | "final_answer",
 	providerFields?: Record<string, unknown>,
 	refusal?: string,
+	text?: {
+		annotations?: Record<string, unknown>[] | undefined;
+		logprobs?: unknown[] | undefined;
+	},
 ): Record<string, unknown> {
 	return {
 		type: "message",
@@ -1119,7 +1138,7 @@ function messageItem(
 			: { provider_specific_fields: providerFields }),
 		content: [
 			...(content || refusal === undefined
-				? [{ type: "output_text", text: content, annotations: [] }]
+				? [outputTextPart(content, text?.annotations, text?.logprobs)]
 				: []),
 			...(refusal === undefined ? [] : [{ type: "refusal", refusal }]),
 		],
@@ -1300,7 +1319,8 @@ function buildResponse(
 		truncation: req.truncation ?? "disabled",
 		usage: parts.usage ? toResponsesUsage(parts.usage) : null,
 		metadata: req.metadata ?? {},
-		service_tier: req.service_tier ?? "default",
+		// The tier the response ran at when the provider reports it, not just the one requested.
+		service_tier: parts.usage?.serviceTier ?? req.service_tier ?? "default",
 		safety_identifier: req.safety_identifier ?? null,
 		prompt_cache_key: req.prompt_cache_key ?? null,
 		...(providerSpecificFields === undefined
@@ -1363,6 +1383,10 @@ export function canonicalToResponsesResponse(
 					choice?.message.phase,
 					withoutOpenAIResponsesReasoningState(choice?.message.providerFields),
 					refusal,
+					{
+						annotations: choice?.message.annotations,
+						logprobs: logprobTokens(choice?.logprobs),
+					},
 				),
 			);
 		}
@@ -1525,6 +1549,9 @@ export async function* canonicalChunksToResponsesEvents(
 	let textPart: number | undefined;
 	let refusalPart: number | undefined;
 	let refusal = "";
+	let messagePhase: "commentary" | "final_answer" | undefined;
+	const textAnnotations: Record<string, unknown>[] = [];
+	const textLogprobs: unknown[] = [];
 	let msgIndex = 0;
 	const msgId = `msg_${randomUUID()}`;
 
@@ -1655,6 +1682,13 @@ export async function* canonicalChunksToResponsesEvents(
 		}
 
 		const { delta } = choice;
+		if (delta.phase !== undefined) {
+			messagePhase = delta.phase;
+		}
+		const tokens = logprobTokens(choice.logprobs);
+		if (tokens !== undefined) {
+			textLogprobs.push(...tokens);
+		}
 		const streamOutput = openaiResponsesStreamOutputFromProviderFields(
 			delta.providerFields,
 		);
@@ -1837,7 +1871,20 @@ export async function* canonicalChunksToResponsesEvents(
 				output_index: msgIndex,
 				content_index: textPart,
 				delta: delta.content,
+				...(tokens === undefined ? {} : { logprobs: tokens }),
 			});
+		}
+		if (delta.annotations !== undefined && textPart !== undefined) {
+			for (const annotation of delta.annotations) {
+				yield sse("response.output_text.annotation.added", next(), {
+					item_id: msgId,
+					output_index: msgIndex,
+					content_index: textPart,
+					annotation_index: textAnnotations.length,
+					annotation: responsesAnnotationFromChat(annotation),
+				});
+				textAnnotations.push(annotation);
+			}
 		}
 		if (delta.refusal) {
 			if (refusalPart === undefined) {
@@ -1937,7 +1984,11 @@ export async function* canonicalChunksToResponsesEvents(
 				item_id: msgId,
 				output_index: msgIndex,
 				content_index: textPart,
-				part: { type: "output_text", text: content, annotations: [] },
+				part: outputTextPart(
+					content,
+					textAnnotations,
+					textLogprobs.length > 0 ? textLogprobs : undefined,
+				),
 			});
 		}
 		if (refusalPart !== undefined) {
@@ -1957,9 +2008,13 @@ export async function* canonicalChunksToResponsesEvents(
 		const item = messageItem(
 			content,
 			msgId,
-			undefined,
+			messagePhase,
 			messageProviderFields,
 			refusalPart === undefined ? undefined : refusal,
+			{
+				annotations: textAnnotations,
+				logprobs: textLogprobs.length > 0 ? textLogprobs : undefined,
+			},
 		);
 		output.push(item);
 		yield sse("response.output_item.done", next(), {

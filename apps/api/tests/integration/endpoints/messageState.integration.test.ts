@@ -2,7 +2,11 @@ import { createDeployment, deleteDeployment } from "#db/repos/deployments.ts";
 import { jsonResponse, withStubbedFetch } from "#test-support/fetch.ts";
 import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
 import { makeOpenAIContractTestApp } from "#test-support/app.ts";
-import { responsesHandler } from "#endpoints/responses.ts";
+import {
+	listResponseInputItemsHandler,
+	retrieveResponseHandler,
+	responsesHandler,
+} from "#endpoints/responses.ts";
 import { messagesHandler } from "#endpoints/messages.ts";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
@@ -18,6 +22,8 @@ const skip =
 const app = makeOpenAIContractTestApp((instance) => {
 	instance.post("/v1/responses", responsesHandler);
 	instance.post("/v1/messages", messagesHandler);
+	instance.get("/v1/responses/:id", retrieveResponseHandler);
+	instance.get("/v1/responses/:id/input_items", listResponseInputItemsHandler);
 });
 
 type Item = Record<string, unknown>;
@@ -355,11 +361,92 @@ test("stored Claude thinking survives previous_response_id without include", {
 			},
 		);
 		const messages = upstreamBodies[1]?.messages as Item[];
-		assert.deepEqual((messages[1]?.content as Item[])[0], {
+		assert.deepEqual((messages[1]?.content as Item[] | undefined)?.[0], {
 			type: "thinking",
 			thinking: "Search first.",
 			signature: "sig-claude",
 		});
+	} finally {
+		await deleteDeployment(row.id);
+	}
+});
+
+test("stored responses page their input items and show state only on request", {
+	skip,
+}, async () => {
+	const row = await createDeployment({
+		publicModel: `message-state-${randomUUID()}`,
+		adapterKey: "anthropic",
+		upstreamModel: "claude-sonnet-4-5",
+		credentials: { apiKey: "test-key" },
+	});
+	const get = async (path: string) => {
+		const response = await app.request(path, {
+			headers: { authorization: `Bearer ${env.MASTER_KEY}` },
+		});
+		const body = (await response.json()) as Item;
+		assert.equal(response.status, 200, JSON.stringify(body));
+		return body;
+	};
+	try {
+		let responseId = "";
+		await withStubbedFetch(
+			() => claudeToolStream(),
+			async () => {
+				const response = await app.request("/v1/responses", {
+					method: "POST",
+					headers: {
+						authorization: `Bearer ${env.MASTER_KEY}`,
+						"content-type": "application/json",
+					},
+					body: JSON.stringify({
+						model: row.publicModel,
+						stream: true,
+						store: true,
+						reasoning: { effort: "high" },
+						tools: [
+							{
+								type: "function",
+								name: "search",
+								parameters: { type: "object", properties: {} },
+							},
+						],
+						input: [
+							{ role: "user", content: "one" },
+							{ role: "assistant", content: "two" },
+							{ role: "user", content: "find x" },
+						],
+					}),
+				});
+				const wire = await response.text();
+				assert.equal(response.status, 200, wire);
+				const completed = wire
+					.split("\n")
+					.filter((line) => line.startsWith("data: {"))
+					.map((line) => JSON.parse(line.slice(6)) as Item)
+					.find((event) => event.type === "response.completed");
+				responseId = String((completed?.response as Item | undefined)?.id);
+			},
+		);
+		const firstPage = await get(
+			`/v1/responses/${responseId}/input_items?limit=2&order=asc`,
+		);
+		assert.equal((firstPage.data as Item[]).length, 2);
+		assert.equal(firstPage.has_more, true);
+		const secondPage = await get(
+			`/v1/responses/${responseId}/input_items?limit=2&order=asc&after=${String(firstPage.last_id)}`,
+		);
+		assert.equal((secondPage.data as Item[]).length, 1);
+		assert.equal(secondPage.has_more, false);
+		const isCarrier = (item: Item) =>
+			typeof item.encrypted_content === "string" &&
+			item.encrypted_content.startsWith("bfrs_");
+		const plain = await get(`/v1/responses/${responseId}`);
+		assert.ok(!(plain.output as Item[]).some(isCarrier));
+		const withState = await get(
+			`/v1/responses/${responseId}?include[]=reasoning.encrypted_content`,
+		);
+		assert.ok((withState.output as Item[]).some(isCarrier));
 	} finally {
 		await deleteDeployment(row.id);
 	}
