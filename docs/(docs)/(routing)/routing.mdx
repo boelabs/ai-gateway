@@ -86,7 +86,7 @@ Circuit controls remain global. Execution deadlines and retry budgets are define
 
 | Field | Default | Meaning |
 |---|---|---|
-| `allowedFails` | `3` | Transient logical-request failures a deployment is allowed before the **next** one opens cooldown. A success resets the count; `0` opens on the first failure. |
+| `allowedFails` | `3` | Transient logical-request failures a deployment is allowed within the failure window before the **next** one opens cooldown, however many requests succeeded in between; `0` opens on the first failure. |
 | `cooldownSeconds` | `5` | Time a deployment stays in cooldown after exceeding `allowedFails`. `0` disables automatic cooldown circuits. |
 | `retryAfterSeconds` | `0` | Minimum wait before retrying the same upstream (see [Retries](#retries)). |
 

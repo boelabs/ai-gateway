@@ -773,7 +773,7 @@ test("circuit: zero allowed failures opens on the first transient failure", {
 	}
 });
 
-test("circuit: a successful call resets accumulated transient failures", {
+test("circuit: a success in between does not hide the window's failures", {
 	skip,
 }, async () => {
 	const id = randomUUID();
@@ -812,7 +812,8 @@ test("circuit: a successful call resets accumulated transient failures", {
 			message: "after success",
 		});
 		const [snapshot] = await getCircuitSnapshots([{ deployment, capacity }]);
-		assert.equal(snapshot?.status, "available");
+		// Two failures in one window exceed allowedFails: 1, whatever succeeded between them.
+		assert.equal(snapshot?.status, "cooldown");
 	} finally {
 		await cleanup([], [prefix(deployment), prefix(capacity)]);
 	}

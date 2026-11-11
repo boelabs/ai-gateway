@@ -492,8 +492,10 @@ async function closeSubject(
 	token: string,
 ): Promise<void> {
 	const subjectKeys = keys(subject);
+	// A success on a closed circuit changes nothing: failures and attempts are two counts of the same
+	// window, and the failure rate needs both. Clearing the failures here would let one success in
+	// between hide any rate of failure.
 	if (mode === "closed") {
-		await redis.del(subjectKeys.failures);
 		return;
 	}
 	// A forced attempt holds no probe, so the token-guarded close would find nothing to release. It

@@ -51,7 +51,7 @@ Los controles de los circuitos siguen siendo globales. Los plazos de ejecución 
 
 | Campo | Predeterminado | Significado |
 |---|---|---|
-| `allowedFails` | `3` | Fallos transitorios de solicitudes lógicas: se permite un deployment antes de que la **siguiente** abre el cooldown. Un éxito reinicia la cuenta; `0` se abre ante el primer error. |
+| `allowedFails` | `3` | Fallos transitorios de solicitudes lógicas que se permiten a un deployment dentro de la ventana de fallos antes de que el **siguiente** abra el cooldown, sin importar cuántas solicitudes tuvieron éxito entre medias; `0` se abre ante el primer error. |
 | `cooldownSeconds` | `5` | Tiempo que un deployment permanece en cooldown después de exceder `allowedFails`. `0` desactiva los circuitos de enfriamiento automático. |
 | `retryAfterSeconds` | `0` | Espera mínima antes de reintentar el mismo upstream (ver [Reintentos](#retries)). |
 
