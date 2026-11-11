@@ -134,7 +134,9 @@ if mode == "threshold" then
   if not may_open then return { 0, redis.call("PTTL", KEYS[3]) } end
   redis.call("SET", KEYS[4], "1", "PX", history_ttl)
 elseif mode == "half_open" then
-  if redis.call("GET", KEYS[5]) ~= token then return { 0, 0 } end
+  -- Same ownership rule as closing: an expired probe still reports, a newer live one wins.
+  local owner = redis.call("GET", KEYS[5])
+  if owner and owner ~= token then return { 0, 0 } end
   open_count = tonumber(redis.call("INCR", KEYS[4]))
   -- NX keeps the ORIGINAL window: the memory of an episode must not slide forward on every failed
   -- probe, or a client retrying in a loop would keep a deployment half-open forever. It still
@@ -163,9 +165,13 @@ end
 return { 1, duration }
 `;
 
+// The probe key only keeps other requests out for its TTL; it does not bound how long the probing
+// request may run. A probe that outlived its key still closes the circuit when it succeeds, unless
+// another request has taken a live probe since, which then owns the verdict.
 const CLOSE_SCRIPT = `
 local token = ARGV[1]
-if redis.call("GET", KEYS[5]) ~= token then return 0 end
+local owner = redis.call("GET", KEYS[5])
+if owner and owner ~= token then return 0 end
 redis.call("DEL", KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5])
 return 1
 `;

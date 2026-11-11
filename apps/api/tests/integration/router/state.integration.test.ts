@@ -819,6 +819,44 @@ test("circuit: a success in between does not hide the window's failures", {
 	}
 });
 
+test("circuit: a half-open probe that outlives its key still closes the circuit", {
+	skip,
+}, async () => {
+	const id = randomUUID();
+	const deployment = deploymentSubject(id);
+	const capacity = capacitySubject(id, null);
+	const config = settings({
+		allowedFails: 0,
+		baseCooldownMs: 100,
+		probeTtlMs: 100,
+	});
+	try {
+		const first = await acquireCircuitPermit(deployment, capacity, config);
+		assert.ok(first.allowed);
+		if (!first.allowed) {
+			return;
+		}
+		await recordTransientFailure(first.permit, config, {
+			class: "server",
+			message: "down",
+		});
+		await wait(200);
+		const probe = await acquireCircuitPermit(deployment, capacity, config);
+		assert.ok(probe.allowed);
+		if (!probe.allowed) {
+			return;
+		}
+		assert.equal(probe.permit.deploymentMode, "half_open");
+		// A long request: its probe key expires before it finishes.
+		await wait(250);
+		await closeCircuits(probe.permit);
+		const [snapshot] = await getCircuitSnapshots([{ deployment, capacity }]);
+		assert.equal(snapshot?.status, "available");
+	} finally {
+		await cleanup([], [prefix(deployment), prefix(capacity)]);
+	}
+});
+
 test("capacity circuit: Retry-After state is shared by one configured failure domain", {
 	skip,
 }, async () => {

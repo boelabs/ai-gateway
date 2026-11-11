@@ -61,7 +61,7 @@ Los campos restantes son controles de seguridad avanzados:
 |---|---|---|
 | `failureWindowSeconds` | `60` | Ventana fija (no deslizante) de recuento de fallos |
 | `maxCooldownSeconds` | `300` | Enfriamiento exponencial máximo después de sondas de recuperación fallidas |
-| `halfOpenProbeSeconds` | `30` | Propiedad TTL para la sonda única de recuperación semiabierta |
+| `halfOpenProbeSeconds` | `30` | Cuánto tiempo la única sonda de recuperación semiabierta mantiene fuera a otras solicitudes. Una sonda que tarda más sigue cerrando (o reabriendo) el circuito al terminar, salvo que otra solicitud haya tomado una sonda entretanto |
 | `configurationCooldownSeconds` | `300` | Cuarentena inmediata para credenciales/acceso a modelos no válidos, o un `402` del upstream (la cuenta no puede pagar) |
 | `throttleCooldownSeconds` | `5` | Tiempo de reutilización mínimo de capacidad compartida para las respuestas del proveedor `429` |
 
