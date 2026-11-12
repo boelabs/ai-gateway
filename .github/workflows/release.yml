@@ -261,11 +261,13 @@ jobs:
         run: docker buildx imagetools inspect "$IMAGE:$VERSION"
 
   # Only when both images published, and only for a stable tag. The `production` environment
-  # and its approval rules apply inside the called workflow.
+  # and its approval rules apply inside the called workflow. Both conditions name the result they
+  # depend on: without a status function GitHub adds `success()`, which is false whenever any
+  # earlier job in the chain was skipped, and `manual-tag` always is on a tag push.
   deploy:
     name: Production
     needs: [publish]
-    if: github.event_name == 'push' && !contains(github.ref_name, '-')
+    if: ${{ !cancelled() && needs.publish.result == 'success' && github.event_name == 'push' && !contains(github.ref_name, '-') }}
     permissions:
       contents: write
       packages: write
@@ -280,7 +282,7 @@ jobs:
   revalidate-docs:
     name: Refresh docs on boelabs.com
     needs: [deploy]
-    if: needs.deploy.result == 'success'
+    if: ${{ !cancelled() && needs.deploy.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
