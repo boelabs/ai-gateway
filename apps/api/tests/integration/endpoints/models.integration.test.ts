@@ -170,6 +170,45 @@ test("rerank model discovery exposes operation, modality, search pricing, and re
 	}
 });
 
+test("decision model discovery exposes its context window and no chat parameters", {
+	skip,
+}, async () => {
+	const app = modelsTestApp();
+	const publicModel = `decide-models-e2e-${randomUUID()}`;
+	let deploymentId: string | undefined;
+	try {
+		const deployment = await createDeployment({
+			publicModel,
+			adapterKey: "googleaistudio",
+			upstreamModel: "gemini-decision-1",
+			credentials: { apiKey: "test-upstream-key" },
+		});
+		deploymentId = deployment.row.id;
+
+		const single = await app.request(`/v1/models/${publicModel}`);
+		assert.equal(single.status, 200);
+		const body = (await single.json()) as {
+			architecture: { output_modalities: string[] };
+			top_provider: { context_length: number | null };
+			supported_parameters: string[];
+			operations: Array<{ id: string; endpoints: string[] }>;
+		};
+		assert.deepEqual(body.architecture.output_modalities, ["decision"]);
+		assert.equal(body.top_provider.context_length, 262_144);
+		assert.deepEqual(body.supported_parameters, []);
+		assert.deepEqual(body.operations, [
+			{
+				id: "decision.create",
+				endpoints: ["/v1/decisions", "/v1beta/decisions", "/v1/systemone"],
+			},
+		]);
+	} finally {
+		if (deploymentId) {
+			await deleteDeployment(deploymentId);
+		}
+	}
+});
+
 test("public model cache invalidates after deployment mutations", {
 	skip,
 }, async () => {

@@ -25,6 +25,7 @@ una solicitud con la forma de OpenAI puede responderla Jev de TypeSafe.
 | Proveedor | Adapter | Modelos | Transport upstream |
 |---|---|---|---|
 | OpenAI | `openai` | `gpt-6-luna` | `openai_decisions` (`POST /v1/decisions`) |
+| Azure OpenAI | `azureopenai` | `gpt-6-luna` (el nombre del deployment en Azure) | `openai_decisions` (`POST {resource}/openai/v1/decisions`) |
 | Google AI Studio | `googleaistudio` | `gemini-decision-1` | `gemini_decisions` (`POST /v1beta/decisions`) |
 | TypeSafe | `typesafe` | `jev-1.14.0`, `jev-1.13.0`, `jev-latest` | `systemone` (`POST /v1/systemone`) |
 | OpenRouter | `openrouter` | `typesafe/jev-1.14`, `typesafe/jev-1.13`, `~typesafe/jev-latest`, `openai/gpt-6-luna-decisions`, `google/gemini-decision-1` | `openrouter_decisions` (`POST /api/alpha/decisions`) |
@@ -183,6 +184,10 @@ cambia en estos puntos:
 - **Rechazos.** OpenAI rechaza por pregunta; Gemini bloquea toda la entrada. Una respuesta con la forma
   de Gemini deja fuera de `answers` una pregunta rechazada, y reporta una solicitud en la que se
   rechazaron todas las preguntas como `prompt_feedback` con `block_reason`.
+- **Azure OpenAI** solo documenta mensajes de usuario con texto e imágenes, y ninguno de los campos de
+  caché o de usuario final de OpenAI. Sus solicitudes llevan toda la entrada como un único mensaje de
+  usuario etiquetado por rol, igual que Gemini, y omiten `prompt_cache_key`, `prompt_cache_options` y
+  `safety_identifier`.
 - **Las preguntas box** no tienen equivalente fuera de Jev 1.14.
 
 ## Routing y validación [#routing-and-validation]
@@ -220,7 +225,7 @@ Cada ruta responde los errores con la forma de su propia API:
 
 Los modelos de decisión cobran tokens de entrada. El catálogo pone a Gemini Decision 1 en $0.10 y a Jev
 en $0.042 por millón de tokens de entrada, con salida gratuita. `gpt-6-luna` usa las tarifas de
-catálogo de ese modelo. Los modelos de OpenRouter no tienen precio de catálogo: el costo que OpenRouter
+catálogo de ese modelo, tanto en OpenAI como en Azure OpenAI. Los modelos de OpenRouter no tienen precio de catálogo: el costo que OpenRouter
 reporta en cada solicitud es el respaldo contable, salvo que el deployment defina su propio pricing.
 
 Los logs de operación guardan la forma de la solicitud, nunca su contenido: la cantidad de items y
@@ -238,7 +243,7 @@ tipos de respuesta, el uso y el costo.
 }
 ```
 
-Añade `openai` con `gpt-6-luna`, `typesafe` con `jev-1.14.0` u `openrouter` con
+Añade `openai` o `azureopenai` con `gpt-6-luna`, `typesafe` con `jev-1.14.0` u `openrouter` con
 `typesafe/jev-1.14` bajo el mismo `publicModel` para armar un pool mixto. El contexto largo de TypeSafe
 (262,144 tokens en lugar de 65,536) es opcional: envía su header desde el deployment con
 `"credentials": { "apiKey": "...", "headers": { "TypeSafe-Danger-Zone-Long-Context": "true" } }`.

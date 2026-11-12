@@ -46,6 +46,12 @@ credentials and choose a model available to your provider account. See
 - Azure OpenAI and [Azure Foundry](/docs/providers-azure-foundry) are two independent adapters and
   catalogs, even though both live under the Azure umbrella — use this one for models you deploy through
   Azure OpenAI resources specifically.
+- **Decisions**: `gpt-6-luna` answers [decisions](/docs/decisions) on
+  `POST {resource}/openai/v1/decisions`, with the Azure deployment name as `model` and no
+  `api-version`. Azure documents only user messages of text and images, so the input travels as one
+  labeled user message, without prompt-cache or end-user fields. Up to 400 questions and 128 PNG, JPEG,
+  WebP or GIF images (32 MB together) per request. Microsoft is rolling the API out to the regions
+  that run `gpt-6-luna`, except East US 2.
 - Catalog: `src/adapters/azureopenai/catalog.json`.
 
 ## Next steps

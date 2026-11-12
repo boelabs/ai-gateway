@@ -24,6 +24,7 @@ can be answered by TypeSafe's Jev.
 | Provider | Adapter | Models | Upstream transport |
 |---|---|---|---|
 | OpenAI | `openai` | `gpt-6-luna` | `openai_decisions` (`POST /v1/decisions`) |
+| Azure OpenAI | `azureopenai` | `gpt-6-luna` (the Azure deployment name) | `openai_decisions` (`POST {resource}/openai/v1/decisions`) |
 | Google AI Studio | `googleaistudio` | `gemini-decision-1` | `gemini_decisions` (`POST /v1beta/decisions`) |
 | TypeSafe | `typesafe` | `jev-1.14.0`, `jev-1.13.0`, `jev-latest` | `systemone` (`POST /v1/systemone`) |
 | OpenRouter | `openrouter` | `typesafe/jev-1.14`, `typesafe/jev-1.13`, `~typesafe/jev-latest`, `openai/gpt-6-luna-decisions`, `google/gemini-decision-1` | `openrouter_decisions` (`POST /api/alpha/decisions`) |
@@ -177,6 +178,9 @@ changes in these places:
 - **Refusals.** OpenAI refuses per question; Gemini blocks the whole input. A Gemini-shaped response
   leaves a refused question out of `answers`, and reports a request where every question was refused
   as `prompt_feedback` with `block_reason`.
+- **Azure OpenAI** documents only user messages of text and images, and none of OpenAI's caching or
+  end-user fields. Its requests carry the whole input as one user message labeled by role, like
+  Gemini's, and leave out `prompt_cache_key`, `prompt_cache_options` and `safety_identifier`.
 - **Box questions** have no equivalent outside Jev 1.14.
 
 ## Routing and validation
@@ -212,7 +216,7 @@ Each route answers errors in its own API's shape:
 ## Pricing and observability
 
 Decision models bill input tokens. The catalog prices Gemini Decision 1 at $0.10 and Jev at $0.042 per
-million input tokens, with free output. `gpt-6-luna` uses that model's catalog rates. OpenRouter
+million input tokens, with free output. `gpt-6-luna` uses that model's catalog rates, on OpenAI and on Azure OpenAI alike. OpenRouter
 models carry no catalog price: the cost OpenRouter reports for each request is the accounting
 fallback, unless the deployment sets its own pricing.
 
@@ -230,7 +234,7 @@ type, the input text size, the number of questions by kind, the answer kinds, us
 }
 ```
 
-Add `openai` with `gpt-6-luna`, `typesafe` with `jev-1.14.0` or `openrouter` with
+Add `openai` or `azureopenai` with `gpt-6-luna`, `typesafe` with `jev-1.14.0` or `openrouter` with
 `typesafe/jev-1.14` under the same `publicModel` to build a mixed pool. TypeSafe's long context
 (262,144 tokens instead of 65,536) is opt-in: send its header from the deployment with
 `"credentials": { "apiKey": "...", "headers": { "TypeSafe-Danger-Zone-Long-Context": "true" } }`.

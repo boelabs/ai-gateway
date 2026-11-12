@@ -61,7 +61,11 @@ const openAIStyle = makeOpenAIStyleAdapter({
 export const openaiAdapter: Adapter = {
 	...openAIStyle,
 	supportedCallTypes: new Set([...openAIStyle.supportedCallTypes, "decisions"]),
-	decisions: makeOpenAIDecisionsHandler("https://api.openai.com/v1", "OpenAI"),
+	decisions: makeOpenAIDecisionsHandler({
+		label: "OpenAI",
+		defaultBaseUrl: "https://api.openai.com/v1",
+		refineBadRequest,
+	}),
 	transports: {
 		...openAIStyle.transports,
 		decisions: { supported: ["openai_decisions"], default: "openai_decisions" },

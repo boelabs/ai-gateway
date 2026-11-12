@@ -10,6 +10,8 @@ import {
 	type DecisionQuestion,
 	requireAnswer,
 	partsAsText,
+	flattenDecisionInput,
+	mergeTextParts,
 } from "#core/decisions.ts";
 
 /** Canonical decisions to OpenAI `POST /decisions` and back. */
@@ -146,17 +148,40 @@ function questionToOpenAI(
 /**
  * Questions are sent named by position so answers map back without trusting the upstream's names.
  */
+/**
+ * `openai` is OpenAI's own API. `azure` is Azure OpenAI's `/openai/v1/decisions`, which documents only
+ * user messages of text and images and none of the caching or end-user fields, so the input is folded
+ * into one labeled user message and those fields are left out.
+ */
+export type OpenAIDecisionDialect = "openai" | "azure";
+
+function azureInput(req: CanonicalDecisionRequest): Record<string, unknown>[] {
+	const parts = mergeTextParts(
+		flattenDecisionInput(req.input).map((part) =>
+			part.type === "json"
+				? { type: "text" as const, text: JSON.stringify(part.data) }
+				: part,
+		),
+	);
+	return [{ type: "message", role: "user", content: textOnly(parts) }];
+}
+
 export function buildOpenAIDecisionBody(
 	req: CanonicalDecisionRequest,
 	upstreamModel: string,
+	dialect: OpenAIDecisionDialect = "openai",
 ): Record<string, unknown> {
+	const questions = req.questions.map((question, index) =>
+		questionToOpenAI(question, `q${index}`),
+	);
+	if (dialect === "azure") {
+		return { model: upstreamModel, input: azureInput(req), questions };
+	}
 	const cache = req.promptCache;
 	return {
 		model: upstreamModel,
 		input: req.input.map(itemToOpenAI),
-		questions: req.questions.map((question, index) =>
-			questionToOpenAI(question, `q${index}`),
-		),
+		questions,
 		...(cache?.key ? { prompt_cache_key: cache.key } : {}),
 		...(cache?.mode || cache?.ttl
 			? {

@@ -4,6 +4,7 @@ import type {
 } from "#core/decisions.ts";
 import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
 import { jsonResponse, withStubbedFetch } from "#test-support/fetch.ts";
+import { azureopenaiAdapter } from "#adapters/azureopenai/index.ts";
 import { openrouterAdapter } from "#adapters/openrouter/index.ts";
 import { assertDecisionRequestSupported } from "./decisionValidation.ts";
 import type { Adapter, AdapterContext } from "#adapters/types.ts";
@@ -269,6 +270,72 @@ test("each provider's decisions request goes to its own endpoint with its own au
 			},
 		);
 	}
+});
+
+test("Azure OpenAI decisions use the resource's v1 route, api-key, and one user message", async () => {
+	const conversation: CanonicalDecisionRequest = {
+		model: "decide",
+		input: [
+			{
+				type: "message",
+				role: "developer",
+				content: [{ type: "text", text: "Triage tickets." }],
+			},
+			{
+				type: "message",
+				role: "user",
+				content: [{ type: "json", data: { ticket: "Charged twice" } }],
+			},
+		],
+		questions: [binary],
+		promptCache: { key: "tickets" },
+		user: "end-user-1",
+	};
+	assertDecisionRequestSupported(
+		conversation,
+		candidate(azureopenaiAdapter, "gpt-6-luna"),
+	);
+	await withStubbedFetch(
+		async (input, init) => {
+			assert.equal(
+				String(input),
+				"https://example-resource.openai.azure.com/openai/v1/decisions",
+			);
+			const headers = new Headers(init?.headers);
+			assert.equal(headers.get("api-key"), "secret");
+			assert.equal(headers.get("authorization"), null);
+			assert.deepEqual(JSON.parse(String(init?.body)), {
+				model: "luna-deployment",
+				input: [
+					{
+						type: "message",
+						role: "user",
+						content:
+							'Developer:\nTriage tickets.\n\nUser:\n{"ticket":"Charged twice"}',
+					},
+				],
+				questions: [{ type: "predicate", name: "q0", instructions: "Urgent?" }],
+			});
+			return jsonResponse({
+				model: "gpt-6-luna",
+				answers: [{ type: "predicate", name: "q0", probability: 0.3 }],
+				usage: { input_tokens: 20, output_tokens: 0, total_tokens: 20 },
+			});
+		},
+		async () => {
+			const result = await executeDecisions(azureopenaiAdapter, conversation, {
+				...context("luna-deployment", "openai_decisions", azureopenaiAdapter),
+				credentials: {
+					apiKey: "secret",
+					baseUrl: "https://example-resource.openai.azure.com",
+				},
+				meta: resolveModelMetadata("azureopenai", "gpt-6-luna"),
+			});
+			assert.deepEqual(result.response.answers, [
+				{ kind: "binary", probability: 0.3 },
+			]);
+		},
+	);
 });
 
 test("a decisions answer of the wrong kind is a retryable protocol error", async () => {
