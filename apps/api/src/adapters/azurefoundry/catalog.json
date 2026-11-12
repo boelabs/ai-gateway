@@ -300,6 +300,18 @@
 				}
 			}
 		},
+		"mistral-large-4-latest": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": false,
+						"structuredOutputs": false
+					}
+				}
+			}
+		},
 		"mistral-medium-3-5": {
 			"operations": {
 				"text.generate": {

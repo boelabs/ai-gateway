@@ -571,7 +571,9 @@
 							"mode": "unsupported",
 							"notes": "Rejected with a 400 at any non-default value on this model."
 						}
-					}
+					},
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 128000
 				}
 			},
 			"pricing": {
@@ -642,6 +644,63 @@
 				}
 			}
 		},
+		"claude-mythos-5-2": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"max_tokens": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"stop": true,
+						"tools": true,
+						"tool_choice": {
+							"mode": "range",
+							"values": ["auto", "none"],
+							"notes": "Forced tool use (any or a named tool) is rejected with a 400 on this model."
+						},
+						"reasoning": true,
+						"include_reasoning": true,
+						"structured_outputs": true,
+						"response_format": true,
+						"verbosity": true,
+						"reasoning_effort": true,
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "anthropic_adaptive",
+						"levels": ["low", "medium", "high", "xhigh", "max"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 800,
+				"outputCentsPerMTokens": 4000,
+				"cacheReadCentsPerMTokens": 20,
+				"cacheWriteCentsPerMTokens": 1000,
+				"cacheWriteCentsPerMTokensByTtl": {
+					"300": 1000,
+					"3600": 1600
+				}
+			}
+		},
 		"claude-sonnet-4-5": {
 			"operations": {
 				"text.generate": {
@@ -675,7 +734,7 @@
 						"top_k": true,
 						"top_p": true
 					},
-					"maxInputTokens": 1000000,
+					"maxInputTokens": 200000,
 					"maxOutputTokens": 64000
 				}
 			},
@@ -1140,7 +1199,7 @@
 		"claude-sonnet-4": {
 			"operations": {
 				"text.generate": {
-					"maxInputTokens": 1000000,
+					"maxInputTokens": 200000,
 					"maxOutputTokens": 64000,
 					"parameters": {
 						"max_tokens": true,
@@ -1238,6 +1297,63 @@
 				"cacheWriteCentsPerMTokensByTtl": {
 					"300": 1250,
 					"3600": 2000
+				}
+			}
+		},
+		"claude-fable-5-2": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"max_tokens": true,
+						"temperature": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"stop": true,
+						"tools": true,
+						"tool_choice": {
+							"mode": "range",
+							"values": ["auto", "none"],
+							"notes": "Forced tool use (any or a named tool) is rejected with a 400 on this model."
+						},
+						"reasoning": true,
+						"include_reasoning": true,
+						"structured_outputs": true,
+						"response_format": true,
+						"verbosity": true,
+						"reasoning_effort": true,
+						"top_p": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						},
+						"top_k": {
+							"mode": "unsupported",
+							"notes": "Rejected with a 400 at any non-default value on this model."
+						}
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "anthropic_adaptive",
+						"levels": ["low", "medium", "high", "xhigh", "max"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 800,
+				"outputCentsPerMTokens": 4000,
+				"cacheReadCentsPerMTokens": 20,
+				"cacheWriteCentsPerMTokens": 1000,
+				"cacheWriteCentsPerMTokensByTtl": {
+					"300": 1000,
+					"3600": 1600
 				}
 			}
 		}

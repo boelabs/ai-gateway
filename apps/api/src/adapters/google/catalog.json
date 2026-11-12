@@ -161,7 +161,7 @@
 				}
 			},
 			"deprecated": true,
-			"notes": "Google's deprecations page schedules veo-3.1-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.1-flash."
+			"notes": "Google's deprecations page schedules veo-3.1-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.2-flash."
 		},
 		"veo-3.1-fast-generate-preview": {
 			"operations": {
@@ -204,7 +204,7 @@
 				}
 			},
 			"deprecated": true,
-			"notes": "Google's deprecations page schedules veo-3.1-fast-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.1-flash."
+			"notes": "Google's deprecations page schedules veo-3.1-fast-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.2-flash."
 		},
 		"veo-3.1-lite-generate-preview": {
 			"operations": {
@@ -238,7 +238,7 @@
 				}
 			},
 			"deprecated": true,
-			"notes": "Google's deprecations page schedules veo-3.1-lite-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.1-flash."
+			"notes": "Google's deprecations page schedules veo-3.1-lite-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.2-flash."
 		},
 		"gemini-3.5-transcribe": {
 			"operations": {
@@ -1770,6 +1770,41 @@
 				"cacheReadCentsPerMTokens": 10
 			},
 			"notes": "Introductory pricing through 2026-11-30. From 2026-12-01 Google publishes $4.00 input / $20.00 output / $0.20 cached input per 1M tokens: update before then. Implicit caching only (no explicit cache or storage price). Non-streaming generateContent caps output at 32,768 tokens (a higher max_output_tokens without a continuation token returns 400); streaming caps at 65,536. Long decode up to 1,048,576 needs continuation hops the adapter does not run. temperature/top_p/top_k are ignored by Gemini 4."
+		},
+		"gemini-4-carbon": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"parameters": {
+						"max_tokens": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["low", "medium", "high"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 10
+			},
+			"notes": "Introductory pricing through 2026-11-30. From 2026-12-01 Google publishes $4.00 input / $20.00 output / $0.20 cached input per 1M tokens: update before then. Implicit caching only (no explicit cache or storage price). temperature/top_p/top_k are ignored by Gemini 4."
 		},
 		"gemini-3.1-pro-preview": {
 			"operations": {
@@ -3469,7 +3504,7 @@
 				"imageInputCentsPerMTokens": 100
 			},
 			"deprecated": true,
-			"notes": "Google deprecated gemini-3.1-flash-live-preview; it shuts down no earlier than 2026-11-17 (replacement: gemini-3.8-live). Live API (BidiGenerateContent), native audio. Legacy: Google recommends gemini-3.8-live. Synchronous function calling only. Answers in audio only; text sessions are served from the transcript."
+			"notes": "Google deprecated gemini-3.1-flash-live-preview; it shuts down on 2026-11-17 (replacement: gemini-3.8-live). Live API (BidiGenerateContent), native audio. Legacy: Google recommends gemini-3.8-live. Synchronous function calling only. Answers in audio only; text sessions are served from the transcript."
 		},
 		"gemini-2.5-flash-native-audio-preview-12-2025": {
 			"operations": {
@@ -3528,7 +3563,7 @@
 				"imageInputCentsPerMTokens": 300
 			},
 			"deprecated": true,
-			"notes": "Google deprecated gemini-2.5-flash-native-audio-preview-12-2025; it shuts down no earlier than 2026-11-17 (replacement: gemini-3.8-live). Live API (BidiGenerateContent), native audio. Google limits 2.5 access to projects that already used it. Answers in audio only; text sessions are served from the transcript."
+			"notes": "Google deprecated gemini-2.5-flash-native-audio-preview-12-2025; it shuts down on 2026-11-17 (replacement: gemini-3.8-live). Live API (BidiGenerateContent), native audio. Google limits 2.5 access to projects that already used it. Answers in audio only; text sessions are served from the transcript."
 		},
 		"gemini-3.5-live-translate-preview": {
 			"operations": {
