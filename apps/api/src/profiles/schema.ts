@@ -560,6 +560,23 @@ const rerankOperationProfileSchema = z
 		}
 	});
 
+const decisionOperationProfileSchema = z
+	.object({
+		...transportField,
+		questionKinds: z.array(z.enum(["binary", "choice", "score", "box"])).min(1),
+		inputModalities: z
+			.array(z.enum(["text", "image", "audio", "video", "document"]))
+			.min(1),
+		instructionModalities: z.array(z.enum(["image", "json"])).optional(),
+		maxQuestions: z.int().positive().optional(),
+		minChoices: z.int().positive().optional(),
+		maxChoices: z.int().positive().optional(),
+		minScoreLevels: z.int().positive().optional(),
+		maxScoreLevels: z.int().positive().optional(),
+		contextWindow: z.int().positive().optional(),
+	})
+	.strict();
+
 export const operationProfilesSchema = z
 	.object({
 		"text.generate": textGenerateProfileSchema.optional(),
@@ -573,6 +590,7 @@ export const operationProfilesSchema = z
 			realtimeConversationOperationProfileSchema.optional(),
 		"embedding.create": embeddingOperationProfileSchema.optional(),
 		rerank: rerankOperationProfileSchema.optional(),
+		"decision.create": decisionOperationProfileSchema.optional(),
 	})
 	.strict()
 	.refine(

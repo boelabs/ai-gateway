@@ -8,14 +8,14 @@ Los ejemplos utilizan `GATEWAY` para el origen (por ejemplo, `http://localhost:4
 
 ## Autenticación [#authentication]
 
-- **Inferencia** (`/v1/*`): master key o virtual key mediante `Authorization: Bearer <key>` o el header `x-api-key`. No se aceptan credenciales en los query parameters, porque las URL pueden aparecer en logs, historiales y referencias. `/v1/models` y `/v1/models/{model}` son las únicas excepciones sin autenticación; consulta [Consultar modelos](/docs/models-discovery).
+- **Inferencia** (`/v1/*` y `/v1beta/decisions`): master key o virtual key mediante `Authorization: Bearer <key>`, el header `x-api-key` o el header `x-goog-api-key` de Google. No se aceptan credenciales en los query parameters, porque las URL pueden aparecer en logs, historiales y referencias. `/v1/models` y `/v1/models/{model}` son las únicas excepciones sin autenticación; consulta [Consultar modelos](/docs/models-discovery).
 - **Admin** (`/admin/*`): utiliza la master key para la automatización API. Cuando la autenticación del panel está habilitada, las sesiones del operador también pueden acceder a las rutas permitidas por su rol.
 
 Modelo completo: [Seguridad](/docs/security).
 
 ## Formato de los errores [#error-shape]
 
-La mayoría de los errores utilizan el formato compatible con OpenAI. `/v1/messages` usa la forma de Anthropic y `/v1/rerank` usa la forma `{ "error": { "code": <status>, "message": "..." } }` de OpenRouter:
+La mayoría de los errores utilizan el formato compatible con OpenAI. `/v1/messages` usa la forma de Anthropic, `/v1/rerank` usa la forma `{ "error": { "code": <status>, "message": "..." } }` de OpenRouter, `/v1beta/decisions` usa la forma `{ "error": { "code", "message", "status" } }` de Google y `/v1/systemone` usa la forma `{ "detail": "..." }` de TypeSafe:
 
 ```json
 { "error": { "message": "...", "type": "invalid_request_error", "param": "model", "code": "model_not_found" } }
@@ -50,6 +50,7 @@ En Bruno, selecciona **Import Collection → OpenAPI V3** e importa `apps/api/op
 | `POST/GET/DELETE /v1/videos`, `GET /v1/videos/:id/content` | Vídeos con formato de OpenAI | [Videos](/docs/videos) |
 | `POST /v1/embeddings` | OpenAI Embeddings | [Embeddings](/docs/embeddings) |
 | `POST /v1/rerank` | OpenRouter Reranking | [Reranking](/docs/reranking) |
+| `POST /v1/decisions`, `POST /v1beta/decisions`, `POST /v1/systemone` | Decisiones de OpenAI, Gemini y TypeSafe | [Decisiones](/docs/decisions) |
 | `POST /v1/audio/transcriptions` | OpenAI Audio | [Transcripción de audio](/docs/audio-transcriptions) |
 | `GET /v1/realtime?model=` (WebSocket) | OpenAI Realtime, conversación | [Conversaciones en tiempo real](/docs/realtime-conversations) |
 | `GET /v1/realtime?intent=transcription` (WebSocket) | OpenAI Realtime, transcripción | [Transcripción en tiempo real](/docs/realtime-transcription) |

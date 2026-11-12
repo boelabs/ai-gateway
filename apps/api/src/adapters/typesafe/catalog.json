@@ -1,0 +1,71 @@
+{
+	"$schema": "../../../schemas/model-catalog.schema.json",
+	"schemaVersion": 1,
+	"provider": {
+		"id": "typesafe",
+		"adapterKey": "typesafe",
+		"name": "TypeSafe",
+		"docs": [
+			"https://docs.typesafe.ai/api",
+			"https://docs.typesafe.ai/models",
+			"https://docs.typesafe.ai/images"
+		]
+	},
+	"models": {
+		"jev-1.14.0": {
+			"operations": {
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score", "box"],
+					"inputModalities": ["text", "image"],
+					"instructionModalities": ["image", "json"],
+					"minChoices": 1,
+					"maxChoices": 255,
+					"minScoreLevels": 1,
+					"maxScoreLevels": 10,
+					"contextWindow": 65536
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 4.2,
+				"outputCentsPerMTokens": 0
+			}
+		},
+		"jev-1.13.0": {
+			"operations": {
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score"],
+					"inputModalities": ["text", "image"],
+					"instructionModalities": ["image", "json"],
+					"minChoices": 1,
+					"maxChoices": 255,
+					"minScoreLevels": 1,
+					"maxScoreLevels": 10,
+					"contextWindow": 65536
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 4.2,
+				"outputCentsPerMTokens": 0
+			}
+		},
+		"jev-latest": {
+			"operations": {
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score", "box"],
+					"inputModalities": ["text", "image"],
+					"instructionModalities": ["image", "json"],
+					"minChoices": 1,
+					"maxChoices": 255,
+					"minScoreLevels": 1,
+					"maxScoreLevels": 10,
+					"contextWindow": 65536
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 4.2,
+				"outputCentsPerMTokens": 0
+			},
+			"notes": "Alias TypeSafe moves to its newest stable Jev release; currently jev-1.14.0."
+		}
+	}
+}

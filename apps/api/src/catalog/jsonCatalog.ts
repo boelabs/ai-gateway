@@ -35,6 +35,7 @@ const OPERATION_IDS = new Set<keyof OperationProfiles>([
 	"audio.converse.realtime",
 	"embedding.create",
 	"rerank",
+	"decision.create",
 ]);
 
 const REASONING_KINDS = new Set<ReasoningControlKind>([
@@ -517,6 +518,34 @@ function validateOperations(value: unknown, path: string): void {
 				"maxTokensPerDocument",
 				"maxTotalTokens",
 				"documentsPerSearchUnit",
+			]) {
+				if (profile[key] !== undefined) {
+					assertNumber(profile[key], `${path}.${operation}.${key}`);
+				}
+			}
+		} else if (operation === "decision.create") {
+			const allowed: Record<string, readonly string[]> = {
+				questionKinds: ["binary", "choice", "score", "box"],
+				inputModalities: ["text", "image", "audio", "video", "document"],
+				instructionModalities: ["image", "json"],
+			};
+			for (const [key, values] of Object.entries(allowed)) {
+				if (key !== "instructionModalities" || profile[key] !== undefined) {
+					assertStringArray(profile[key], `${path}.${operation}.${key}`);
+					for (const entry of profile[key] as string[]) {
+						if (!values.includes(entry)) {
+							fail(`${path}.${operation}.${key}`, `unknown value "${entry}"`);
+						}
+					}
+				}
+			}
+			for (const key of [
+				"maxQuestions",
+				"minChoices",
+				"maxChoices",
+				"minScoreLevels",
+				"maxScoreLevels",
+				"contextWindow",
 			]) {
 				if (profile[key] !== undefined) {
 					assertNumber(profile[key], `${path}.${operation}.${key}`);

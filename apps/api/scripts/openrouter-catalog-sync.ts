@@ -53,6 +53,15 @@ async function run(): Promise<void> {
 	if (generated.report.includedModels === 0) {
 		throw new Error("OpenRouter returned no usable rerank models");
 	}
+	// Only rerank entries are generated; the decision models are maintained by hand and carried over.
+	const handMaintained = Object.entries(
+		loadCatalogDocument(CATALOG_URL, { adapterKey: "openrouter" }).models,
+	).filter(([, entry]) => entry.operations.rerank === undefined);
+	generated.document.models = Object.fromEntries(
+		[...Object.entries(generated.document.models), ...handMaintained].sort(
+			([a], [b]) => a.localeCompare(b),
+		),
+	);
 
 	mkdirSync(REPORT_DIR, { recursive: true });
 	writeFileSync(

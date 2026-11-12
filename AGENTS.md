@@ -31,7 +31,8 @@ Boelabs AI Gateway — a backend-only, provider-agnostic AI gateway. Public endp
 (`/v1/chat/completions`, `/v1/responses`, `/v1/images/*`, `/v1/embeddings`,
 `/v1/audio/transcriptions`, `/v1/realtime` for voice conversations and transcription, `/v1/videos`,
 `/v1/rerank`) plus an
-Anthropic-compatible `/v1/messages`.
+Anthropic-compatible `/v1/messages` and three decisions contracts: OpenAI's `/v1/decisions`, Gemini's
+`/v1beta/decisions` and TypeSafe's `/v1/systemone`.
 Every request is translated through one canonical core and routed to a provider adapter.
 
 `GET /v1/models` and `GET /v1/models/{model}` are deliberately **unauthenticated**, like other

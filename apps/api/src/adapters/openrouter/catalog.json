@@ -11,6 +11,19 @@
 		]
 	},
 	"models": {
+		"~typesafe/jev-latest": {
+			"operations": {
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score", "box"],
+					"inputModalities": ["text", "image"],
+					"instructionModalities": ["image", "json"],
+					"minChoices": 1,
+					"maxChoices": 255,
+					"minScoreLevels": 1,
+					"maxScoreLevels": 10
+				}
+			}
+		},
 		"cohere/rerank-4-fast": {
 			"operations": {
 				"rerank": {
@@ -68,6 +81,15 @@
 			},
 			"pricing": {
 				"searchUnitCents": 0.1
+			}
+		},
+		"google/gemini-decision-1": {
+			"operations": {
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score"],
+					"inputModalities": ["text", "image"],
+					"maxQuestions": 1000
+				}
 			}
 		},
 		"mongodb/rerank-2.5": {
@@ -130,12 +152,47 @@
 				"searchUnitCents": 0
 			}
 		},
+		"openai/gpt-6-luna-decisions": {
+			"operations": {
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score"],
+					"inputModalities": ["text", "image"],
+					"maxQuestions": 400
+				}
+			}
+		},
 		"qwen/qwen3-reranker-8b": {
 			"operations": {
 				"rerank": {
 					"documentModalities": ["text"],
 					"maxDocuments": 1000,
 					"maxTokensPerDocument": 40960
+				}
+			}
+		},
+		"typesafe/jev-1.13": {
+			"operations": {
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score"],
+					"inputModalities": ["text", "image"],
+					"instructionModalities": ["image", "json"],
+					"minChoices": 1,
+					"maxChoices": 255,
+					"minScoreLevels": 1,
+					"maxScoreLevels": 10
+				}
+			}
+		},
+		"typesafe/jev-1.14": {
+			"operations": {
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score", "box"],
+					"inputModalities": ["text", "image"],
+					"instructionModalities": ["image", "json"],
+					"minChoices": 1,
+					"maxChoices": 255,
+					"minScoreLevels": 1,
+					"maxScoreLevels": 10
 				}
 			}
 		}

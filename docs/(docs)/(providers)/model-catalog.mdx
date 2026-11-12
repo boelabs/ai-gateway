@@ -262,6 +262,36 @@ future image-capable profiles, but current catalogs expose `text` only. Byte and
 enforced before an upstream call. Token fields describe documented provider limits and do not trigger
 local approximate tokenization.
 
+## Decisions
+
+A decision model declares the `decision.create` operation, which enables `/v1/decisions`,
+`/v1beta/decisions` and `/v1/systemone`:
+
+```json
+{
+  "operations": {
+    "decision.create": {
+      "questionKinds": ["binary", "choice", "score"],
+      "inputModalities": ["text", "image", "audio", "video", "document"],
+      "maxQuestions": 1000,
+      "minChoices": 2,
+      "maxChoices": 255,
+      "minScoreLevels": 2,
+      "maxScoreLevels": 255,
+      "contextWindow": 262144
+    }
+  },
+  "pricing": { "inputCentsPerMTokens": 10, "outputCentsPerMTokens": 0 }
+}
+```
+
+`questionKinds` (`binary`, `choice`, `score`, `box`) and `inputModalities` (`text`, `image`, `audio`,
+`video`, `document`) are required. `instructionModalities` (`image`, `json`) says what questions may
+contain besides text. `maxQuestions`, `minChoices`, `maxChoices`, `minScoreLevels` and
+`maxScoreLevels` are enforced before an upstream call: a deployment whose profile does not fit the
+request is skipped by the router. `contextWindow` documents the provider's limit and does not trigger
+local tokenization. See [Decisions](/docs/decisions).
+
 ## Catalog sync
 
 The cross-provider sync (`catalog:sync` and `catalog:sync:verify`) compares Vercel AI Gateway,

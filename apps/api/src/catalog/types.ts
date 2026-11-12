@@ -5,6 +5,7 @@ import type { UpstreamTransport } from "#core/transport.ts";
 import type { TranscriptionProfile } from "#core/audio.ts";
 import type { OperationId } from "#operations/registry.ts";
 import type { RuntimeModelMetadata } from "#db/schema.ts";
+import type { DecisionProfile } from "#core/decisions.ts";
 import type { ImageModelProfile } from "#core/images.ts";
 import type { VideoModelProfile } from "#core/videos.ts";
 import type { RerankProfile } from "#core/rerank.ts";
@@ -112,6 +113,12 @@ export function rerankProfileFor(
 	meta: ResolvedModelMetadata,
 ): RerankProfile | undefined {
 	return (meta.operations?.rerank as RerankProfile | undefined) ?? meta.rerank;
+}
+
+export function decisionProfileFor(
+	meta: ResolvedModelMetadata,
+): DecisionProfile | undefined {
+	return meta.operations?.["decision.create"] as DecisionProfile | undefined;
 }
 
 /**

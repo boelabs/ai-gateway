@@ -1,0 +1,245 @@
+---
+title: "Decisions"
+description: "POST /v1/decisions, /v1beta/decisions and /v1/systemone — closed-set answers with probabilities, in OpenAI, Gemini and TypeSafe shapes."
+---
+
+A decision model does not write text. It reads one input and answers a set of questions you define,
+each with a closed set of possible answers, and returns a probability for every answer. Typical uses
+are routing, triage, moderation and policy checks, tool selection, and scoring against a rubric.
+
+AI Gateway serves the three decisions APIs that exist today, each with its own request and response
+shape, and translates between them:
+
+| Endpoint | Contract | SDKs that work unchanged |
+|---|---|---|
+| `POST /v1/decisions` | OpenAI Decisions API | OpenAI SDKs (`client.decisions.create`) |
+| `POST /v1beta/decisions` | Gemini Decisions API | Google Gen AI SDKs (`client.decisions.create`) |
+| `POST /v1/systemone` | TypeSafe Jev API | TypeSafe SDKs |
+
+The contract is how your application talks to the gateway; it does not choose the provider. A public
+model is a pool of decisions deployments, and any of the three contracts can reach any deployment in
+it: a request in Gemini's shape can be answered by OpenAI's `gpt-6-luna`, and an OpenAI-shaped request
+can be answered by TypeSafe's Jev.
+
+| Provider | Adapter | Models | Upstream transport |
+|---|---|---|---|
+| OpenAI | `openai` | `gpt-6-luna` | `openai_decisions` (`POST /v1/decisions`) |
+| Google AI Studio | `googleaistudio` | `gemini-decision-1` | `gemini_decisions` (`POST /v1beta/decisions`) |
+| TypeSafe | `typesafe` | `jev-1.14.0`, `jev-1.13.0`, `jev-latest` | `systemone` (`POST /v1/systemone`) |
+| OpenRouter | `openrouter` | `typesafe/jev-1.14`, `typesafe/jev-1.13`, `~typesafe/jev-latest`, `openai/gpt-6-luna-decisions`, `google/gemini-decision-1` | `openrouter_decisions` (`POST /api/alpha/decisions`) |
+
+Each provider's decisions API accepts only its own decision models. Running decisions on a general
+chat model (emulating them with structured output and log probabilities) is not supported yet.
+
+## Question kinds
+
+The three APIs share three kinds of question under different names; TypeSafe adds a fourth.
+
+| Kind | OpenAI | Gemini | TypeSafe | Answer |
+|---|---|---|---|---|
+| Yes or no | `predicate` | `noul` | `noul` | Probability that the statement is true. |
+| One of a set | `choice` with `choices` | `choice` with `criteria` (map) | `choice` with `criteria` (map) | The most probable option, its confidence, and a probability per option. |
+| Ordered rubric | `score` with `levels` | `score` with `criteria` (list) | `score` with `criteria` (list) | The probability-weighted level (it can fall between levels), confidence, and a probability per level. |
+| Bounding box | — | — | `box` (Jev 1.14 only) | `top`, `bottom`, `left`, `right` as fractions of the image. |
+
+OpenAI returns answers as a list in question order; Gemini and TypeSafe return a map keyed by the
+question names you chose. The gateway keeps each contract's own convention whatever provider
+answered.
+
+A box question can only be asked through `/v1/systemone` and is only answered by a Jev 1.14
+deployment (`jev-1.14.0`, `jev-latest`, or OpenRouter's `typesafe/jev-1.14`).
+
+## OpenAI contract
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url=f"{GATEWAY}/v1", api_key=API_KEY)
+
+decision = client.decisions.create(
+    model="triage",
+    input="My card was charged twice for the March invoice, please reverse one.",
+    questions=[
+        {"type": "predicate", "name": "wants_refund",
+         "instructions": "The customer asks for money back."},
+        {"type": "choice", "name": "team",
+         "instructions": "Which team should own this ticket?",
+         "choices": [{"value": "billing"}, {"value": "technical"}, {"value": "other"}]},
+        {"type": "score", "name": "urgency",
+         "instructions": "How urgent is this ticket?",
+         "levels": [{"label": "routine"}, {"label": "same day"}, {"label": "churn risk"}]},
+    ],
+)
+```
+
+| Field | Rules |
+|---|---|
+| `model` | Public model name. |
+| `input` | A string, or a list of `user`, `developer`, `system` and `assistant` messages, `function_call`, `function_call_output`, `custom_tool_call` and `custom_tool_call_output` items. User content takes `input_text`, `input_image` (data URL or HTTPS URL) and `input_json` parts. |
+| `questions` | 1-400 questions. `name` is optional. A `choice` takes 2-255 unique typed values (`"true"` and `true` are different choices); a `score` takes at least two `levels` with a `label` and an optional `description`. |
+| `prompt_cache_key`, `prompt_cache_options`, `safety_identifier` | Forwarded to OpenAI. Other providers ignore them. |
+
+Unknown fields return `400`. The response carries `model` (the public name), `answers` in question
+order (`predicate`, `choice`, `score`, or `refusal` for a question the model declined), and `usage`
+with `input_tokens`, `input_tokens_details.cached_tokens`/`cache_write_tokens`, `output_tokens`,
+`output_tokens_details.reasoning_tokens` and `total_tokens`.
+
+## Gemini contract
+
+The path keeps Google's version prefix so Google's SDKs only need a different base URL. The gateway
+accepts the key in `x-goog-api-key`, as well as `Authorization: Bearer` and `x-api-key`.
+
+```python
+from google import genai
+
+client = genai.Client(
+    api_key=API_KEY,
+    http_options={"base_url": GATEWAY, "api_version": "v1beta"},
+)
+
+decision = client.decisions.create(
+    model="triage",
+    input="My card was charged twice for the March invoice, please reverse one.",
+    questions={
+        "wants_refund": {"type": "noul", "instructions": "Is the customer asking for money back?"},
+        "team": {"type": "choice", "instructions": "Which team should own this ticket?",
+                 "criteria": {"billing": "Invoices and charges.", "technical": "", "other": ""}},
+        "urgency": {"type": "score", "instructions": "How urgent is this ticket?",
+                    "criteria": ["Routine.", "Needs a same-day reply.", "The customer threatens to leave."]},
+    },
+)
+```
+
+| Field | Rules |
+|---|---|
+| `model` | Public model name; a leading `models/` is removed. |
+| `input` | A string, one content block, or a list of `text`, `image`, `audio`, `video` and `document` blocks. A media block sets exactly one of `data` (base64) or `uri`, plus `mime_type`. |
+| `questions` | 1-1000 questions keyed by names of 1-64 characters from `A-Z`, `a-z`, `0-9`, `_` and `-`. `instructions` is text only. A `noul` may add `criteria.true_description`/`false_description`; a `choice` maps 2-255 option keys to descriptions; a `score` lists 2-255 levels, lowest first. |
+
+The response carries `answers` keyed by question name (each with `confidence`), `usage`
+(`total_input_tokens`, `total_cached_tokens`, `total_output_tokens`, `total_thought_tokens`,
+`total_tokens`), and `prompt_feedback` when the input was blocked.
+
+## TypeSafe contract
+
+```python
+import requests
+
+decision = requests.post(
+    f"{GATEWAY}/v1/systemone",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    json={
+        "model": "triage",
+        "state": {"ticket": "My card was charged twice for March.", "plan": "pro"},
+        "questions": {
+            "refund": {"type": "noul", "instructions": "The customer asks for money back."},
+            "tone": {"type": "choice", "criteria": {"angry": None, "calm": None, "confused": None}},
+        },
+    },
+).json()
+```
+
+| Field | Rules |
+|---|---|
+| `model` | Public model name. |
+| `state` | Any JSON value: a string or a structured object. |
+| `questions` | Named `noul`, `choice` (1-255 options), `score` (1-10 levels) and `box` questions. `instructions` and `criteria` may be strings, objects or lists. |
+| `assets` | Images by reference, each with `format` (`png`, `jpg` or `jpeg`) and `data_base64`. A reference string anywhere in `state`, `instructions` or `criteria` places that image there. |
+
+The body may also be `multipart/form-data`: a `request` part with the JSON, then one part per image,
+named by the asset's `part` field. Bodies are capped at 32 MiB, TypeSafe's own limit. The response
+carries `model`, `answers` keyed by question name, and `usage.input_tokens`/`output_tokens`. A
+question a non-TypeSafe provider refused comes back as `{ "type": "refusal" }`, as OpenRouter does.
+
+## Translation between providers
+
+The three APIs do not carry the same information, so a request crossing from one shape to another
+changes in these places:
+
+- **Conversation and tools.** Gemini and TypeSafe take a single input. A lone user message passes
+  through as is; anything richer (system or developer messages, earlier assistant turns, tool calls
+  and results) becomes one input with each item labeled by role, such as `System:` or
+  `Tool result (call_1):`.
+- **Structured input.** OpenAI's `input_json` and TypeSafe's structured `state` become JSON text for
+  Gemini. TypeSafe receives them as JSON.
+- **Yes/no criteria.** OpenAI predicates have no criteria, so a `noul` question's
+  `true_description`/`false_description` (or TypeSafe's `criteria.true`/`false`) are appended to its
+  instructions as `True when:` and `False when:`.
+- **Score levels.** Gemini and TypeSafe name a level with one string, so an OpenAI level becomes
+  `label: description`. In the other direction, a level without a label is shown by its description.
+- **Choice values.** OpenAI choices are typed; Gemini and TypeSafe key options by text. A question
+  whose options include both `"true"` and `true` cannot go to them.
+- **Question names.** A name the upstream cannot take (OpenAI allows any string or none) is replaced
+  upstream by `q<index>`; answers always come back under the name you sent.
+- **Media.** Audio, video and documents are only accepted by Gemini. Images inside questions are only
+  accepted by OpenAI and TypeSafe. TypeSafe and OpenRouter take images only as inline PNG or JPEG
+  (TypeSafe up to 16 MiB each); an image URL can only go to OpenAI or Gemini.
+- **Refusals.** OpenAI refuses per question; Gemini blocks the whole input. A Gemini-shaped response
+  leaves a refused question out of `answers`, and reports a request where every question was refused
+  as `prompt_feedback` with `block_reason`.
+- **Box questions** have no equivalent outside Jev 1.14.
+
+## Routing and validation
+
+Every decision model declares a `decision.create` profile in its catalog entry: the question kinds it
+answers, its input modalities, what it accepts inside questions, and its documented limits (see
+[Model catalog](/docs/model-catalog#decisions)). Before routing, each deployment in the pool is checked
+against the request: question kinds and counts, choice and level counts, input modalities, and the
+media its transport accepts. A deployment that cannot answer the request as asked is skipped, and the
+router uses the rest of the pool. When none can, the request fails with `400` and
+`unsupported_parameter`, naming what no deployment supports.
+
+Every response is checked before it is returned: one answer per question, each of the kind asked or
+a refusal, probabilities between 0 and 1, a known chosen option and a finite score. A response that
+fails becomes a retryable `upstream_protocol_error`, penalizes that deployment and lets the router
+retry or fall back.
+
+The endpoints never stream and never use the response cache. The default execution policy is 60
+seconds to the first response, 3 minutes in total and at most three attempts, configurable as the
+`decisions` entry of the router settings. Canonical request and response extensions run on decisions
+like on the other operations.
+
+## Errors
+
+Each route answers errors in its own API's shape:
+
+| Route | Error body |
+|---|---|
+| `/v1/decisions` | `{ "error": { "message", "type", "param", "code" } }` (OpenAI) |
+| `/v1beta/decisions` | `{ "error": { "code": 400, "message": "...", "status": "INVALID_ARGUMENT" } }` (Google) |
+| `/v1/systemone` | `{ "detail": "..." }` (TypeSafe) |
+
+## Pricing and observability
+
+Decision models bill input tokens. The catalog prices Gemini Decision 1 at $0.10 and Jev at $0.042 per
+million input tokens, with free output. `gpt-6-luna` uses that model's catalog rates. OpenRouter
+models carry no catalog price: the cost OpenRouter reports for each request is the accounting
+fallback, unless the deployment sets its own pricing.
+
+Operation logs keep the request's shape, never its content: the number of input items and parts by
+type, the input text size, the number of questions by kind, the answer kinds, usage and cost.
+
+## Deployments
+
+```json
+{
+  "publicModel": "triage",
+  "adapterKey": "googleaistudio",
+  "upstreamModel": "gemini-decision-1",
+  "credentials": { "apiKey": "..." }
+}
+```
+
+Add `openai` with `gpt-6-luna`, `typesafe` with `jev-1.14.0` or `openrouter` with
+`typesafe/jev-1.14` under the same `publicModel` to build a mixed pool. TypeSafe's long context
+(262,144 tokens instead of 65,536) is opt-in: send its header from the deployment with
+`"credentials": { "apiKey": "...", "headers": { "TypeSafe-Danger-Zone-Long-Context": "true" } }`.
+The gateway adds `TypeSafe-Danger-Zone-Images: true` by itself to requests with images or box
+questions.
+
+## Next steps
+
+- [TypeSafe provider](/docs/providers-typesafe) — credentials, models and image limits.
+- [Creating deployments](/docs/creating-deployments) — a mixed decisions pool.
+- [Model catalog](/docs/model-catalog#decisions) — the `decision.create` profile.
+- [Routing](/docs/routing) — retries, fallback, health and price strategy.

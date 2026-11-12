@@ -94,7 +94,8 @@
 					"$ref": "#/$defs/realtimeConversationProfile"
 				},
 				"embedding.create": { "$ref": "#/$defs/embeddingProfile" },
-				"rerank": { "$ref": "#/$defs/rerankProfile" }
+				"rerank": { "$ref": "#/$defs/rerankProfile" },
+				"decision.create": { "$ref": "#/$defs/decisionProfile" }
 			},
 			"minProperties": 1
 		},
@@ -588,6 +589,36 @@
 				"maxTokensPerDocument": { "type": "integer", "minimum": 1 },
 				"maxTotalTokens": { "type": "integer", "minimum": 1 },
 				"documentsPerSearchUnit": { "type": "integer", "minimum": 1 }
+			}
+		},
+		"decisionProfile": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["questionKinds", "inputModalities"],
+			"properties": {
+				"questionKinds": {
+					"type": "array",
+					"items": { "enum": ["binary", "choice", "score", "box"] },
+					"minItems": 1,
+					"uniqueItems": true
+				},
+				"inputModalities": {
+					"type": "array",
+					"items": { "enum": ["text", "image", "audio", "video", "document"] },
+					"minItems": 1,
+					"uniqueItems": true
+				},
+				"instructionModalities": {
+					"type": "array",
+					"items": { "enum": ["image", "json"] },
+					"uniqueItems": true
+				},
+				"maxQuestions": { "type": "integer", "minimum": 1 },
+				"minChoices": { "type": "integer", "minimum": 1 },
+				"maxChoices": { "type": "integer", "minimum": 1 },
+				"minScoreLevels": { "type": "integer", "minimum": 1 },
+				"maxScoreLevels": { "type": "integer", "minimum": 1 },
+				"contextWindow": { "type": "integer", "minimum": 1 }
 			}
 		},
 		"pricing": {

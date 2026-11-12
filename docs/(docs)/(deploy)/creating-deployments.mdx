@@ -240,6 +240,43 @@ Both deployments participate in normal routing for `POST /v1/rerank`. A request 
 OpenRouter `provider` field filters the pool to OpenRouter deployments only. See
 [Reranking](/docs/reranking).
 
+### 6) Decisions — OpenAI, Google, TypeSafe and OpenRouter pool
+
+```bash
+curl -X POST $BASE/admin/deployments -H "Authorization: Bearer $MASTER_KEY" -H "content-type: application/json" -d '{
+  "publicModel": "triage",
+  "adapterKey": "googleaistudio",
+  "upstreamModel": "gemini-decision-1",
+  "credentials": { "apiKey": "..." }
+}'
+
+curl -X POST $BASE/admin/deployments -H "Authorization: Bearer $MASTER_KEY" -H "content-type: application/json" -d '{
+  "publicModel": "triage",
+  "adapterKey": "openai",
+  "upstreamModel": "gpt-6-luna",
+  "credentials": { "apiKey": "sk-..." }
+}'
+
+curl -X POST $BASE/admin/deployments -H "Authorization: Bearer $MASTER_KEY" -H "content-type: application/json" -d '{
+  "publicModel": "triage",
+  "adapterKey": "typesafe",
+  "upstreamModel": "jev-1.14.0",
+  "credentials": { "apiKey": "..." }
+}'
+
+curl -X POST $BASE/admin/deployments -H "Authorization: Bearer $MASTER_KEY" -H "content-type: application/json" -d '{
+  "publicModel": "triage",
+  "adapterKey": "openrouter",
+  "upstreamModel": "typesafe/jev-1.14",
+  "credentials": { "apiKey": "sk-or-..." }
+}'
+```
+
+The four deployments serve `POST /v1/decisions`, `POST /v1beta/decisions` and `POST /v1/systemone`
+alike. For each request the router skips the deployments whose `decision.create` profile cannot
+answer it (a `box` question only reaches Jev 1.14; audio or video only reaches Gemini). See
+[Decisions](/docs/decisions).
+
 ---
 
 ## Custom models (OpenAI-compatible)

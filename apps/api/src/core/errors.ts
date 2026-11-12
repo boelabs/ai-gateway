@@ -317,7 +317,54 @@ export class GatewayError extends Error {
 		};
 	}
 
+	/** Error body of Google's APIs, used by the Gemini-shaped decisions contract. */
+	toGoogle(): { error: { code: number; message: string; status: string } } {
+		return {
+			error: {
+				code: this.httpStatus,
+				message: this.publicMessage,
+				status: googleStatus(this.httpStatus),
+			},
+		};
+	}
+
+	/** Error body of TypeSafe's API (FastAPI's `detail`), used by the `/v1/systemone` contract. */
+	toTypeSafe(): { detail: string } {
+		return { detail: this.publicMessage };
+	}
+
 	static is(value: unknown): value is GatewayError {
 		return value instanceof GatewayError;
+	}
+}
+
+/** The canonical google.rpc code name Google's REST APIs report for an HTTP status. */
+function googleStatus(httpStatus: number): string {
+	switch (httpStatus) {
+		case 400:
+		case 413:
+		case 422:
+			return "INVALID_ARGUMENT";
+		case 401:
+			return "UNAUTHENTICATED";
+		case 402:
+		case 403:
+			return "PERMISSION_DENIED";
+		case 404:
+			return "NOT_FOUND";
+		case 409:
+			return "ABORTED";
+		case 429:
+			return "RESOURCE_EXHAUSTED";
+		case 501:
+			return "UNIMPLEMENTED";
+		case 502:
+		case 503:
+		case 529:
+			return "UNAVAILABLE";
+		case 504:
+			return "DEADLINE_EXCEEDED";
+		default:
+			return httpStatus >= 500 ? "INTERNAL" : "FAILED_PRECONDITION";
 	}
 }

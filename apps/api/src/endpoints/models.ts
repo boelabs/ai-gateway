@@ -1,21 +1,15 @@
 import type { OperationProfiles, TransportOverrides } from "#profiles/types.ts";
 import { publicTextCapabilities } from "#catalog/publicTextCapabilities.ts";
 import { enforcePublicModelRateLimit } from "./modelsRateLimit.ts";
-import { resolveTransport } from "#router/transport.ts";
-import { getAdapter } from "#adapters/registry.ts";
-
-import {
-	supportedParameterNames,
-	withAdapterParameters,
-} from "#catalog/parameters.ts";
-import type { ResolvedModelMetadata } from "#catalog/types.ts";
 import type { DeploymentRow } from "#db/repos/deployments.ts";
 import { authMiddleware, getAuth } from "#auth/middleware.ts";
 import type { OperationId } from "#operations/registry.ts";
 import { getEffectiveSettings } from "#router/settings.ts";
 import type { RuntimeModelMetadata } from "#db/schema.ts";
+import { resolveTransport } from "#router/transport.ts";
 import { OPERATIONS } from "#operations/registry.ts";
 import { assertModelAllowed } from "#auth/scope.ts";
+import { getAdapter } from "#adapters/registry.ts";
 import { fetchMetrics } from "#router/state.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { AppEnv } from "#auth/types.ts";
@@ -29,9 +23,19 @@ import {
 } from "#router/circuit.ts";
 
 import {
+	supportedParameterNames,
+	withAdapterParameters,
+} from "#catalog/parameters.ts";
+
+import {
 	type PublicModelGroup,
 	loadPublicModelGroups,
 } from "#catalog/publicModels.ts";
+
+import {
+	type ResolvedModelMetadata,
+	decisionProfileFor,
+} from "#catalog/types.ts";
 
 type Modality =
 	| "text"
@@ -42,7 +46,8 @@ type Modality =
 	| "file"
 	| "embedding"
 	| "moderation"
-	| "rerank";
+	| "rerank"
+	| "decision";
 
 function operationIds(meta: ResolvedModelMetadata): OperationId[] {
 	return Object.keys(meta.operations ?? {}) as OperationId[];
@@ -125,6 +130,14 @@ function addModalitiesForOperation(
 		case "rerank":
 			input.add("text");
 			output.add("rerank");
+			break;
+		case "decision.create":
+			for (const modality of decisionProfileFor(meta)?.inputModalities ?? [
+				"text",
+			]) {
+				input.add(modality === "document" ? "pdf" : modality);
+			}
+			output.add("decision");
 			break;
 		default:
 			break;

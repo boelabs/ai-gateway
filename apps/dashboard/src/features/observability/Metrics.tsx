@@ -48,6 +48,7 @@ const operations = [
 	["audio.converse.realtime", "Realtime conversation"],
 	["video.generate", "Video generation"],
 	["rerank", "Reranking"],
+	["decision.create", "Decisions"],
 ] as const;
 
 function Breakdown({ data }: { data: DetailedMetrics }) {

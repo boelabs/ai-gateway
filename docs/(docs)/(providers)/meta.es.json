@@ -16,6 +16,7 @@
 		"providers-zai",
 		"providers-vercel",
 		"providers-openrouter",
+		"providers-typesafe",
 		"providers-openai-compatible"
 	]
 }

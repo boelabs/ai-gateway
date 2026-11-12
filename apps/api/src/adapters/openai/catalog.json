@@ -3236,6 +3236,14 @@
 						"kind": "openai_effort",
 						"levels": ["none", "low", "medium", "high", "xhigh", "max"]
 					}
+				},
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score"],
+					"inputModalities": ["text", "image"],
+					"instructionModalities": ["image", "json"],
+					"maxQuestions": 400,
+					"minChoices": 2,
+					"maxChoices": 255
 				}
 			},
 			"pricing": {

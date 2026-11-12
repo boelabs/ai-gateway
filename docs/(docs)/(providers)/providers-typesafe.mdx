@@ -1,0 +1,42 @@
+---
+title: "TypeSafe"
+description: "Configure TypeSafe deployments for the Jev decision models."
+---
+
+## Configure a deployment
+
+Send this body to `POST /admin/deployments` with an operator credential. Replace the example
+credentials. See [Creating deployments](/docs/creating-deployments) for the shared configuration
+fields.
+
+```json
+{
+  "publicModel": "triage",
+  "adapterKey": "typesafe",
+  "upstreamModel": "jev-1.14.0",
+  "credentials": { "apiKey": "..." }
+}
+```
+
+## Behavior and limitations
+
+- **Credentials**: `apiKey` is required. `baseUrl` and custom `headers` are optional. The default base
+  URL is `https://api.typesafe.ai`.
+- **Operation**: decisions only. The adapter sends `POST /v1/systemone` through the `systemone`
+  transport, whichever public contract the request came in on.
+- **Models**: `jev-1.14.0`, `jev-1.13.0` and the `jev-latest` alias, which TypeSafe moves to its newest
+  stable release. Only Jev 1.14 answers `box` questions.
+- **Images**: inline PNG or JPEG only, up to 16 MiB each; image URLs are not accepted. The gateway
+  sends them as `assets` and adds `TypeSafe-Danger-Zone-Images: true` to requests with images or box
+  questions.
+- **Long context**: Jev reads 65,536 tokens per request by default. To raise it to 262,144, set
+  `"headers": { "TypeSafe-Danger-Zone-Long-Context": "true" }` in the deployment's credentials.
+- **Input**: Jev takes a single state, so conversations and tool items are flattened into one labeled
+  input, and audio, video and documents are not accepted.
+- **Pricing**: $0.042 per million input tokens; output is free.
+
+## Next steps
+
+- [Decisions](/docs/decisions) — the three public contracts and how they translate.
+- [Model catalog](/docs/model-catalog#decisions) — the `decision.create` profile.
+- [Routing](/docs/routing) — retries, fallback, health and price strategy.

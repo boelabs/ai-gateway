@@ -10,7 +10,7 @@ catalog supplies known model capabilities and pricing.
 ## Choose an adapter
 
 The transport column describes the upstream protocol. Your application still uses AI Gateway's
-public API. OpenRouter currently supports reranking only.
+public API. OpenRouter currently supports reranking and decisions; TypeSafe supports decisions only.
 
 | Provider | Adapter key | Credentials | Default transport |
 |---|---|---|---|
@@ -25,6 +25,7 @@ public API. OpenRouter currently supports reranking only.
 | [Z.AI](/docs/providers-zai) | `zai` | `apiKey` | Chat Completions |
 | [Vercel AI Gateway](/docs/providers-vercel) | `vercel` | `apiKey` | Responses API |
 | [OpenRouter](/docs/providers-openrouter) | `openrouter` | `apiKey` | Reranking |
+| [TypeSafe](/docs/providers-typesafe) | `typesafe` | `apiKey` | `systemone` (decisions) |
 | [OpenAI-compatible](/docs/providers-openai-compatible) | `openaicompatible` | `apiKey`, `baseUrl` | Chat Completions |
 
 ## Configure the connection

@@ -71,6 +71,13 @@
       "when": 1794324716905,
       "tag": "0009_operation_foreign_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794451158522,
+      "tag": "0010_decisions_execution_policy",
+      "breakpoints": true
     }
   ]
 }

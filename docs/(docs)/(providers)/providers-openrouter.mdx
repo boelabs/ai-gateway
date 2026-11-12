@@ -22,8 +22,9 @@ credentials and choose a model available to your provider account. See
 
 - **Credentials**: `apiKey` is required. `baseUrl` and custom `headers` are optional. The default base
   URL is `https://openrouter.ai/api/v1`.
-- **Operation**: reranking only in this release. The adapter sends `POST /rerank` through the native
-  `openrouter_rerank` transport.
+- **Operations**: reranking and decisions. The adapter sends `POST /rerank` through the native
+  `openrouter_rerank` transport, and decisions to `POST /api/alpha/decisions` through
+  `openrouter_decisions`, in TypeSafe's body shape. Decision images must be inline PNG or JPEG.
 - **Provider routing**: the public `provider` object is preserved exactly and makes only OpenRouter
   deployments eligible for that request.
 - **Model ids**: use OpenRouter's complete ids, including creator and suffixes such as `:free`.
@@ -49,5 +50,6 @@ overrides, and paid models without a representable local cost.
 ## Next steps
 
 - [Reranking](/docs/reranking) — public contract, routing, validation, and examples.
+- [Decisions](/docs/decisions) — the decisions contracts and the OpenRouter decision models.
 - [Model catalog](/docs/model-catalog#openrouter-rerank-sync) — sync ownership and schema.
 - [Routing](/docs/routing) — retries, fallback, health, and price strategy.

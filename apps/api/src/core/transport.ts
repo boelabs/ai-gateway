@@ -12,6 +12,10 @@
  *   - embed_content:    Google Gemini Embeddings API (:embedContent/:batchEmbedContents)
  *   - openrouter_rerank: OpenRouter Rerank API (/rerank)
  *   - cohere_rerank:     Cohere-compatible Rerank API (/rerank)
+ *   - openai_decisions:  OpenAI Decisions API (/decisions)
+ *   - gemini_decisions:  Google Gemini Decisions API (/v1beta/decisions)
+ *   - systemone:         TypeSafe Jev decisions API (/v1/systemone)
+ *   - openrouter_decisions: OpenRouter Decisions API (/api/alpha/decisions)
  *   - videos:           OpenAI-compatible Videos API (/videos)
  *   - videos_async:     Async job Videos API (POST /videos -> 202 + polling_url, GET /videos/{job},
  *                       GET /videos/{job}/content?index=N)
@@ -32,6 +36,10 @@ export const UPSTREAM_TRANSPORTS = [
 	"embed_content",
 	"openrouter_rerank",
 	"cohere_rerank",
+	"openai_decisions",
+	"gemini_decisions",
+	"systemone",
+	"openrouter_decisions",
 	"videos",
 	"videos_async",
 	"generate_videos",

@@ -19,6 +19,7 @@ export const metricsSearch = z.object({
 			"audio.converse.realtime",
 			"embedding.create",
 			"rerank",
+			"decision.create",
 		])
 		.optional()
 		.catch(undefined),

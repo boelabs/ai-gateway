@@ -38,6 +38,11 @@ test("admin mounts the new platform behind master authentication", async () => {
 		body.data.operations.some((operation) => operation.id === "rerank"),
 	);
 	assert.ok(
+		body.data.operations.some(
+			(operation) => operation.id === "decision.create",
+		),
+	);
+	assert.ok(
 		body.data.operations.every((operation) =>
 			[
 				"text.generate",
@@ -49,6 +54,7 @@ test("admin mounts the new platform behind master authentication", async () => {
 				"audio.converse.realtime",
 				"embedding.create",
 				"rerank",
+				"decision.create",
 			].includes(operation.id),
 		),
 	);

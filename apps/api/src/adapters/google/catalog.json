@@ -3547,6 +3547,24 @@
 				"audioOutputCentsPerMTokens": 2100
 			},
 			"notes": "Live API speech-to-speech translation into 70+ languages; requires session.translation.target_language (AI Gateway extension). Audio in, translated audio out; no instructions, tools or text input. The source language is detected. Each connection lasts about 10 minutes; the gateway reconnects without carrying context. Translation streams without turns; the gateway ends a response after 1.5 s without translated output."
+		},
+		"gemini-decision-1": {
+			"operations": {
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score"],
+					"inputModalities": ["text", "image", "audio", "video", "document"],
+					"maxQuestions": 1000,
+					"minChoices": 2,
+					"maxChoices": 255,
+					"minScoreLevels": 2,
+					"maxScoreLevels": 255,
+					"contextWindow": 262144
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 10,
+				"outputCentsPerMTokens": 0
+			}
 		}
 	}
 }

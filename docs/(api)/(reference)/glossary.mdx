@@ -15,7 +15,7 @@ A public endpoint does not determine the protocol used against the provider.
 ## Operation
 
 The semantic product a model offers: `text.generate`, `image.generate`, `image.edit`,
-`audio.transcribe`, `embedding.create`, etc. It is the stable vocabulary of the catalog and the admin
+`audio.transcribe`, `embedding.create`, `decision.create`, etc. It is the stable vocabulary of the catalog and the admin
 API. The presence of an operation in `catalogEntry.operations` declares support.
 
 ## Public Model
@@ -55,8 +55,8 @@ catalog lives next to the adapter; if it is missing, that provider is not regist
 
 The protocol an adapter uses against the provider: `chat_completions`, `responses`,
 `generate_content`, `messages`, `images`, `audio_transcriptions`,
-`azure_audio_transcriptions_legacy`, `embeddings`, `embed_content`, `openrouter_rerank`, or
-`cohere_rerank`.
+`azure_audio_transcriptions_legacy`, `embeddings`, `embed_content`, `openrouter_rerank`,
+`cohere_rerank`, `openai_decisions`, `gemini_decisions`, `systemone`, or `openrouter_decisions`.
 The type is `UpstreamTransport`, in `src/core/transport.ts`, and the execution context uses
 `ctx.transport`.
 
@@ -66,6 +66,10 @@ native transport for `:embedContent` and `:batchEmbedContents`.
 `openrouter_rerank` is OpenRouter's native `/rerank` contract; `cohere_rerank` is the internal
 Cohere-compatible `/rerank` transport used by Vercel AI Gateway. Both normalize into one canonical
 rerank operation.
+
+`openai_decisions` (OpenAI `/decisions`), `gemini_decisions` (Gemini `/v1beta/decisions`), `systemone`
+(TypeSafe `/v1/systemone`) and `openrouter_decisions` (OpenRouter `/api/alpha/decisions`) all carry
+the one canonical `decision.create` operation. See [Decisions](/docs/decisions).
 
 `transportOverrides` lets you replace the adapter's default transport per operation. Do not use the
 former names **wire** or **bindings**.
@@ -119,7 +123,7 @@ derive its `CallType` via `operations/registry.ts`.
 ## Canonical
 
 The provider-agnostic internal representation in `src/core/canonical.ts`, `images.ts`, `audio.ts`, and
-`embeddings.ts`, and `rerank.ts`. Public contracts are converted to canonical types; adapters convert between those
+`embeddings.ts`, `rerank.ts`, and `decisions.ts`. Public contracts are converted to canonical types; adapters convert between those
 types and their Transport. Do not use **Unified**.
 
 ## Message State

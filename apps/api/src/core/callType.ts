@@ -13,6 +13,7 @@ const CALL_TYPES = [
 	"realtime.conversation",
 	"embeddings",
 	"rerank",
+	"decisions",
 ] as const;
 
 export type CallType = (typeof CALL_TYPES)[number];

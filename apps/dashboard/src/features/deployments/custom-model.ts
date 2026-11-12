@@ -79,6 +79,11 @@ export function operationTemplate(id: string): Record<string, unknown> {
 			return {};
 		case "rerank":
 			return { documentModalities: ["text"] };
+		case "decision.create":
+			return {
+				questionKinds: ["binary", "choice", "score"],
+				inputModalities: ["text"],
+			};
 		default:
 			throw new Error(`Unsupported operation: ${id}`);
 	}

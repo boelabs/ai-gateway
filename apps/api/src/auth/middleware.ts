@@ -47,6 +47,11 @@ function extractKey(c: Context): string | undefined {
 	if (x) {
 		return x.trim();
 	}
+	// Google's SDKs send the key here, and the Gemini-shaped decisions contract accepts them as-is.
+	const google = c.req.header("x-goog-api-key");
+	if (google) {
+		return google.trim();
+	}
 	// Browsers cannot set headers on a WebSocket; OpenAI's Realtime clients send the key as a
 	// subprotocol instead (`openai-insecure-api-key.<key>`).
 	const protocols = c.req.header("sec-websocket-protocol");
