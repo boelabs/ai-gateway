@@ -19,5 +19,9 @@ export async function requireIdentity(): Promise<OperatorIdentity> {
 	if (!identity) {
 		redirect("/auth");
 	}
+	// The gateway refuses such a session everything but this one change, so nothing else can render.
+	if (identity.user.mustChangePassword) {
+		redirect("/auth/password");
+	}
 	return identity;
 }

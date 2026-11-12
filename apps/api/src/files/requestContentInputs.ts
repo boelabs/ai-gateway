@@ -5,8 +5,8 @@ import { fetchPinnedHttps, type ResolvedAddress } from "./pinnedHttpsFetch.ts";
 import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
 import type { ContentPartInputSupport } from "#adapters/types.ts";
 import type { UpstreamTransport } from "#core/transport.ts";
+import { pdfWorkerPool } from "./pdfWorkerPool.ts";
 import { GatewayError } from "#core/errors.ts";
-import { Worker } from "node:worker_threads";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
@@ -26,6 +26,13 @@ const MAX_PDF_PAGES = 200;
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
 const MAX_CONCURRENT_FETCHES = 4;
+/**
+ * Upper bound on file and image parts in one request, across every message. It matches the largest
+ * per-request image count a supported provider documents (OpenAI: 1,500 images per request), so no
+ * request a provider would accept is refused, and it bounds the work one request can queue on the
+ * shared fetch and parser capacity.
+ */
+export const MAX_CONTENT_INPUT_PARTS = 1500;
 const SIGNATURED_IMAGE_MIME_TYPES = new Set([
 	"image/avif",
 	"image/bmp",
@@ -689,6 +696,7 @@ async function fetchInput(
 	maxBytes = MAX_MATERIALIZED_INPUT_BYTES,
 	errorParam = "messages",
 ): Promise<MaterializedInput> {
+	signal.throwIfAborted();
 	let current = value;
 	for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
 		const validated = await assertPublicUrl(
@@ -698,6 +706,7 @@ async function fetchInput(
 			errorParam,
 		);
 		const { url, addresses } = validated;
+		signal.throwIfAborted();
 		let response: Response;
 		try {
 			response = await dependencies.fetch(
@@ -995,7 +1004,14 @@ async function extractPortableText(
 	assertPdfSignature(file);
 	let text: string;
 	if (file.mimeType === "application/pdf") {
-		const result = await extractPdfText(file.bytes, signal);
+		const result = await pdfWorkerPool().run(
+			{
+				bytes: file.bytes,
+				maxCharacters: MAX_TEXT_CHARACTERS,
+				maxPages: MAX_PDF_PAGES,
+			},
+			signal,
+		);
 		if (!result.ok) {
 			if (
 				result.code === "too_many_pages" ||
@@ -1051,71 +1067,6 @@ async function extractPortableText(
 	return text;
 }
 
-type PdfTextResult =
-	| { ok: true; text: string; totalPages: number }
-	| {
-			ok: false;
-			code: "too_many_characters" | "too_many_pages" | "parse_failed";
-			message: string;
-	  };
-
-/** Runs PDF parsing off the event loop and terminates it immediately when the request is aborted. */
-async function extractPdfText(
-	bytes: Uint8Array,
-	signal: AbortSignal,
-): Promise<PdfTextResult> {
-	signal.throwIfAborted();
-	const worker = new Worker(new URL("./pdfTextWorker.ts", import.meta.url));
-	const transferred = bytes.slice().buffer;
-	return new Promise<PdfTextResult>((resolve, reject) => {
-		let settled = false;
-		const cleanup = () => {
-			signal.removeEventListener("abort", onAbort);
-			void worker.terminate();
-		};
-		const finish = (result: PdfTextResult) => {
-			if (settled) {
-				return;
-			}
-			settled = true;
-			cleanup();
-			resolve(result);
-		};
-		const onAbort = () => {
-			if (settled) {
-				return;
-			}
-			settled = true;
-			cleanup();
-			reject(signal.reason);
-		};
-		worker.once("message", (result: PdfTextResult) => finish(result));
-		worker.once("error", (error: Error) =>
-			finish({ ok: false, code: "parse_failed", message: error.message }),
-		);
-		worker.once("exit", (code) => {
-			finish({
-				ok: false,
-				code: "parse_failed",
-				message: `PDF parser worker exited before replying (code ${code})`,
-			});
-		});
-		signal.addEventListener("abort", onAbort, { once: true });
-		if (signal.aborted) {
-			onAbort();
-			return;
-		}
-		worker.postMessage(
-			{
-				bytes: transferred,
-				maxCharacters: MAX_TEXT_CHARACTERS,
-				maxPages: MAX_PDF_PAGES,
-			},
-			[transferred],
-		);
-	});
-}
-
 function portableTextPart(
 	part: CanonicalFilePart,
 	file: MaterializedInput,
@@ -1132,6 +1083,56 @@ function portableTextPart(
 			? {}
 			: { cacheControl: part.cacheControl }),
 	};
+}
+
+/**
+ * The bytes one request may download, shared by its remote inputs. Each fetch reserves what it may
+ * read before it starts and is capped to that, so concurrent downloads cannot together pass the
+ * limit before any of them is counted. A fetch that does not fit waits for another to settle and
+ * return what it did not use; only when nothing is in flight does it get the true remainder, and a
+ * request with none left is refused.
+ */
+class ByteBudget {
+	#remaining: number;
+	#inFlight = 0;
+	readonly #waiters: Array<() => void> = [];
+
+	constructor(limit: number) {
+		this.#remaining = limit;
+	}
+
+	async run<T extends { bytes: Uint8Array }>(
+		maxBytes: number,
+		param: string,
+		fetch: (grant: number) => Promise<T>,
+	): Promise<T> {
+		while (this.#remaining < maxBytes && this.#inFlight > 0) {
+			await new Promise<void>((resolve) => this.#waiters.push(resolve));
+		}
+		const grant = Math.min(maxBytes, this.#remaining);
+		if (grant <= 0) {
+			throw requestError(
+				`Remote content inputs exceed the ${MAX_PORTABLE_CONTENT_INPUT_BYTES} byte request limit`,
+				"content_inputs_too_large",
+				"The combined content inputs are too large for portable processing.",
+				param,
+			);
+		}
+		this.#remaining -= grant;
+		this.#inFlight += 1;
+		let used = 0;
+		try {
+			const result = await fetch(grant);
+			used = result.bytes.byteLength;
+			return result;
+		} finally {
+			this.#remaining += grant - used;
+			this.#inFlight -= 1;
+			for (const wake of this.#waiters.splice(0)) {
+				wake();
+			}
+		}
+	}
 }
 
 class AsyncSemaphore {
@@ -1178,6 +1179,9 @@ export class ContentInputResolver {
 	readonly #parsedText = new WeakMap<MaterializedInput, Promise<string>>();
 	readonly #accounted = new WeakSet<MaterializablePart>();
 	readonly #fetches = new AsyncSemaphore(MAX_CONCURRENT_FETCHES);
+	readonly #budget = new ByteBudget(MAX_PORTABLE_CONTENT_INPUT_BYTES);
+	/** Aborted on the first failed fetch, so its siblings stop downloading for a request that failed. */
+	readonly #fetchAbort = new AbortController();
 	#totalBytes = 0;
 
 	constructor(
@@ -1189,6 +1193,13 @@ export class ContentInputResolver {
 		this.#signal = signal;
 		this.#dependencies = dependencies;
 		this.#parts = inputParts(request);
+		if (this.#parts.length > MAX_CONTENT_INPUT_PARTS) {
+			throw requestError(
+				`Request contains ${this.#parts.length} file and image parts, above the ${MAX_CONTENT_INPUT_PARTS} part limit`,
+				"too_many_content_inputs",
+				`A request may contain at most ${MAX_CONTENT_INPUT_PARTS} file and image parts.`,
+			);
+		}
 		this.#engine = request.fileParser?.pdfEngine ?? "auto";
 		for (const part of this.#parts) {
 			const source =
@@ -1262,14 +1273,25 @@ export class ContentInputResolver {
 			pending = this.#materializedBySource.get(sourceKey);
 			if (pending === undefined) {
 				if (source.kind === "url") {
-					pending = this.#fetches.run(() =>
-						fetchInput(
-							source.value,
-							this.#signal,
-							this.#dependencies,
-							part.type,
-						),
-					);
+					pending = this.#fetches
+						.run(() =>
+							this.#budget.run(
+								MAX_MATERIALIZED_INPUT_BYTES,
+								"messages",
+								(grant) =>
+									fetchInput(
+										source.value,
+										AbortSignal.any([this.#signal, this.#fetchAbort.signal]),
+										this.#dependencies,
+										part.type,
+										grant,
+									),
+							),
+						)
+						.catch((error: unknown) => {
+							this.#fetchAbort.abort(error);
+							throw error;
+						});
 				} else if (source.kind === "data_url") {
 					pending = Promise.resolve(
 						decodeDataUrl(source.value, filename, part.type),
@@ -1618,6 +1640,8 @@ export class VideoInputResolver {
 	readonly #parts: VideoMediaPart[];
 	readonly #materialized = new Map<string, Promise<MaterializedInput>>();
 	readonly #fetches = new AsyncSemaphore(MAX_CONCURRENT_FETCHES);
+	readonly #budget = new ByteBudget(MAX_PORTABLE_CONTENT_INPUT_BYTES);
+	readonly #fetchAbort = new AbortController();
 
 	constructor(
 		request: CanonicalVideoRequest,
@@ -1654,16 +1678,26 @@ export class VideoInputResolver {
 		if (pending === undefined) {
 			pending =
 				source.kind === "url"
-					? this.#fetches.run(() =>
-							fetchInput(
-								source.value,
-								this.#signal,
-								this.#dependencies,
-								part.kind,
-								MAX_PORTABLE_CONTENT_INPUT_BYTES,
-								part.param,
-							),
-						)
+					? this.#fetches
+							.run(() =>
+								this.#budget.run(
+									MAX_PORTABLE_CONTENT_INPUT_BYTES,
+									part.param,
+									(grant) =>
+										fetchInput(
+											source.value,
+											AbortSignal.any([this.#signal, this.#fetchAbort.signal]),
+											this.#dependencies,
+											part.kind,
+											grant,
+											part.param,
+										),
+								),
+							)
+							.catch((error: unknown) => {
+								this.#fetchAbort.abort(error);
+								throw error;
+							})
 					: Promise.resolve(
 							decodeDataUrl(
 								source.value,

@@ -40,3 +40,17 @@ test("If-None-Match matches weakly, across lists, and on *", async () => {
 	});
 	assert.equal(again.status, 304);
 });
+
+test("the docs ETag depends on the pages, not on when the export was built", async () => {
+	const { docsEtag } = await import("./docs.ts");
+	const { readDocsContent } = await import("../docs/export.ts");
+	const content = await readDocsContent();
+	assert.equal(docsEtag(content), docsEtag(content));
+	const changed = {
+		...content,
+		pages: content.pages.map((page, index) =>
+			index === 0 ? { ...page, mdx: `${page.mdx}\nchanged` } : page,
+		),
+	};
+	assert.notEqual(docsEtag(changed), docsEtag(content));
+});

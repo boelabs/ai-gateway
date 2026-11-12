@@ -116,7 +116,10 @@ test("price-based never falsely compares token pricing with search-unit pricing"
 
 test("health-aware chooses the strongest health score adjusted by weight", () => {
 	const c = [cand("a", 1), cand("b", 2)];
-	const m = metrics({ a: { healthScore: 0.9 }, b: { healthScore: 0.8 } });
+	const m = metrics({
+		a: { healthScore: 0.9, successes: 9, failures: 1 },
+		b: { healthScore: 0.8, successes: 8, failures: 2 },
+	});
 	assert.equal(pickDeployment("health-aware", c, m).row.id, "b");
 });
 
@@ -125,5 +128,32 @@ test("simple-shuffle always returns a valid candidate", () => {
 	const ids = new Set(c.map((x) => x.row.id));
 	for (let i = 0; i < 50; i++) {
 		assert.ok(ids.has(pickDeployment("simple-shuffle", c, new Map()).row.id));
+	}
+});
+
+test("measurement-ranked strategies send traffic to a deployment with no sample yet", () => {
+	const measured = cand("measured");
+	const fresh = cand("fresh");
+	const m = metrics({
+		measured: {
+			latencyMs: 10,
+			throughputTps: 500,
+			successes: 50,
+			healthScore: 1,
+		},
+		fresh: {},
+	});
+	for (const strategy of [
+		"latency-based",
+		"throughput-based",
+		"health-aware",
+	] as const) {
+		for (let i = 0; i < 20; i += 1) {
+			assert.equal(
+				pickDeployment(strategy, [measured, fresh], m).row.id,
+				"fresh",
+				strategy,
+			);
+		}
 	}
 });

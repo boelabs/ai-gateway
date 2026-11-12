@@ -7,7 +7,7 @@ import { Hono, type Context } from "hono";
 import { pingDb } from "./db/client.ts";
 import { log } from "./logging/log.ts";
 import { env } from "./config/env.ts";
-import { WebSocketServer } from "ws";
+import { createSocketServer } from "#endpoints/socketServer.ts";
 
 import {
 	DEPENDENCY_RETRY_AFTER_SECONDS,
@@ -19,7 +19,10 @@ import "./adapters/index.ts"; // registers the adapters (side-effect)
 
 import { messagesCountTokensHandler } from "./endpoints/messagesCountTokens.ts";
 import { publicizeManagementError, isManagementPath } from "./admin/errors.ts";
+import { authMiddleware, requireInferenceAccess } from "./auth/middleware.ts";
+import { installProcessErrorHandlers } from "./runtime/processErrors.ts";
 import { startResponseStateGcJob } from "./db/repos/responseStates.ts";
+import { startSpendLedgerGcJob } from "./ratelimit/spendLedgerGc.ts";
 import { requestContextMiddleware } from "./http/requestContext.ts";
 import { lifecyclePhase, isDraining } from "./runtime/lifecycle.ts";
 import { usesAnthropicErrorDialect } from "./http/errorDialect.ts";
@@ -34,7 +37,6 @@ import { messagesHandler } from "./endpoints/messages.ts";
 import { docsExportHandler } from "./endpoints/docs.ts";
 import { getRequestId } from "./http/requestContext.ts";
 import { rerankHandler } from "./endpoints/rerank.ts";
-import { authMiddleware } from "./auth/middleware.ts";
 import { startTelemetry } from "./telemetry/index.ts";
 import { runMigrations } from "./db/migrations.ts";
 import { startVideoJobs } from "./videos/jobs.ts";
@@ -85,6 +87,7 @@ import {
 	listModelsHandler,
 } from "./endpoints/models.ts";
 
+installProcessErrorHandlers();
 startTelemetry();
 
 // Before anything touches a table. The extension runtime, the background jobs and readiness itself
@@ -123,6 +126,7 @@ const stopExtensionReload = startExtensionReloadJob();
 const stopVideoJobs = startVideoJobs();
 const stopDashboardSessionGc = startDashboardSessionGcJob();
 const stopIdempotencyGc = startIdempotencyGcJob();
+const stopSpendLedgerGc = startSpendLedgerGcJob();
 
 app.use("*", requestContextMiddleware());
 app.use("*", async (c, next) => {
@@ -330,6 +334,7 @@ app.route("/admin", adminApp);
 
 // Public API - requires a master or virtual key.
 app.use("/v1/*", authMiddleware());
+app.use("/v1/*", requireInferenceAccess());
 app.post("/v1/chat/completions", chatCompletionsHandler);
 app.post("/v1/responses", responsesHandler);
 app.get("/v1/responses", responsesWebSocketHandler);
@@ -352,11 +357,8 @@ app.post("/v1/audio/transcriptions", transcriptionsHandler);
 app.post("/v1/embeddings", embeddingsHandler);
 app.post("/v1/rerank", rerankHandler);
 
-const webSocketServer = new WebSocketServer({
-	noServer: true,
-	maxPayload: 16 * 1024 * 1024,
-	perMessageDeflate: false,
-});
+const { server: webSocketServer, stop: stopSocketHeartbeat } =
+	createSocketServer();
 const server = serve(
 	{
 		fetch: app.fetch,
@@ -381,5 +383,7 @@ installGracefulShutdown({
 		stopVideoJobs,
 		stopDashboardSessionGc,
 		stopIdempotencyGc,
+		stopSocketHeartbeat,
+		stopSpendLedgerGc,
 	],
 });

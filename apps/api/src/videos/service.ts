@@ -9,9 +9,11 @@ import { resolveTransport } from "#router/transport.ts";
 import { settleVideoJobBilling } from "./billing.ts";
 import { getAdapter } from "#adapters/registry.ts";
 import type { Adapter } from "#adapters/types.ts";
+import type { StateScope } from "#auth/scope.ts";
 import { GatewayError } from "#core/errors.ts";
 import { decryptRecord } from "#db/crypto.ts";
 import { randomUUID } from "node:crypto";
+import { redis } from "#cache/redis.ts";
 import { log } from "#logging/log.ts";
 import { env } from "#config/env.ts";
 
@@ -285,7 +287,80 @@ function makeObjectKey(
 	]);
 }
 
-export async function ensureVideoAsset(
+/** Ingestions running in this process, so concurrent requests for one asset share one download. */
+const ingesting = new Map<string, Promise<VideoAssetRow>>();
+/** How long an ingestion may hold the cross-replica lock; a crashed holder frees it after this. */
+const INGEST_LOCK_MS = 10 * 60_000;
+const INGEST_WAIT_MS = 30_000;
+const INGEST_POLL_MS = 500;
+
+/**
+ * The stored asset for a completed job, downloading it from the provider the first time. One
+ * download per (video, variant) at a time across every replica: the first caller takes a Redis
+ * lock and ingests, the others wait for its row instead of fetching the same file again.
+ */
+export function ensureVideoAsset(
+	inputRow: VideoJobRow,
+	variant: VideoAssetVariant,
+	signal?: AbortSignal,
+): Promise<VideoAssetRow> {
+	const key = `${inputRow.id}:${variant}`;
+	const running = ingesting.get(key);
+	if (running) {
+		return running;
+	}
+	const task = ensureVideoAssetOnce(inputRow, variant, signal).finally(() => {
+		ingesting.delete(key);
+	});
+	ingesting.set(key, task);
+	return task;
+}
+
+async function ensureVideoAssetOnce(
+	inputRow: VideoJobRow,
+	variant: VideoAssetVariant,
+	signal?: AbortSignal,
+): Promise<VideoAssetRow> {
+	const lockKey = `video-ingest:${inputRow.id}:${variant}`;
+	const token = randomUUID();
+	const deadline = Date.now() + INGEST_WAIT_MS;
+	while (
+		(await redis.set(lockKey, token, "PX", INGEST_LOCK_MS, "NX")) !== "OK"
+	) {
+		const stored = await getVideoAsset(inputRow.id, variant);
+		if (stored) {
+			return stored;
+		}
+		if (Date.now() >= deadline) {
+			throw new GatewayError({
+				class: "server",
+				status: 503,
+				code: "video_ingest_in_progress",
+				message: `Video ${inputRow.id} is being stored by another replica`,
+				publicMessage: "The video is still being prepared. Retry shortly.",
+				retryAfterMs: 5000,
+			});
+		}
+		signal?.throwIfAborted();
+		await new Promise((resolve) => setTimeout(resolve, INGEST_POLL_MS));
+	}
+	try {
+		return await ingestVideoAsset(inputRow, variant, signal);
+	} finally {
+		// Released only by its holder: compare-and-delete, so an expired lock taken over by another
+		// replica is never released from under it.
+		await redis
+			.eval(
+				"if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0",
+				1,
+				lockKey,
+				token,
+			)
+			.catch(() => undefined);
+	}
+}
+
+async function ingestVideoAsset(
 	inputRow: VideoJobRow,
 	variant: VideoAssetVariant,
 	signal?: AbortSignal,
@@ -393,6 +468,44 @@ export async function deleteExpiredVideoAssets(): Promise<number> {
 	return deletedIds.length;
 }
 
+/** Downloads of completed videos running in the background, beyond which new ones wait. */
+const MAX_BACKGROUND_INGESTIONS = 2;
+const ingestionQueue: VideoJobRow[] = [];
+let backgroundIngestions = 0;
+
+/**
+ * Stores a completed video's asset off the polling loop. A download takes as long as the file is
+ * large, and done inline it held every other job in the batch (and the next tick) behind it.
+ */
+function ingestInBackground(row: VideoJobRow): void {
+	ingestionQueue.push(row);
+	drainIngestions();
+}
+
+function startIngestion(row: VideoJobRow): void {
+	backgroundIngestions += 1;
+	void ensureVideoAsset(row, "video")
+		.catch((err: unknown) => {
+			log.warn("videos", "completed video asset ingestion failed", {
+				err,
+				videoId: row.id,
+			});
+		})
+		.finally(() => {
+			backgroundIngestions -= 1;
+			drainIngestions();
+		});
+}
+
+function drainIngestions(): void {
+	while (
+		backgroundIngestions < MAX_BACKGROUND_INGESTIONS &&
+		ingestionQueue.length > 0
+	) {
+		startIngestion(ingestionQueue.shift() as VideoJobRow);
+	}
+}
+
 export async function refreshDueVideoJobs(): Promise<number> {
 	const rows = await claimDueVideoJobs();
 	let refreshed = 0;
@@ -400,12 +513,7 @@ export async function refreshDueVideoJobs(): Promise<number> {
 		try {
 			const updated = await refreshVideoJob(row);
 			if (updated.status === "completed") {
-				await ensureVideoAsset(updated, "video").catch((err: unknown) => {
-					log.warn("videos", "completed video asset ingestion failed", {
-						err,
-						videoId: updated.id,
-					});
-				});
+				ingestInBackground(updated);
 			}
 			refreshed += 1;
 		} catch (err) {
@@ -417,7 +525,7 @@ export async function refreshDueVideoJobs(): Promise<number> {
 
 export async function loadAndRefreshVideo(
 	id: string,
-	virtualKeyId: string | null,
+	scope: StateScope,
 	signal?: AbortSignal,
 ): Promise<VideoJobRow> {
 	const row = await getVideoJobById(id);
@@ -428,8 +536,13 @@ export async function loadAndRefreshVideo(
 			message: `Video ${id} not found`,
 		});
 	}
-	// Virtual keys only see their own jobs; the master key (null) is the operator and sees all.
-	if (virtualKeyId !== null && row.virtualKeyId !== virtualKeyId) {
+	// Keys and operator sessions see their own jobs; the master key is the operator and sees all.
+	if (
+		(scope.virtualKeyId !== null && row.virtualKeyId !== scope.virtualKeyId) ||
+		(scope.virtualKeyId === null &&
+			scope.ownerActor !== null &&
+			(row.virtualKeyId !== null || row.ownerActor !== scope.ownerActor))
+	) {
 		throw new GatewayError({
 			class: "not_found",
 			code: "video_not_found",
@@ -443,22 +556,35 @@ export async function loadAndRefreshVideo(
 }
 
 /**
- * Best-effort upstream delete/cancel after a local delete. Failures are logged, never surfaced:
- * the local soft-delete already succeeded and not every provider has a delete endpoint.
+ * Upstream delete/cancel after a local delete, then the job's terminal billing transition. The
+ * provider call is best effort: a failure is logged, never surfaced, because the local soft-delete
+ * already succeeded and not every provider has a delete endpoint. A job that was still running is
+ * released only when the provider confirmed the cancellation; otherwise it may still be generated
+ * and billed upstream, so its reservation settles at the profile's estimate.
  */
-export async function removeUpstreamVideo(row: VideoJobRow): Promise<void> {
+export async function removeUpstreamVideo(
+	row: VideoJobRow,
+	previousStatus: VideoJobRow["status"] | undefined,
+): Promise<void> {
+	let cancelConfirmed = false;
+	let meta: ResolvedModelMetadata | undefined;
 	try {
 		const { candidate, ctx, cleanup } = await candidateFromJob(row);
+		({ meta } = candidate);
 		try {
-			await candidate.adapter.videoGeneration?.remove?.(
-				{
-					upstreamJobId: row.upstreamJobId,
-					upstreamGenerationId: row.upstreamGenerationId,
-					upstreamPollingUrl: row.upstreamPollingUrl,
-					providerState: row.providerState,
-				},
-				ctx,
-			);
+			const remove = candidate.adapter.videoGeneration?.remove;
+			if (remove) {
+				await remove(
+					{
+						upstreamJobId: row.upstreamJobId,
+						upstreamGenerationId: row.upstreamGenerationId,
+						upstreamPollingUrl: row.upstreamPollingUrl,
+						providerState: row.providerState,
+					},
+					ctx,
+				);
+				cancelConfirmed = true;
+			}
 		} finally {
 			cleanup();
 		}
@@ -466,6 +592,12 @@ export async function removeUpstreamVideo(row: VideoJobRow): Promise<void> {
 		log.warn("videos", "best-effort upstream video delete failed", {
 			err,
 			videoId: row.id,
+		});
+	}
+	if (previousStatus !== undefined && !TERMINAL_STATUSES.has(previousStatus)) {
+		await settleVideoJobBilling(row, "deleted", {
+			cancelConfirmed,
+			...(meta ? { meta } : {}),
 		});
 	}
 }

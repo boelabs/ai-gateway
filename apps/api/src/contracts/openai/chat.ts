@@ -238,6 +238,8 @@ export const chatRequestSchema = z
 			.optional(),
 		temperature: z.number().optional(),
 		top_p: z.number().optional(),
+		/** Not OpenAI's; the common extension of compatible APIs, carried as canonical topK. */
+		top_k: z.int().optional(),
 		n: z.int().optional(),
 		max_tokens: z.int().optional(),
 		max_completion_tokens: z.int().optional(),
@@ -274,6 +276,50 @@ export const chatRequestSchema = z
 	.loose();
 
 export type OpenAIChatRequest = z.infer<typeof chatRequestSchema>;
+
+const MAPPED_CHAT_FIELDS: ReadonlySet<string> = new Set(
+	Object.keys(chatRequestSchema.shape),
+);
+
+/**
+ * One rule for top-level fields the contract does not map: they are the client's provider
+ * extensions (repetition_penalty, min_p, guided_json...), so they join `extra_body` and reach the
+ * upstream, which accepts or rejects them. Nothing is dropped. Legacy function calling is the
+ * exception: it would come back as tool calls the client is not reading, so it is rejected.
+ */
+function unmappedTopLevelFields(
+	req: OpenAIChatRequest,
+): Record<string, unknown> | undefined {
+	const raw = req as Record<string, unknown>;
+	for (const legacy of ["functions", "function_call"]) {
+		if (raw[legacy] !== undefined) {
+			throw new GatewayError({
+				class: "bad_request",
+				code: "unsupported_parameter",
+				param: legacy,
+				message: `${legacy} is the deprecated function-calling API; send tools and tool_choice instead`,
+			});
+		}
+	}
+	const extra: Record<string, unknown> = { ...req.extra_body };
+	for (const [key, value] of Object.entries(raw)) {
+		if (MAPPED_CHAT_FIELDS.has(key)) {
+			continue;
+		}
+		if (key in extra && JSON.stringify(extra[key]) !== JSON.stringify(value)) {
+			throw new GatewayError({
+				class: "bad_request",
+				code: "invalid_request_error",
+				param: key,
+				message: `${key} is set both at the top level and in extra_body`,
+			});
+		}
+		extra[key] = value;
+	}
+	return Object.keys(extra).length > 0 || req.extra_body !== undefined
+		? extra
+		: undefined;
+}
 
 /* =========================================================== RESPONSE ===
  * Schemas of what the gateway EMITS (output validation in tests).
@@ -449,22 +495,59 @@ function mapContentPart(
 	}
 }
 
+/** An assistant turn's refusal parts, which are the model's refusal rather than its content. */
+function assistantRefusal(m: z.infer<typeof messageSchema>): {
+	content: z.infer<typeof messageSchema>["content"];
+	refusal?: string;
+} {
+	const refusals: string[] = typeof m.refusal === "string" ? [m.refusal] : [];
+	let { content } = m;
+	if (Array.isArray(content)) {
+		refusals.push(
+			...content
+				.filter((part) => part.type === "refusal")
+				.map((part) => (part as { refusal: string }).refusal),
+		);
+		const rest = content.filter((part) => part.type !== "refusal");
+		content = rest.length > 0 ? (rest as typeof content) : null;
+	}
+	return refusals.length > 0
+		? { content, refusal: refusals.join("") }
+		: { content };
+}
+
 function mapMessage(m: z.infer<typeof messageSchema>): CanonicalMessage {
+	const raw = m as unknown as Record<string, unknown>;
+	if (raw.function_call !== undefined) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "unsupported_parameter",
+			param: "messages",
+			message:
+				"Legacy function_call messages are not supported; send tool_calls instead",
+		});
+	}
+	const refusal = m.role === "assistant" ? assistantRefusal(m) : undefined;
 	const msg: CanonicalMessage = {
 		role: m.role,
-		content: mapContent(m.content),
+		content: mapContent(refusal ? refusal.content : m.content),
 	};
+	if (refusal?.refusal !== undefined) {
+		msg.refusal = refusal.refusal;
+	}
 	if (m.name !== undefined) {
 		msg.name = m.name;
 	}
 	if (m.tool_calls !== undefined) {
 		msg.toolCalls = m.tool_calls.map((tc) => {
-			const raw = tc as unknown as Record<string, unknown>;
+			const rawCall = tc as unknown as Record<string, unknown>;
 			const decoded = decodeThoughtSignatureId(tc.id);
 			const extra = mergeProviderExtraContent(
 				decoded.extraContent,
-				extraContentFromProviderSpecificFields(raw.provider_specific_fields),
-				extraContent(raw.extra_content),
+				extraContentFromProviderSpecificFields(
+					rawCall.provider_specific_fields,
+				),
+				extraContent(rawCall.extra_content),
 			);
 			return {
 				id: decoded.id,
@@ -478,15 +561,28 @@ function mapMessage(m: z.infer<typeof messageSchema>): CanonicalMessage {
 		msg.toolCallId = stripThoughtSignatureId(m.tool_call_id);
 	}
 	if (m.role === "assistant") {
-		const raw = m as unknown as Record<string, unknown>;
 		const providerFields = extraContent(raw.provider_specific_fields);
 		const reasoning = openaiReasoningFromProviderFields(providerFields);
+		// The provider's own reasoning for the turn, which some compatible providers need back.
+		const reasoningContent = raw.reasoning_content ?? raw.reasoning;
+		if (typeof reasoningContent === "string" && reasoningContent.length > 0) {
+			msg.providerFields = { chat: { reasoning_content: reasoningContent } };
+		}
+		// A previous audio answer, referenced by id; only Chat Completions can resolve it.
+		const audio = raw.audio as { id?: unknown } | null | undefined;
 		const mergedProviderFields = mergeProviderFields(
-			providerFields,
-			reasoning === undefined ? undefined : { openai: { reasoning } },
+			mergeProviderFields(
+				providerFields,
+				reasoning === undefined ? undefined : { openai: { reasoning } },
+			),
+			typeof audio?.id === "string"
+				? { openai: { audio: { id: audio.id } } }
+				: undefined,
 		);
 		if (mergedProviderFields !== undefined) {
-			msg.providerFields = mergedProviderFields;
+			msg.providerFields =
+				mergeProviderFields(msg.providerFields, mergedProviderFields) ??
+				mergedProviderFields;
 		}
 	}
 	return msg;
@@ -608,6 +704,11 @@ export function toCanonicalChatRequest(
 	}
 	const requiresNativeChatTransport =
 		req.audio !== undefined ||
+		req.messages.some(
+			(message) =>
+				message.role === "assistant" &&
+				typeof (message as { audio?: { id?: unknown } }).audio?.id === "string",
+		) ||
 		req.logprobs === true ||
 		(req.top_logprobs ?? 0) > 0 ||
 		Object.keys(req.logit_bias ?? {}).length > 0 ||
@@ -653,9 +754,13 @@ export function toCanonicalChatRequest(
 		u.promptCacheKey = req.prompt_cache_key;
 	}
 	readPromptCachePolicy(req, u);
-	if (req.extra_body !== undefined) {
-		assertNoManagedExtraBodyKeys(req.extra_body, CHAT_EXTRA_BODY_MANAGED_KEYS);
-		u.extraBody = req.extra_body;
+	if (req.top_k !== undefined) {
+		u.topK = req.top_k;
+	}
+	const extraBody = unmappedTopLevelFields(req);
+	if (extraBody !== undefined) {
+		assertNoManagedExtraBodyKeys(extraBody, CHAT_EXTRA_BODY_MANAGED_KEYS);
+		u.extraBody = extraBody;
 	}
 	if (req.tools !== undefined) {
 		u.tools = req.tools.map((t) => {
@@ -865,6 +970,13 @@ export function toOpenAIChatResponse(
 			};
 		}),
 		usage: toOpenAIUsage(resp.usage),
+		// The tier the request actually ran at, and the backend fingerprint, as OpenAI reports them.
+		...(resp.usage.serviceTier === undefined
+			? {}
+			: { service_tier: resp.usage.serviceTier }),
+		...(resp.systemFingerprint === undefined
+			? {}
+			: { system_fingerprint: resp.systemFingerprint }),
 	};
 }
 
@@ -962,5 +1074,11 @@ export function toOpenAIChatChunk(
 		...(chunk.usage === undefined
 			? {}
 			: { usage: chunk.usage ? toOpenAIUsage(chunk.usage) : null }),
+		...(chunk.usage?.serviceTier === undefined
+			? {}
+			: { service_tier: chunk.usage.serviceTier }),
+		...(chunk.systemFingerprint === undefined
+			? {}
+			: { system_fingerprint: chunk.systemFingerprint }),
 	};
 }

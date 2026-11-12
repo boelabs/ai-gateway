@@ -1,14 +1,8 @@
+import { receiveMultipart } from "#http/multipartToDisk.ts";
 import type { CanonicalImageInput } from "#core/images.ts";
-import { pipeline } from "node:stream/promises";
-import { mkdtemp, rm } from "node:fs/promises";
 import { GatewayError } from "#core/errors.ts";
-import { createWriteStream } from "node:fs";
-import { basename, join } from "node:path";
-import { randomUUID } from "node:crypto";
-import { Readable } from "node:stream";
+import { basename } from "node:path";
 import { env } from "#config/env.ts";
-import { tmpdir } from "node:os";
-import Busboy from "busboy";
 import sharp from "sharp";
 
 import {
@@ -146,119 +140,52 @@ async function inspectUpload(
 export async function parseImageEditMultipart(
 	request: Request,
 ): Promise<ParsedImageEditMultipart> {
-	const contentType = request.headers.get("content-type");
-	if (!contentType?.toLowerCase().startsWith("multipart/form-data")) {
-		throw badMultipart("Content-Type must be multipart/form-data", null);
-	}
-	if (!request.body) {
-		throw badMultipart("Missing multipart body", null);
-	}
-
-	const dir = await mkdtemp(join(tmpdir(), "ai-gateway-images-"));
-	const cleanup = () => rm(dir, { recursive: true, force: true });
-	const fields: Record<string, string> = {};
-	const pending: PendingUpload[] = [];
-	const writes: Promise<void>[] = [];
-	let totalBytes = 0;
-	let failure: GatewayError | null = null;
-	let source: Readable | null = null;
-
-	try {
-		const bb = Busboy({
-			headers: Object.fromEntries(request.headers.entries()),
-			limits: {
-				files: MAX_FILES,
-				fileSize: MAX_IMAGE_BYTES,
-				fields: 24,
-				fieldSize: 65_536,
-				parts: 48,
-			},
-		});
-
-		bb.on("field", (name, value, info) => {
-			if (info.valueTruncated) {
-				failure ??= badMultipart(`Field "${name}" exceeds 64 KiB`, name);
-			}
-			if (fields[name] !== undefined) {
-				failure ??= badMultipart(`Duplicate field "${name}"`, name);
-			}
-			fields[name] = value;
-		});
-		bb.on("file", (name, stream, info) => {
+	const received = await receiveMultipart({
+		request,
+		tmpPrefix: "ai-gateway-images-",
+		limits: {
+			files: MAX_FILES,
+			fileSize: MAX_IMAGE_BYTES,
+			fields: 24,
+			fieldSize: 65_536,
+			parts: 48,
+			totalFileBytes: env.IMAGES_MAX_MULTIPART_BYTES,
+		},
+		error: badMultipart,
+		acceptFile: (name, accepted) => {
 			const field = uploadField(name);
 			if (!field) {
-				failure ??= badMultipart(`Unexpected file field "${name}"`, name);
-				stream.resume();
-				return;
+				return badMultipart(`Unexpected file field "${name}"`, name);
 			}
 			if (
 				field === "mask" &&
-				pending.some((upload) => upload.field === "mask")
+				accepted.some((file) => uploadField(file.field) === "mask")
 			) {
-				failure ??= badMultipart("Only one mask is allowed", "mask");
-				stream.resume();
-				return;
+				return badMultipart("Only one mask is allowed", "mask");
 			}
-			const file: PendingUpload = {
-				field,
-				path: join(dir, randomUUID()),
-				filename: safeFilename(info.filename),
-				sizeBytes: 0,
-			};
-			pending.push(file);
-			stream.on("data", (chunk: Buffer) => {
-				file.sizeBytes += chunk.length;
-				totalBytes += chunk.length;
-				if (totalBytes > env.IMAGES_MAX_MULTIPART_BYTES) {
-					failure ??= badMultipart(
-						"Multipart body exceeds the configured aggregate limit",
-						null,
-					);
-					source?.destroy(failure);
-				}
-			});
-			stream.on("limit", () => {
-				failure ??= badMultipart(
-					`File "${file.filename}" exceeds 50 MB`,
-					field,
-				);
-			});
-			writes.push(
-				pipeline(stream, createWriteStream(file.path, { flags: "wx" })),
-			);
-		});
-		bb.on("filesLimit", () => {
-			failure ??= badMultipart(
-				`At most ${MAX_FILES} file parts are allowed`,
-				"image",
-			);
-		});
-		bb.on("fieldsLimit", () => {
-			failure ??= badMultipart("Too many multipart fields", null);
-		});
-		bb.on("partsLimit", () => {
-			failure ??= badMultipart("Too many multipart parts", null);
-		});
+			return null;
+		},
+		fileTooLarge: (file) =>
+			badMultipart(
+				`File "${safeFilename(file.filename)}" exceeds 50 MB`,
+				uploadField(file.field),
+			),
+	});
+	const { cleanup } = received;
+	const fields: Record<string, string> = {};
+	const pending: PendingUpload[] = received.files.map((file) => ({
+		field: uploadField(file.field) ?? "image",
+		path: file.path,
+		filename: safeFilename(file.filename),
+		sizeBytes: file.sizeBytes,
+	}));
 
-		const finished = new Promise<void>((resolve, reject) => {
-			bb.once("finish", resolve);
-			bb.once("error", reject);
-		});
-		const readable = Readable.fromWeb(
-			request.body as import("node:stream/web").ReadableStream<Uint8Array>,
-		);
-		source = readable;
-		const abort = () => readable.destroy(new Error("request aborted"));
-		request.signal.addEventListener("abort", abort, { once: true });
-		try {
-			source.pipe(bb);
-			await finished;
-			await Promise.all(writes);
-		} finally {
-			request.signal.removeEventListener("abort", abort);
-		}
-		if (failure) {
-			throw failure;
+	try {
+		for (const [name, value] of received.fields) {
+			if (fields[name] !== undefined) {
+				throw badMultipart(`Duplicate field "${name}"`, name);
+			}
+			fields[name] = value;
 		}
 
 		const parsed = imageEditFieldsSchema.safeParse(parseScalarFields(fields));

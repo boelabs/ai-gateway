@@ -247,6 +247,57 @@ export function providerFieldsWithAnthropicContentBlocks(
 	return { anthropic: { content_blocks: structuredClone(blocks) } };
 }
 
+/** Block types the canonical message carries itself; everything else rides only in native content. */
+const CANONICAL_ANTHROPIC_BLOCKS = new Set(["text", "tool_use"]);
+
+/**
+ * Whether Anthropic content holds anything the canonical message cannot: thinking, server-tool
+ * calls and their results, MCP blocks, or text with citations. Such content must travel natively,
+ * since the next turn has to send it back exactly as received.
+ */
+export function hasNonCanonicalAnthropicContent(
+	blocks: Record<string, unknown>[],
+): boolean {
+	return blocks.some(
+		(block) =>
+			!CANONICAL_ANTHROPIC_BLOCKS.has(String(block.type)) ||
+			(block.type === "text" &&
+				Array.isArray(block.citations) &&
+				block.citations.length > 0),
+	);
+}
+
+/**
+ * One streamed Anthropic block the canonical delta cannot express (a server-tool call or result),
+ * complete, in the position it streamed. The Messages renderer emits it there.
+ */
+export function anthropicStreamBlockFromProviderFields(
+	fields: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+	const block = recordValue(recordValue(fields?.anthropic)?.stream_block);
+	return block === undefined ? undefined : structuredClone(block);
+}
+
+export function providerFieldsWithAnthropicStreamBlock(
+	block: Record<string, unknown>,
+): Record<string, unknown> {
+	return { anthropic: { stream_block: structuredClone(block) } };
+}
+
+/** Anthropic's own stop reason, kept where the canonical finish reason folds it (`pause_turn`). */
+export function anthropicStopReasonFromProviderFields(
+	fields: Record<string, unknown> | undefined,
+): string | undefined {
+	const reason = recordValue(fields?.anthropic)?.stop_reason;
+	return typeof reason === "string" ? reason : undefined;
+}
+
+export function providerFieldsWithAnthropicStopReason(
+	reason: string,
+): Record<string, unknown> {
+	return { anthropic: { stop_reason: reason } };
+}
+
 function toolInput(args: string): Record<string, unknown> {
 	try {
 		return recordValue(JSON.parse(args)) ?? {};

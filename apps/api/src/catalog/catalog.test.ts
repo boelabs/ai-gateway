@@ -1,3 +1,4 @@
+import type { ParameterSupportEntry } from "./parameters.ts";
 import { resolveModelMetadata, getCatalogEntry } from "./index.ts";
 import { reasoningLogInfo } from "../core/reasoning.ts";
 import { MODEL_CATALOG } from "#adapters/index.ts";
@@ -232,9 +233,11 @@ test("Anthropic catalog exposes Opus 5 reasoning, fast mode, and model-specific 
 		kind: "anthropic_adaptive",
 		levels: ["none", "low", "medium", "high", "xhigh", "max"],
 	});
-	assert.equal(opus5?.parameters?.temperature, undefined);
-	assert.equal(opus5?.parameters?.top_p, undefined);
-	assert.equal(opus5?.parameters?.top_k, undefined);
+	// Opus 5 rejects sampling parameters on every request, so the policy must drop or reject them.
+	for (const name of ["temperature", "top_p", "top_k"] as const) {
+		const entry: ParameterSupportEntry | undefined = opus5?.parameters?.[name];
+		assert.equal(typeof entry === "object" && entry.mode, "unsupported");
+	}
 
 	const opus5Fast = getCatalogEntry("anthropic", "claude-opus-5-fast");
 	assert.deepEqual(
@@ -383,4 +386,23 @@ test("unknown models default to no structured outputs; declared through text.gen
 		}).capabilities.structuredOutputs,
 		true,
 	);
+});
+
+test("a deployment's own catalog entry wins over a catalog model added later", () => {
+	const custom = {
+		operations: {
+			"text.generate": {
+				maxOutputTokens: 1234,
+				capabilities: {
+					tools: false,
+					vision: false,
+					reasoning: false,
+					structuredOutputs: false,
+				},
+			},
+		},
+	};
+	const meta = resolveModelMetadata("openai", "gpt-5.4", custom);
+	assert.equal(meta.maxOutputTokens, 1234);
+	assert.equal(meta.capabilities.tools, false);
 });

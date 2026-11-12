@@ -1,3 +1,4 @@
+import type { UpstreamTransport } from "#core/transport.ts";
 import { getEffectiveSettings, type EffectiveSettings } from "./settings.ts";
 import type { AdapterContext, AdapterDiagnostics } from "#adapters/types.ts";
 import { buildRoutingError, type FailReason } from "./routingError.ts";
@@ -38,6 +39,7 @@ import {
 	onAttemptCancel,
 	onSuccessFinish,
 	onAttemptStart,
+	type DeploymentMetrics,
 	fetchMetrics,
 } from "./state.ts";
 
@@ -60,8 +62,15 @@ import {
 } from "#endpoints/runtime/sse.ts";
 
 import {
+	estimateUnreportedUsage,
+	type TokenReservation,
+	reservedTotal,
+} from "./tokenReservation.ts";
+
+import {
 	type GatewayAbortReason,
 	isClientAbortSignal,
+	clientClosedRequestError,
 } from "#gateway/abortReason.ts";
 
 export interface RouteOptions {
@@ -69,6 +78,13 @@ export interface RouteOptions {
 	requestId: string;
 	/** Excludes deployments incompatible with the request before balancing, without cooldown. */
 	candidateEligibility?: (candidate: DeploymentCandidate) => void;
+	/**
+	 * The transport this request would rather use on a candidate, when one of the adapter's
+	 * transports carries it better than the default. Overrides and model declarations still win.
+	 */
+	preferredTransport?: (
+		candidate: DeploymentCandidate,
+	) => UpstreamTransport | undefined;
 	/** Session affinity hint; used only when this deployment is still healthy and eligible. */
 	preferredDeploymentId?: string;
 	executionMode?: "json" | "stream";
@@ -89,13 +105,30 @@ export interface RouteOptions {
 	 * budget of a deployment by itself - opening a cooldown against its own next attempt.
 	 */
 	countedTransientDeployments?: Set<string>;
-	/** Conservative upper bound reserved against a deployment TPM limit before execution. */
-	tokenReservation?: (candidate: DeploymentCandidate) => number;
+	/**
+	 * Conservative upper bound reserved against a deployment TPM limit before execution. Its input
+	 * half is also what an accepted exchange settles when the upstream reports no usage.
+	 */
+	tokenReservation?: (candidate: DeploymentCandidate) => TokenReservation;
+	/**
+	 * What an accepted exchange that reports no usage settles. `estimate` (the default) charges the
+	 * reserved input plus the observed output. `release` is for call types whose usage is not known at
+	 * finish by design: free ones (token counting) and ones settled later by their own lifecycle
+	 * (video jobs).
+	 */
+	unreportedUsage?: "estimate" | "release";
 	/** Optional public-key quota admission, kept provider-independent through this lifecycle contract. */
 	usageQuota?: UsageQuota;
 }
 
+const NO_RESERVATION: TokenReservation = { inputTokens: 0, outputTokens: 0 };
+
 export interface UsageQuotaLease {
+	/**
+	 * Charges the usage of a long-lived exchange so far (cumulative, not a delta) before it ends.
+	 * `settle` then charges only the rest. Resolves to whether the key's budget is now exhausted.
+	 */
+	charge?: (usage: Usage) => Promise<{ budgetExhausted: boolean }>;
 	settle: (usage: Usage) => Promise<void>;
 	release: () => Promise<void>;
 }
@@ -183,14 +216,24 @@ export interface RouteResult<T> {
 	 * last upstream chunk received) - pass it for streaming so latency/throughput metrics reflect
 	 * upstream speed, not how long relaying the response to the client additionally took. Defaults to
 	 * `Date.now()`, which is accurate for the non-streaming case (finish() runs before the client write).
+	 *
+	 * Resolves to the usage actually settled: the reported usage, or, when the upstream accepted the
+	 * request but reported none (or only an adapter estimate), a conservative estimate flagged
+	 * `estimated: true`. Callers record that, not their own copy, so the log and the budget agree.
 	 */
+	/**
+	 * Charges a long-lived exchange's cumulative usage so far, without ending it (realtime sessions
+	 * call it after every completed response). Resolves to whether the budget is now exhausted, so
+	 * the caller can end the session.
+	 */
+	charge: (usage: Usage) => Promise<{ budgetExhausted: boolean }>;
 	finish: (
 		usage: Usage | null,
 		finishedAt?: number,
 		streamError?: GatewayError | null,
 		terminalOverride?: CanonicalTerminal | null,
 		downstream?: DownstreamWriteObservation,
-	) => Promise<void>;
+	) => Promise<Usage | null>;
 }
 
 type FallbackReason = "general" | "context_window" | "content_policy";
@@ -213,7 +256,31 @@ function fallbackReasonForFailures(
 	return only ?? "general";
 }
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/**
+ * A retry backoff that ends when the client leaves: waiting on would only start another attempt
+ * (charging the deployment's RPM and opening an upstream call) for nobody.
+ */
+const STRATEGIES_WITHOUT_METRICS: ReadonlySet<string> = new Set([
+	"simple-shuffle",
+	"price-based",
+]);
+
+function backoff(ms: number, clientSignal: AbortSignal): Promise<void> {
+	if (clientSignal.aborted) {
+		return Promise.reject(clientClosedRequestError());
+	}
+	return new Promise<void>((resolve, reject) => {
+		const onAbort = () => {
+			clearTimeout(timer);
+			reject(clientClosedRequestError());
+		};
+		const timer = setTimeout(() => {
+			clientSignal.removeEventListener("abort", onAbort);
+			resolve();
+		}, ms);
+		clientSignal.addEventListener("abort", onAbort, { once: true });
+	});
+}
 
 /** What an attempt record keeps of a failure: enough to answer "what did the upstream say". */
 function failureDetail(
@@ -339,6 +406,9 @@ function buildContext(
 	opts: RouteOptions,
 	totalDeadlineAt: number,
 ): { ctx: AdapterContext; cleanup: () => void } {
+	// Resolved before anything is armed: a credential that fails to decrypt must not leave a
+	// watchdog, a deadline timer and a client-abort listener behind with no cleanup to release them.
+	const credentials = decryptDeploymentCredentials(candidate);
 	const mode = opts.executionMode ?? "json";
 	const policy = resolveExecutionPolicy(
 		settings.executionPolicies[callType][mode],
@@ -369,9 +439,13 @@ function buildContext(
 	return {
 		ctx: {
 			upstreamModel: candidate.upstreamModel,
-			credentials: decryptDeploymentCredentials(candidate),
+			credentials,
 			meta: candidate.meta,
-			transport: resolveTransport(candidate, callType),
+			transport: resolveTransport(
+				candidate,
+				callType,
+				opts.preferredTransport?.(candidate),
+			),
 			requestId: opts.requestId,
 			...(opts.operationId ? { operationId: opts.operationId } : {}),
 			watchdog,
@@ -665,16 +739,21 @@ export async function route<T>(
 
 				// Metrics guide balancing only. The authoritative RPM/TPM decision is an atomic reservation
 				// after circuit admission, eliminating the read-then-increment race between replicas.
-				const metrics = await fetchMetrics(
-					withAttemptsLeft.map((c) => c.row.id),
-				);
+				// Weighted and price-based picks read no metric, so they skip the Redis round-trip.
+				const metrics = STRATEGIES_WITHOUT_METRICS.has(settings.routingStrategy)
+					? new Map<string, DeploymentMetrics>()
+					: await fetchMetrics(withAttemptsLeft.map((c) => c.row.id));
 
 				const chosen =
 					withAttemptsLeft.find(
 						(candidate) => candidate.row.id === opts.preferredDeploymentId,
 					) ??
 					pickDeployment(settings.routingStrategy, withAttemptsLeft, metrics);
-				const transport = resolveTransport(chosen, callType);
+				const transport = resolveTransport(
+					chosen,
+					callType,
+					opts.preferredTransport?.(chosen),
+				);
 				const deployment = deploymentSubject(chosen.row.id);
 				const capacity = capacitySubject(
 					chosen.row.id,
@@ -704,7 +783,8 @@ export async function route<T>(
 				const { permit } = permitResult;
 				let attemptLease: AttemptLease | null = null;
 				let usageQuotaLease: UsageQuotaLease | undefined;
-				const reservedTokens = opts.tokenReservation?.(chosen) ?? 0;
+				const reservation = opts.tokenReservation?.(chosen) ?? NO_RESERVATION;
+				const reservedTokens = reservedTotal(reservation);
 				try {
 					usageQuotaLease = await opts.usageQuota?.reserve(
 						chosen,
@@ -813,7 +893,7 @@ export async function route<T>(
 						ok: false,
 					};
 					attemptLog.push(attemptRecord);
-					let settled = false;
+					let settled: Promise<Usage | null> | null = null;
 					return {
 						ok: true,
 						result: {
@@ -823,296 +903,317 @@ export async function route<T>(
 							fallbackUsed,
 							upstreamStartedAt: startedAt,
 							attemptLog,
-							finish: async (
+							charge: async (usage) => {
+								if (settled !== null || !usageQuotaLease?.charge) {
+									return { budgetExhausted: false };
+								}
+								return usageQuotaLease.charge(usage);
+							},
+							finish: (
 								usage,
 								finishedAt,
 								streamError,
 								terminalOverride,
 								downstream,
 							) => {
-								if (settled) {
-									return;
-								}
-								settled = true;
-								let error = streamError;
-								if (downstream) {
-									finishDownstreamWriteObservation(downstream, error?.code);
-								}
-								cleanupContext();
-								const endedAt = finishedAt ?? Date.now();
-								attemptRecord.ms = endedAt - startedAt;
-								attemptRecord.endedAt = endedAt;
-								attemptRecord.upstreamBytes =
-									instrumentedContext.ctx.transportStats?.upstreamBytes ?? 0;
-								const terminal = terminalOverride ?? terminalFromValue(value);
-								const observation =
-									value !== null && typeof value === "object"
-										? (
-												value as {
-													observation?: {
-														frames: number;
-														metadataFrames: number;
-														reasoningFrames: number;
-														contentFrames: number;
-														toolFrames: number;
-														mediaFrames: number;
-														usageFrames: number;
-														usage: Usage | null;
-														transportTerminator: string | null;
-														lastEventAt: number | null;
-														firstEventAt: number | null;
-														firstReasoningAt: number | null;
-														firstOutputAt: number | null;
-														maxInterEventGapMs: number;
-														diagnostics?: AdapterDiagnostics;
-													};
-												}
-											).observation
-										: undefined;
-								attemptRecord.usage = usage ?? observation?.usage ?? null;
-								if (usageQuotaLease) {
-									await settleSideEffects(opts.requestId, [
-										attemptRecord.usage
-											? usageQuotaLease.settle(attemptRecord.usage)
-											: usageQuotaLease.release(),
-									]);
-								}
-								if (downstream) {
-									attemptRecord.downstreamBlockedMs = downstream.maxBlockedMs;
-								}
-								if (downstream) {
-									attemptRecord.downstreamBytes = downstream.bytes;
-								}
-								if (attemptRecord.usage) {
-									attemptRecord.estimatedCostCents = computeCost(
-										chosen.meta,
-										attemptRecord.usage,
-									).totalCents;
-								}
-								if (
-									value !== null &&
-									typeof value === "object" &&
-									"diagnostics" in value &&
-									(value as { diagnostics?: AdapterDiagnostics }).diagnostics
-								) {
-									attemptRecord.diagnostics = (
-										value as { diagnostics: AdapterDiagnostics }
-									).diagnostics;
-								}
-								if (observation) {
-									attemptRecord.frames = observation.frames;
-									attemptRecord.metadataFrames = observation.metadataFrames;
-									attemptRecord.reasoningFrames = observation.reasoningFrames;
-									attemptRecord.contentFrames = observation.contentFrames;
-									attemptRecord.toolFrames = observation.toolFrames;
-									attemptRecord.mediaFrames = observation.mediaFrames;
-									attemptRecord.usageFrames = observation.usageFrames;
-									if (observation.firstEventAt !== null) {
-										attemptRecord.firstEventMs =
-											observation.firstEventAt - startedAt;
-									}
-									if (observation.firstReasoningAt !== null) {
-										attemptRecord.firstReasoningMs =
-											observation.firstReasoningAt - startedAt;
-									}
-									if (observation.firstOutputAt !== null) {
-										attemptRecord.firstOutputMs =
-											observation.firstOutputAt - startedAt;
-									}
-									attemptRecord.maxInterEventGapMs =
-										observation.maxInterEventGapMs;
-									attemptRecord.lastProgressAt =
-										observation.lastEventAt ?? endedAt;
-									if (observation.transportTerminator) {
-										attemptRecord.transportTerminator =
-											observation.transportTerminator;
-									}
-									if (observation.diagnostics) {
-										attemptRecord.diagnostics = observation.diagnostics;
-									}
-								}
-								if (!(error || terminal)) {
-									error = new GatewayError({
-										class: "server",
-										code: "upstream_protocol_error",
-										message:
-											"Upstream execution settled without terminal evidence",
-										failureKind: "transient",
-										deploymentHealth: "penalize",
-									});
-								}
-								if (!error && terminal) {
-									attemptRecord.ok = true;
-									attemptRecord.terminalVerified = true;
-									attemptRecord.terminalOutcome = terminal.outcome;
-									attemptRecord.terminalReason = terminal.reason;
-									await settleSideEffects(opts.requestId, [
-										onSuccessFinish(
-											chosen.row.id,
-											{
-												totalTokens: usage?.totalTokens ?? null,
-												completionTokens: usage?.completionTokens ?? null,
-												durationMs: endedAt - startedAt,
-												// A non-streaming attempt has no distinct first token, so it
-												// contributes nothing here: substituting its duration taught the
-												// estimate that this deployment answers as fast as its shortest
-												// complete answers, and the adaptive deadline then held every
-												// longer generation to that. Its duration is already the
-												// `durationMs` above, which is what the latency estimate is for.
-												firstOutputMs: attemptRecord.firstOutputMs ?? null,
-											},
-											permit,
-											activeAttemptLease,
-										),
-									]);
-									finishUpstreamAttemptTelemetry(attemptTelemetry, {
-										endedAt,
-										outcome: terminal.outcome,
-										terminalVerified: true,
-									});
-									return;
-								}
-								if (!error) {
-									return;
-								}
-
-								Object.assign(
-									attemptRecord,
-									failureDetail(error, observation ? "stream" : undefined),
+								settled ??= settleAttempt(
+									usage,
+									finishedAt,
+									streamError,
+									terminalOverride,
+									downstream,
 								);
-								if (error.deploymentHealth === "neutral") {
-									attemptRecord.deploymentHealth = "neutral";
-								}
-								if (error.provider?.status !== undefined) {
-									attemptRecord.providerStatus = error.provider.status;
-								}
-								if (error.provider?.body !== undefined) {
-									attemptRecord.providerBody = error.provider.body;
-								}
-
-								if (
-									isClientAbortSignal(opts.clientSignal) ||
-									error.code === "client_closed_request"
-								) {
-									attemptRecord.errorClass = "client_closed_request";
-									attemptRecord.failureKind = "request";
-									attemptRecord.deploymentHealth = "neutral";
-									await settleSideEffects(opts.requestId, [
-										onAttemptCancel(chosen.row.id, permit, activeAttemptLease),
-									]);
-									finishUpstreamAttemptTelemetry(attemptTelemetry, {
-										endedAt,
-										outcome: "cancelled",
-										terminalVerified: false,
-										errorCode: "client_closed_request",
-									});
-									return;
-								}
-
-								const cause: CooldownCause = {
-									class: error.class,
-									message: error.message,
-									...(error.provider?.status === undefined
-										? {}
-										: { status: error.provider.status }),
-									...(error.provider?.body === undefined
-										? {}
-										: { body: error.provider.body }),
-								};
-								switch (error.failureKind) {
-									case "transient":
-										await settleSideEffects(
-											opts.requestId,
-											error.deploymentHealth === "neutral"
-												? [
-														onAttemptFailure(
-															chosen.row.id,
-															false,
-															activeAttemptLease,
-														),
-														closeCircuits(permit),
-													]
-												: [
-														onAttemptFailure(
-															chosen.row.id,
-															true,
-															activeAttemptLease,
-														),
-														...(countTransientSignal(chosen.row.id, permit)
-															? [
-																	recordTransientFailure(
-																		permit,
-																		circuitSettings,
-																		cause,
-																		transientCharge(chosen.row.id, error.class),
-																	),
-																]
-															: []),
-													],
-										);
-										break;
-									case "configuration":
-										await settleSideEffects(opts.requestId, [
-											onAttemptFailure(chosen.row.id, true, activeAttemptLease),
-											recordConfigurationFailure(
-												permit,
-												circuitSettings,
-												cause,
-												settings.configurationCooldownSeconds * 1000,
-												configurationCharge(chosen.row.id),
-											),
-										]);
-										break;
-									case "throttle":
-										await settleSideEffects(opts.requestId, [
-											onAttemptFailure(
-												chosen.row.id,
-												false,
-												activeAttemptLease,
-											),
-											recordThrottleFailure(
-												permit,
-												circuitSettings,
-												cause,
-												Math.max(
-													error.retryAfterMs ?? 0,
-													settings.throttleCooldownSeconds * 1000,
-												),
-											),
-										]);
-										break;
-									case "request":
-										await settleSideEffects(opts.requestId, [
-											onAttemptFailure(
-												chosen.row.id,
-												false,
-												activeAttemptLease,
-											),
-											closeCircuits(permit),
-										]);
-										break;
-									case "gateway":
-										await settleSideEffects(opts.requestId, [
-											onAttemptGatewayFinish(
-												chosen.row.id,
-												attemptRecord.usage?.totalTokens ?? 0,
-												permit,
-												activeAttemptLease,
-											),
-										]);
-										break;
-									default:
-										break;
-								}
-								finishUpstreamAttemptTelemetry(attemptTelemetry, {
-									endedAt,
-									outcome: "error",
-									terminalVerified: false,
-									errorCode: error.code,
-								});
+								return settled;
 							},
 						},
 					};
+					async function settleAttempt(
+						usage: Usage | null,
+						finishedAt: number | undefined,
+						streamError: GatewayError | null | undefined,
+						terminalOverride: CanonicalTerminal | null | undefined,
+						downstream: DownstreamWriteObservation | undefined,
+					): Promise<Usage | null> {
+						let error = streamError;
+						if (downstream) {
+							finishDownstreamWriteObservation(downstream, error?.code);
+						}
+						cleanupContext();
+						const endedAt = finishedAt ?? Date.now();
+						attemptRecord.ms = endedAt - startedAt;
+						attemptRecord.endedAt = endedAt;
+						attemptRecord.upstreamBytes =
+							instrumentedContext.ctx.transportStats?.upstreamBytes ?? 0;
+						const terminal = terminalOverride ?? terminalFromValue(value);
+						const observation =
+							value !== null && typeof value === "object"
+								? (
+										value as {
+											observation?: {
+												frames: number;
+												metadataFrames: number;
+												reasoningFrames: number;
+												contentFrames: number;
+												toolFrames: number;
+												mediaFrames: number;
+												usageFrames: number;
+												usage: Usage | null;
+												transportTerminator: string | null;
+												lastEventAt: number | null;
+												firstEventAt: number | null;
+												firstReasoningAt: number | null;
+												firstOutputAt: number | null;
+												maxInterEventGapMs: number;
+												outputBytes?: number;
+												diagnostics?: AdapterDiagnostics;
+											};
+										}
+									).observation
+								: undefined;
+						// finish() exists only once the upstream accepted the request, so it may have been
+						// billed: missing usage settles an estimate rather than releasing the reservation.
+						const reported = usage ?? observation?.usage ?? null;
+						attemptRecord.usage =
+							(reported && !reported.estimated) ||
+							opts.unreportedUsage === "release"
+								? reported
+								: estimateUnreportedUsage(
+										reservation,
+										observation?.outputBytes ?? 0,
+										reported,
+									);
+						const settledUsage = attemptRecord.usage;
+						if (usageQuotaLease) {
+							await settleSideEffects(opts.requestId, [
+								settledUsage
+									? usageQuotaLease.settle(settledUsage)
+									: usageQuotaLease.release(),
+							]);
+						}
+						if (downstream) {
+							attemptRecord.downstreamBlockedMs = downstream.maxBlockedMs;
+						}
+						if (downstream) {
+							attemptRecord.downstreamBytes = downstream.bytes;
+						}
+						if (attemptRecord.usage) {
+							attemptRecord.estimatedCostCents = computeCost(
+								chosen.meta,
+								attemptRecord.usage,
+							).totalCents;
+						}
+						if (
+							value !== null &&
+							typeof value === "object" &&
+							"diagnostics" in value &&
+							(value as { diagnostics?: AdapterDiagnostics }).diagnostics
+						) {
+							attemptRecord.diagnostics = (
+								value as { diagnostics: AdapterDiagnostics }
+							).diagnostics;
+						}
+						if (observation) {
+							attemptRecord.frames = observation.frames;
+							attemptRecord.metadataFrames = observation.metadataFrames;
+							attemptRecord.reasoningFrames = observation.reasoningFrames;
+							attemptRecord.contentFrames = observation.contentFrames;
+							attemptRecord.toolFrames = observation.toolFrames;
+							attemptRecord.mediaFrames = observation.mediaFrames;
+							attemptRecord.usageFrames = observation.usageFrames;
+							if (observation.firstEventAt !== null) {
+								attemptRecord.firstEventMs =
+									observation.firstEventAt - startedAt;
+							}
+							if (observation.firstReasoningAt !== null) {
+								attemptRecord.firstReasoningMs =
+									observation.firstReasoningAt - startedAt;
+							}
+							if (observation.firstOutputAt !== null) {
+								attemptRecord.firstOutputMs =
+									observation.firstOutputAt - startedAt;
+							}
+							attemptRecord.maxInterEventGapMs = observation.maxInterEventGapMs;
+							attemptRecord.lastProgressAt = observation.lastEventAt ?? endedAt;
+							if (observation.transportTerminator) {
+								attemptRecord.transportTerminator =
+									observation.transportTerminator;
+							}
+							if (observation.diagnostics) {
+								attemptRecord.diagnostics = observation.diagnostics;
+							}
+						}
+						if (!(error || terminal)) {
+							error = new GatewayError({
+								class: "server",
+								code: "upstream_protocol_error",
+								message: "Upstream execution settled without terminal evidence",
+								failureKind: "transient",
+								deploymentHealth: "penalize",
+							});
+						}
+						if (!error && terminal) {
+							attemptRecord.ok = true;
+							attemptRecord.terminalVerified = true;
+							attemptRecord.terminalOutcome = terminal.outcome;
+							attemptRecord.terminalReason = terminal.reason;
+							await settleSideEffects(opts.requestId, [
+								onSuccessFinish(
+									chosen.row.id,
+									{
+										totalTokens: settledUsage?.totalTokens ?? null,
+										completionTokens: settledUsage?.completionTokens ?? null,
+										durationMs: endedAt - startedAt,
+										// A non-streaming attempt has no distinct first token, so it
+										// contributes nothing here: substituting its duration taught the
+										// estimate that this deployment answers as fast as its shortest
+										// complete answers, and the adaptive deadline then held every
+										// longer generation to that. Its duration is already the
+										// `durationMs` above, which is what the latency estimate is for.
+										firstOutputMs: attemptRecord.firstOutputMs ?? null,
+									},
+									permit,
+									activeAttemptLease,
+								),
+							]);
+							finishUpstreamAttemptTelemetry(attemptTelemetry, {
+								endedAt,
+								outcome: terminal.outcome,
+								terminalVerified: true,
+							});
+							return settledUsage;
+						}
+						if (!error) {
+							return settledUsage;
+						}
+
+						Object.assign(
+							attemptRecord,
+							failureDetail(error, observation ? "stream" : undefined),
+						);
+						if (error.deploymentHealth === "neutral") {
+							attemptRecord.deploymentHealth = "neutral";
+						}
+						if (error.provider?.status !== undefined) {
+							attemptRecord.providerStatus = error.provider.status;
+						}
+						if (error.provider?.body !== undefined) {
+							attemptRecord.providerBody = error.provider.body;
+						}
+
+						if (
+							isClientAbortSignal(opts.clientSignal) ||
+							error.code === "client_closed_request"
+						) {
+							attemptRecord.errorClass = "client_closed_request";
+							attemptRecord.failureKind = "request";
+							attemptRecord.deploymentHealth = "neutral";
+							await settleSideEffects(opts.requestId, [
+								onAttemptCancel(chosen.row.id, permit, activeAttemptLease),
+							]);
+							finishUpstreamAttemptTelemetry(attemptTelemetry, {
+								endedAt,
+								outcome: "cancelled",
+								terminalVerified: false,
+								errorCode: "client_closed_request",
+							});
+							return settledUsage;
+						}
+
+						const cause: CooldownCause = {
+							class: error.class,
+							message: error.message,
+							...(error.provider?.status === undefined
+								? {}
+								: { status: error.provider.status }),
+							...(error.provider?.body === undefined
+								? {}
+								: { body: error.provider.body }),
+						};
+						switch (error.failureKind) {
+							case "transient":
+								await settleSideEffects(
+									opts.requestId,
+									error.deploymentHealth === "neutral"
+										? [
+												onAttemptFailure(
+													chosen.row.id,
+													false,
+													activeAttemptLease,
+												),
+												closeCircuits(permit),
+											]
+										: [
+												onAttemptFailure(
+													chosen.row.id,
+													true,
+													activeAttemptLease,
+												),
+												...(countTransientSignal(chosen.row.id, permit)
+													? [
+															recordTransientFailure(
+																permit,
+																circuitSettings,
+																cause,
+																transientCharge(chosen.row.id, error.class),
+															),
+														]
+													: []),
+											],
+								);
+								break;
+							case "configuration":
+								await settleSideEffects(opts.requestId, [
+									onAttemptFailure(chosen.row.id, true, activeAttemptLease),
+									recordConfigurationFailure(
+										permit,
+										circuitSettings,
+										cause,
+										settings.configurationCooldownSeconds * 1000,
+										configurationCharge(chosen.row.id),
+									),
+								]);
+								break;
+							case "throttle":
+								await settleSideEffects(opts.requestId, [
+									onAttemptFailure(chosen.row.id, false, activeAttemptLease),
+									recordThrottleFailure(
+										permit,
+										circuitSettings,
+										cause,
+										Math.max(
+											error.retryAfterMs ?? 0,
+											settings.throttleCooldownSeconds * 1000,
+										),
+									),
+								]);
+								break;
+							case "request":
+								await settleSideEffects(opts.requestId, [
+									onAttemptFailure(chosen.row.id, false, activeAttemptLease),
+									closeCircuits(permit),
+								]);
+								break;
+							case "gateway":
+								await settleSideEffects(opts.requestId, [
+									onAttemptGatewayFinish(
+										chosen.row.id,
+										attemptRecord.usage?.totalTokens ?? 0,
+										permit,
+										activeAttemptLease,
+									),
+								]);
+								break;
+							default:
+								break;
+						}
+						finishUpstreamAttemptTelemetry(attemptTelemetry, {
+							endedAt,
+							outcome: "error",
+							terminalVerified: false,
+							errorCode: error.code,
+						});
+						return settledUsage;
+					}
 				} catch (err) {
 					cleanupContext();
 					if (usageQuotaLease) {
@@ -1320,7 +1421,7 @@ export async function route<T>(
 							reason = "deadline";
 							break;
 						}
-						await sleep(delay);
+						await backoff(delay, opts.clientSignal);
 					}
 				}
 			}
@@ -1412,7 +1513,7 @@ export async function route<T>(
 					lastReason = "deadline";
 					break;
 				}
-				await sleep(delay);
+				await backoff(delay, opts.clientSignal);
 			}
 
 			const roundStartedAt = attempts;

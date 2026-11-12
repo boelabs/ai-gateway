@@ -433,65 +433,76 @@ test("DeepSeek keeps its default for public Responses and requires an override f
 	}
 });
 
-test("incompatible Chat parameters fail before contacting Azure; explicit override preserves them", {
+test("Chat-only controls pick Chat Completions; a Responses-only deployment drops them", {
 	skip,
 }, async () => {
 	const row = await deployment();
-	try {
-		await withStubbedFetch(
-			() => {
-				throw new Error("Incompatible request reached upstream");
+	const chatCompletion = {
+		id: "chat_1",
+		created: 1,
+		model: "gpt-5.6-luna",
+		choices: [
+			{
+				index: 0,
+				message: { role: "assistant", content: "Answer." },
+				finish_reason: "stop",
 			},
-			async () => {
-				for (const fields of [
-					{ n: 2 },
-					{ seed: 42 },
-					{ stop: ["END"] },
-					{ logprobs: true },
-				]) {
+		],
+		usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 },
+	};
+	try {
+		for (const fields of [
+			{ n: 2 },
+			{ seed: 42 },
+			{ stop: ["END"] },
+			{ logprobs: true },
+		]) {
+			await withStubbedFetch(
+				(input, init) => {
+					assert.equal(
+						new URL(String(input)).pathname,
+						"/openai/v1/chat/completions",
+					);
+					const body = JSON.parse(String(init?.body));
+					for (const [key, value] of Object.entries(fields)) {
+						assert.deepEqual(body[key], value, key);
+					}
+					return jsonResponse(chatCompletion);
+				},
+				async () => {
 					const response = await send("/v1/chat/completions", {
 						...requests(row.publicModel)[0][1],
 						...fields,
 					});
-					assert.equal(response.status, 400, await response.clone().text());
-				}
-			},
-		);
+					assert.equal(response.status, 200, await response.text());
+				},
+			);
+		}
+		// An operator who pins Responses gets the policy: under drop, the controls Responses has no
+		// field for are removed and recorded, and the request still succeeds.
 		await updateDeployment(row.id, {
-			transportOverrides: { "text.generate": "chat_completions" },
+			transportOverrides: { "text.generate": "responses" },
 		});
+		const requestId = randomUUID();
 		await withStubbedFetch(
 			(input, init) => {
-				assert.equal(
-					new URL(String(input)).pathname,
-					"/openai/v1/chat/completions",
-				);
+				assert.equal(new URL(String(input)).pathname, "/openai/v1/responses");
 				const body = JSON.parse(String(init?.body));
-				assert.deepEqual(body.stop, ["END"]);
-				assert.equal(body.seed, 42);
-				return jsonResponse({
-					id: "chat_1",
-					created: 1,
-					model: "gpt-5.6-luna",
-					choices: [
-						{
-							index: 0,
-							message: { role: "assistant", content: "Answer." },
-							finish_reason: "stop",
-						},
-					],
-					usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 },
-				});
+				assert.equal(body.stop, undefined);
+				assert.equal(body.seed, undefined);
+				return jsonResponse(completed);
 			},
 			async () => {
-				const response = await send("/v1/chat/completions", {
-					...requests(row.publicModel)[0][1],
-					stop: ["END"],
-					seed: 42,
-				});
+				const response = await send(
+					"/v1/chat/completions",
+					{ ...requests(row.publicModel)[0][1], stop: ["END"], seed: 42 },
+					requestId,
+				);
 				assert.equal(response.status, 200, await response.text());
 			},
 		);
+		const detail = await operation(requestId);
+		assert.match(JSON.stringify(detail), /droppedParameters[^\]]*seed/u);
 	} finally {
 		await deleteDeployment(row.id);
 	}

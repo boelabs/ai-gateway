@@ -167,10 +167,30 @@ generating it, and it is billed.
 - A connection lasts at most 60 minutes. Gemini ends each provider connection after about ten
   minutes; the gateway resumes the session on a new one behind the same socket. The translation
   model has no resumption and reconnects without context.
+- Gemini takes its configuration only when a connection opens. A `session.update` that changes it is
+  answered with `session.updated` at once and applied at the next moment nothing is in flight (the
+  current turn has ended): a new session seeded with the conversation. A connection the gateway
+  rotates meanwhile keeps the new configuration waiting rather than reopening with the old one.
 - `REALTIME_WEBSOCKET_MAX_CONNECTIONS` and `REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY` cap open
   sessions per process and per key.
+- A client event may be at most 4 MiB. Events waiting to be handled may hold at most 32 MiB per
+  connection (and 512 MiB across the process): a client that sends faster than it is served gets an
+  `error` with code `websocket_queue_bytes_exceeded` and the socket is closed with `1008`.
+- The gateway pings every socket (`WEBSOCKET_HEARTBEAT_INTERVAL_MS`) and drops one that misses a pong,
+  closes one with no client message for `WEBSOCKET_IDLE_TIMEOUT_MS`, and closes with `1008` a client
+  that stops reading the events sent to it. The subprotocol it answers with is never the one carrying
+  your key.
 - Each connection is logged as one `realtime.conversation` operation with the usage Gemini reported
   and its cost. Live models price audio and text separately (`audioInputCentsPerMTokens`,
   `audioOutputCentsPerMTokens` in the catalog). If the provider reports no usage, the gateway
   estimates it (25 tokens per second of audio, about 4 characters per text token) and marks the
   operation `usageEstimated`.
+- A virtual key is charged as the session runs, at every `response.done`, not only when it closes:
+  the spend and the TPM window are current while a long session is open. Once the key's budget is
+  spent the gateway sends an `error` with code `budget_exceeded` and closes the socket with 1008.
+- The credential is re-checked at every provider run and once a minute: a disabled, expired or
+  deleted key, or a revoked session, ends the socket with an `error` and close code 1008. A session
+  opened with a client secret is checked against the key that minted it, so the secret's own short
+  expiry does not end it.
+- Realtime sessions have no extension hooks yet, so a session whose model an active extension
+  instance targets is refused with `extensions_unsupported_for_realtime` instead of running without it.

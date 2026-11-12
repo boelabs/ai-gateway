@@ -2,6 +2,7 @@ import { parentPort } from "node:worker_threads";
 import { getDocumentProxy } from "unpdf";
 
 interface PdfTextWorkerRequest {
+	id: number;
 	bytes: ArrayBuffer;
 	maxCharacters: number;
 	maxPages: number;
@@ -81,5 +82,5 @@ port.on("message", async (request: PdfTextWorkerRequest) => {
 			message: error instanceof Error ? error.message : String(error),
 		};
 	}
-	port.postMessage(response);
+	port.postMessage({ id: request.id, ...response });
 });

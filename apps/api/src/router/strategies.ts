@@ -67,6 +67,25 @@ function pickMin(
 	return pick(winners[Math.floor(Math.random() * winners.length)]);
 }
 
+/**
+ * Optimistic exploration: a deployment with no sample yet is assumed to be the best, so it gets
+ * traffic until it has one. Without this, a strategy that ranks by a measurement never sends a
+ * request to a deployment that has none, and a new or recovered deployment stays unmeasured for
+ * good. Samples age out of their window, so a deployment that measured badly is tried again later.
+ */
+function unmeasuredFirst(
+	candidates: DeploymentCandidate[],
+	score: (candidate: DeploymentCandidate) => number | null,
+): DeploymentCandidate | undefined {
+	const unmeasured = candidates.filter((candidate) => {
+		const value = score(candidate);
+		return value === null || !Number.isFinite(value);
+	});
+	return unmeasured.length > 0 && unmeasured.length < candidates.length
+		? weightedRandom(unmeasured)
+		: undefined;
+}
+
 function pickMinScore(
 	candidates: DeploymentCandidate[],
 	score: (candidate: DeploymentCandidate) => number | null,
@@ -168,25 +187,40 @@ export function pickDeployment(
 			return pickMin(candidates, metrics, "tpm");
 		case "usage-based-rpm":
 			return pickMin(candidates, metrics, "rpm");
-		case "latency-based":
-			return pickMinScore(
-				candidates,
-				(candidate) => metrics.get(candidate.row.id)?.latencyMs ?? null,
+		case "latency-based": {
+			const latency = (candidate: DeploymentCandidate) =>
+				metrics.get(candidate.row.id)?.latencyMs ?? null;
+			return (
+				unmeasuredFirst(candidates, latency) ??
+				pickMinScore(candidates, latency)
 			);
-		case "throughput-based":
-			return pickMaxScore(
-				candidates,
-				(candidate) => metrics.get(candidate.row.id)?.throughputTps ?? null,
+		}
+		case "throughput-based": {
+			const throughput = (candidate: DeploymentCandidate) =>
+				metrics.get(candidate.row.id)?.throughputTps ?? null;
+			return (
+				unmeasuredFirst(candidates, throughput) ??
+				pickMaxScore(candidates, throughput)
 			);
+		}
 		case "price-based":
 			return pickByComparablePrice(candidates);
-		case "health-aware":
-			return pickMaxScore(
-				candidates,
-				(candidate) =>
-					(metrics.get(candidate.row.id) ?? ZERO).healthScore *
-					Math.max(0, candidate.row.weight),
+		case "health-aware": {
+			// No attempt recorded: no health sample, explored first like the others.
+			const health = (candidate: DeploymentCandidate) => {
+				const m = metrics.get(candidate.row.id) ?? ZERO;
+				return m.successes + m.failures === 0 ? null : m.healthScore;
+			};
+			return (
+				unmeasuredFirst(candidates, health) ??
+				pickMaxScore(candidates, (candidate) => {
+					const value = health(candidate);
+					return value === null
+						? null
+						: value * Math.max(0, candidate.row.weight);
+				})
 			);
+		}
 		case "simple-shuffle":
 			return weightedRandom(candidates);
 		default:

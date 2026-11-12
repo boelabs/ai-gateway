@@ -1,6 +1,7 @@
 import { resolveModelMetadata, getCatalogEntry } from "#catalog/index.ts";
 import type { ExecutionPolicyOverrides } from "#core/executionPolicy.ts";
 import { invalidatePublicModelGroups } from "#catalog/publicModels.ts";
+import { invalidatingResponseCache } from "#cache/responseCache.ts";
 import type { TransportOverrides } from "#profiles/types.ts";
 import type { RuntimeModelMetadata } from "#db/schema.ts";
 import { declaredTransportFor } from "#catalog/types.ts";
@@ -126,6 +127,41 @@ function validateRequiredCredentials(
 				param: `credentials.${key}`,
 			});
 		}
+	}
+	validateBaseUrl(credentials.baseUrl);
+	adapter.validateCredentials?.(credentials);
+}
+
+/**
+ * A base URL the gateway will send credentials to: an absolute http(s) URL with no userinfo, query
+ * or fragment, all of which would leak or be silently dropped when paths are appended.
+ */
+function validateBaseUrl(value: unknown): void {
+	if (value === undefined) {
+		return;
+	}
+	const invalid = (message: string) =>
+		new GatewayError({
+			class: "bad_request",
+			message,
+			param: "credentials.baseUrl",
+		});
+	if (typeof value !== "string") {
+		throw invalid("credentials.baseUrl must be a string");
+	}
+	let url: URL;
+	try {
+		url = new URL(value);
+	} catch {
+		throw invalid("credentials.baseUrl must be an absolute URL");
+	}
+	if (url.protocol !== "https:" && url.protocol !== "http:") {
+		throw invalid("credentials.baseUrl must use http or https");
+	}
+	if (url.username || url.password || url.search || url.hash) {
+		throw invalid(
+			"credentials.baseUrl cannot contain credentials, query parameters, or fragments",
+		);
 	}
 }
 
@@ -285,6 +321,10 @@ export async function previewDeployment(
 	};
 }
 
+/**
+ * Validation runs before the response cache is touched: a rejected change moves no cache epoch,
+ * and does not depend on Redis to answer its 4xx.
+ */
 export async function createDeployment(
 	input: CreateDeploymentInput,
 ): Promise<{ row: DeploymentRow; preview: DeploymentPreview }> {
@@ -298,24 +338,26 @@ export async function createDeployment(
 		});
 	}
 	validateRequiredCredentials(adapter, input.credentials);
-	const row = await insertDeployment({
-		publicModel: input.publicModel,
-		adapterKey: input.adapterKey,
-		upstreamModel: input.upstreamModel,
-		credentials: input.credentials,
-		label: input.label ?? null,
-		failureDomain: input.failureDomain ?? null,
-		metadata: input.metadata ?? {},
-		catalogEntry:
-			preview.source === "custom" ? (input.catalogEntry ?? null) : null,
-		pricing: input.pricing ?? null,
-		transportOverrides: input.transportOverrides ?? {},
-		executionPolicyOverrides: input.executionPolicyOverrides ?? {},
-		...(input.enabled === undefined ? {} : { enabled: input.enabled }),
-		...(input.weight === undefined ? {} : { weight: input.weight }),
-		...(input.tpmLimit === undefined ? {} : { tpmLimit: input.tpmLimit }),
-		...(input.rpmLimit === undefined ? {} : { rpmLimit: input.rpmLimit }),
-	});
+	const row = await invalidatingResponseCache(() =>
+		insertDeployment({
+			publicModel: input.publicModel,
+			adapterKey: input.adapterKey,
+			upstreamModel: input.upstreamModel,
+			credentials: input.credentials,
+			label: input.label ?? null,
+			failureDomain: input.failureDomain ?? null,
+			metadata: input.metadata ?? {},
+			catalogEntry:
+				preview.source === "custom" ? (input.catalogEntry ?? null) : null,
+			pricing: input.pricing ?? null,
+			transportOverrides: input.transportOverrides ?? {},
+			executionPolicyOverrides: input.executionPolicyOverrides ?? {},
+			...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+			...(input.weight === undefined ? {} : { weight: input.weight }),
+			...(input.tpmLimit === undefined ? {} : { tpmLimit: input.tpmLimit }),
+			...(input.rpmLimit === undefined ? {} : { rpmLimit: input.rpmLimit }),
+		}),
+	);
 	invalidatePublicModelGroups();
 	return { row, preview };
 }
@@ -373,29 +415,32 @@ export async function updateDeployment(
 	}
 	let row: DeploymentRow | undefined;
 	try {
-		row = await persistDeployment(id, {
-			upstreamModel: input.upstreamModel,
-			publicModel: input.publicModel,
-			catalogEntry: preview.source === "custom" ? (catalogEntry ?? null) : null,
-			transportOverrides: input.transportOverrides ?? {},
-			executionPolicyOverrides:
-				patch.executionPolicyOverrides ?? existing.executionPolicyOverrides,
-			enabled: patch.enabled ?? existing.enabled,
-			weight: patch.weight ?? existing.weight,
-			tpmLimit:
-				patch.tpmLimit === undefined ? existing.tpmLimit : patch.tpmLimit,
-			rpmLimit:
-				patch.rpmLimit === undefined ? existing.rpmLimit : patch.rpmLimit,
-			...(patch.pricing === undefined ? {} : { pricing: patch.pricing }),
-			...(mergedCredentials === undefined
-				? {}
-				: { credentials: mergedCredentials }),
-			...(patch.label === undefined ? {} : { label: patch.label }),
-			...(patch.failureDomain === undefined
-				? {}
-				: { failureDomain: patch.failureDomain }),
-			...(patch.metadata === undefined ? {} : { metadata: patch.metadata }),
-		});
+		row = await invalidatingResponseCache(() =>
+			persistDeployment(id, {
+				upstreamModel: input.upstreamModel,
+				publicModel: input.publicModel,
+				catalogEntry:
+					preview.source === "custom" ? (catalogEntry ?? null) : null,
+				transportOverrides: input.transportOverrides ?? {},
+				executionPolicyOverrides:
+					patch.executionPolicyOverrides ?? existing.executionPolicyOverrides,
+				enabled: patch.enabled ?? existing.enabled,
+				weight: patch.weight ?? existing.weight,
+				tpmLimit:
+					patch.tpmLimit === undefined ? existing.tpmLimit : patch.tpmLimit,
+				rpmLimit:
+					patch.rpmLimit === undefined ? existing.rpmLimit : patch.rpmLimit,
+				...(patch.pricing === undefined ? {} : { pricing: patch.pricing }),
+				...(mergedCredentials === undefined
+					? {}
+					: { credentials: mergedCredentials }),
+				...(patch.label === undefined ? {} : { label: patch.label }),
+				...(patch.failureDomain === undefined
+					? {}
+					: { failureDomain: patch.failureDomain }),
+				...(patch.metadata === undefined ? {} : { metadata: patch.metadata }),
+			}),
+		);
 	} catch (error) {
 		if (error instanceof PublicModelReferencedError) {
 			throw new GatewayError({
@@ -416,7 +461,11 @@ export async function updateDeployment(
 	return { row, preview };
 }
 
-export async function deleteDeployment(id: string): Promise<void> {
+async function deleteDeploymentUnchanged(id: string): Promise<void> {
 	await removeDeployment(id);
 	invalidatePublicModelGroups();
+}
+
+export function deleteDeployment(id: string): Promise<void> {
+	return invalidatingResponseCache(() => deleteDeploymentUnchanged(id));
 }

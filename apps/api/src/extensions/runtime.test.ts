@@ -4,7 +4,9 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { extensionRuntime } from "./runtime.ts";
 import assert from "node:assert/strict";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { GatewayError } from "#core/errors.ts";
 import { test } from "node:test";
 
 type Instances = Awaited<
@@ -364,8 +366,49 @@ test("extensions: a hook that ignores cancellation is aborted, not awaited forev
 	setTimeout(() => controller.abort(new Error("client disconnected")), 10);
 
 	await assert.rejects(pending, /client disconnected/u);
+	// The client left; that says nothing about the extension, so its breaker is untouched.
 	const status = extensionRuntime.status();
-	assert.equal(status.instances[0]!.failureCount, 1);
+	assert.equal(status.instances[0]!.failureCount, 0);
+});
+
+test("extensions: a deliberate rejection reaches the client as its 4xx without tripping the breaker", async (t) => {
+	await resetRuntime();
+	t.after(resetRuntime);
+	const sdk = pathToFileURL(resolve(import.meta.dirname, "sdk.ts")).href;
+	await load(
+		{
+			"block.mjs": `
+				import { rejectRequest } from ${JSON.stringify(sdk)};
+				export default {
+					key: "block",
+					hooks: {
+						onCanonicalRequest() {
+							rejectRequest({ message: "Blocked by policy.", code: "policy_blocked", status: 403 });
+						}
+					}
+				};
+			`,
+		},
+		[{ id: "block-default", definition: "block", critical: false }],
+	);
+	for (let i = 0; i < 5; i += 1) {
+		await assert.rejects(
+			extensionRuntime.runCanonicalRequest(scope(), {
+				callType: "chat",
+				model: "demo-model",
+				messages: [],
+				stream: false,
+			}),
+			(error) =>
+				GatewayError.is(error) &&
+				error.httpStatus === 403 &&
+				error.code === "policy_blocked" &&
+				error.publicMessage === "Blocked by policy.",
+		);
+	}
+	const status = extensionRuntime.status();
+	assert.equal(status.instances[0]!.failureCount, 0);
+	assert.equal(status.instances[0]!.status, "active");
 });
 
 test("extensions: onError hook failures never trip the circuit breaker", async (t) => {
@@ -488,4 +531,71 @@ test("extensions: image output hooks can replace the encoded bytes", async (t) =
 
 	const transformed = await extensionRuntime.runImageOutput(scope(), output);
 	assert.deepEqual([...transformed.data], [4, 5, 6]);
+});
+
+test("extensions: a realtime session on a targeted model is refused, others pass", async (t) => {
+	await resetRuntime();
+	t.after(resetRuntime);
+	await load(
+		{
+			"noop.mjs": `export default { key: "noop", hooks: { onCanonicalRequest(ctx, req) { return req; } } };`,
+		},
+		[
+			{
+				id: "noop-default",
+				definition: "noop",
+				match: { models: ["demo-model"] },
+				config: {},
+			},
+		],
+	);
+	assert.throws(
+		() => extensionRuntime.assertNoInstanceTargets(scope("demo-model")),
+		(error: unknown) =>
+			(error as { code?: string }).code ===
+			"extensions_unsupported_for_realtime",
+	);
+	assert.doesNotThrow(() =>
+		extensionRuntime.assertNoInstanceTargets(scope("other-model")),
+	);
+});
+
+test("extensions: a reload keeps an unchanged definition's setup and breaker state", async (t) => {
+	await resetRuntime();
+	t.after(resetRuntime);
+	const counter = `__extSetup_${Date.now()}`;
+	const { source, dir } = await moduleSource(
+		{
+			"flaky.mjs": `
+				export default {
+					key: "flaky",
+					setup() { globalThis.${counter} = (globalThis.${counter} ?? 0) + 1; },
+					hooks: { onCanonicalRequest() { throw new Error("boom"); } }
+				};
+			`,
+		},
+		[{ id: "flaky-default", definition: "flaky", critical: false }],
+	);
+	await extensionRuntime.loadFromSource(source, dir);
+	for (let i = 0; i < 3; i += 1) {
+		await assert.rejects(
+			extensionRuntime.runCanonicalRequest(scope(), {
+				callType: "chat",
+				model: "demo-model",
+				messages: [],
+				stream: false,
+			}),
+		);
+	}
+	assert.equal(
+		extensionRuntime.status().instances[0]!.status,
+		"runtime_disabled",
+	);
+
+	await extensionRuntime.loadFromSource(source, dir);
+	assert.equal((globalThis as Record<string, unknown>)[counter], 1);
+	assert.equal(
+		extensionRuntime.status().instances[0]!.status,
+		"runtime_disabled",
+	);
 });

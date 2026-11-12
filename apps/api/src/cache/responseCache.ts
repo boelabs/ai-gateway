@@ -1,4 +1,5 @@
 import type { Usage } from "#core/usage.ts";
+import { log } from "#logging/log.ts";
 import { redis } from "./redis.ts";
 
 /** Cached entry: the body rendered to the client + the original usage (for the log). */
@@ -33,6 +34,21 @@ export async function advanceResponseCacheEpoch(): Promise<string> {
 	return String(await redis.incr(CACHE_EPOCH_KEY));
 }
 
+/**
+ * Runs a change to state that decides what a cached response would be (deployments, fallbacks,
+ * router settings, extensions) and invalidates the cache around it. The epoch moves before the
+ * change, so no request that read the old state can store under the new epoch, and again after it,
+ * so nothing written while it ran survives.
+ */
+export async function invalidatingResponseCache<T>(
+	change: () => Promise<T>,
+): Promise<T> {
+	await advanceResponseCacheEpoch();
+	const result = await change();
+	await advanceResponseCacheEpoch();
+	return result;
+}
+
 /** Reads the cache config from the x-unified-cache / x-unified-cache-ttl headers. */
 export function cacheConfigFromHeaders(
 	get: (name: string) => string | undefined,
@@ -59,17 +75,24 @@ export async function cacheGet(key: string): Promise<CachedEntry | null> {
 	}
 }
 
+/**
+ * Best-effort write: it never rejects. An oversized entry is skipped and a Redis failure is logged,
+ * because serving without the cache is not an error and callers do not await the write.
+ */
 export async function cacheSet(
 	key: string,
 	entry: CachedEntry,
 	ttlSeconds: number,
 ): Promise<void> {
-	const payload = JSON.stringify(entry);
-	// Best-effort: an oversized entry is silently skipped (serving without cache is not an error).
-	if (Buffer.byteLength(payload, "utf8") > MAX_VALUE_BYTES) {
-		return;
+	try {
+		const payload = JSON.stringify(entry);
+		if (Buffer.byteLength(payload, "utf8") > MAX_VALUE_BYTES) {
+			return;
+		}
+		await redis.set(key, payload, "EX", ttlSeconds);
+	} catch (err) {
+		log.warn("response-cache", "cache write failed", { err });
 	}
-	await redis.set(key, payload, "EX", ttlSeconds);
 }
 
 export interface CacheInvalidationOptions {

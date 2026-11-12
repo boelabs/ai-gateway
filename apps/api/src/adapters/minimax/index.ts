@@ -17,6 +17,8 @@ export const minimaxAdapter = makeOpenAIStyleAdapter({
 	defaultTransport: "chat_completions",
 	maxTokensField: "max_tokens",
 	supportsTopK: true,
+	// Its thinking models need their reasoning_content back in later requests.
+	replayReasoningContent: true,
 	refineBadRequest: contextWindowRefine,
 });
 

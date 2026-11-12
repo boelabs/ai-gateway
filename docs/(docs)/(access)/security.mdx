@@ -53,11 +53,27 @@ login form somewhere else.
 stored as a SHA-256 hash of the token, exactly like virtual keys, with an absolute expiry
 and a sliding idle expiry, both set in **Settings › Operator sessions**. Disabling a
 user, changing their role, or resetting their password revokes every live session of theirs
-immediately rather than waiting for expiry.
+immediately rather than waiting for expiry. The same change bumps the user's session epoch, and a
+session only resolves while its epoch matches, so even a sign-in that raced the change cannot keep
+the old role or password; a session's role is always read from the user row.
 
-**Failed logins** are counted per username *and* per client IP, so neither one account under a
-distributed attack nor one address spraying many usernames reaches the attempt ceiling unnoticed.
-Both counters then lock out for the configured window. Every rejection returns the same
+A user flagged **must change password** (the default when an owner sets someone's password) can read
+`GET /auth/session` and call `POST /auth/password` with their session, and nothing else: every other
+request answers `403 password_change_required`. The dashboard sends them to a change-password screen
+before anything else renders.
+
+A session cookie never authenticates a WebSocket handshake (`401 session_websocket_refused`): a
+browser sends cookies on a cross-site upgrade, which is a `GET` the CSRF check does not cover, and no
+browser opens sockets to the gateway directly. Realtime and Responses WebSockets take an API key or a
+realtime client secret.
+
+**Failed logins** are counted three ways, each attempt reserved before the password is checked so
+concurrent guesses cannot slip past the limit. The username and client IP *pair* locks after the
+configured attempts; that is the lock a person meets, and nobody at another address can trip it for
+them. The username alone and the IP alone have a ceiling ten times higher, which stops one account
+under a distributed attack and one address spraying many usernames; the username lock doubles its
+window each time the ceiling is passed again, up to 24 hours. A successful sign-in clears only its
+own pair, so signing into one account never resets the counters built up against another. Every rejection returns the same
 generic message, and an unknown username is still verified against a real digest, so neither the
 wording nor the timing discloses whether an account exists.
 
@@ -106,7 +122,8 @@ server does, and relays the three calls that must be the browser's own request. 
 ### Audit trail
 
 Every mutating `/admin` call is appended to `admin_audit` with the acting identity (`master-key`,
-`root`, or `user:<uuid>`), the route, the target, the request id, and the resulting status. Reads are
+`root`, or `user:<uuid>`), the route, the target, the request id, and the resulting status — a
+`403` refusal included, since an attempt to change what one's role does not allow is worth a record. Reads are
 not audited — they are most of a dashboard's traffic and would bury what matters — with one deliberate
 exception in the other direction: reading a payload sample is a `GET` that reveals real content, and
 `payload_access_audit` records it separately.
@@ -117,7 +134,10 @@ updates or deletes an entry.
 
 Inference operations carry the same identity in `gateway_operations.actor`, so operator traffic
 (a playground, a manual test) is attributable and shows up in `GET /admin/usage?groupBy=actor` instead
-of appearing as unattributed spend.
+of appearing as unattributed spend. An operator session reaches the public API only with
+`inference:use` (admin and owner); a viewer's session is refused with `403 insufficient_permission`.
+Stored responses and video jobs created through a session belong to its user: neither the master key
+nor another operator reaches them through `/v1`.
 
 ## Virtual keys at rest
 
@@ -133,9 +153,9 @@ credential, as a deployment decision a compromised operator account cannot rever
 `POST /admin/keys/:id/rotate`: the old secret stops working immediately. See
 [Virtual keys](/docs/virtual-keys#copy-a-key-again).
 
-A create or rotate response is also remembered for a day when the request carries an `Idempotency-Key`,
-so a retry can replay it; it is stored encrypted with the keyring, like every remembered response.
-A database dump without the keyring reveals no key.
+A create or rotate response is never kept for an `Idempotency-Key` retry: the gateway remembers only
+that the call completed and with what status, so the plaintext key exists nowhere but in the one
+response that returned it.
 
 ## Deployment credentials at rest
 

@@ -24,6 +24,8 @@ export interface SessionAuth {
 	userId: string | null;
 	role: DashboardRole;
 	isRoot: boolean;
+	/** The user must set a new password before the session may do anything else. */
+	mustChangePassword: boolean;
 }
 
 /**
@@ -33,6 +35,8 @@ export interface SessionAuth {
 export interface RealtimeSecretGrant {
 	/** The `session` given when the secret was minted, or null. */
 	session: Record<string, unknown> | null;
+	/** Hash of the virtual key that minted it (null: the master key), for revalidation. */
+	keyHash?: string | null;
 }
 
 export type Auth =
@@ -73,5 +77,7 @@ export interface AppEnv {
 		operationId: string | undefined;
 		turnRequestId: string | undefined;
 		turnSignal: AbortSignal | undefined;
+		/** The request body, once read through `readBodyBytes`; the stream itself is then spent. */
+		requestBody: Uint8Array | undefined;
 	};
 }

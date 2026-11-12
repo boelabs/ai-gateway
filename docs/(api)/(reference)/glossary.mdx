@@ -84,6 +84,12 @@ mechanisms — `openai_effort`, `openai_body`, `anthropic_adaptive`, `anthropic_
 `none < minimal < low < medium < high < xhigh < max` ladder it accepts), and kind-specific config
 (`bodyField`, `chatTemplateFlag`, `budgets`, `upstreamEffortMap`). See [Reasoning](/docs/reasoning).
 
+## Reasoning Budget
+
+`reasoning.budgetTokens`: an explicit thinking-token budget (Anthropic `thinking.budget_tokens`),
+carried beside the effort it falls into. Budget-controlled models receive the number unchanged;
+level-controlled models receive the effort.
+
 ## Parameter Policy
 
 The operator-configured behavior (`unsupportedParameterStrategy`: `drop`, `error`, or `allow`) for a
@@ -122,6 +128,26 @@ Opaque provider state bound to an assistant turn rather than to one of its tool 
 Gemini signature on a text response or Claude's signed `thinking` blocks. Where a public endpoint has no native carrier for it, the
 gateway seals it into a `reasoning` item whose `encrypted_content` starts with `bfrs_`; clients
 replay it and nothing is stored. See [Provider-specific fields](/docs/provider-specific-fields).
+
+## Estimated Usage
+
+`Usage` flagged `estimated: true`: the counts the gateway settles when an upstream accepted a request
+but reported no usage — the reserved input plus the observed output. See
+[Cost accounting](/docs/cost-accounting#when-the-provider-reports-no-usage).
+
+## Refusal
+
+The model declining to answer, carried apart from content on canonical messages, responses and
+stream deltas: Chat's `refusal`, a `refusal` content part and `response.refusal.*` events on
+Responses. A refusal served through one wire reaches clients of the other as a refusal.
+
+## Server Tool
+
+A tool the provider runs itself during a turn, such as Anthropic's web search, web fetch or code
+execution. Its call and result blocks have no canonical form, so they travel as native provider
+content: `/v1/messages` returns and streams them where the model produced them, and a client that
+sends the turn back reaches the provider with them unchanged. `Usage.serverToolCalls` counts the
+calls per tool (`server_tool_use` on the Messages wire).
 
 ## Fallback Policy
 

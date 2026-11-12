@@ -2,11 +2,12 @@ import { periodSeconds, secondsUntilReset } from "./period.ts";
 import type { VirtualKeyAuth } from "#auth/types.ts";
 import { GatewayError } from "#core/errors.ts";
 import { randomUUID } from "node:crypto";
-import { redis } from "#cache/redis.ts";
+import { redis, runScript } from "#cache/redis.ts";
+import { log } from "#logging/log.ts";
 
 import {
 	resetVirtualKeySpendIfDue,
-	addVirtualKeySpend,
+	recordVirtualKeySpend,
 	getVirtualKeyById,
 } from "#db/repos/virtualKeys.ts";
 
@@ -93,6 +94,8 @@ const kBudgetLeases = (id: string) => `${KEY_PREFIX}:budget-leases:${id}`;
 const kBudgetAmounts = (id: string) => `${KEY_PREFIX}:budget-amounts:${id}`;
 
 const LEASE_TTL_SECONDS = 2 * 60 * 60;
+/** Lifetime of a per-minute TPM window's keys: its minute plus one for late settlements. */
+const TPM_BUCKET_TTL_SECONDS = 120;
 const LEASE_TTL_MS = LEASE_TTL_SECONDS * 1000;
 
 export async function clearVirtualKeyBudget(id: string): Promise<void> {
@@ -293,7 +296,7 @@ export async function enforceVirtualKey(
 	let budgetResetSeconds: number | undefined;
 
 	if (key.rpm != null) {
-		const res = (await redis.eval(
+		const res = (await runScript(
 			RPM_LUA,
 			1,
 			kRpm(key.id, b),
@@ -395,7 +398,7 @@ async function reserveCounter(options: {
 	}
 	const amount = finiteNonNegative(options.amount, "Reservation amount");
 	const result = evalArray(
-		await redis.eval(
+		await runScript(
 			RESERVE_LUA,
 			4,
 			options.actualKey,
@@ -429,7 +432,7 @@ async function settleCounter(
 	actual: number,
 ): Promise<void> {
 	const settledActual = finiteNonNegative(actual, "Settled usage");
-	await redis.eval(
+	await runScript(
 		SETTLE_LUA,
 		4,
 		lease.actualKey,
@@ -444,6 +447,15 @@ async function settleCounter(
 }
 
 export interface VirtualKeyUsageLease {
+	/**
+	 * Records usage that has already happened while the lease stays open (a long realtime session),
+	 * in the current minute's TPM window and in the spend. `settle` later charges only what exceeds
+	 * the amounts charged here. Resolves to whether the budget is now exhausted.
+	 */
+	charge: (
+		totalTokens: number,
+		costCents: number,
+	) => Promise<{ budgetExhausted: boolean }>;
 	settle: (totalTokens: number, costCents: number) => Promise<void>;
 	release: () => Promise<void>;
 	/** Plain-data form of the lease, so another process can settle it after the request ends. */
@@ -455,26 +467,116 @@ export interface VirtualKeyUsageLeaseSnapshot {
 	/** True when the first counter is the TPM one, which settles in tokens rather than cents. */
 	tpmFirst: boolean;
 	counters: CounterLease[];
+	/** The budget limit in cents, when the key has one. */
+	budgetLimitCents?: number;
+	/**
+	 * Idempotency key of this lease's spend writes. Snapshots persisted before it existed fall back
+	 * to their first counter's id, which is equally unique.
+	 */
+	ledgerId?: string;
+}
+
+const SPEND_WRITE_DELAYS_MS = [200, 1000, 5000];
+
+/**
+ * Writes spend to Postgres through the idempotent ledger, retrying transient failures. Redis already
+ * holds the spend for enforcement; Postgres is the durable record a Redis flush is reseeded from.
+ */
+async function writeSpend(
+	entryId: string,
+	keyId: string,
+	cents: number,
+): Promise<void> {
+	for (let attempt = 0; ; attempt += 1) {
+		try {
+			await recordVirtualKeySpend(entryId, keyId, cents);
+			return;
+		} catch (err) {
+			const delay = SPEND_WRITE_DELAYS_MS[attempt];
+			if (delay === undefined) {
+				log.error("ratelimit", "failed to persist virtual key spend", {
+					err,
+					keyId,
+					entryId,
+					cents,
+				});
+				throw err;
+			}
+			await new Promise((resolve) => setTimeout(resolve, delay));
+		}
+	}
+}
+
+function ledgerIdOf(snapshot: VirtualKeyUsageLeaseSnapshot): string {
+	return snapshot.ledgerId ?? snapshot.counters[0]?.id ?? randomUUID();
 }
 
 function buildUsageLease(
 	snapshot: VirtualKeyUsageLeaseSnapshot,
 ): VirtualKeyUsageLease {
 	let settled = false;
+	let chargedTokens = 0;
+	let chargedCents = 0;
+	let charges = 0;
+	const ledgerId = ledgerIdOf(snapshot);
+	const budgetLease = snapshot.counters.at(snapshot.tpmFirst ? 1 : 0);
 	return {
+		charge: async (totalTokens, costCents) => {
+			const tokens = finiteNonNegative(totalTokens, "Charged usage");
+			const cents = finiteNonNegative(costCents, "Charged cost");
+			if (settled || (tokens === 0 && cents === 0)) {
+				return { budgetExhausted: false };
+			}
+			chargedTokens += tokens;
+			chargedCents += cents;
+			const operations: Promise<unknown>[] = [];
+			if (snapshot.tpmFirst && tokens > 0) {
+				const key = kTpm(snapshot.keyId, minuteBucket());
+				operations.push(
+					redis
+						.multi()
+						.incrby(key, Math.ceil(tokens))
+						.expire(key, TPM_BUCKET_TTL_SECONDS)
+						.exec(),
+				);
+			}
+			let spend: Promise<string | null> | null = null;
+			if (budgetLease && cents > 0) {
+				spend = redis.incrbyfloat(budgetLease.actualKey, cents);
+				if (budgetLease.actualTtlSeconds > 0) {
+					operations.push(
+						spend.then(() =>
+							redis.expire(budgetLease.actualKey, budgetLease.actualTtlSeconds),
+						),
+					);
+				}
+				charges += 1;
+				operations.push(
+					writeSpend(`${ledgerId}:charge:${charges}`, snapshot.keyId, cents),
+				);
+			}
+			await Promise.all(operations);
+			const spent = spend ? redisCounter(await spend, "budget") : 0;
+			return {
+				budgetExhausted:
+					snapshot.budgetLimitCents !== undefined &&
+					spent >= snapshot.budgetLimitCents,
+			};
+		},
 		settle: async (totalTokens, costCents) => {
 			if (settled) {
 				return;
 			}
 			settled = true;
+			const tokens = Math.max(0, totalTokens - chargedTokens);
+			const cents = Math.max(0, costCents - chargedCents);
 			const operations = snapshot.counters.map((lease, index) =>
-				settleCounter(
-					lease,
-					index === 0 && snapshot.tpmFirst ? totalTokens : costCents,
-				),
+				settleCounter(lease, index === 0 && snapshot.tpmFirst ? tokens : cents),
 			);
-			if (costCents > 0) {
-				operations.push(addVirtualKeySpend(snapshot.keyId, costCents));
+			if (cents > 0) {
+				operations.push(
+					writeSpend(`${ledgerId}:settle`, snapshot.keyId, cents),
+				);
 			}
 			await Promise.all(operations);
 		},
@@ -514,8 +616,10 @@ export async function reserveVirtualKeyUsage(
 			amountsKey: kTpmAmounts(key.id, b),
 			limit: key.tpm,
 			amount: reservedTokens,
-			leaseTtlSeconds: LEASE_TTL_SECONDS,
-			actualTtlSeconds: 120,
+			// A TPM window is one minute: its reservation keys need outlive it only as long as the
+			// counter does, not the two hours a budget lease may stay open.
+			leaseTtlSeconds: TPM_BUCKET_TTL_SECONDS,
+			actualTtlSeconds: TPM_BUCKET_TTL_SECONDS,
 		});
 		if (!reservation.accepted) {
 			throw new GatewayError({
@@ -558,5 +662,9 @@ export async function reserveVirtualKeyUsage(
 		keyId: key.id,
 		tpmFirst: key.tpm != null,
 		counters: leases,
+		ledgerId: randomUUID(),
+		...(key.maxBudgetCents == null
+			? {}
+			: { budgetLimitCents: key.maxBudgetCents }),
 	});
 }

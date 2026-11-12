@@ -1,4 +1,5 @@
 import { assertImageRequestSupported } from "#gateway/imageRequestValidation.ts";
+import { type imageUsageToCore, imageResponseUsage } from "#core/images.ts";
 import { executeImage, type ImageExecResult } from "#gateway/executor.ts";
 import { estimateTokenReservation } from "#router/tokenReservation.ts";
 import { withResolvedQuality } from "#gateway/qualityResolution.ts";
@@ -10,7 +11,6 @@ import { getEffectiveSettings } from "#router/settings.ts";
 import { route, type RouteResult } from "#router/index.ts";
 import { imageResponseLog } from "#images/logging.ts";
 import { imageProfileFor } from "#catalog/types.ts";
-import { imageUsageToCore } from "#core/images.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { AppEnv } from "#auth/types.ts";
 import { streamSSE } from "hono/streaming";
@@ -25,6 +25,7 @@ import {
 	assertFinalModelAllowed,
 	notifyExtensionError,
 	usageQuotaForRequest,
+	enforceKeyLimits,
 	computeUsageCost,
 	toGatewayError,
 	extensionScope,
@@ -145,7 +146,7 @@ async function handleImageRequest(
 						estimateTokenReservation(req, {
 							maxOutputTokens: candidate.meta.maxOutputTokens ?? 0,
 						}),
-					usageQuota: usageQuotaForRequest(c),
+					usageQuota: usageQuotaForRequest(c, { outputImages: req.n ?? 1 }),
 				},
 				(candidate, ctx) => {
 					const { request, resolved } = forCandidate(candidate);
@@ -160,7 +161,12 @@ async function handleImageRequest(
 			routing = routed;
 			log.applyRouting(routed);
 			if (routed.value.kind === "json") {
-				fallbackUsage = imageUsageToCore(routed.value.response.usage);
+				const { response } = routed.value;
+				fallbackUsage = imageResponseUsage(response.usage, {
+					images: response.data.length,
+					size: response.size ?? req.size,
+					quality: response.quality ?? sentQuality,
+				});
 			}
 			return routed;
 		};
@@ -204,7 +210,11 @@ async function handleImageRequest(
 				});
 			}
 			const response = await jsonResponse(routed, routed.value.response);
-			const usage = imageUsageToCore(response.usage);
+			const usage = imageResponseUsage(response.usage, {
+				images: response.data.length,
+				size: response.size ?? req.size,
+				quality: response.quality,
+			});
 			await finish(usage);
 			await cleanup?.();
 			log.write({
@@ -230,6 +240,7 @@ async function handleImageRequest(
 			let usage: ReturnType<typeof imageUsageToCore> = null;
 			let responseBody: Record<string, unknown> | null = null;
 			let count = 0;
+			let completedImages = 0;
 			let firstAt: number | null = null;
 			let streamError: GatewayError | null = null;
 			try {
@@ -241,7 +252,11 @@ async function handleImageRequest(
 
 				if (routed.value.kind === "json") {
 					const response = await jsonResponse(routed, routed.value.response);
-					usage = imageUsageToCore(response.usage);
+					usage = imageResponseUsage(response.usage, {
+						images: response.data.length,
+						size: response.size ?? req.size,
+						quality: response.quality,
+					});
 					responseBody = imageResponseLog(response);
 					const [completedImage] = response.data;
 					if (response.data.length !== 1 || !completedImage) {
@@ -299,8 +314,13 @@ async function handleImageRequest(
 							firstAt = Date.now();
 							log.upstreamTtftMs = firstAt - routed.upstreamStartedAt;
 						}
-						if (event.kind === "completed" && event.usage) {
-							usage = imageUsageToCore(event.usage);
+						if (event.kind === "completed") {
+							completedImages += 1;
+							usage = imageResponseUsage(event.usage, {
+								images: completedImages,
+								size: event.size ?? req.size,
+								quality: event.quality,
+							});
 						}
 						count += 1;
 						await writeSSE(
@@ -372,6 +392,7 @@ export async function imageGenerationsHandler(
 }
 
 export async function imageEditsHandler(c: Context<AppEnv>): Promise<Response> {
+	await enforceKeyLimits(c);
 	const multipart = await parseImageEditMultipart(c.req.raw);
 	return handleImageRequest(
 		c,

@@ -16,13 +16,16 @@ deployment. Gateway and dashboard processes read separate environment files.
 | `ACTIVE_ENCRYPTION_KEY_ID` | Key id | Must exist in `ENCRYPTION_KEYRING`; encrypts every new envelope. |
 | `DATABASE_URL` | Postgres connection URL | TLS follows `sslmode` as in libpq; without it the connection is plaintext. |
 | `REDIS_URL` | Redis connection URL | |
+| `DATABASE_STATEMENT_TIMEOUT_MS` | `30000` | Postgres cancels a request-path statement running longer. Admin lists and analytics use a separate 4-connection pool with a 120 s limit; every connection also ends transactions idle for 60 s and closes after 60 s unused. Redis commands and connections time out after 5 s. |
+| `REDIS_TLS_CA` | — | CA that signs a `rediss://` server certificate (PEM, or `file:/path`). Verification is always on otherwise. |
+| `REDIS_TLS_INSECURE` | `false` | `true` skips `rediss://` certificate verification. |
 
 ## Server
 
 | Variable | Default | Controls |
 |---|---|---|
 | `PORT` | `4000` | HTTP listen port. |
-| `TRUSTED_PROXY_HOPS` | `0` | Number of rightmost, operator-controlled proxy hops trusted in `X-Forwarded-For`. `0` ignores the header. |
+| `TRUSTED_PROXY_HOPS` | `0` | Number of rightmost, operator-controlled proxy hops trusted in `X-Forwarded-For`. `0` ignores the header. The dashboard is one such hop: it forwards the operator's `X-Forwarded-For` and `User-Agent`, so a gateway it calls directly needs at least `1`, or every sign-in shares one throttle address. |
 | `PUBLIC_MODELS_RPM` | `600` | Per-process anonymous `/v1/models` requests allowed each minute per resolved client IP. `0` disables the limit. |
 | `NODE_ENV` | `development` | `development` \| `test` \| `production`. |
 | `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error`. |
@@ -49,6 +52,8 @@ deployment. Gateway and dashboard processes read separate environment files.
 | `REALTIME_WEBSOCKET_MAX_CONNECTIONS` | `500` | Maximum live `/v1/realtime` transcription sessions per gateway process. |
 | `REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY` | `20` | Maximum live `/v1/realtime` transcription sessions for one virtual key (the master key has its own scope). |
 | `RESPONSES_WEBSOCKET_MAX_QUEUED_TURNS` | `64` | Maximum queued `response.create` turns per connection; one turn is processed at a time. |
+| `WEBSOCKET_HEARTBEAT_INTERVAL_MS` | `30000` | How often every public WebSocket (`/v1/realtime`, `/v1/responses`) is pinged; a socket that missed the previous pong is dropped. |
+| `WEBSOCKET_IDLE_TIMEOUT_MS` | `600000` | A public WebSocket with no client message for this long is closed. |
 | `RESPONSE_STATE_GC_INTERVAL_MS` | `3600000` (1h) | How often the in-process job deletes expired response state. |
 
 ## Runtime extensions

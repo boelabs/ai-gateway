@@ -5,6 +5,11 @@ export function classifyStatus(status: number): ErrorClass {
 	if (status === 401 || status === 403) {
 		return "auth";
 	}
+	// Payment required: the deployment's account cannot pay for the request (credits exhausted,
+	// billing suspended). Nothing about the request is wrong; another deployment may serve it.
+	if (status === 402) {
+		return "permission";
+	}
 	if (status === 404) {
 		return "not_found";
 	}

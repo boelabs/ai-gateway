@@ -18,6 +18,26 @@ import type { Context } from "hono";
 import { z } from "zod/v4";
 
 import {
+	assertRealtimeSocketCapacity,
+	type RealtimeSocketEntry,
+	unregisterRealtimeSocket,
+	assertWebSocketUpgrade,
+	registerRealtimeSocket,
+	eventQueueLimitError,
+	revalidateConnection,
+	sessionExpiredError,
+	realtimeMessageJson,
+	capacityLimitError,
+	sendRealtimeEvent,
+	MAX_QUEUED_EVENTS,
+	admitQueuedBytes,
+	queuedBytesError,
+	messageBytes,
+	REALTIME_MAX_MS,
+	watchCredential,
+} from "./realtimeSockets.ts";
+
+import {
 	realtimeTranscriptionSessionSchema,
 	type RealtimeSessionUpdate,
 	type RealtimeSessionState,
@@ -33,16 +53,13 @@ import {
 } from "#contracts/openai/realtime.ts";
 
 import {
-	type RealtimeSocketEntry,
-	unregisterRealtimeSocket,
-	registerRealtimeSocket,
-	eventQueueLimitError,
-	sessionExpiredError,
-	realtimeMessageJson,
-	sendRealtimeEvent,
-	MAX_QUEUED_EVENTS,
-	REALTIME_MAX_MS,
-} from "./realtimeSockets.ts";
+	assertRealtimeExtensionsSupported,
+	assertFinalModelAllowed,
+	usageQuotaForRequest,
+	computeUsageCost,
+	toGatewayError,
+	preflight,
+} from "./runtime/pipeline.ts";
 
 import {
 	type CanonicalRealtimeTranscriptionConfig,
@@ -56,14 +73,6 @@ import {
 	type DownstreamWriteObservation,
 	newDownstreamWriteObservation,
 } from "./runtime/sse.ts";
-
-import {
-	assertFinalModelAllowed,
-	usageQuotaForRequest,
-	computeUsageCost,
-	toGatewayError,
-	preflight,
-} from "./runtime/pipeline.ts";
 
 export { closeRealtimeWebSockets } from "./realtimeSockets.ts";
 
@@ -99,6 +108,9 @@ interface UpstreamRun {
 	tracker: RealtimeTranscriptTracker;
 	downstream: DownstreamWriteObservation;
 	ended: boolean;
+	/** Completed transcript items and usage reports already charged against the key. */
+	chargedItems: number;
+	chargedUsage: RealtimeUsage | null;
 }
 
 interface RealtimeConnection {
@@ -107,9 +119,12 @@ interface RealtimeConnection {
 	state: RealtimeSessionState;
 	queue: Promise<void>;
 	queued: number;
+	queuedBytes: number;
 	run: UpstreamRun | null;
 	lastItemId: string | null;
 	timer: ReturnType<typeof setTimeout> | undefined;
+	/** Stops the periodic credential re-check (see `watchCredential`). */
+	stopCredentialWatch?: () => void;
 	closed: boolean;
 }
 
@@ -153,6 +168,20 @@ async function pump(connection: RealtimeConnection, run: UpstreamRun) {
 				run.usage = addRealtimeUsage(run.usage, event.usage);
 			}
 			run.tracker.provider(event);
+			if (await budgetExhaustedAfterCharge(run)) {
+				const exhausted = new GatewayError({
+					class: "rate_limit",
+					code: "budget_exceeded",
+					message:
+						"Budget exhausted for this API key during the realtime session",
+					failureKind: "request",
+					deploymentHealth: "neutral",
+				});
+				sendError(connection, exhausted);
+				await endRun(connection, run, exhausted);
+				connection.entry.socket?.close(1008, "budget exceeded");
+				return;
+			}
 		}
 		await endRun(connection, run, null);
 	} catch (error) {
@@ -164,6 +193,51 @@ async function pump(connection: RealtimeConnection, run: UpstreamRun) {
 		await endRun(connection, run, gatewayError);
 		connection.entry.socket?.close(1011, "upstream session failed");
 	}
+}
+
+/** The run's usage so far: the provider's reports, or an estimate from the audio received. */
+function runUsage(run: UpstreamRun): {
+	usage: RealtimeUsage | null;
+	estimated: boolean;
+} {
+	const seconds = runSeconds(run);
+	if (run.usage || seconds <= 0) {
+		return { usage: run.usage, estimated: false };
+	}
+	const audioTokens = Math.ceil(seconds * ESTIMATED_AUDIO_TOKENS_PER_SECOND);
+	const outputTokens = Math.ceil(
+		run.tracker.transcriptCharacters / ESTIMATED_CHARACTERS_PER_OUTPUT_TOKEN,
+	);
+	return {
+		usage: {
+			inputTokens: audioTokens,
+			outputTokens,
+			totalTokens: audioTokens + outputTokens,
+			audioTokens,
+		},
+		estimated: true,
+	};
+}
+
+/**
+ * Charges the run as it goes, at each usage report or completed transcript, so a long session is
+ * billed in the current TPM window and stopped once the budget is spent.
+ */
+async function budgetExhaustedAfterCharge(run: UpstreamRun): Promise<boolean> {
+	if (
+		run.usage === run.chargedUsage &&
+		run.tracker.completedItems === run.chargedItems
+	) {
+		return false;
+	}
+	run.chargedUsage = run.usage;
+	run.chargedItems = run.tracker.completedItems;
+	const core = realtimeUsageToCore(runUsage(run).usage);
+	if (!core) {
+		return false;
+	}
+	const { budgetExhausted } = await run.routing.charge(core);
+	return budgetExhausted;
 }
 
 async function endRun(
@@ -182,22 +256,8 @@ async function endRun(
 	connection.lastItemId = run.tracker.lastItemId;
 	run.session.close();
 	run.abort.abort();
-	let { usage } = run;
-	let estimated = false;
 	const seconds = runSeconds(run);
-	if (!usage && seconds > 0) {
-		const audioTokens = Math.ceil(seconds * ESTIMATED_AUDIO_TOKENS_PER_SECOND);
-		const outputTokens = Math.ceil(
-			run.tracker.transcriptCharacters / ESTIMATED_CHARACTERS_PER_OUTPUT_TOKEN,
-		);
-		usage = {
-			inputTokens: audioTokens,
-			outputTokens,
-			totalTokens: audioTokens + outputTokens,
-			audioTokens,
-		};
-		estimated = true;
-	}
+	const { usage, estimated } = runUsage(run);
 	const core = realtimeUsageToCore(usage);
 	const terminal = error ? null : completedTerminal(core);
 	await run.routing.finish(core, undefined, error, terminal, run.downstream);
@@ -241,6 +301,12 @@ async function startRun(
 	log.requestBody = { session: renderSession(state) };
 	const abort = new AbortController();
 	try {
+		await revalidateConnection(c);
+		assertRealtimeExtensionsSupported(
+			c,
+			"realtime.transcription",
+			config.model,
+		);
 		await preflight(c, config.model, { writeHeaders: false });
 		assertFinalModelAllowed(c, config.model);
 		const routing = await route(
@@ -281,6 +347,8 @@ async function startRun(
 			usage: null,
 			downstream,
 			ended: false,
+			chargedItems: 0,
+			chargedUsage: null,
 			tracker: new RealtimeTranscriptTracker({
 				turnDetection: config.turnDetection,
 				previousItemId: connection.lastItemId,
@@ -335,6 +403,29 @@ async function updateSession(
 	});
 }
 
+/** Opens the provider run for the session as it is already configured, if it is. */
+async function ensureConfiguredRun(
+	connection: RealtimeConnection,
+): Promise<UpstreamRun | null> {
+	const config = realtimeConfigOf(connection.state);
+	if (!config) {
+		return null;
+	}
+	const run = await startRun(
+		connection,
+		config,
+		JSON.stringify(config),
+		connection.state,
+	);
+	if (connection.closed) {
+		await endRun(connection, run, null);
+		return null;
+	}
+	connection.run = run;
+	void pump(connection, run);
+	return run;
+}
+
 async function handleMessage(
 	connection: RealtimeConnection,
 	rawMessage: unknown,
@@ -350,7 +441,14 @@ async function handleMessage(
 			);
 			return;
 		}
-		const { run } = connection;
+		// A session configured before the socket opened (a client secret's preset) starts its provider
+		// run on first use, as a conversation does; one configured by session.update already has it.
+		const run =
+			connection.run ??
+			(event.type === "input_audio_buffer.append" ||
+			event.type === "input_audio_buffer.commit"
+				? await ensureConfiguredRun(connection)
+				: null);
 		if (!run) {
 			throw new RealtimeClientEventError(
 				event.type === "input_audio_buffer.commit"
@@ -411,11 +509,14 @@ async function closeConnection(connection: RealtimeConnection): Promise<void> {
 	}
 	connection.closed = true;
 	clearTimeout(connection.timer);
+	connection.stopCredentialWatch?.();
 	unregisterRealtimeSocket(connection.entry);
-	await connection.queue.catch(() => undefined);
+	// End the provider run first: that aborts whatever a queued client event is waiting on and
+	// settles the session's usage. Waiting for the queue first could hang on that very event.
 	if (connection.run) {
 		await endRun(connection, connection.run, null);
 	}
+	await connection.queue.catch(() => undefined);
 }
 
 /** Builds the socket handlers for a transcription session. Throws when the socket is refused. */
@@ -431,7 +532,7 @@ function realtimeTranscriptionSocket(
 		busy: () => connection.run !== null,
 		close: () => closeConnection(connection),
 	};
-	registerRealtimeSocket(entry);
+	assertRealtimeSocketCapacity(scopeKey);
 	connection = {
 		c,
 		entry,
@@ -440,6 +541,7 @@ function realtimeTranscriptionSocket(
 			: newRealtimeSessionState(),
 		queue: Promise.resolve(),
 		queued: 0,
+		queuedBytes: 0,
 		run: null,
 		lastItemId: null,
 		timer: undefined,
@@ -448,6 +550,12 @@ function realtimeTranscriptionSocket(
 	return {
 		onOpen(_event, ws) {
 			entry.socket = ws;
+			if (!registerRealtimeSocket(entry)) {
+				sendError(connection, capacityLimitError());
+				connection.closed = true;
+				ws.close(1013, "connection limit");
+				return;
+			}
 			send(connection, {
 				type: "session.created",
 				event_id: eventId(),
@@ -458,10 +566,20 @@ function realtimeTranscriptionSocket(
 				entry.socket?.close(1000, "60 minute session limit");
 			}, REALTIME_MAX_MS);
 			connection.timer.unref?.();
+			connection.stopCredentialWatch = watchCredential(c, (error) => {
+				sendError(connection, error);
+				entry.socket?.close(1008, "credential revoked");
+			});
 		},
 		onMessage(event) {
 			if (connection.queued >= MAX_QUEUED_EVENTS) {
 				sendError(connection, eventQueueLimitError());
+				return;
+			}
+			const admitted = admitQueuedBytes(connection, messageBytes(event.data));
+			if (!admitted) {
+				sendError(connection, queuedBytesError());
+				connection.entry.socket?.close(1008, "too much queued data");
 				return;
 			}
 			connection.queued += 1;
@@ -469,6 +587,7 @@ function realtimeTranscriptionSocket(
 				.then(() => handleMessage(connection, event.data))
 				.finally(() => {
 					connection.queued -= 1;
+					admitted.release();
 				});
 		},
 		onClose() {
@@ -498,6 +617,7 @@ function parseSecretSession(
 
 export const realtimeWebSocketHandler = upgradeWebSocket(
 	(c) => {
+		assertWebSocketUpgrade(c);
 		const auth = getAuth(c);
 		const scopeKey = auth.type === "virtual" ? auth.key.id : "master";
 		// A client secret's session applies unless the URL says otherwise, as with OpenAI.

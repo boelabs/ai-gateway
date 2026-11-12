@@ -6,7 +6,7 @@
 #
 # A `v1.2.3` tag is the only thing that changes production: merges to main are batched until someone
 # tags one. The tag must point at a commit of main whose CI passed. A prerelease (`v1.2.3-rc.1`)
-# publishes images and stops there. A manual run publishes an extra tag such as `edge` and never
+# publishes images and stops there. A manual run publishes only `edge` or `edge-<name>` and never
 # deploys.
 name: Release images
 
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Image tag to publish (e.g. v1.2.3 or edge)"
+        description: "Image tag to publish: edge, or edge-<name> (a release is a v* git tag)"
         required: true
         type: string
 
@@ -94,14 +94,32 @@ jobs:
             sleep 30
           done
 
+  # A manual run may only publish into the edge namespace. `production`, `latest`, `main`, `sha-*`
+  # and version tags belong to the release and deploy workflows; a typo here must not overwrite one.
+  manual-tag:
+    name: Validate the manual tag
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Require an edge tag
+        run: |
+          if [[ ! "$TAG" =~ ^edge(-[a-z0-9][a-z0-9._-]{0,63})?$ ]]; then
+            echo "::error::'$TAG' is not an edge tag. A manual run publishes edge or edge-<name>; versions are released by pushing a v* git tag."
+            exit 1
+          fi
+
   # Each architecture builds on a runner of its own: arm64 used to be emulated with QEMU, which made
   # the Next.js images take 10-13 minutes. Every build pushes by digest only; `publish` then names
   # the pair with the release tags, so a tag never points at a single-architecture image.
   build:
     name: ${{ matrix.name }} (${{ matrix.arch }})
-    needs: [verify]
-    # A manual run skips the verification; a tag must pass it.
-    if: ${{ !cancelled() && needs.verify.result != 'failure' }}
+    needs: [verify, manual-tag]
+    # A tag must pass the verification and a manual run the tag check; each skips the other.
+    if: ${{ !cancelled() && needs.verify.result != 'failure' && needs.manual-tag.result != 'failure' }}
     runs-on: ${{ matrix.runner }}
     strategy:
       # One failing image must not cancel the others: a half-published release is easier to finish
@@ -172,9 +190,9 @@ jobs:
 
   publish:
     name: ${{ matrix.name }}
-    needs: [verify, build]
+    needs: [verify, manual-tag, build]
     # An image whose two builds succeeded is published even when another image failed.
-    if: ${{ !cancelled() && needs.verify.result != 'failure' }}
+    if: ${{ !cancelled() && needs.verify.result != 'failure' && needs.manual-tag.result != 'failure' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

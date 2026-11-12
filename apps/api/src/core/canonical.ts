@@ -51,6 +51,12 @@ export interface CanonicalFilePart extends CanonicalCacheControlled {
 	filename?: string;
 	/** Responses-only PDF rendering hint; ignored by transports that do not expose it. */
 	detail?: "auto" | "low" | "high";
+	/**
+	 * The provider's own input block, when it holds what no canonical part can (an Anthropic
+	 * document with citations, context or a text source, an image by file id, a search result).
+	 * Sent unchanged; a request carrying one requires the native wire.
+	 */
+	native?: Record<string, unknown>;
 }
 export type CanonicalContentPart =
 	| CanonicalTextPart
@@ -84,6 +90,8 @@ export interface CanonicalMessage extends CanonicalCacheControlled {
 	toolResultError?: boolean;
 	/** Responses assistant-message phase; preserved across continuation and native transports. */
 	phase?: "commentary" | "final_answer";
+	/** Only on assistant messages: the model's refusal, which is not content. */
+	refusal?: string;
 	/**
 	 * Opaque provider-namespaced per-message state that must round-trip with the assistant message
 	 * (e.g. OpenAI encrypted reasoning items as `providerFields.openai.reasoning`). Filled and
@@ -144,8 +152,19 @@ interface CanonicalResponsesTransportOptions {
 	contextManagement?: Record<string, unknown>[];
 	/** Exact wire items retained when canonical emulation cannot represent them losslessly. */
 	rawInput?: Record<string, unknown>[];
+	/**
+	 * The request's own `instructions`, kept beside `rawInput`: with the raw items sent as they are,
+	 * only these may become instructions, since the items already carry every other message.
+	 */
+	instructions?: string;
 	/** Exact wire tools retained for native Responses transports. */
 	rawTools?: Record<string, unknown>[];
+	/**
+	 * The exact `tool_choice` when it names something the canonical choice cannot (a hosted tool, an
+	 * MCP server's tool, a custom tool, an allowed list with non-function tools). Sent as given; the
+	 * request requires the native wire.
+	 */
+	rawToolChoice?: Record<string, unknown>;
 }
 
 interface CanonicalChatTransportOptions {
@@ -169,6 +188,19 @@ interface CanonicalMessagesTransportOptions {
 	metadata?: Record<string, unknown>;
 	/** Exact Anthropic tool definitions when built-in tools cannot be represented as functions. */
 	rawTools?: Record<string, unknown>[];
+	/**
+	 * `output_config.effort` sent with thinking disabled: the effort of the response itself (text and
+	 * tool calls), with no reasoning. Canonical reasoning is then off (`effort: "none"`).
+	 */
+	outputEffort?: string;
+	/** The client's `anthropic-beta` features, sent to a Messages upstream with the adapter's own. */
+	betas?: string[];
+	/**
+	 * Top-level Messages fields with no canonical form (`container`, `mcp_servers`,
+	 * `context_management`, `inference_geo`, `service_tier`, `speed`, `diagnostics`), sent as given.
+	 * A request carrying them requires the native wire.
+	 */
+	nativeFields?: Record<string, unknown>;
 }
 
 export type PublicChatWire = "chat_completions" | "responses" | "messages";
@@ -267,6 +299,8 @@ export interface CanonicalChatResponse {
 	model: string;
 	choices: CanonicalChatResponseChoice[];
 	usage: Usage;
+	/** The backend configuration fingerprint the provider reported (OpenAI `system_fingerprint`). */
+	systemFingerprint?: string;
 }
 
 export interface CanonicalChatStreamChunk {
@@ -298,4 +332,11 @@ export interface CanonicalChatStreamChunk {
 	}>;
 	/** Only present in the final chunk if includeUsage. */
 	usage?: Usage | null;
+	/** See CanonicalChatResponse.systemFingerprint. */
+	systemFingerprint?: string;
+	/**
+	 * Usage the provider reported as the stream opened (its input tokens, before any output).
+	 * Provisional: the final chunk's `usage` replaces it.
+	 */
+	initialUsage?: Usage;
 }

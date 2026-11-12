@@ -899,6 +899,32 @@ test("google.parseResponse: maps candidates/usageMetadata to canonical", () => {
 	assert.equal(u.usage.promptTokens, 5);
 });
 
+test("google.parseResponse: splits audio tokens out of prompt and output", () => {
+	const u = must(googleAdapter, "chat").parseResponse(
+		{
+			candidates: [
+				{
+					content: { role: "model", parts: [{ text: "hi" }] },
+					finishReason: "STOP",
+				},
+			],
+			usageMetadata: {
+				promptTokenCount: 30,
+				candidatesTokenCount: 12,
+				totalTokenCount: 42,
+				promptTokensDetails: [
+					{ modality: "TEXT", tokenCount: 5 },
+					{ modality: "AUDIO", tokenCount: 25 },
+				],
+				candidatesTokensDetails: [{ modality: "AUDIO", tokenCount: 12 }],
+			},
+		},
+		ctx,
+	);
+	assert.equal(u.usage.promptAudioTokens, 25);
+	assert.equal(u.usage.completionAudioTokens, 12);
+});
+
 test("google.parseResponse: documented and future finish reasons remain observable", () => {
 	const parse = (finishReason: string) =>
 		must(googleAdapter, "chat").parseResponse(
@@ -1435,16 +1461,24 @@ test("google.buildRequest: Responses parallel calls return as one model turn", a
 			name: "weather",
 			arguments: '{"city":"Rome"}',
 		},
+		// Results in the other order than the calls: they still go back in call order.
+		{ type: "function_call_output", call_id: "c2", output: "{}" },
 		{
 			type: "function_call_output",
 			call_id: "c1__thought__sig-1",
 			output: "{}",
 		},
-		{ type: "function_call_output", call_id: "c2", output: "{}" },
 	]);
+	// Every result of the parallel calls returns in one user turn.
 	assert.deepEqual(
 		body.contents.map((content: { role: string }) => content.role),
-		["user", "model", "user", "user"],
+		["user", "model", "user"],
+	);
+	assert.deepEqual(
+		body.contents[2].parts.map(
+			(part: { functionResponse: { id: string } }) => part.functionResponse.id,
+		),
+		["c1", "c2"],
 	);
 	assert.deepEqual(body.contents[1].parts, [
 		{
@@ -1489,4 +1523,38 @@ test("google.buildRequest: a replayed native turn does not repeat its function c
 			thoughtSignature: "sig-fc",
 		},
 	]);
+});
+
+test("google: an allowed subset under auto is expressed by the declarations, not allowedFunctionNames", () => {
+	const base: CanonicalChatRequest = {
+		callType: "chat",
+		model: "g",
+		stream: false,
+		messages: [{ role: "user", content: "hi" }],
+		tools: [
+			{ name: "a", parameters: { type: "object" } },
+			{ name: "b", parameters: { type: "object" } },
+		],
+	};
+	const auto = jsonBody(
+		must(googleAdapter, "chat").buildRequest(
+			{ ...base, toolChoice: { allowedTools: ["a"], mode: "auto" } },
+			ctx,
+		),
+	);
+	assert.deepEqual(auto.toolConfig.functionCallingConfig, { mode: "AUTO" });
+	assert.deepEqual(
+		auto.tools[0].functionDeclarations.map((d: { name: string }) => d.name),
+		["a"],
+	);
+	const required = jsonBody(
+		must(googleAdapter, "chat").buildRequest(
+			{ ...base, toolChoice: { allowedTools: ["a"], mode: "required" } },
+			ctx,
+		),
+	);
+	assert.deepEqual(required.toolConfig.functionCallingConfig, {
+		mode: "ANY",
+		allowedFunctionNames: ["a"],
+	});
 });

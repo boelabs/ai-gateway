@@ -1055,6 +1055,57 @@ test("chat response: derives total usage when an OpenAI-compatible upstream omit
 	assert.equal(isUsageConsistent(canonical.usage), true);
 });
 
+test("chat response: a response with no usage carries an estimate of its output", () => {
+	const canonical = parseOpenAIChatResponse({
+		choices: [{ finish_reason: "stop", message: { content: "done" } }],
+	});
+
+	assert.deepEqual(canonical.usage, {
+		promptTokens: 0,
+		completionTokens: 4,
+		totalTokens: 4,
+		estimated: true,
+	});
+});
+
+test("chat response: usage carries the service tier the response reports", () => {
+	const canonical = parseOpenAIChatResponse({
+		choices: [{ finish_reason: "stop", message: { content: "done" } }],
+		usage: { prompt_tokens: 7, completion_tokens: 3 },
+		service_tier: "flex",
+	});
+	assert.equal(canonical.usage.serviceTier, "flex");
+});
+
+test("chat response: reasoning reported beside completion_tokens is folded into it", () => {
+	// xAI: total_tokens = prompt + completion + reasoning.
+	const canonical = parseOpenAIChatResponse({
+		choices: [{ finish_reason: "stop", message: { content: "done" } }],
+		usage: {
+			prompt_tokens: 10,
+			completion_tokens: 5,
+			total_tokens: 35,
+			completion_tokens_details: { reasoning_tokens: 20 },
+		},
+	});
+	assert.equal(canonical.usage.completionTokens, 25);
+	assert.equal(canonical.usage.reasoningTokens, 20);
+	assert.equal(isUsageConsistent(canonical.usage), true);
+});
+
+test("chat response: reasoning already inside completion_tokens is not counted twice", () => {
+	const canonical = parseOpenAIChatResponse({
+		choices: [{ finish_reason: "stop", message: { content: "done" } }],
+		usage: {
+			prompt_tokens: 10,
+			completion_tokens: 25,
+			total_tokens: 35,
+			completion_tokens_details: { reasoning_tokens: 20 },
+		},
+	});
+	assert.equal(canonical.usage.completionTokens, 25);
+});
+
 test("chat response: preserves detailed usage and provider-reported cost", () => {
 	const canonical = parseOpenAIChatResponse({
 		choices: [{ finish_reason: "stop", message: { content: "done" } }],

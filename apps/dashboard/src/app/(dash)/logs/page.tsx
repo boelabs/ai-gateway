@@ -83,5 +83,12 @@ async function Operations({ searchParams }: { searchParams: Params }) {
 		...(range.start ? { start: range.start } : {}),
 		...(range.end ? { end: range.end } : {}),
 	});
-	return <LogsTable filters={filters} rows={data} total={pagination.total} />;
+	return (
+		<LogsTable
+			filters={filters}
+			rows={data}
+			total={pagination.total}
+			totalIsLowerBound={pagination.totalIsLowerBound === true}
+		/>
+	);
 }

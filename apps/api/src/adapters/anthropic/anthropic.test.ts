@@ -696,14 +696,31 @@ test("anthropic.buildRequest: structured output drops constraints Anthropic cann
 	});
 });
 
-test("anthropic.buildRequest: json_object uses an open object schema", () => {
-	const built = must(anthropicAdapter, "chat").buildRequest(
-		{ ...req, responseFormat: { type: "json_object" } },
-		ctx,
+test("anthropic.buildRequest: json_object is rejected rather than constrained to an empty object", () => {
+	assert.throws(
+		() =>
+			must(anthropicAdapter, "chat").buildRequest(
+				{ ...req, responseFormat: { type: "json_object" } },
+				ctx,
+			),
+		(error) =>
+			GatewayError.is(error) &&
+			error.code === "unsupported_parameter" &&
+			error.param === "response_format",
 	);
-	assert.deepEqual(jsonBody(built).output_config, {
-		format: { type: "json_schema", schema: { type: "object" } },
+});
+
+test("anthropic: the parameter policy drops json_object and records it", () => {
+	const request = { ...req, responseFormat: { type: "json_object" as const } };
+	const params = anthropicAdapter.chatRequestParameters?.(request, {
+		upstreamModel: ctx.upstreamModel,
+		meta: ctx.meta,
+		transport: "messages",
 	});
+	assert.equal(
+		typeof params?.response_format === "object" && params.response_format.mode,
+		"unsupported",
+	);
 });
 
 test("anthropic.buildRequest: omitted effort explicitly disables optional adaptive reasoning", () => {
@@ -734,7 +751,7 @@ test("anthropic.buildRequest: omitted effort on MANDATORY reasoner -> lowest lev
 
 test("anthropic.buildRequest: legacy budget uses thinking.enabled and none uses disabled", () => {
 	const high = must(anthropicAdapter, "chat").buildRequest(
-		{ ...req, reasoning: { effort: "high" } },
+		{ ...req, maxTokens: 32_000, reasoning: { effort: "high" } },
 		budgetCtx,
 	);
 	assert.deepEqual(jsonBody(high).thinking, {
@@ -748,6 +765,35 @@ test("anthropic.buildRequest: legacy budget uses thinking.enabled and none uses 
 		budgetCtx,
 	);
 	assert.deepEqual(jsonBody(none).thinking, { type: "disabled" });
+});
+
+test("anthropic.buildRequest: an explicit thinking budget reaches Anthropic unchanged", () => {
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		{
+			...req,
+			maxTokens: 20_000,
+			reasoning: { effort: "medium", budgetTokens: 10_000 },
+		},
+		budgetCtx,
+	);
+	assert.equal(jsonBody(built).thinking.budget_tokens, 10_000);
+});
+
+test("anthropic.buildRequest: an effort's budget is fitted below max_tokens", () => {
+	const fitted = must(anthropicAdapter, "chat").buildRequest(
+		{ ...req, maxTokens: 4000, reasoning: { effort: "high" } },
+		budgetCtx,
+	);
+	assert.equal(jsonBody(fitted).thinking.budget_tokens, 3999);
+	assert.throws(
+		() =>
+			must(anthropicAdapter, "chat").buildRequest(
+				{ ...req, maxTokens: 1000, reasoning: { effort: "high" } },
+				budgetCtx,
+			),
+		(error) =>
+			GatewayError.is(error) && error.code === "invalid_reasoning_budget",
+	);
 });
 
 test("anthropic.buildRequest: summary none uses omitted display", () => {

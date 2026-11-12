@@ -78,6 +78,11 @@ For the second, per resource:
   every replica can try and only one does. Do not reach for a platform "pre-deployment" hook here:
   those run in the *outgoing* container, which is the old image and does not contain the new
   migration files.
+- **Migrations wait their turn.** DDL runs with a 5 s `lock_timeout` and retries with backoff, so a
+  migration that queues behind a long transaction steps aside instead of blocking every query on the
+  table; a replica waits at most ten minutes for another to finish migrating. Indexes on large tables
+  are built `CONCURRENTLY` from `src/db/migrations-concurrent/`, after the regular migrations, without
+  locking writes.
 
 ## Schema changes must survive the overlap
 

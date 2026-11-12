@@ -54,6 +54,7 @@ const EVENT_LEVEL: Record<DrainEvent, "info" | "error"> = {
 	"requests-timeout": "error",
 	"flush-timeout": "error",
 	"dependencies-timeout": "error",
+	"release-timeout": "error",
 	failed: "error",
 };
 
@@ -68,6 +69,7 @@ const EVENT_MESSAGE: Record<DrainEvent, string> = {
 		"in-flight requests exceeded the drain window; forcing connections",
 	"flush-timeout": "operation-log flush exceeded the deadline",
 	"dependencies-timeout": "dependency shutdown exceeded the deadline",
+	"release-timeout": "releasing open connections exceeded the deadline",
 	failed: "a shutdown step failed; continuing",
 };
 

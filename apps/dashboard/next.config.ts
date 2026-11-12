@@ -5,6 +5,35 @@ import type { NextConfig } from "next";
 const here = dirname(fileURLToPath(import.meta.url));
 
 /**
+ * The browser talks only to this origin (the gateway is reached through the dashboard's own relay),
+ * so everything is `'self'`. Scripts keep `'unsafe-inline'`: the theme script and Next's inline
+ * RSC payloads have no nonce, because a nonce needs every page rendered per request and the
+ * dashboard's Partial Prefetching serves static shells (Next's CSP guide: nonces are incompatible
+ * with it), and adding a hash would make browsers ignore `'unsafe-inline'` and block Next's own
+ * scripts. Scripts from any other origin, plugins, framing and form posts elsewhere stay blocked.
+ */
+const CONTENT_SECURITY_POLICY = [
+	"default-src 'self'",
+	`script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+	"style-src 'self' 'unsafe-inline'",
+	"img-src 'self' blob: data:",
+	"media-src 'self' blob: data:",
+	"font-src 'self'",
+	"connect-src 'self'",
+	"object-src 'none'",
+	"base-uri 'self'",
+	"form-action 'self'",
+	"frame-ancestors 'none'",
+].join("; ");
+
+const SECURITY_HEADERS = [
+	{ key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },
+	{ key: "X-Content-Type-Options", value: "nosniff" },
+	{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+	{ key: "X-Frame-Options", value: "DENY" },
+];
+
+/**
  * The dashboard is its own product: its own image, its own domain, its own process.
  *
  * Nothing about the gateway appears in this file, and that is the design. Every address the app
@@ -46,6 +75,10 @@ const nextConfig: NextConfig = {
 
 	// Development only: the default corner covers the operator at the foot of the sidebar.
 	devIndicators: { position: "bottom-right" },
+
+	async headers() {
+		return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
+	},
 };
 
 export default nextConfig;

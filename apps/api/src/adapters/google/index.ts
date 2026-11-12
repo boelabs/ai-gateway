@@ -1,4 +1,8 @@
-import { summaryVisible, toUpstreamReasoningEffort } from "#core/reasoning.ts";
+import {
+	toUpstreamReasoningEffort,
+	summaryVisible,
+	thinkingBudget,
+} from "#core/reasoning.ts";
 import { makeGeminiRealtimeConversationHandler } from "./liveConversation.ts";
 import { mergeExtraBody, mergeExtraBodyDeep } from "#core/extraBody.ts";
 import { type BaseCreds, requireApiKeyCreds } from "#adapters/creds.ts";
@@ -403,16 +407,18 @@ function geminiThinkingConfig(
 	if (effort === "none") {
 		return { thinkingBudget: 0 };
 	}
-	const budget =
+	const budget = thinkingBudget(
+		req.reasoning,
 		spec.budgets?.[effort] ??
-		(effort === "max" ? undefined : DEFAULT_GEMINI_BUDGETS[effort]);
+			(effort === "max" ? undefined : DEFAULT_GEMINI_BUDGETS[effort]),
+	);
 	if (budget === undefined) {
 		throw new Error(
 			'Gemini budget-based reasoning requires an explicit budget for effort "max"',
 		);
 	}
 	return {
-		thinkingBudget: budget,
+		thinkingBudget: budget.tokens,
 		...(includeThoughts ? { includeThoughts: true } : {}),
 	};
 }
@@ -471,6 +477,15 @@ function buildGeminiBody(
 	const systemParts: Record<string, unknown>[] = [];
 	// Map toolCallId -> function name (to map tool results).
 	const toolNameById = new Map<string, string>();
+	// Position of each call in the latest model turn, and the user turn its results are joining.
+	const callOrder = new Map<string, number>();
+	let toolTurn:
+		| {
+				content: { role: "user"; parts: Record<string, unknown>[] };
+				responses: { order: number; part: Record<string, unknown> }[];
+				siblings: Record<string, unknown>[];
+		  }
+		| undefined;
 
 	// Only leading system/developer messages form `systemInstruction`. Responses API clients also send
 	// developer messages mid-conversation (context updates, local compaction summaries); folding them
@@ -487,6 +502,9 @@ function buildGeminiBody(
 	};
 
 	for (const m of req.messages) {
+		if (m.role !== "tool") {
+			toolTurn = undefined;
+		}
 		if (m.role === "system" || m.role === "developer") {
 			const parts = contentToParts(m.content);
 			if (conversationStarted) {
@@ -517,7 +535,12 @@ function buildGeminiBody(
 			if (nativeParts === undefined && m.content) {
 				parts.push(...contentToParts(m.content));
 			}
+			// /v1/responses sends one model turn as several items, which rejoin it below.
+			if (body.contents.at(-1)?.role !== "model") {
+				callOrder.clear();
+			}
 			for (const tc of m.toolCalls ?? []) {
+				callOrder.set(tc.id, callOrder.size);
 				toolNameById.set(tc.id, tc.name);
 				let args: unknown = {};
 				try {
@@ -577,20 +600,35 @@ function buildGeminiBody(
 				? media.filter(isFunctionResponseMedia)
 				: [];
 			const siblings = media.filter((part) => !nested.includes(part));
-			body.contents.push({
-				role: "user",
-				parts: [
-					{
-						functionResponse: {
-							name,
-							response,
-							...(nested.length > 0 ? { parts: nested } : {}),
-							...(m.toolCallId ? { id: m.toolCallId } : {}),
-						},
-					},
-					...siblings,
-				],
+			const functionResponse = {
+				functionResponse: {
+					name,
+					response,
+					...(nested.length > 0 ? { parts: nested } : {}),
+					...(m.toolCallId ? { id: m.toolCallId } : {}),
+				},
+			};
+			// Gemini wants every response to a turn's parallel calls in one content, in the order
+			// of the calls, so consecutive tool results join the same turn.
+			if (toolTurn === undefined) {
+				toolTurn = {
+					content: { role: "user", parts: [] },
+					responses: [],
+					siblings: [],
+				};
+				body.contents.push(toolTurn.content);
+			}
+			toolTurn.responses.push({
+				order: callOrder.get(m.toolCallId ?? "") ?? Number.MAX_SAFE_INTEGER,
+				part: functionResponse,
 			});
+			toolTurn.siblings.push(...siblings);
+			toolTurn.content.parts = [
+				...[...toolTurn.responses]
+					.sort((left, right) => left.order - right.order)
+					.map((entry) => entry.part),
+				...toolTurn.siblings,
+			];
 			continue;
 		}
 		// user
@@ -677,7 +715,22 @@ function buildGeminiBody(
 			} else {
 				fc.mode = strictToolDecoding ? "VALIDATED" : "AUTO";
 			}
-			fc.allowedFunctionNames = toolChoice.allowedTools;
+			if (fc.mode === "AUTO") {
+				// allowedFunctionNames is only for ANY and VALIDATED; under AUTO the allowed subset is
+				// expressed by declaring only those functions.
+				const allowed = new Set(toolChoice.allowedTools);
+				for (const tool of (body.tools ?? []) as {
+					functionDeclarations?: { name: string }[];
+				}[]) {
+					if (tool.functionDeclarations) {
+						tool.functionDeclarations = tool.functionDeclarations.filter(
+							(declaration) => allowed.has(declaration.name),
+						);
+					}
+				}
+			} else {
+				fc.allowedFunctionNames = toolChoice.allowedTools;
+			}
 		}
 		body.toolConfig = { functionCallingConfig: fc };
 	}
@@ -1158,6 +1211,18 @@ function mapGeminiUsage(u: GeminiUsage | undefined): Usage {
 	);
 	if (completionImageTokens) {
 		usage.completionImageTokens = completionImageTokens;
+	}
+	// Gemini bills audio above text (see the Live and TTS models' audio rates), so the split matters.
+	const promptAudioTokens = modalityTokens(u?.promptTokensDetails, "AUDIO");
+	if (promptAudioTokens) {
+		usage.promptAudioTokens = promptAudioTokens;
+	}
+	const completionAudioTokens = modalityTokens(
+		u?.candidatesTokensDetails,
+		"AUDIO",
+	);
+	if (completionAudioTokens) {
+		usage.completionAudioTokens = completionAudioTokens;
 	}
 	return usage;
 }
@@ -2462,6 +2527,15 @@ export const googleAdapter: Adapter = {
 				mimeTypes: ["video/mp4"],
 				maxBytes: 20_000_000,
 			},
+		},
+	},
+	// generateContent has no end-user identifier, no switch for parallel function calls and no cache
+	// key (explicit caching goes through cachedContent).
+	chatParameters: {
+		generate_content: {
+			user: { mode: "unsupported" },
+			parallel_tool_calls: { mode: "unsupported" },
+			prompt_cache_key: { mode: "unsupported" },
 		},
 	},
 	transports: {

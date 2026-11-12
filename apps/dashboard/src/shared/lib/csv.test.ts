@@ -31,3 +31,16 @@ describe("toCsv", () => {
 		expect(toCsv([], columns)).toBe("model,cost,note");
 	});
 });
+
+test("text cells that a spreadsheet would run as a formula stay text", () => {
+	const csv = toCsv(
+		[{ text: '=HYPERLINK("http://x")', plus: "+1", at: "@cmd", count: -5 }],
+		[
+			["text", (row) => row.text],
+			["plus", (row) => row.plus],
+			["at", (row) => row.at],
+			["count", (row) => row.count],
+		],
+	);
+	expect(csv.split("\r\n")[1]).toBe(`"'=HYPERLINK(""http://x"")",'+1,'@cmd,-5`);
+});

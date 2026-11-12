@@ -168,10 +168,23 @@ Gemini termina de generarlo y se factura.
 - Una conexión dura como máximo 60 minutos. Gemini termina cada conexión con el proveedor a los diez
   minutos aproximadamente; el gateway reanuda la sesión en una nueva detrás del mismo socket. El
   modelo de traducción no tiene reanudación y se reconecta sin contexto.
+- Gemini solo toma su configuración al abrir una conexión. Un `session.update` que la cambia se responde con `session.updated` de inmediato y se aplica en el siguiente momento en que no hay nada en curso (cuando termina el turno actual): una sesión nueva sembrada con la conversación. Una conexión que el gateway rota entretanto conserva la configuración nueva pendiente en lugar de reabrirse con la anterior.
 - `REALTIME_WEBSOCKET_MAX_CONNECTIONS` y `REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY` limitan las
   sesiones abiertas por proceso y por key.
+- Un evento del cliente puede ocupar como máximo 4 MiB. Los eventos en espera de procesarse pueden ocupar como máximo 32 MiB por conexión (y 512 MiB en todo el proceso): un cliente que envía más rápido de lo que se le atiende recibe un `error` con código `websocket_queue_bytes_exceeded` y el socket se cierra con `1008`.
+- El gateway envía pings a cada socket (`WEBSOCKET_HEARTBEAT_INTERVAL_MS`) y descarta el que no responde, cierra el que no recibe mensajes del cliente durante `WEBSOCKET_IDLE_TIMEOUT_MS` y cierra con `1008` al cliente que deja de leer los eventos que se le envían. El subprotocolo con el que responde nunca es el que lleva tu key.
 - Cada conexión se registra como una operación `realtime.conversation` con el uso que informó Gemini
   y su costo. Los modelos Live cobran distinto el audio y el texto (`audioInputCentsPerMTokens`,
   `audioOutputCentsPerMTokens` en el catálogo). Si el proveedor no informa uso, el gateway lo estima
   (25 tokens por segundo de audio, unos 4 caracteres por token de texto) y marca la operación con
   `usageEstimated`.
+- La virtual key se cobra mientras la sesión transcurre, en cada `response.done`, y no solo al cerrar:
+  el gasto y la ventana de TPM están al día durante una sesión larga. Cuando se agota el presupuesto
+  de la key, el gateway envía un `error` con código `budget_exceeded` y cierra el socket con 1008.
+- La credencial se vuelve a comprobar en cada ejecución con el proveedor y una vez por minuto: una key
+  deshabilitada, caducada o eliminada, o una sesión revocada, cierra el socket con un `error` y el
+  código 1008. Una sesión abierta con un client secret se comprueba contra la key que lo emitió, así
+  que la caducidad corta del propio secret no la termina.
+- Las sesiones realtime aún no tienen hooks de extensiones, así que una sesión cuyo modelo apunta una
+  instancia de extensión activa se rechaza con `extensions_unsupported_for_realtime` en lugar de
+  ejecutarse sin ella.

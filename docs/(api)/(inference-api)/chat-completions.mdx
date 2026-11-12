@@ -34,11 +34,22 @@ text, image, audio, file), `stream`, `stream_options.include_usage`, `temperatur
 `user`, `tools`, `tool_choice`, `parallel_tool_calls`, `response_format`, `reasoning_effort`,
 `prompt_cache_key`, `audio`, `logprobs`, `top_logprobs`, `logit_bias`, `metadata`, `modalities`,
 `prediction`, `service_tier`, `safety_identifier`, `store`, `verbosity`, `web_search_options`, and
-`extra_body` for provider-specific fields the gateway doesn't manage itself.
+`extra_body` for provider-specific fields the gateway doesn't manage itself. `top_k`, the common
+extension of compatible APIs, is mapped too. Any other top-level field joins `extra_body` and reaches
+the upstream, which accepts or rejects it; the deprecated `functions`/`function_call` are rejected
+with `400 unsupported_parameter` (send `tools` and `tool_choice`).
 
 Whether a given deployment actually **supports** a field you send is a per-model catalog declaration —
 see [Parameter policy](/docs/parameter-policy) for what happens when it doesn't (`drop`, `error`, or
 `allow`, operator-configured).
+
+OpenAI and Azure OpenAI deployments speak the Responses API by default, which has no `n`, `stop` or
+`seed`. A request that uses them, or a Chat-only field such as `logprobs` or `audio`, goes to the
+deployment's Chat Completions API instead when the model offers it. Models OpenAI documents for one
+API only declare it in the catalog (`gpt-5-pro` and the Codex models answer only on Responses,
+`gpt-audio` and the search-preview models only on Chat Completions), and a deployment's transport
+override always wins. Where the request ends up on Responses, `n`, `stop` and `seed` go through the
+parameter policy.
 
 ## Tools and tool choice
 
@@ -65,8 +76,9 @@ rich clients, and all forms are accepted back. See
 `response_format: { "type": "json_schema", "json_schema": { ..., "strict": true } }` requests
 schema-adherent output on models that declare `structuredOutputs: true`; the strict flag is preserved
 on native transports that expose it. `{"type": "json_object"}` remains available as legacy
-JSON mode — valid JSON, but no schema adherence guarantee — on any model, and does not imply structured
-output support.
+JSON mode — valid JSON, but no schema adherence guarantee — and does not imply structured output
+support. Anthropic has no JSON mode without a schema, so on Claude models `json_object` goes through
+the [parameter policy](/docs/parameter-policy) as unsupported; use `json_schema` there.
 
 ## Reasoning
 

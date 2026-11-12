@@ -156,10 +156,16 @@ function publicProviderField(
 	return safe.length <= maxChars ? safe : `${safe.slice(0, maxChars - 1)}…`;
 }
 
+/**
+ * Statuses whose detail describes the client's own request: a malformed request, an oversized
+ * body, unprocessable content. Every other 4xx (payment, conflicts, legal blocks...) is about the
+ * deployment or its account, and its wording stays private.
+ */
+const REQUEST_DETAIL_STATUSES = new Set([400, 413, 422]);
+
 function exposesRequestDetail(cls: ErrorClass, status: number): boolean {
 	return (
-		status >= 400 &&
-		status < 500 &&
+		REQUEST_DETAIL_STATUSES.has(status) &&
 		(cls === "bad_request" ||
 			cls === "context_window" ||
 			cls === "content_policy")
@@ -197,11 +203,13 @@ export function mapUpstreamHttpError(
 		const headerRetryAfterMs = parseRetryAfter(up.headers?.["retry-after"]);
 		const retryAfterMs =
 			headerRetryAfterMs ?? mapping.retryAfterMs?.(up.status, up.body);
-		const upstreamCredentialFailure = up.status === 401 || up.status === 403;
+		// The deployment's credentials or account failed, not the client: a generic server error.
+		const upstreamCredentialFailure =
+			up.status === 401 || up.status === 403 || up.status === 402;
 		const exposeDetail =
 			!upstreamCredentialFailure && exposesRequestDetail(cls, up.status);
 		const exposeFields =
-			!upstreamCredentialFailure && up.status >= 400 && up.status < 500;
+			!upstreamCredentialFailure && REQUEST_DETAIL_STATUSES.has(up.status);
 		return new GatewayError({
 			class: cls,
 			...(upstreamCredentialFailure ? { publicClass: "server" as const } : {}),
@@ -243,5 +251,51 @@ export function mapUpstreamHttpError(
 		message: `${label}: ${d.message}`,
 		provider: { body: d.body },
 		cause: err,
+	});
+}
+
+const STREAM_ERROR_CLASSES: readonly [RegExp, ErrorClass][] = [
+	[
+		/context.?length|context.?window|too.?many.?tokens|max.?tokens/iu,
+		"context_window",
+	],
+	[/rate.?limit|quota|overloaded|too.?many.?requests|throttl/iu, "rate_limit"],
+	[/content.?(filter|policy)|safety|moderation/iu, "content_policy"],
+	[/auth|api.?key|unauthori[sz]ed/iu, "auth"],
+	[/permission|forbidden/iu, "permission"],
+	[/invalid|bad.?request|not.?supported|unsupported/iu, "bad_request"],
+	[/timeout|timed.?out/iu, "timeout"],
+];
+
+/**
+ * An error object an upstream sent inside a stream it had already answered with 200. There is no
+ * HTTP status to go by, so the class comes from the body: a numeric `code` some aggregators copy
+ * from the provider's HTTP status, else the error's `type` or `code` words. Nothing recognisable
+ * stays a server error. No status is invented for it.
+ */
+export function mapUpstreamStreamError(
+	body: Record<string, unknown>,
+	label: string,
+): GatewayError {
+	const error = record(body.error) ?? {};
+	const detail = upstreamDetail(body);
+	let numericCode: number | undefined;
+	if (typeof error.code === "number") {
+		numericCode = error.code;
+	} else if (typeof error.code === "string" && /^\d{3}$/u.test(error.code)) {
+		numericCode = Number(error.code);
+	}
+	const words = [error.type, error.code, detail.message]
+		.filter((value): value is string => typeof value === "string")
+		.join(" ");
+	const cls: ErrorClass =
+		numericCode !== undefined && numericCode >= 400
+			? classifyStatus(numericCode)
+			: (STREAM_ERROR_CLASSES.find(([pattern]) => pattern.test(words))?.[1] ??
+				"server");
+	return new GatewayError({
+		class: cls,
+		message: detail.message ?? `${label} reported an error in its stream`,
+		provider: { body },
 	});
 }

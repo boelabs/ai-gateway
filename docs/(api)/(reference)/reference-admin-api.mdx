@@ -75,11 +75,11 @@ the API.
 
 | Route | Purpose |
 |---|---|
-| `GET /admin/logs` | Paginated operation summaries. Filters include `outcome`, `degraded`, `active`, `terminalVerified`, `failureKind`, `failurePhase`, duration, model, key, request id, cache, and time range. |
+| `GET /admin/logs` | Paginated operation summaries. Filters include `outcome`, `degraded`, `active`, `terminalVerified`, `failureKind`, `failurePhase`, duration, model, key, request id, cache, and time range. The window is bounded: without `start` it is the last 7 days, and it may span at most 93 days (`400 invalid_window`). `pagination.total` counts up to 10,000 (`totalIsLowerBound` past that); pass `pagination.nextCursor` back as `cursor` for keyset paging that stays fast on deep pages. Rows carry scalar columns only; the summaries and metadata are in the detail. |
 | `GET /admin/logs/:operationId` | Full operation record, ordered upstream-attempt timeline, and whether a retained sample exists and can be read (`payload.retained`, `payload.readable`, `payload.access`). |
 | `GET /admin/logs/:operationId/payload` | Decrypt the retained forensic sample kept for every finished operation. Requires `payloads:read` (master, owner, or admin) and is audit logged, outcome included. 403 `payload_access_sealed` when the deployment runs `OBSERVABILITY_PAYLOAD_ACCESS=sealed`, 404 once retention has swept the sample, 409 when it outlived its key. |
 | `GET /admin/observability/summary` | Outcomes, degraded/stalled/active/abandoned counts, retries, and latency percentiles. Takes a trailing `window=5m|1h|24h` or an explicit `start`/`end` range of at most 31 days; `active` always counts what is in flight now. |
-| `GET /admin/usage` | Consumer usage/cost and estimated upstream cost across every attempt; group by `public_model`, `virtual_key`, `actor`, `hour`, `day`, or `none`. Filterable by `actor`. See [Cost accounting](/docs/cost-accounting). |
+| `GET /admin/usage` | Consumer usage/cost and estimated upstream cost across every attempt; group by `public_model`, `virtual_key`, `actor`, `hour`, `day`, or `none`. Filterable by `actor`. Without `start` it covers the last 30 days; the window may span at most 400 days. See [Cost accounting](/docs/cost-accounting). |
 
 ## Audit trail
 
@@ -112,10 +112,15 @@ the header behaves exactly as it always has.
 - A retry that arrives while the first request is still running is `409 idempotency_key_in_progress`.
 - Only successful responses are remembered. A rejected or failed call releases the key, so the
   corrected request can reuse it.
-- The remembered response is encrypted with the keyring, because some carry a secret (a new virtual
-  key's plaintext). If the key that encrypted it has been retired, a retry gets
-  `409 idempotency_response_unreadable`: check whether the first call took effect before retrying
-  with a new key.
+- A response that carries a secret — creating or rotating a virtual key returns its plaintext — is
+  never stored. A retry of such a call does not run it again; it gets
+  `409 idempotency_response_withheld`, whose message gives the first call's status.
+- Every other remembered response is encrypted with the keyring. If the key that encrypted it has been
+  retired, a retry gets `409 idempotency_response_unreadable`: check whether the first call took
+  effect before retrying with a new key.
+- A first request that never completed (its process died) is `409 idempotency_outcome_unknown` after
+  five minutes, instead of `idempotency_key_in_progress` for the rest of the day.
+- A replay is answered after the permission checks: a caller who has lost the permission gets `403`.
 
 ## Operators and sessions
 

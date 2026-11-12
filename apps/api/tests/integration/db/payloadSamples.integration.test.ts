@@ -6,7 +6,6 @@
  */
 
 import { getPayloadSample, payloadAccessIsOpen } from "#logging/operations.ts";
-import { payloadAccessAudit, payloadSamples } from "#db/schema.ts";
 import { pgAvailable } from "#test-support/infra.ts";
 import { encryptJson } from "#db/crypto.ts";
 import { randomUUID } from "node:crypto";
@@ -15,9 +14,34 @@ import { db } from "#db/client.ts";
 import { eq } from "drizzle-orm";
 import { test } from "node:test";
 
+import {
+	payloadAccessAudit,
+	gatewayOperations,
+	payloadSamples,
+} from "#db/schema.ts";
+
 const skip = (await pgAvailable()) ? false : "Postgres unavailable";
 
+/** A sample belongs to an operation (foreign key), so each one gets a finished operation row. */
+async function operation(operationId: string) {
+	await db
+		.insert(gatewayOperations)
+		.values({
+			id: operationId,
+			requestId: randomUUID(),
+			publicModel: "m",
+			callType: "chat",
+			lifecycleState: "finished",
+			outcome: "error",
+			degraded: true,
+			startedAt: new Date(),
+			endedAt: new Date(),
+		})
+		.onConflictDoNothing();
+}
+
 async function seed(operationId: string, expiresAt: Date) {
+	await operation(operationId);
 	await db.insert(payloadSamples).values({
 		operationId,
 		captureReason: "success",
@@ -41,6 +65,9 @@ async function cleanup(operationId: string) {
 	await db
 		.delete(payloadAccessAudit)
 		.where(eq(payloadAccessAudit.operationId, operationId));
+	await db
+		.delete(gatewayOperations)
+		.where(eq(gatewayOperations.id, operationId));
 }
 
 test("payload samples: a live sample is revealed, timestamped and audited", {
@@ -111,6 +138,7 @@ test("payload samples: a sample sealed by a retired key is unreadable, not a cra
 }, async () => {
 	const operationId = randomUUID();
 	const envelope = encryptJson({ request: {} }, "observability-payload");
+	await operation(operationId);
 	await db.insert(payloadSamples).values({
 		operationId,
 		captureReason: "error",

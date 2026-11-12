@@ -123,11 +123,17 @@ function parseUsage(raw: unknown): TranscriptionUsage | undefined {
 		return undefined;
 	}
 	const u = raw as {
+		type?: string;
+		seconds?: number;
 		input_tokens?: number;
 		output_tokens?: number;
 		total_tokens?: number;
 		input_token_details?: { text_tokens?: number; audio_tokens?: number };
 	};
+	// Duration-billed models (whisper-1, gpt-transcribe) report `{ type: "duration", seconds }`.
+	if (u.type === "duration" && typeof u.seconds === "number") {
+		return { type: "duration", seconds: u.seconds };
+	}
 	if (typeof u.total_tokens !== "number") {
 		return undefined;
 	}

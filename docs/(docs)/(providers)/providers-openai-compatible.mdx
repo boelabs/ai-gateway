@@ -43,6 +43,10 @@ credentials and choose a model available to your provider account. See
 - If the target speaks vLLM/SGLang-style thinking controls (`chat_template_kwargs`), declare
   `reasoning.kind: "chat_template_flag"` in the custom catalog entry — see [Reasoning](/docs/reasoning).
 
+- **Reasoning in later turns**: an assistant turn's `reasoning_content` (or `reasoning`) that a
+  client sends back is forwarded as `reasoning_content` to DeepSeek, Moonshot, Z.AI and MiniMax,
+  whose thinking models need it, and not to this generic adapter, since OpenAI defines no such field.
+
 ## Next steps
 
 - [Creating deployments](/docs/creating-deployments) — the full custom-model example.

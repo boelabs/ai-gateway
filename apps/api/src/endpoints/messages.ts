@@ -212,8 +212,9 @@ function streamMessages(
 				}
 			}
 		} finally {
+			let settledUsage: Usage | null = usage;
 			if (routed) {
-				await routed.routing.finish(
+				settledUsage = await routed.routing.finish(
 					usage,
 					lastChunkAt ?? undefined,
 					streamError,
@@ -224,7 +225,7 @@ function streamMessages(
 				finishDownstreamWriteObservation(downstream, streamError?.code);
 			}
 			const cost = routed
-				? computeUsageCost(routed.routing.candidate.meta, usage)
+				? computeUsageCost(routed.routing.candidate.meta, settledUsage)
 				: null;
 			log.write({
 				status: streamError ? "error" : "success",
@@ -233,7 +234,7 @@ function streamMessages(
 					streamError?.code === "client_closed_request"
 						? 499
 						: 200,
-				usage,
+				usage: settledUsage,
 				cost,
 				firstOutputMs:
 					firstTokenAt === null ? null : firstTokenAt - log.startedAt,
@@ -259,8 +260,10 @@ export async function messagesHandler(c: Context<AppEnv>): Promise<Response> {
 		log.requestBody = json;
 		const req = parseBody(messagesRequestSchema, json);
 		log.publicModel = req.model;
+		const beta = c.req.header("anthropic-beta");
 		let canonical = messagesRequestToCanonical(req, {
 			messageState: messageStateCodec,
+			...(beta === undefined ? {} : { betas: [beta] }),
 		});
 		await preflight(c, canonical.model);
 		canonical = await applyCanonicalRequestExtensions(c, "chat", canonical);
@@ -348,10 +351,10 @@ export async function messagesHandler(c: Context<AppEnv>): Promise<Response> {
 				routing.value.response,
 			);
 			const { usage } = response;
-			await lifecycle.finish(usage);
-			const cost = computeUsageCost(meta, usage);
+			const settledUsage = (await lifecycle.finish(usage)) ?? usage;
+			const cost = computeUsageCost(meta, settledUsage);
 			const rendered = canonicalToMessagesResponse(response, renderOpts);
-			cache.store(rendered, usage);
+			cache.store(rendered, settledUsage);
 			const body = attachRoutingMetadata(
 				rendered as Record<string, unknown>,
 				routingMetadata,
@@ -359,7 +362,7 @@ export async function messagesHandler(c: Context<AppEnv>): Promise<Response> {
 			log.write({
 				status: "success",
 				httpStatus: 200,
-				usage,
+				usage: settledUsage,
 				cost,
 				firstOutputMs: null,
 				responseBody: rendered,

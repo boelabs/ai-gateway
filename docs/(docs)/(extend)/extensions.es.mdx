@@ -11,7 +11,7 @@ Las extensiones se dividen en dos conceptos:
 
 <Callout>
 
-**Modelo de confianza.** El código de extensión se ejecuta **en proceso con privilegios completos**: puede leer y reescribir cada solicitud y respuesta. Por lo tanto, la carga está restringida a la **master key**, el código se cifra en reposo y se verifica la integridad de cada artefacto (sha256) antes de cargarlo. Trate la carga de una extensión con el mismo cuidado que un deployment.
+**Modelo de confianza.** El código de extensión se ejecuta **en proceso con privilegios completos**: puede leer y reescribir cada solicitud y respuesta. Además, importar una carga ejecuta su código de nivel superior en el host. Por lo tanto, la carga requiere `extensions:manage`: la **master key** o una sesión **owner**, lo que hace que una cuenta owner equivalga a ejecutar código en el host del gateway; asigna ese rol en consecuencia. El código se cifra en reposo y se verifica la integridad de cada artefacto (sha256) antes de cargarlo. Trate la carga de una extensión con el mismo cuidado que un deployment.
 
 </Callout>
 
@@ -35,7 +35,7 @@ Las extensiones solo requieren Postgres, del que ya depende el gateway. No hay n
 
 ## Administrar extensiones (API de administración) [#managing-extensions-admin-api]
 
-Todas las rutas requieren la master key. La envolvente de gestión es `{ "data": ... }`.
+Todas las rutas requieren `extensions:manage` (la master key o una sesión owner). La envolvente de gestión es `{ "data": ... }`.
 
 | Método y ruta | Propósito |
 |---|---|
@@ -156,7 +156,9 @@ Las exportaciones de módulos no válidos, una clave que no coincide o una fuent
 
 En runtime, las fallas de enlace devuelven un error de gateway desinfectada para esa solicitud. Después de fallas consecutivas de `EXTENSIONS_MAX_FAILURES`, la instancia se deshabilita para el proceso actual. Si una instancia deshabilitada es crítica, las solicitudes afectadas fallan con `extension_disabled` y `/health/ready` devuelve un estado incorrecto. Las instancias deshabilitadas no críticas se omiten y se informan como degradadas.
 
-Cada hook funciona con un límite de tiempo transcurrido (`EXTENSIONS_HOOK_TIMEOUT_MS`, predeterminado 5000 ms; configura `0` para desactivarlo). Un hook que lo excede, o uno que ignora su `ctx.signal` mientras el cliente cancela, se cancela y cuenta como una falla, por lo que un hook que se comporta mal nunca puede bloquear el procesamiento de solicitudes indefinidamente. Los hooks con buen comportamiento deben respetar `ctx.signal`, que se activa tanto en el tiempo de espera como en la cancelación upstream.
+Cada hook funciona con un límite de tiempo transcurrido (`EXTENSIONS_HOOK_TIMEOUT_MS`, predeterminado 5000 ms; configura `0` para desactivarlo). Un hook que lo excede se cancela y cuenta como una falla, por lo que un hook que se comporta mal nunca puede bloquear el procesamiento de solicitudes indefinidamente. Un hook interrumpido porque el cliente canceló también se cancela, pero no cuenta: que el cliente se vaya no dice nada de la extensión. Los hooks con buen comportamiento deben respetar `ctx.signal`, que se activa tanto en el tiempo de espera como en la cancelación upstream.
+
+Para rechazar una solicitud a propósito (una regla de firewall, una política), un hook llama a `rejectRequest({ message, code, status })` del SDK de extensiones (o lanza un `ExtensionRejection`). El cliente recibe ese `status` (`400`, `403`, `413`, `422` o `429`) con el mensaje y el código indicados, y el rechazo no es una falla: nunca cuenta para el disyuntor.
 
 `onError` es un hook de observabilidad de disparo y olvido: una falla dentro de él se registra y aparece en estado, pero nunca activa el disyuntor, por lo que una falla de registro no puede deshabilitar una instancia crítica.
 

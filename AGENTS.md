@@ -237,6 +237,10 @@ bun run --filter @boelabs/ai-gateway-api db:migrate    # applies pending
 - Historical migrations contain hand-tuned DDL and stay immutable even after a later migration
   removes the structure; snapshots describe the schema at each point in time.
 - `pgEnum`s must be **`export const`** or drizzle-kit won't emit their `CREATE TYPE`.
+- **An index on a large table** (`gateway_operations`, `upstream_attempts`, `payload_samples`, …) is
+  not declared in `schema.ts`: add one file to `src/db/migrations-concurrent/` holding a single
+  `CREATE INDEX CONCURRENTLY IF NOT EXISTS`. The runner builds those after the regular migrations,
+  outside a transaction, and rebuilds one left INVALID by an interrupted build.
 - `src/db/migrations/**` is excluded from Biome (drizzle owns its formatting).
 
 ## 7. Adding a provider or model

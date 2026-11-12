@@ -1,5 +1,5 @@
 import { assertNoManagedExtraBodyKeys } from "#core/extraBody.ts";
-import type { MessagesRequest } from "./messages.ts";
+import { type MessagesRequest, messagesRequestSchema } from "./messages.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { SSEEvent } from "#core/sse.ts";
 import type { Usage } from "#core/usage.ts";
@@ -8,6 +8,9 @@ import { randomUUID } from "node:crypto";
 import {
 	anthropicContentBlocksFromProviderFields,
 	providerFieldsWithAnthropicContentBlocks,
+	anthropicStreamBlockFromProviderFields,
+	anthropicStopReasonFromProviderFields,
+	hasNonCanonicalAnthropicContent,
 	googleContentPartsFromProviderFields,
 	providerFieldsWithGoogleContentParts,
 	providerFieldsWithAnthropicThinking,
@@ -64,6 +67,80 @@ export interface MessagesRenderOptions {
 export interface MessagesCanonicalOptions {
 	/** Opens gateway state carriers. Without it they are dropped. */
 	messageState?: MessageStateCodec;
+	/** The request's `anthropic-beta` header values. */
+	betas?: readonly string[];
+}
+
+/** Custom tool fields the canonical function tool carries. */
+const PORTABLE_TOOL_FIELDS = new Set([
+	"name",
+	"description",
+	"input_schema",
+	"strict",
+	"cache_control",
+]);
+
+/**
+ * Documented top-level Messages fields the canonical request has no form for. They reach an
+ * Anthropic upstream unchanged and make the request require it; no other provider can honour them.
+ */
+const NATIVE_TOP_LEVEL_FIELDS = new Set([
+	"container",
+	"mcp_servers",
+	"context_management",
+	"inference_geo",
+	"service_tier",
+	"speed",
+	"diagnostics",
+]);
+
+const MAPPED_TOP_LEVEL_FIELDS: ReadonlySet<string> = new Set(
+	Object.keys(messagesRequestSchema.shape),
+);
+
+/** Beta names follow `feature-name-YYYY-MM-DD`; anything else is not a beta Anthropic documents. */
+const BETA_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*-\d{4}-\d{2}-\d{2}$/u;
+
+function betaNames(values: readonly string[]): string[] {
+	const names = values
+		.flatMap((value) => value.split(","))
+		.map((name) => name.trim())
+		.filter((name) => name.length > 0);
+	const invalid = names.find((name) => !BETA_NAME.test(name));
+	if (invalid !== undefined) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_request_error",
+			param: "anthropic-beta",
+			message: `Unexpected value \`${invalid}\` for the anthropic-beta header`,
+		});
+	}
+	return [...new Set(names)];
+}
+
+/**
+ * The request's top-level fields the canonical request does not map, split into the documented
+ * native ones and the rest, which is rejected: a field accepted and then lost is never acceptable.
+ */
+function nativeTopLevelFields(
+	req: MessagesRequest,
+): Record<string, unknown> | undefined {
+	const native: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(req)) {
+		if (MAPPED_TOP_LEVEL_FIELDS.has(key)) {
+			continue;
+		}
+		if (!NATIVE_TOP_LEVEL_FIELDS.has(key)) {
+			throw new GatewayError({
+				class: "bad_request",
+				code: "unknown_parameter",
+				param: key,
+				message: `Unknown parameter: ${key}`,
+			});
+		}
+		native[key] = structuredClone(value);
+	}
+	return Object.keys(native).length > 0 ? native : undefined;
 }
 
 /** A gateway state carrier: Anthropic clients replay `thinking` blocks verbatim. */
@@ -156,7 +233,49 @@ function withCacheControl(
 	return part;
 }
 
-function blockToPart(block: Block): CanonicalContentPart | null {
+/** Document fields the canonical file part has no form for. */
+const NATIVE_DOCUMENT_FIELDS = ["citations", "context"] as const;
+
+/** A block only Anthropic can read, carried as written. */
+function nativePart(block: Block): CanonicalContentPart {
+	return {
+		type: "file",
+		native: structuredClone(block) as Record<string, unknown>,
+		...(typeof block.title === "string" ? { filename: block.title } : {}),
+	};
+}
+
+function needsNativeBlock(block: Block): boolean {
+	if (block.type === "text") {
+		return Array.isArray((block as { citations?: unknown }).citations);
+	}
+	if (block.type === "image") {
+		return block.source?.type === "file";
+	}
+	if (block.type === "document") {
+		return (
+			NATIVE_DOCUMENT_FIELDS.some(
+				(field) => (block as Record<string, unknown>)[field] !== undefined,
+			) ||
+			block.source?.type === "text" ||
+			block.source?.type === "content"
+		);
+	}
+	return true;
+}
+
+/**
+ * One input block as a canonical part. User content the canonical form cannot hold is carried
+ * natively; assistant content has its own native carrier (the turn's content blocks), so there
+ * `native: false` keeps the portable parts only.
+ */
+function blockToPart(
+	block: Block,
+	{ native = true }: { native?: boolean } = {},
+): CanonicalContentPart | null {
+	if (native && needsNativeBlock(block)) {
+		return nativePart(block);
+	}
 	switch (block.type) {
 		case "text":
 			return withCacheControl({ type: "text", text: block.text ?? "" }, block);
@@ -270,7 +389,7 @@ function toolResultToCanonical(
 				return { type: "text", text: value };
 			}
 			const part = blockToPart(value as Block);
-			return part ?? { type: "text", text: JSON.stringify(value) };
+			return part ?? nativePart(value as Block);
 		});
 	}
 	return JSON.stringify(content ?? "");
@@ -294,9 +413,19 @@ function mapToolChoice(
 	}
 	if (type === "tool") {
 		const { name } = tc as { name?: string };
-		return name ? { name } : "auto";
+		if (name) {
+			return { name };
+		}
 	}
-	return "auto";
+	throw new GatewayError({
+		class: "bad_request",
+		code: "invalid_request_error",
+		param: "tool_choice",
+		message:
+			type === "tool"
+				? 'tool_choice "tool" requires a name'
+				: `Unsupported tool_choice type: ${String(type)}`,
+	});
 }
 
 function displayFromThinking(
@@ -312,6 +441,11 @@ function reasoningEffortFromMessages(
 	req: MessagesRequest,
 ): ReasoningEffort | undefined {
 	const outputEffort = req.output_config?.effort;
+	if (outputEffort !== undefined && req.thinking?.type === "disabled") {
+		// Effort applies with or without thinking; with thinking off it steers only the response,
+		// which travels as messagesTransport.outputEffort while reasoning stays off.
+		return "none";
+	}
 	if (outputEffort !== undefined) {
 		if (!isReasoningEffort(outputEffort)) {
 			throw new GatewayError({
@@ -402,7 +536,7 @@ export function messagesRequestToCanonical(
 						...(extraContent === undefined ? {} : { extraContent }),
 					});
 				} else {
-					const p = blockToPart(b);
+					const p = blockToPart(b, { native: false });
 					if (p) {
 						parts.push(p);
 					}
@@ -415,18 +549,29 @@ export function messagesRequestToCanonical(
 			if (toolCalls.length > 0) {
 				msg.toolCalls = toolCalls;
 			}
-			if (thinkingBlocks.length > 0) {
-				// The turn exactly as the client holds it: Anthropic binds thinking to block order.
-				const native = providerFieldsWithAnthropicContentBlocks(
-					blocks.filter(
-						(block) => gatewayStateOf(block) === undefined,
-					) as Record<string, unknown>[],
-				);
+			const nativeBlocks = blocks.filter(
+				(block) => gatewayStateOf(block) === undefined,
+			) as Record<string, unknown>[];
+			if (
+				thinkingBlocks.length > 0 ||
+				// Thinking counts only when signed (above): unsigned thinking is portable text.
+				hasNonCanonicalAnthropicContent(
+					nativeBlocks.filter(
+						(block) =>
+							block.type !== "thinking" && block.type !== "redacted_thinking",
+					),
+				)
+			) {
+				// The turn exactly as the client holds it: Anthropic binds thinking to block order and
+				// needs server-tool calls and results (their encrypted content) back unchanged.
+				const native = providerFieldsWithAnthropicContentBlocks(nativeBlocks);
 				msg.providerFields =
-					mergeProviderFields(
-						providerFieldsWithAnthropicThinking(thinkingBlocks),
-						native,
-					) ?? native;
+					thinkingBlocks.length > 0
+						? (mergeProviderFields(
+								providerFieldsWithAnthropicThinking(thinkingBlocks),
+								native,
+							) ?? native)
+						: native;
 			}
 			restoreMessageStates(msg, carriers, options.messageState);
 			messages.push(msg);
@@ -470,6 +615,17 @@ export function messagesRequestToCanonical(
 		messages,
 		stream: req.stream,
 	};
+	if (
+		messages.some(
+			(message) =>
+				Array.isArray(message.content) &&
+				message.content.some(
+					(part) => part.type === "file" && part.native !== undefined,
+				),
+		)
+	) {
+		u.requiresNativeWire = true;
+	}
 	u.maxTokens = req.max_tokens;
 	if (req.temperature !== undefined) {
 		u.temperature = req.temperature;
@@ -494,15 +650,43 @@ export function messagesRequestToCanonical(
 		};
 		u.requiresNativeWire = true;
 	}
+	const outputEffort = req.output_config?.effort;
+	if (outputEffort !== undefined && req.thinking?.type === "disabled") {
+		if (!isReasoningEffort(outputEffort)) {
+			throw new GatewayError({
+				class: "bad_request",
+				message: `Unsupported output_config.effort: ${String(outputEffort)}`,
+				param: "output_config.effort",
+			});
+		}
+		u.messagesTransport = { ...u.messagesTransport, outputEffort };
+	}
+	const nativeFields = nativeTopLevelFields(req);
+	if (nativeFields !== undefined) {
+		u.messagesTransport = { ...u.messagesTransport, nativeFields };
+		u.requiresNativeWire = true;
+	}
+	const betas = betaNames(options.betas ?? []);
+	if (betas.length > 0) {
+		u.messagesTransport = { ...u.messagesTransport, betas };
+	}
 	const effort = reasoningEffortFromMessages(req);
 	const display = displayFromThinking(req.thinking);
 	const summary =
 		display === "omitted" ? "none" : summaryForEffort(effort, undefined);
+	// The exact budget travels beside its effort bucket, so a budget-controlled model gets the number
+	// the client asked for rather than the bucket's configured budget.
+	const budgetTokens =
+		req.thinking?.type === "enabled" &&
+		typeof req.thinking.budget_tokens === "number"
+			? req.thinking.budget_tokens
+			: undefined;
 	if (effort !== undefined || display !== undefined) {
 		u.reasoning = {
 			...(effort === undefined ? {} : { effort }),
 			...(summary === undefined ? {} : { summary }),
 			...(display === undefined ? {} : { display }),
+			...(budgetTokens === undefined ? {} : { budgetTokens }),
 		};
 	}
 	const outputFormat = req.output_config?.format;
@@ -533,7 +717,13 @@ export function messagesRequestToCanonical(
 				cache_control?: Record<string, unknown>;
 			};
 			if (typeof tool.name === "string") {
-				if (typeof tool.type === "string" || tool.input_schema === undefined) {
+				if (
+					typeof tool.type === "string" ||
+					tool.input_schema === undefined ||
+					// input_examples, defer_loading, eager_input_streaming, allowed_callers...: fields a
+					// function tool has no form for, so the definitions travel as written.
+					Object.keys(tool).some((key) => !PORTABLE_TOOL_FIELDS.has(key))
+				) {
 					hasNativeTool = true;
 				}
 				const entry: NonNullable<CanonicalChatRequest["tools"]>[number] = {
@@ -569,6 +759,12 @@ export function messagesRequestToCanonical(
 	if (tc !== undefined) {
 		u.toolChoice = tc;
 	}
+	const disableParallel = (
+		req.tool_choice as { disable_parallel_tool_use?: unknown } | undefined
+	)?.disable_parallel_tool_use;
+	if (typeof disableParallel === "boolean") {
+		u.parallelToolCalls = !disableParallel;
+	}
 	const carriesNativeMessageState = messages.some((message) => {
 		if (
 			anthropicThinkingFromProviderFields(message.providerFields) !== undefined
@@ -599,7 +795,11 @@ export function messagesRequestToCanonical(
 function mapStopReason(
 	finish: CanonicalFinishReason | null,
 	stopSequence?: string | null,
+	native?: string,
 ): string | null {
+	if (native !== undefined) {
+		return native;
+	}
 	if (stopSequence) {
 		return "stop_sequence";
 	}
@@ -645,6 +845,16 @@ function usageToAnthropic(usage: Usage): Record<string, unknown> {
 		...(usage.reasoningTokens === undefined
 			? {}
 			: { output_tokens_details: { thinking_tokens: usage.reasoningTokens } }),
+		...(usage.serverToolCalls === undefined
+			? {}
+			: {
+					server_tool_use: Object.fromEntries(
+						Object.entries(usage.serverToolCalls).map(([tool, calls]) => [
+							`${tool}_requests`,
+							calls,
+						]),
+					),
+				}),
 	};
 }
 
@@ -747,6 +957,7 @@ export function canonicalToMessagesResponse(
 		stop_reason: mapStopReason(
 			choice?.finishReason ?? null,
 			choice?.stopSequence,
+			anthropicStopReasonFromProviderFields(choice?.message.providerFields),
 		),
 		stop_sequence: choice?.stopSequence ?? null,
 		usage: usageToAnthropic(resp.usage),
@@ -767,6 +978,7 @@ export async function* canonicalChunksToMessagesEvents(
 	let finalUsage: Usage | null = null;
 	let finish: CanonicalFinishReason | null = null;
 	let stopSequence: string | null = null;
+	let nativeStopReason: string | undefined;
 
 	let nextIndex = 0;
 	let textOpen = false;
@@ -774,31 +986,57 @@ export async function* canonicalChunksToMessagesEvents(
 	let textIndex = 0;
 	let thinkingIndex = 0;
 	const toolBlock = new Map<number, number>(); // canonical toolCall index -> anthropic block index
+	// Anthropic stops each block before the next one starts; at most one is open at a time.
+	let openTool: number | undefined;
+	function* closeOpenBlocks(): Generator<SSEEvent> {
+		if (thinkingOpen) {
+			yield sse("content_block_stop", { index: thinkingIndex });
+			thinkingOpen = false;
+		}
+		if (textOpen) {
+			yield sse("content_block_stop", { index: textIndex });
+			textOpen = false;
+		}
+		if (openTool !== undefined) {
+			yield sse("content_block_stop", { index: openTool });
+			openTool = undefined;
+		}
+	}
 	// Other providers' message-bound state, sealed into one trailing block once the turn is done.
 	let googleParts: Record<string, unknown>[] | undefined;
 	const openaiReasoning: OpenAIReasoningStateItem[] = [];
 
-	yield sse("message_start", {
-		message: {
-			id,
-			type: "message",
-			role: "assistant",
-			model: opts.publicModel,
-			content: [],
-			stop_reason: null,
-			stop_sequence: null,
-			usage: {
-				input_tokens: 0,
-				cache_creation_input_tokens: 0,
-				cache_read_input_tokens: 0,
-				output_tokens: 0,
+	// Opened on the first chunk, so the usage Anthropic reports up front (input tokens) is known.
+	let started = false;
+	const messageStart = (initial: Usage | undefined): SSEEvent[] => [
+		sse("message_start", {
+			message: {
+				id,
+				type: "message",
+				role: "assistant",
+				model: opts.publicModel,
+				content: [],
+				stop_reason: null,
+				stop_sequence: null,
+				usage: initial
+					? usageToAnthropic(initial)
+					: {
+							input_tokens: 0,
+							cache_creation_input_tokens: 0,
+							cache_read_input_tokens: 0,
+							output_tokens: 0,
+						},
 			},
-		},
-	});
-	// Anthropic emits a keep-alive ping after opening the stream.
-	yield sse("ping", {});
+		}),
+		// Anthropic emits a keep-alive ping after opening the stream.
+		sse("ping", {}),
+	];
 
 	for await (const chunk of chunks) {
+		if (!started) {
+			started = true;
+			yield* messageStart(chunk.initialUsage);
+		}
 		if (chunk.usage) {
 			finalUsage = chunk.usage;
 		}
@@ -813,6 +1051,35 @@ export async function* canonicalChunksToMessagesEvents(
 			({ stopSequence } = choice);
 		}
 		const { delta } = choice;
+		nativeStopReason =
+			anthropicStopReasonFromProviderFields(delta.providerFields) ??
+			nativeStopReason;
+		const streamBlock = anthropicStreamBlockFromProviderFields(
+			delta.providerFields,
+		);
+		if (streamBlock !== undefined) {
+			// A server-tool call or result, where Anthropic streamed it.
+			yield* closeOpenBlocks();
+			const index = nextIndex++;
+			const { input } = streamBlock;
+			const streamedInput = "input" in streamBlock;
+			yield sse("content_block_start", {
+				index,
+				content_block: streamedInput
+					? { ...streamBlock, input: {} }
+					: streamBlock,
+			});
+			if (streamedInput) {
+				yield sse("content_block_delta", {
+					index,
+					delta: {
+						type: "input_json_delta",
+						partial_json: JSON.stringify(input ?? {}),
+					},
+				});
+			}
+			yield sse("content_block_stop", { index });
+		}
 		googleParts =
 			googleContentPartsFromProviderFields(delta.providerFields) ?? googleParts;
 		for (const item of openaiReasoningFromProviderFields(
@@ -835,13 +1102,13 @@ export async function* canonicalChunksToMessagesEvents(
 						delta: { type: "signature_delta", signature: block.signature },
 					});
 				}
+				// The signature ends its block: thinking that follows is a block of its own.
+				yield sse("content_block_stop", { index: thinkingIndex });
+				thinkingOpen = false;
 			} else if (block.type === "thinking") {
 				// Thinking without visible text (display "omitted") streams no deltas; the signature
 				// carries the reasoning and must still reach the client, in its place.
-				if (textOpen) {
-					yield sse("content_block_stop", { index: textIndex });
-					textOpen = false;
-				}
+				yield* closeOpenBlocks();
 				const index = nextIndex++;
 				yield sse("content_block_start", {
 					index,
@@ -859,10 +1126,7 @@ export async function* canonicalChunksToMessagesEvents(
 				});
 				yield sse("content_block_stop", { index });
 			} else {
-				if (thinkingOpen) {
-					yield sse("content_block_stop", { index: thinkingIndex });
-					thinkingOpen = false;
-				}
+				yield* closeOpenBlocks();
 				const index = nextIndex++;
 				yield sse("content_block_start", {
 					index,
@@ -873,11 +1137,8 @@ export async function* canonicalChunksToMessagesEvents(
 		}
 
 		if (delta.reasoning) {
-			if (textOpen) {
-				yield sse("content_block_stop", { index: textIndex });
-				textOpen = false;
-			}
 			if (!thinkingOpen) {
+				yield* closeOpenBlocks();
 				thinkingIndex = nextIndex++;
 				thinkingOpen = true;
 				yield sse("content_block_start", {
@@ -892,11 +1153,8 @@ export async function* canonicalChunksToMessagesEvents(
 		}
 
 		if (delta.content) {
-			if (thinkingOpen) {
-				yield sse("content_block_stop", { index: thinkingIndex });
-				thinkingOpen = false;
-			}
 			if (!textOpen) {
+				yield* closeOpenBlocks();
 				textIndex = nextIndex++;
 				textOpen = true;
 				yield sse("content_block_start", {
@@ -913,16 +1171,10 @@ export async function* canonicalChunksToMessagesEvents(
 		for (const tc of delta.toolCalls ?? []) {
 			let blockIndex = toolBlock.get(tc.index);
 			if (blockIndex === undefined) {
-				if (textOpen) {
-					yield sse("content_block_stop", { index: textIndex });
-					textOpen = false;
-				}
-				if (thinkingOpen) {
-					yield sse("content_block_stop", { index: thinkingIndex });
-					thinkingOpen = false;
-				}
+				yield* closeOpenBlocks();
 				blockIndex = nextIndex++;
 				toolBlock.set(tc.index, blockIndex);
+				openTool = blockIndex;
 				yield sse("content_block_start", {
 					index: blockIndex,
 					content_block: {
@@ -949,15 +1201,10 @@ export async function* canonicalChunksToMessagesEvents(
 		}
 	}
 
-	if (thinkingOpen) {
-		yield sse("content_block_stop", { index: thinkingIndex });
+	if (!started) {
+		yield* messageStart(undefined);
 	}
-	if (textOpen) {
-		yield sse("content_block_stop", { index: textIndex });
-	}
-	for (const blockIndex of toolBlock.values()) {
-		yield sse("content_block_stop", { index: blockIndex });
-	}
+	yield* closeOpenBlocks();
 	const carrier = messageStateBlock(
 		mergeProviderFields(
 			googleParts === undefined
@@ -977,7 +1224,7 @@ export async function* canonicalChunksToMessagesEvents(
 
 	yield sse("message_delta", {
 		delta: {
-			stop_reason: mapStopReason(finish, stopSequence),
+			stop_reason: mapStopReason(finish, stopSequence, nativeStopReason),
 			stop_sequence: stopSequence,
 		},
 		// Cross-provider transports may learn input usage only at the end. Current Anthropic SDKs

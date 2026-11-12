@@ -1,6 +1,11 @@
-import { buildDocsExport, readDocsContent } from "../docs/export.ts";
 import { createHash } from "node:crypto";
 import type { Context } from "hono";
+
+import {
+	type DocsContent,
+	buildDocsExport,
+	readDocsContent,
+} from "../docs/export.ts";
 
 /**
  * `GET /docs/export.json` — the documentation source boelabs.com renders (contract in AGENTS.md).
@@ -17,12 +22,22 @@ interface Serialized {
 
 let serialized: Promise<Serialized> | undefined;
 
+/**
+ * The ETag names the content, not this serialization: `generatedAt` differs per process, and every
+ * replica serving the same pages must answer the same tag, or a CDN in front of several of them
+ * would keep refetching a document that never changed.
+ */
+export function docsEtag(content: DocsContent): string {
+	const digest = createHash("sha256")
+		.update(JSON.stringify(buildDocsExport(content, new Date(0))))
+		.digest("base64url");
+	return `"${digest.slice(0, 27)}"`;
+}
+
 async function serialize(): Promise<Serialized> {
-	const body = JSON.stringify(
-		buildDocsExport(await readDocsContent(), new Date()),
-	);
-	const etag = `"${createHash("sha256").update(body).digest("base64url").slice(0, 27)}"`;
-	return { body, etag };
+	const content = await readDocsContent();
+	const body = JSON.stringify(buildDocsExport(content, new Date()));
+	return { body, etag: docsEtag(content) };
 }
 
 /**

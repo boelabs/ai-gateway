@@ -19,7 +19,7 @@ Configurado con `PUT /admin/router-settings` (`routingStrategy`), efectivo para 
 | `price-based` | La tasa de token comparable más baja o `searchUnitCents` | Optimización de costos en modelos equivalentes con una única base de facturación |
 | `health-aware` | El más alto `successRate × weight` | Alejar el tráfico de un deployment inestable sin cortarlo por completo |
 
-Un grupo de exactamente un deployment omite la selección por completo: la estrategia nunca se ejecuta y las métricas aún se acumulan para la observabilidad. Todas las estrategias que se clasifican según una métrica activa (`latency-based`, `throughput-based`, `price-based`, `health-aware`) vuelven a ser aleatorias ponderadas cuando ningún candidato tiene un valor utilizable todavía (por ejemplo, una nuevo deployment sin solicitudes completadas).
+Un grupo de exactamente un deployment omite la selección por completo: la estrategia nunca se ejecuta y las métricas aún se acumulan para la observabilidad. Todas las estrategias que se clasifican según una métrica activa (`latency-based`, `throughput-based`, `price-based`, `health-aware`) vuelven a ser aleatorias ponderadas cuando ningún candidato tiene un valor utilizable todavía (por ejemplo, una nuevo deployment sin solicitudes completadas). Cuando solo algunos lo tienen, `latency-based`, `throughput-based` y `health-aware` exploran: los candidatos sin muestra se eligen primero (ponderados entre sí) hasta que cada uno tiene una, de modo que un deployment nuevo o recuperado se mide en lugar de no probarse nunca. Las muestras caducan con su ventana, así que un deployment que midió mal vuelve a probarse más adelante.
 
 Para la reranking, los precios unitarios de búsqueda son exactos sólo cuando cada candidato declara esa misma base. Si un grupo combina facturación de token y unidad de búsqueda, combina ambas bases o contiene un precio desconocido, `price-based` recurre a la selección ponderada en lugar de presentar una comparación numérica falsa.
 
@@ -31,7 +31,7 @@ Las métricas por deployment se encuentran en Redis, codificadas por ID de deplo
 - **RPM / TPM** — contadores por minuto. Las RPM aumentan en cada intento de inicio; el TPM aumenta en `totalTokens` en caso de éxito. Ambos expiran por sí solos cada minuto.
 - **Latencia**: un EWMA (α = 0,2) de tiempo transcurrido desde justo antes de la llamada upstream hasta el momento en que realmente terminó de responder. Para las solicitudes de streaming, este es el tiempo hasta el **último fragmento upstream**, no cuando el cliente terminó de recibir la respuesta retransmitida, por lo que el routing basado en latencia refleja la velocidad upstream, no el tiempo que tomó su propia red hasta el cliente.
 - **Rendimiento**: un EWMA (α = 0,2) de `completionTokens / durationSeconds`, que utiliza el mismo tiempo de finalización upstream como latencia.
-- **Puntuación de salud**: `successes / (successes + failures)` durante un período continuo de 10 minutos. Un deployment sin **ningún intento registrado** en esa ventana tiene como valor predeterminado un **0.5** neutral, no un 1.0 perfecto; un valor predeterminado perfecto permitiría a `health-aware` reenviar inmediatamente todo el tráfico a un deployment que estaba fallando hace minutos, en el instante en que sus contadores expiran después de ser enrutados. Neutral lo mantiene clasificado detrás de cualquier cosa con un historial real, sin incluirlo permanentemente en la lista negra.
+- **Puntuación de salud**: `successes / (successes + failures)` durante un período continuo de 10 minutos. Un deployment sin **ningún intento registrado** en esa ventana informa un **0.5** neutral; `health-aware` lo trata como no medido y le envía la siguiente solicitud para medirlo, en lugar de dejarlo para siempre detrás de todos los deployments con historial. Un fallo allí lo devuelve detrás de los demás.
 
 Ninguna de estas métricas influye en la **elegibilidad** del deployment: todavía se intenta un deployment lenta o de bajo estado, solo que con menos frecuencia. La elegibilidad se decide por separado según el estado del circuito y los **límites** de RPM/TPM por deployment (consulta a continuación).
 
@@ -51,7 +51,7 @@ Los controles de los circuitos siguen siendo globales. Los plazos de ejecución 
 
 | Campo | Predeterminado | Significado |
 |---|---|---|
-| `allowedFails` | `3` | Fallos transitorios de solicitudes lógicas: se permite un deployment antes de que la **siguiente** abre el cooldown. Un éxito reinicia la cuenta; `0` se abre ante el primer error. |
+| `allowedFails` | `3` | Fallos transitorios de solicitudes lógicas que se permiten a un deployment dentro de la ventana de fallos antes de que el **siguiente** abra el cooldown, sin importar cuántas solicitudes tuvieron éxito entre medias; `0` se abre ante el primer error. |
 | `cooldownSeconds` | `5` | Tiempo que un deployment permanece en cooldown después de exceder `allowedFails`. `0` desactiva los circuitos de enfriamiento automático. |
 | `retryAfterSeconds` | `0` | Espera mínima antes de reintentar el mismo upstream (ver [Reintentos](#retries)). |
 
@@ -61,8 +61,8 @@ Los campos restantes son controles de seguridad avanzados:
 |---|---|---|
 | `failureWindowSeconds` | `60` | Ventana fija (no deslizante) de recuento de fallos |
 | `maxCooldownSeconds` | `300` | Enfriamiento exponencial máximo después de sondas de recuperación fallidas |
-| `halfOpenProbeSeconds` | `30` | Propiedad TTL para la sonda única de recuperación semiabierta |
-| `configurationCooldownSeconds` | `300` | Cuarentena inmediata para credenciales/acceso a modelos no válidos |
+| `halfOpenProbeSeconds` | `30` | Cuánto tiempo la única sonda de recuperación semiabierta mantiene fuera a otras solicitudes. Una sonda que tarda más sigue cerrando (o reabriendo) el circuito al terminar, salvo que otra solicitud haya tomado una sonda entretanto |
+| `configurationCooldownSeconds` | `300` | Cuarentena inmediata para credenciales/acceso a modelos no válidos, o un `402` del upstream (la cuenta no puede pagar) |
 | `throttleCooldownSeconds` | `5` | Tiempo de reutilización mínimo de capacidad compartida para las respuestas del proveedor `429` |
 
 ### Cuánto espera el gateway [#how-long-the-gateway-waits]

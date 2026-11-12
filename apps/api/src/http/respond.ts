@@ -21,6 +21,10 @@ export interface PaginationMeta {
 	offset: number;
 	total: number;
 	nextOffset: number | null;
+	/** Keyset position of the next page, where the list supports it. */
+	nextCursor?: string | null;
+	/** `total` stopped counting at a cap: there are at least that many. */
+	totalIsLowerBound?: boolean;
 }
 
 export function paginated<T>(

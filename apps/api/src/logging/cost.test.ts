@@ -134,6 +134,45 @@ test("tiered pricing: tier cache read applies and is subtracted from input", () 
 	assert.ok(Math.abs(c.cacheReadCents - (50_000 * 40) / 1e6) < 1e-9);
 });
 
+test("tiered pricing: cached tokens without their own rate follow the tier's input rate", () => {
+	const pricing = {
+		inputCentsPerMTokens: 200,
+		outputCentsPerMTokens: 1200,
+		tiers: [{ aboveInputTokens: 200_000, inputCentsPerMTokens: 400 }],
+	};
+	const c = computeCost(
+		{ pricing },
+		{
+			promptTokens: 250_000,
+			completionTokens: 0,
+			totalTokens: 250_000,
+			cacheReadTokens: 50_000,
+			cacheWriteTokens: 10_000,
+		},
+	);
+	assert.ok(Math.abs(c.cacheReadCents - (50_000 * 400) / 1e6) < 1e-9);
+	assert.ok(Math.abs(c.cacheWriteCents - (10_000 * 400) / 1e6) < 1e-9);
+});
+
+test("tiered pricing: an explicit base cache rate still wins over the tier input rate", () => {
+	const pricing = {
+		inputCentsPerMTokens: 200,
+		cacheReadCentsPerMTokens: 20,
+		outputCentsPerMTokens: 1200,
+		tiers: [{ aboveInputTokens: 200_000, inputCentsPerMTokens: 400 }],
+	};
+	const c = computeCost(
+		{ pricing },
+		{
+			promptTokens: 250_000,
+			completionTokens: 0,
+			totalTokens: 250_000,
+			cacheReadTokens: 50_000,
+		},
+	);
+	assert.ok(Math.abs(c.cacheReadCents - (50_000 * 20) / 1e6) < 1e-9);
+});
+
 test("without pricing cost is 0", () => {
 	const c = computeCost(
 		{},
@@ -397,4 +436,92 @@ test("the budget bound prices reserved tokens at the video rate when it is the h
 		1_000_000,
 	);
 	assert.equal(max, 1200);
+});
+
+test("service tier: the served tier's rates replace the standard ones", () => {
+	const pricing = {
+		inputCentsPerMTokens: 200,
+		outputCentsPerMTokens: 1000,
+		cacheReadCentsPerMTokens: 10,
+		tiers: [{ aboveInputTokens: 272_000, inputCentsPerMTokens: 400 }],
+		serviceTiers: {
+			flex: {
+				inputCentsPerMTokens: 100,
+				outputCentsPerMTokens: 500,
+				cacheReadCentsPerMTokens: 5,
+			},
+		},
+	};
+	const usage = {
+		promptTokens: 1_000_000,
+		completionTokens: 1_000_000,
+		totalTokens: 2_000_000,
+	};
+	const standard = computeCost({ pricing }, usage);
+	const flex = computeCost({ pricing }, { ...usage, serviceTier: "flex" });
+	assert.equal(standard.inputCents, 400);
+	assert.equal(flex.inputCents, 100);
+	assert.equal(flex.outputCents, 500);
+});
+
+test("service tier: an undeclared tier is charged at the standard rates", () => {
+	const pricing = { inputCentsPerMTokens: 200, outputCentsPerMTokens: 1000 };
+	const cost = computeCost(
+		{ pricing },
+		{
+			promptTokens: 1_000_000,
+			completionTokens: 0,
+			totalTokens: 1_000_000,
+			serviceTier: "default",
+		},
+	);
+	assert.equal(cost.inputCents, 200);
+});
+
+test("service tier: the budget bound covers the most expensive declared tier", () => {
+	const pricing = {
+		inputCentsPerMTokens: 200,
+		outputCentsPerMTokens: 1000,
+		serviceTiers: { ultrafast: { outputCentsPerMTokens: 6000 } },
+	};
+	assert.equal(estimateMaximumCostCents({ pricing }, 1_000_000), 6000);
+});
+
+test("per-unit pricing: images by variant and audio by the second", () => {
+	const pricing = {
+		imageOutputCentsPerImage: 6,
+		imageOutputCentsPerImageByVariant: { low: 4, "low:2048x2048": 5 },
+		audioInputCentsPerSecond: 0.0075,
+	};
+	const zero = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+	assert.equal(
+		computeCost({ pricing }, { ...zero, outputImages: 2 }).totalCents,
+		12,
+	);
+	assert.equal(
+		computeCost(
+			{ pricing },
+			{ ...zero, outputImages: 1, outputImageQuality: "low" },
+		).totalCents,
+		4,
+	);
+	assert.equal(
+		computeCost(
+			{ pricing },
+			{
+				...zero,
+				outputImages: 1,
+				outputImageQuality: "low",
+				outputImageSize: "2048x2048",
+			},
+		).totalCents,
+		5,
+	);
+	assert.ok(
+		Math.abs(
+			computeCost({ pricing }, { ...zero, inputAudioSeconds: 60 }).totalCents -
+				0.45,
+		) < 1e-9,
+	);
+	assert.equal(estimateMaximumCostCents({ pricing }, 0, 0, 3), 18);
 });

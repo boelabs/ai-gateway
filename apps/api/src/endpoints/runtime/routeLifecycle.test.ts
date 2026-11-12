@@ -15,6 +15,7 @@ test("route lifecycle settles its route exactly once", async () => {
 	lifecycle.attach(
 		route(async (_usage, _finishedAt, error) => {
 			calls.push({ error });
+			return null;
 		}),
 	);
 	const failure = new GatewayError({
@@ -36,6 +37,7 @@ test("route lifecycle retains usage across gateway post-processing failures", as
 	lifecycle.attach(
 		route(async (reported) => {
 			calls.push(reported);
+			return reported;
 		}),
 	);
 	const usage = { promptTokens: 2, completionTokens: 3, totalTokens: 5 };

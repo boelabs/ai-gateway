@@ -185,6 +185,14 @@ paths:
       description: "Returns the stored canonical `response` object when store=true. Scope is per key: a virtual key only sees its own responses; the master key sees responses created with the master key."
       parameters:
         - $ref: "#/components/parameters/ResponseIdPath"
+        - name: include[]
+          in: query
+          required: false
+          description: "`reasoning.encrypted_content` returns encrypted reasoning and the gateway's message-state items."
+          schema:
+            type: array
+            items:
+              type: string
       responses:
         "200":
           description: response object (OpenResponses contract)
@@ -210,6 +218,37 @@ paths:
       summary: List input items for a stored response
       parameters:
         - $ref: "#/components/parameters/ResponseIdPath"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: order
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - name: after
+          in: query
+          required: false
+          description: An item id; the page starts after it.
+          schema:
+            type: string
+        - name: include[]
+          in: query
+          required: false
+          description: "`reasoning.encrypted_content` returns encrypted reasoning and the gateway's message-state items."
+          schema:
+            type: array
+            items:
+              type: string
       responses:
         "200":
           description: "{ object: 'list', data: [...], first_id, last_id, has_more }"
@@ -1767,9 +1806,15 @@ paths:
       tags:
         - Admin
       summary: List gateway operations (master key, paginated, newest first)
+      description: "The window is bounded: without `start` it is the last 7 days, and start to end may span at most 93 days. `total` counts up to 10,000 (`totalIsLowerBound` past that). Pass `pagination.nextCursor` back as `cursor` for keyset pagination, which stays fast on deep pages."
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Offset"
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: pagination.nextCursor of the previous page
         - name: virtualKeyId
           in: query
           schema:
@@ -3721,6 +3766,21 @@ components:
         searchUnitCents:
           type: number
           minimum: 0
+        imageOutputCentsPerImage:
+          type: number
+          minimum: 0
+        imageOutputCentsPerImageByVariant:
+          type: object
+          propertyNames:
+            type: string
+            minLength: 1
+            maxLength: 64
+          additionalProperties:
+            type: number
+            minimum: 0
+        audioInputCentsPerSecond:
+          type: number
+          minimum: 0
         tiers:
           type: array
           items:
@@ -3764,6 +3824,112 @@ components:
                 minimum: 0
             required:
               - aboveInputTokens
+            additionalProperties: false
+        serviceTiers:
+          type: object
+          propertyNames:
+            type: string
+            pattern: ^[a-z][a-z0-9_-]{0,31}$
+          additionalProperties:
+            type: object
+            properties:
+              inputCentsPerMTokens:
+                type: number
+                minimum: 0
+              outputCentsPerMTokens:
+                type: number
+                minimum: 0
+              cacheReadCentsPerMTokens:
+                type: number
+                minimum: 0
+              cacheWriteCentsPerMTokens:
+                type: number
+                minimum: 0
+              cacheWriteCentsPerMTokensByTtl:
+                type: object
+                propertyNames:
+                  type: string
+                  pattern: ^[1-9][0-9]*$
+                additionalProperties:
+                  type: number
+                  minimum: 0
+              imageInputCentsPerMTokens:
+                type: number
+                minimum: 0
+              imageOutputCentsPerMTokens:
+                type: number
+                minimum: 0
+              audioInputCentsPerMTokens:
+                type: number
+                minimum: 0
+              audioOutputCentsPerMTokens:
+                type: number
+                minimum: 0
+              videoOutputCentsPerMTokens:
+                type: number
+                minimum: 0
+              searchUnitCents:
+                type: number
+                minimum: 0
+              imageOutputCentsPerImage:
+                type: number
+                minimum: 0
+              imageOutputCentsPerImageByVariant:
+                type: object
+                propertyNames:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                additionalProperties:
+                  type: number
+                  minimum: 0
+              audioInputCentsPerSecond:
+                type: number
+                minimum: 0
+              tiers:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    aboveInputTokens:
+                      type: integer
+                      exclusiveMinimum: 0
+                      maximum: 9007199254740991
+                    inputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    outputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    cacheReadCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    cacheWriteCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    cacheWriteCentsPerMTokensByTtl:
+                      type: object
+                      propertyNames:
+                        type: string
+                        pattern: ^[1-9][0-9]*$
+                      additionalProperties:
+                        type: number
+                        minimum: 0
+                    imageInputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    imageOutputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    audioInputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                    audioOutputCentsPerMTokens:
+                      type: number
+                      minimum: 0
+                  required:
+                    - aboveInputTokens
+                  additionalProperties: false
             additionalProperties: false
       additionalProperties: false
       description: "Operator pricing in USD cents: token rates are per 1 million tokens and searchUnitCents is per search unit."
@@ -4371,7 +4537,7 @@ components:
           maximum: 43200
         sessionIdleMinutes:
           type: integer
-          minimum: 1
+          minimum: 5
           maximum: 43200
         loginMaxAttempts:
           type: integer
@@ -5200,6 +5366,12 @@ components:
               minimum: -9007199254740991
               maximum: 9007199254740991
             - type: "null"
+        nextCursor:
+          type:
+            - string
+            - "null"
+        totalIsLowerBound:
+          type: boolean
       required:
         - limit
         - offset

@@ -26,7 +26,11 @@ there is no per-deployment or per-public-model override today.
 A pool of exactly one deployment skips selection entirely — the strategy never runs, and metrics still
 accrue for observability. All strategies that rank by a live metric (`latency-based`,
 `throughput-based`, `price-based`, `health-aware`) fall back to weighted-random when no candidate has a
-usable value yet (e.g. a fresh deployment with no completed requests).
+usable value yet (e.g. a fresh deployment with no completed requests). When only some candidates have
+one, `latency-based`, `throughput-based` and `health-aware` explore: the candidates with no sample yet
+are picked first (weighted among themselves) until each has one, so a new or recovered deployment is
+measured instead of never being tried. Samples age out of their window, so a deployment that measured
+badly gets another try later.
 
 For reranking, search-unit prices are exact only when every candidate declares that same basis. If a
 pool mixes token and search-unit billing, combines both bases, or contains an unknown price,
@@ -48,10 +52,9 @@ decision (no client-side caching):
 - **Throughput** — an EWMA (α = 0.2) of `completionTokens / durationSeconds`, using the same
   upstream-finish timing as latency.
 - **Health score** — `successes / (successes + failures)` over a rolling 10-minute window. A deployment
-  with **no recorded attempts** in that window defaults to a neutral **0.5**, not a perfect 1.0 — a
-  perfect default would let `health-aware` immediately resend full traffic to a deployment that was
-  failing minutes ago, the instant its counters expire from being routed around. Neutral keeps it
-  ranked behind anything with an actual track record, without permanently blacklisting it either.
+  with **no recorded attempts** in that window reports a neutral **0.5**; `health-aware` treats it as
+  unmeasured and sends it the next request to measure it, rather than ranking it behind every
+  deployment with a track record forever. One failure there puts it back behind the others.
 
 None of these metrics factor into deployment **eligibility** — a slow or low-health deployment is still
 tried, just less often. Eligibility is decided separately by circuit state and per-deployment RPM/TPM
@@ -83,7 +86,7 @@ Circuit controls remain global. Execution deadlines and retry budgets are define
 
 | Field | Default | Meaning |
 |---|---|---|
-| `allowedFails` | `3` | Transient logical-request failures a deployment is allowed before the **next** one opens cooldown. A success resets the count; `0` opens on the first failure. |
+| `allowedFails` | `3` | Transient logical-request failures a deployment is allowed within the failure window before the **next** one opens cooldown, however many requests succeeded in between; `0` opens on the first failure. |
 | `cooldownSeconds` | `5` | Time a deployment stays in cooldown after exceeding `allowedFails`. `0` disables automatic cooldown circuits. |
 | `retryAfterSeconds` | `0` | Minimum wait before retrying the same upstream (see [Retries](#retries)). |
 
@@ -93,8 +96,8 @@ The remaining fields are advanced safety controls:
 |---|---|---|
 | `failureWindowSeconds` | `60` | Fixed (non-sliding) failure-counting window |
 | `maxCooldownSeconds` | `300` | Maximum exponential cooldown after failed recovery probes |
-| `halfOpenProbeSeconds` | `30` | Ownership TTL for the single half-open recovery probe |
-| `configurationCooldownSeconds` | `300` | Immediate quarantine for invalid credentials/model access |
+| `halfOpenProbeSeconds` | `30` | How long the single half-open recovery probe keeps other requests out. A probe that runs longer still closes (or reopens) the circuit when it finishes, unless another request took a probe in the meantime |
+| `configurationCooldownSeconds` | `300` | Immediate quarantine for invalid credentials/model access, or an upstream `402` (the account cannot pay) |
 | `throttleCooldownSeconds` | `5` | Minimum shared-capacity cooldown for provider `429` responses |
 
 ### How long the gateway waits

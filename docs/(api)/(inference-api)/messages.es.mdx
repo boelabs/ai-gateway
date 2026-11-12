@@ -25,6 +25,10 @@ Los bloques `document` de Messages admiten URL, base64 y archivos del proveedor.
 
 El router prefiere el transport nativo de Messages cuando está disponible. `top_k` se convierte al formato canonical y se traduce para los proveedores que admiten ese control. Los metadatos de solicitud requieren un deployment compatible con Messages; no se descartan silenciosamente.
 
+## Campos y betas exclusivos de Anthropic [#anthropic-only-fields-and-betas]
+
+`container`, `mcp_servers`, `context_management`, `inference_geo`, `service_tier`, `speed` y `diagnostics` no tienen equivalente en otros proveedores. Llegan a un deployment de Anthropic tal como se enviaron, y una solicitud que lleva alguno solo se enruta a Anthropic. El header `anthropic-beta` se reenvía a los deployments de Anthropic junto con los betas que añade el propio gateway; cada nombre debe seguir la forma `feature-name-YYYY-MM-DD` de Anthropic. Cualquier otro campo de nivel superior que la API no define se rechaza con `400 unknown_parameter` en lugar de descartarse. Lo mismo vale para el contenido: los documentos con citations o una fuente de texto, las imágenes por `file_id`, los search results y las definiciones de herramientas con campos exclusivos de Anthropic llegan a Anthropic tal como se escribieron, y solo a Anthropic.
+
 ## Breakpoints de prompt caching [#prompt-caching-breakpoints]
 
 `cache_control: { "type": "ephemeral" }` se conserva en bloques de sistema, contenido y herramientas como un valor opaco: el core no lo interpreta y solo lo emite el adapter de Anthropic. Como eliminar un breakpoint de cache altera la facturación y la latencia, estas solicitudes requieren un deployment nativo de Messages; no se degradan silenciosamente a otro protocolo.
@@ -36,6 +40,10 @@ El router prefiere el transport nativo de Messages cuando está disponible. `top
 ## Reasoning [#reasoning]
 
 El bloque `thinking` de Anthropic se obtiene de los mismos campos canonical `reasoning.effort`/`summary` que usan los demás contratos. El catálogo distingue `anthropic_adaptive` (el modelo decide la profundidad según `output_config.effort`) y `anthropic_budget` (un `budget_tokens` explícito por nivel). Consulta [Reasoning](/docs/reasoning) para ver los formatos y modelos compatibles. En modelos adaptativos, `output_config.effort: "max"` se conserva como un nivel distinto de `"xhigh"`.
+
+Un `thinking.budget_tokens` que envíes se conserva tal cual: los modelos basados en presupuesto (`anthropic_budget` de Anthropic, `gemini_budget` de Gemini) reciben ese número exacto, y Anthropic lo valida frente a `max_tokens`. Los modelos controlados por nivel reciben su nivel de esfuerzo equivalente. Cuando el gateway elige el presupuesto de un nivel, lo ajusta por debajo de `max_tokens`, como exige Anthropic, y responde `400 invalid_reasoning_budget` si `max_tokens` no deja espacio para el mínimo de 1.024 tokens.
+
+`output_config.effort` con `thinking: { "type": "disabled" }` mantiene thinking desactivado: el esfuerzo solo orienta la respuesta, como documenta Anthropic, y se envía a Anthropic tal cual. Los demás proveedores ven el reasoning desactivado.
 
 Los bloques de thinking firmados y los bloques ocultos son estado opaco del proveedor. El gateway conserva y reenvía los bloques completos, incluidas las firmas y los datos ocultos. Si otro proveedor solo devuelve un resumen visible de reasoning, AI Gateway no fabrica bloques firmados.
 

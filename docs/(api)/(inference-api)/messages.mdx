@@ -36,6 +36,17 @@ The router prefers the native Messages transport when it is available. `top_k` i
 translated to providers that expose the same control. Request metadata is native-only and requires a
 Messages-capable deployment instead of being silently dropped.
 
+## Anthropic-only fields and betas
+
+`container`, `mcp_servers`, `context_management`, `inference_geo`, `service_tier`, `speed` and
+`diagnostics` have no equivalent on other providers. They reach an Anthropic deployment exactly as
+sent, and a request that carries one is only routed to Anthropic. The `anthropic-beta` header is
+forwarded to Anthropic deployments together with the betas the gateway adds itself; each name must
+follow Anthropic's `feature-name-YYYY-MM-DD` form. Any other top-level field the API does not define
+is rejected with `400 unknown_parameter` rather than dropped. The same goes for content: documents
+with citations or a text source, images by `file_id`, search results and tool definitions with
+Anthropic-only fields reach Anthropic as written, and only Anthropic.
+
 ## Prompt-caching breakpoints
 
 `cache_control: { "type": "ephemeral" }` on a system block, content block, or tool is preserved
@@ -56,6 +67,16 @@ other contract. Two distinct kinds exist in the catalog — `anthropic_adaptive`
 depth, driven by `output_config.effort`) and `anthropic_budget` (an explicit `budget_tokens` per
 level) — see [Reasoning](/docs/reasoning) for the exact wire shape of each and which models use which.
 For adaptive models, `output_config.effort: "max"` stays distinct from `"xhigh"` end to end.
+
+A `thinking.budget_tokens` you send is kept as given: budget-based models (Anthropic
+`anthropic_budget`, Gemini `gemini_budget`) receive that exact number, and Anthropic itself validates
+it against `max_tokens`. Models controlled by level receive its effort bucket instead. When the gateway
+picks the budget for an effort, it fits it below `max_tokens`, as Anthropic requires, and answers
+`400 invalid_reasoning_budget` when `max_tokens` leaves no room for the 1,024-token minimum.
+
+`output_config.effort` with `thinking: { "type": "disabled" }` keeps thinking off: effort then steers
+only the response itself, as Anthropic documents, and is sent to Anthropic as given. Other providers
+see reasoning off.
 
 Signed thinking and redacted thinking blocks are opaque provider state. The gateway preserves and
 replays the complete blocks, including signatures and redacted data, but does not fabricate signed

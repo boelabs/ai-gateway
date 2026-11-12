@@ -244,23 +244,36 @@ export async function awaitWithSSEHeartbeats<T>(
 	}
 }
 
+type ReadAhead<T> =
+	| { kind: "item"; item: IteratorResult<T> }
+	| { kind: "error"; error: unknown };
+
+/**
+ * Starts the next read and settles it at once, so a read-ahead that fails while the consumer is
+ * still writing the previous item is never an unhandled rejection.
+ */
+function readAhead<T>(iterator: AsyncIterator<T>): Promise<ReadAhead<T>> {
+	return iterator.next().then(
+		(item) => ({ kind: "item" as const, item }),
+		(error: unknown) => ({ kind: "error" as const, error }),
+	);
+}
+
 /** Adds transport heartbeats without treating them as upstream/model progress. */
 export async function* withSSEHeartbeats<T>(
 	items: AsyncIterable<T>,
 	heartbeat: () => Promise<void>,
+	intervalMs = HEARTBEAT_INTERVAL_MS,
 ): AsyncIterable<T> {
 	const iterator = items[Symbol.asyncIterator]();
-	let pending = iterator.next();
+	let pending = readAhead(iterator);
 	try {
 		while (true) {
 			let timer: ReturnType<typeof setTimeout> | undefined;
 			const result = await Promise.race([
-				pending.then((item) => ({ kind: "item" as const, item })),
+				pending,
 				new Promise<{ kind: "heartbeat" }>((resolve) => {
-					timer = setTimeout(
-						() => resolve({ kind: "heartbeat" }),
-						HEARTBEAT_INTERVAL_MS,
-					);
+					timer = setTimeout(() => resolve({ kind: "heartbeat" }), intervalMs);
 				}),
 			]);
 			if (timer) {
@@ -270,10 +283,13 @@ export async function* withSSEHeartbeats<T>(
 				await heartbeat();
 				continue;
 			}
+			if (result.kind === "error") {
+				throw result.error;
+			}
 			if (result.item.done) {
 				return;
 			}
-			pending = iterator.next();
+			pending = readAhead(iterator);
 			yield result.item.value;
 		}
 	} finally {

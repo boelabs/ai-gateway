@@ -330,7 +330,17 @@ export function buildOpenApiDocument() {
 					summary: "Retrieve a stored response (server-side store)",
 					description:
 						"Returns the stored canonical `response` object when store=true. Scope is per key: a virtual key only sees its own responses; the master key sees responses created with the master key.",
-					parameters: [{ $ref: "#/components/parameters/ResponseIdPath" }],
+					parameters: [
+						{ $ref: "#/components/parameters/ResponseIdPath" },
+						{
+							name: "include[]",
+							in: "query",
+							required: false,
+							description:
+								"`reasoning.encrypted_content` returns encrypted reasoning and the gateway's message-state items.",
+							schema: { type: "array", items: { type: "string" } },
+						},
+					],
 					responses: {
 						"200": {
 							description: "response object (OpenResponses contract)",
@@ -357,7 +367,45 @@ export function buildOpenApiDocument() {
 				get: {
 					tags: ["Inference"],
 					summary: "List input items for a stored response",
-					parameters: [{ $ref: "#/components/parameters/ResponseIdPath" }],
+					parameters: [
+						{ $ref: "#/components/parameters/ResponseIdPath" },
+						{
+							name: "limit",
+							in: "query",
+							required: false,
+							schema: {
+								type: "integer",
+								minimum: 1,
+								maximum: 100,
+								default: 20,
+							},
+						},
+						{
+							name: "order",
+							in: "query",
+							required: false,
+							schema: {
+								type: "string",
+								enum: ["asc", "desc"],
+								default: "desc",
+							},
+						},
+						{
+							name: "after",
+							in: "query",
+							required: false,
+							description: "An item id; the page starts after it.",
+							schema: { type: "string" },
+						},
+						{
+							name: "include[]",
+							in: "query",
+							required: false,
+							description:
+								"`reasoning.encrypted_content` returns encrypted reasoning and the gateway's message-state items.",
+							schema: { type: "array", items: { type: "string" } },
+						},
+					],
 					responses: {
 						"200": {
 							description:
@@ -1559,9 +1607,17 @@ export function buildOpenApiDocument() {
 					tags: ["Admin"],
 					summary:
 						"List gateway operations (master key, paginated, newest first)",
+					description:
+						"The window is bounded: without `start` it is the last 7 days, and start to end may span at most 93 days. `total` counts up to 10,000 (`totalIsLowerBound` past that). Pass `pagination.nextCursor` back as `cursor` for keyset pagination, which stays fast on deep pages.",
 					parameters: [
 						{ $ref: "#/components/parameters/Limit" },
 						{ $ref: "#/components/parameters/Offset" },
+						{
+							name: "cursor",
+							in: "query",
+							schema: { type: "string" },
+							description: "pagination.nextCursor of the previous page",
+						},
 						{
 							name: "virtualKeyId",
 							in: "query",

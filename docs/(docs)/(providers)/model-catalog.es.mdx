@@ -88,7 +88,7 @@ La contribución más rápida: sin código, solo JSON:
 
 1. Abre el catálogo del proveedor, p. `src/adapters/deepseek/catalog.json`.
 2. Agrega una clave en `models`, ​​denominada **`upstreamModel`** (la identificación exacta que espera el proveedor). Complete su `operations` (consulta [Reglas](#rules)), `pricing` y cualquier metadato opcional.
-3. Validar: `bun run --filter @boelabs/ai-gateway-api catalog:validate`.
+3. Validar: `bun run --filter @boelabs/ai-gateway-api catalog:validate`. Falla para un modelo con una operación `audio.*` y precio por token pero sin `audioInputCentsPerMTokens` (y, para `audio.converse.realtime`, sin `audioOutputCentsPerMTokens`): el audio se cobra muy por encima del texto.
 
 Luego, el modelo se puede solicitar creando un deployment para él (consulta [Crear deployments](/docs/creating-deployments)).
 

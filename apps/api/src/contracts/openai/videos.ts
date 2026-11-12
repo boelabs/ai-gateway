@@ -38,23 +38,34 @@ const contentPartVideoSchema = z
 	.object({ type: z.literal("video_url"), video_url: urlObjectSchema })
 	.strict();
 
-export const videoInputReferencesSchema = z.array(
-	z.discriminatedUnion("type", [
-		contentPartImageSchema,
-		contentPartAudioSchema,
-		contentPartVideoSchema,
-	]),
-);
+/**
+ * Hard caps on media references per request, above every model's own `maxInputReferences` (at most
+ * 6 today): each one is a download, so the contract bounds them before any model is chosen.
+ */
+const MAX_INPUT_REFERENCES = 16;
 
-export const videoFrameImagesSchema = z.array(
-	z
-		.object({
-			type: z.literal("image_url"),
-			image_url: urlObjectSchema,
-			frame_type: z.enum(["first_frame", "last_frame"]),
-		})
-		.strict(),
-);
+export const videoInputReferencesSchema = z
+	.array(
+		z.discriminatedUnion("type", [
+			contentPartImageSchema,
+			contentPartAudioSchema,
+			contentPartVideoSchema,
+		]),
+	)
+	.max(MAX_INPUT_REFERENCES);
+
+export const videoFrameImagesSchema = z
+	.array(
+		z
+			.object({
+				type: z.literal("image_url"),
+				image_url: urlObjectSchema,
+				frame_type: z.enum(["first_frame", "last_frame"]),
+			})
+			.strict(),
+	)
+	// One first frame and one last frame.
+	.max(2);
 
 // OpenAI Sora compatibility: single reference, image_url as bare string or {url}, or a file_id.
 const imageReferenceSchema = z.union([z.string().min(1), urlObjectSchema]);

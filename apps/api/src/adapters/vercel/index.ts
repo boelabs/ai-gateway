@@ -1,3 +1,4 @@
+import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { parseOpenAIChatChunk } from "#contracts/openai/chatTransport.ts";
 import { mergeProviderFields } from "#core/providerSpecificFields.ts";
 import { makeOpenAIStyleAdapter } from "#adapters/openaiStyle.ts";
@@ -86,24 +87,6 @@ function vercelContext(ctx: AdapterContext): AdapterContext {
 			...(reasoning === undefined ? {} : { reasoning }),
 		},
 	};
-}
-
-function addReasoningDetailsToRequest(
-	body: Record<string, unknown>,
-	req: CanonicalChatRequest,
-): void {
-	if (!Array.isArray(body.messages)) {
-		return;
-	}
-	for (const [index, canonical] of req.messages.entries()) {
-		const details = vercelReasoningDetailsFromProviderFields(
-			canonical.providerFields,
-		);
-		const message = recordValue(body.messages[index]);
-		if (details !== undefined && message !== undefined) {
-			message.reasoning_details = details;
-		}
-	}
 }
 
 function applyVercelChatReasoning(
@@ -198,6 +181,13 @@ const openAIStyle = makeOpenAIStyleAdapter({
 	maxTokensField: "max_completion_tokens",
 	supportsDeveloperRole: true,
 	supportsTopK: true,
+	// An assistant turn's reasoning_details go back on the very wire message it became.
+	assistantMessageFields: (message) => {
+		const details = vercelReasoningDetailsFromProviderFields(
+			message.providerFields,
+		);
+		return details === undefined ? undefined : { reasoning_details: details };
+	},
 	refineBadRequest,
 	imageTransports: ["images", "chat_completions"],
 	defaultImageTransport: "images",
@@ -231,7 +221,6 @@ export const vercelAdapter = {
 			const body = JSON.parse(request.body) as Record<string, unknown>;
 			if (ctx.transport === "chat_completions") {
 				applyVercelChatReasoning(body, req);
-				addReasoningDetailsToRequest(body, req);
 			}
 			applyVercelNativeReasoning(body, req, ctx);
 			return { ...request, body: JSON.stringify(body) };
@@ -264,8 +253,12 @@ export const vercelAdapter = {
 						cause,
 					});
 				}
-				if (recordValue(raw)?.error !== undefined) {
-					throw openAIStyleChat.mapError({ status: 502, body: raw }, ctx);
+				// Only an actual error object ends the stream; `error: null` is no error.
+				if (recordValue(raw)?.error != null) {
+					throw mapUpstreamStreamError(
+						raw as Record<string, unknown>,
+						"Vercel AI Gateway",
+					);
 				}
 				const record = recordValue(raw);
 				if (

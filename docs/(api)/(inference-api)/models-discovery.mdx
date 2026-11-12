@@ -82,7 +82,8 @@ only what a caller needs to decide whether to use this model.
 
 ## `GET /v1/models/{model}/deployments`
 
-One entry per deployment behind the pool, each with its own metrics:
+One entry per deployment behind the pool, each with its own metrics. A virtual key restricted to
+other models gets `403`, as it would calling the model.
 
 ```json
 {

@@ -138,6 +138,10 @@ operating model.
 Rerank usage also increments `ai_gateway_search_units_total`; it remains independent from
 `ai_gateway_tokens_total`.
 
+A promise rejection that reaches the process with no handler is logged at `error` (component
+`process`) and counted in `ai_gateway_unhandled_rejections_total`; the gateway keeps serving. Any
+nonzero value is a bug worth reporting.
+
 ## Initial alerts
 
 - Any successful/incomplete/blocked operation without a verified terminal, abandoned operation, or

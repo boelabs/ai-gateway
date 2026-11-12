@@ -57,6 +57,43 @@ const catalogs = [
 let total = 0;
 const pendingReview: string[] = [];
 const unrunnable: string[] = [];
+const missingAudioRates: string[] = [];
+
+/**
+ * Providers bill audio tokens far above text, so an audio model priced only by its text rates is
+ * under-billed on every request. A model with an audio operation and token pricing must say what its
+ * audio costs: input always, output too when it speaks (realtime conversation).
+ */
+function checkAudioRates(
+	adapterKey: string,
+	models: Record<string, CatalogEntry>,
+): void {
+	for (const [model, entry] of Object.entries(models)) {
+		const operations = Object.keys(entry.operations ?? {});
+		const { pricing } = entry;
+		if (
+			!operations.some((operation) => operation.startsWith("audio.")) ||
+			pricing === undefined ||
+			(pricing.inputCentsPerMTokens === undefined &&
+				pricing.outputCentsPerMTokens === undefined)
+		) {
+			continue;
+		}
+		const required: Array<
+			"audioInputCentsPerMTokens" | "audioOutputCentsPerMTokens"
+		> = [
+			"audioInputCentsPerMTokens",
+			...(operations.includes("audio.converse.realtime")
+				? (["audioOutputCentsPerMTokens"] as const)
+				: []),
+		];
+		for (const field of required) {
+			if (pricing[field] === undefined) {
+				missingAudioRates.push(`${adapterKey}/${model} has no ${field}`);
+			}
+		}
+	}
+}
 
 /**
  * A transport a model declares but its adapter cannot run is a 404 from the provider at the first
@@ -116,6 +153,15 @@ for (const catalog of catalogs) {
 	// gate that makes that marker mean something: a sync PR can't merge until a human clears every one.
 	pendingReview.push(...pendingReviewEntries(catalog.adapterKey, doc.models));
 	checkDeclaredTransports(catalog.adapterKey, doc.models);
+	checkAudioRates(catalog.adapterKey, doc.models);
+}
+
+if (missingAudioRates.length > 0) {
+	console.error("catalog validation failed: audio models without audio rates:");
+	for (const item of missingAudioRates) {
+		console.error(`  - ${item}`);
+	}
+	process.exit(1);
 }
 
 if (unrunnable.length > 0) {

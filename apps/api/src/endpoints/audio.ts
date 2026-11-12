@@ -16,6 +16,7 @@ import {
 	assertFinalModelAllowed,
 	notifyExtensionError,
 	usageQuotaForRequest,
+	enforceKeyLimits,
 	computeUsageCost,
 	toGatewayError,
 	preflight,
@@ -293,6 +294,7 @@ async function handleTranscription(
 export async function transcriptionsHandler(
 	c: Context<AppEnv>,
 ): Promise<Response> {
+	await enforceKeyLimits(c);
 	const multipart = await parseTranscriptionMultipart(c.req.raw);
 	return handleTranscription(
 		c,

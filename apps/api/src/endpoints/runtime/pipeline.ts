@@ -97,8 +97,27 @@ export async function preflight(
 	model: string,
 	options?: { writeHeaders?: boolean },
 ): Promise<void> {
+	assertModelAllowed(getAuth(c), model);
+	if (!keyLimitsEnforced.has(c)) {
+		await enforceKeyLimits(c, options);
+	}
+}
+
+/** Requests whose virtual-key limits were already applied (see `enforceKeyLimits`). */
+const keyLimitsEnforced = new WeakSet<Context<AppEnv>>();
+
+/**
+ * Applies the virtual key's RPM, TPM and budget gates on their own, before a body is read. A
+ * multipart upload names its model inside the body, so its model scope can only be checked after
+ * parsing — but a key over its limits must not get to stream tens of megabytes to disk first.
+ * The later `preflight` then checks only the model.
+ */
+export async function enforceKeyLimits(
+	c: Context<AppEnv>,
+	options?: { writeHeaders?: boolean },
+): Promise<void> {
+	keyLimitsEnforced.add(c);
 	const auth = getAuth(c);
-	assertModelAllowed(auth, model);
 	if (auth.type === "virtual") {
 		const limited = await enforceVirtualKey(auth.key);
 		if (options?.writeHeaders !== false) {
@@ -120,6 +139,8 @@ export function usageQuotaForRequest(
 	c: Context<AppEnv>,
 	options: {
 		searchUnits?: number;
+		/** Images the request may generate, reserved at the highest per-image price. */
+		outputImages?: number;
 		/** Called with each reserved lease, for callers that settle it after the request ends. */
 		onReserve?: (lease: VirtualKeyUsageLease) => void;
 	} = {},
@@ -131,6 +152,7 @@ export function usageQuotaForRequest(
 				/* intentionally empty */
 			},
 			reserve: async () => ({
+				charge: async () => ({ budgetExhausted: false }),
 				settle: async () => {
 					/* intentionally empty */
 				},
@@ -144,8 +166,12 @@ export function usageQuotaForRequest(
 		assertCandidate: (candidate) => {
 			if (
 				auth.key.maxBudgetCents != null &&
-				estimateMaximumCostCents(candidate.meta, 0, options.searchUnits) ===
-					null
+				estimateMaximumCostCents(
+					candidate.meta,
+					0,
+					options.searchUnits,
+					options.outputImages,
+				) === null
 			) {
 				throw new GatewayError({
 					class: "bad_request",
@@ -160,6 +186,7 @@ export function usageQuotaForRequest(
 					candidate.meta,
 					reservedTokens,
 					options.searchUnits,
+					options.outputImages,
 				) ?? 0;
 			const lease = await reserveVirtualKeyUsage(
 				auth.key,
@@ -167,7 +194,18 @@ export function usageQuotaForRequest(
 				reservedCost,
 			);
 			options.onReserve?.(lease);
+			// `charge` receives cumulative usage; the lease records only what is new since the last call.
+			let chargedTokens = 0;
+			let chargedCents = 0;
 			return {
+				charge: (usage) => {
+					const cents = computeCost(candidate.meta, usage).totalCents;
+					const tokens = Math.max(0, usage.totalTokens - chargedTokens);
+					const newCents = Math.max(0, cents - chargedCents);
+					chargedTokens = Math.max(chargedTokens, usage.totalTokens);
+					chargedCents = Math.max(chargedCents, cents);
+					return lease.charge(tokens, newCents);
+				},
 				settle: async (usage) => {
 					const cost = computeCost(candidate.meta, usage);
 					await lease.settle(usage.totalTokens, cost.totalCents);
@@ -200,6 +238,17 @@ export function extensionScope(
 		auth: publicAuth,
 		signal: c.get("turnSignal") ?? c.req.raw.signal,
 	};
+}
+
+/** Refuses a realtime session whose model an active extension instance targets (see the runtime). */
+export function assertRealtimeExtensionsSupported(
+	c: Context<AppEnv>,
+	callType: CallType,
+	publicModel: string,
+): void {
+	extensionRuntime.assertNoInstanceTargets(
+		extensionScope(c, callType, publicModel),
+	);
 }
 
 export async function applyCanonicalRequestExtensions<

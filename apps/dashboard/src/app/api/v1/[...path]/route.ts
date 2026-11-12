@@ -1,4 +1,4 @@
-import { relay } from "#/shared/api/relay.ts";
+import { relay, relayPath } from "#/shared/api/relay.ts";
 
 /**
  * The playground's inference, relayed.
@@ -11,7 +11,7 @@ async function handler(
 	context: RouteContext<"/api/v1/[...path]">,
 ): Promise<Response> {
 	const { path } = await context.params;
-	return relay(request, `/v1/${path.join("/")}`);
+	return relay(request, relayPath("/v1", path));
 }
 
 export { handler as GET, handler as POST };

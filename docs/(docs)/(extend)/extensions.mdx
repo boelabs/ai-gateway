@@ -17,7 +17,9 @@ Extensions are split into two concepts:
 <Callout>
 
 **Trust model.** Extension code runs **in-process with full privileges**: it can read and rewrite
-every request and response. Uploading is therefore restricted to the **master key**, code is
+every request and response, and importing an upload runs its top-level code on the host. Uploading
+therefore takes `extensions:manage`: the **master key** or an **owner** session, which makes an owner
+account equivalent to code execution on the gateway host — grant the role accordingly. Code is
 encrypted at rest, and every artifact is integrity-checked (sha256) before it is loaded. Treat an
 extension upload with the same care as a deploy.
 
@@ -51,7 +53,7 @@ provision.
 
 ## Managing extensions (Admin API)
 
-All routes require the master key. The management envelope is `{ "data": ... }`.
+All routes require `extensions:manage` (the master key or an owner session). The management envelope is `{ "data": ... }`.
 
 | Method & path | Purpose |
 |---|---|
@@ -197,10 +199,15 @@ process. If a disabled instance is critical, affected requests fail with `extens
 `/health/ready` returns unhealthy. Non-critical disabled instances are skipped and reported as degraded.
 
 Each hook runs under a wall-clock budget (`EXTENSIONS_HOOK_TIMEOUT_MS`, default 5000ms;
-set `0` to disable). A hook that exceeds it — or one that ignores its `ctx.signal` while the client
-cancels — is aborted and counts as a failure, so a misbehaving hook can never block request
-processing indefinitely. Well-behaved hooks should honor `ctx.signal`, which fires on both timeout
-and upstream cancellation.
+set `0` to disable). A hook that exceeds it is aborted and counts as a failure, so a misbehaving hook
+can never block request processing indefinitely. A hook interrupted because the client cancelled is
+aborted too, but does not count: the client leaving says nothing about the extension. Well-behaved
+hooks should honor `ctx.signal`, which fires on both timeout and upstream cancellation.
+
+To refuse a request on purpose (a firewall rule, a policy), a hook calls `rejectRequest({ message,
+code, status })` from the extension SDK (or throws an `ExtensionRejection`). The client gets that
+`status` (`400`, `403`, `413`, `422` or `429`) with the message and code given, and the rejection is
+not a failure: it never counts towards the circuit breaker.
 
 `onError` is a fire-and-forget observability hook: a failure inside it is logged and surfaced in
 status but never trips the circuit breaker, so a logging glitch cannot disable a critical instance.

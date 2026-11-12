@@ -59,6 +59,77 @@ function textParameters(meta: ResolvedModelMetadata): ParameterSupportMap {
 	return meta.operations?.["text.generate"]?.parameters ?? {};
 }
 
+const mergedParameterMaps = new WeakMap<
+	ParameterSupportMap,
+	WeakMap<ParameterSupportMap, ParameterSupportMap>
+>();
+const NO_CATALOG_PARAMETERS: ParameterSupportMap = {};
+
+/**
+ * The model's metadata as the parameter policy sees it on one transport: what the adapter declares it
+ * does with each canonical field there (`Adapter.chatParameters`), overridden by whatever the catalog
+ * entry says about the model, except that a field the transport cannot carry stays unsupported. Without the adapter's declaration a field the transport cannot express
+ * would be "unknown" for every model that does not repeat it, and pass through to be lost.
+ */
+export function withAdapterParameters(
+	meta: ResolvedModelMetadata,
+	adapterParameters: ParameterSupportMap | undefined,
+): ResolvedModelMetadata {
+	if (!adapterParameters) {
+		return meta;
+	}
+	const text = meta.operations?.["text.generate"];
+	const catalog = text?.parameters ?? NO_CATALOG_PARAMETERS;
+	let byAdapter = mergedParameterMaps.get(catalog);
+	if (!byAdapter) {
+		byAdapter = new WeakMap();
+		mergedParameterMaps.set(catalog, byAdapter);
+	}
+	let parameters = byAdapter.get(adapterParameters);
+	if (!parameters) {
+		// The catalog says what the model accepts; what the transport cannot carry at all stays out
+		// whatever the model accepts (gpt-4.1 takes `stop`, the Responses request has no field for it).
+		const uncarried = Object.fromEntries(
+			Object.entries(adapterParameters).filter(
+				([, entry]) => entrySupport(entry) === "unsupported",
+			),
+		);
+		parameters = { ...adapterParameters, ...catalog, ...uncarried };
+		byAdapter.set(adapterParameters, parameters);
+	}
+	return {
+		...meta,
+		operations: {
+			...meta.operations,
+			"text.generate": { ...text, parameters },
+		},
+	};
+}
+
+/**
+ * The metadata with request-specific declarations on top: what this particular request makes
+ * unsupported (sampling parameters while thinking is on, say), which wins over the catalog.
+ */
+export function withRequestParameters(
+	meta: ResolvedModelMetadata,
+	requestParameters: ParameterSupportMap | undefined,
+): ResolvedModelMetadata {
+	if (!requestParameters || Object.keys(requestParameters).length === 0) {
+		return meta;
+	}
+	const text = meta.operations?.["text.generate"];
+	return {
+		...meta,
+		operations: {
+			...meta.operations,
+			"text.generate": {
+				...text,
+				parameters: { ...text?.parameters, ...requestParameters },
+			},
+		},
+	};
+}
+
 /** Whether one catalog entry says the parameter reaches the provider at all. */
 function entrySupport(
 	entry: boolean | { mode?: string },

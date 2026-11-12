@@ -18,6 +18,10 @@ counts, OpenAI's `input_tokens_details`/`output_tokens_details`); output of an i
 the provider does not split is counted as image output. The Vercel snapshot inherits a first-party
 model's image rates only when Vercel resells it at the provider's own price.
 
+Reasoning tokens are output and bill at the output rate. Some OpenAI-compatible providers (xAI) report
+them beside `completion_tokens` rather than inside it; the gateway recognizes this from the provider's
+own `total_tokens` (prompt + completion + reasoning) and adds them, so they are never billed as free.
+
 Audio tokens work the same way with `audioInputCentsPerMTokens` and `audioOutputCentsPerMTokens`:
 Gemini's Live models bill audio well above text ($3 against $0.75 per 1M input, $12 against $4.50
 output), and realtime sessions report the split per modality.
@@ -25,8 +29,24 @@ output), and realtime sessions report the split per modality.
 Video output tokens use `videoOutputCentsPerMTokens`; absent, they fall back to the output rate. Video
 jobs finish after the request returns, so the gateway charges them when the job reaches a terminal
 state, from the provider's reported usage (see [Videos](/docs/videos#gemini-omni-flash)).
+Some models are not priced by the token. `imageOutputCentsPerImage` charges each generated image, with
+`imageOutputCentsPerImageByVariant` for prices that depend on the image (keys `<quality>:<size>`,
+`<size>` or `<quality>`, tried in that order). `audioInputCentsPerSecond` charges transcription by the
+second of input audio the provider reports (`usage.type: "duration"`). These units add to any token
+cost. A budgeted key reserves per-image prices up front at the request's `n`; audio duration is only
+known once the provider reports it, so it is charged at settlement without a reservation.
+
+Service tiers have their own rates in `serviceTiers`, keyed by the tier name the provider reports it
+served (OpenAI's `service_tier`: `flex`, `fast` — formerly `priority` — and `ultrafast`). The gateway
+charges the tier in the **response**, not the one requested, because a provider may serve a request at
+another tier (OpenAI downgrades Fast mode to `default` under its ramp-rate limit). A declared tier
+replaces the standard token rates and context tiers, with its own `tiers` for long context; a tier with
+no declared rates is charged at the standard rates. The served tier is recorded as
+`metadata.serviceTier` on the operation.
+
 A deployment's own `pricing` field, if set, **overrides** the catalog rate entirely for that deployment
-— useful for a negotiated rate or a custom model with no catalog entry at all. A model with no pricing
+— useful for a negotiated rate or a custom model with no catalog entry at all. An override must
+declare at least one rate (`{}` is rejected); `null` clears it. A model with no pricing
 anywhere (no catalog rate, no override) normally bills as **zero cost**, not an error. Reranking has
 one guarded fallback: when no configured rate exists and OpenRouter reports `usage.cost`, that value
 is used so a paid request is not falsely recorded as free. When both are present, configured pricing
@@ -40,7 +60,23 @@ resolved pricing and:
 - **Redis** is the hot-path counter: virtual-key TPM windows and the running budget total are checked
   and incremented here, on the request's critical path, because it needs to be fast and atomic.
 - **Postgres** (`spend_cents` on the virtual key, plus consumer and estimated upstream cost in `gateway_operations`)
-  is the durable source of truth, updated on every billed request.
+  is the durable source of truth, updated on every billed request. Each write goes through the
+  `spend_ledger` table keyed by the charge's id, so a retried write (three retries with backoff) or a
+  reconciled one is applied exactly once; ledger rows are pruned after seven days.
+
+### When the provider reports no usage
+
+A stream can end before its final usage frame (the client disconnects, the upstream fails or times
+out) and some OpenAI-compatible upstreams never send usage at all. Once the upstream has accepted the
+request it may already bill it, so the gateway does not treat that as free: it charges a conservative
+estimate — the input it reserved at admission (one token per UTF-8 byte of the request's text, and
+for inline media a bound by modality: about 2,500 tokens per image, 5,500 per PDF page, one per
+1,000 bytes of audio) plus the
+output it actually saw, counted the same way. The estimate settles the budget and TPM like reported
+usage, and the operation records it with `metadata.usageEstimated: true`. A reranking upstream that
+omits search units is charged one unit per `documentsPerSearchUnit` documents. Only a request the
+upstream never accepted releases its reservation without a charge; token counting and video jobs,
+which settle later by their own lifecycle, are not estimated.
 
 Master-key traffic is never billed against any budget (the master key has no limits) — see
 [Security](/docs/security) for the full auth model.

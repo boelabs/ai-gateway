@@ -16,6 +16,8 @@ export interface CreateDashboardSessionInput {
 	tokenHash: string;
 	/** NULL for the environment-backed root operator. */
 	userId: string | null;
+	/** The user's session epoch at issue; null for root. */
+	userEpoch: number | null;
 	role: DashboardRole;
 	expiresAt: Date;
 	ip: string | null;

@@ -18,6 +18,17 @@ export function dollarsPerTokenToCentsPerMillion(
 	return Math.round(parsed * 100_000_000 * 1e6) / 1e6;
 }
 
+/** A dollar amount (per image, per search) in cents; undefined when absent or not a number. */
+export function dollarsToCents(value: string | undefined): number | undefined {
+	if (value === undefined || value.length === 0) {
+		return undefined;
+	}
+	const parsed = Number(value);
+	return Number.isFinite(parsed) && parsed >= 0
+		? Math.round(parsed * 100 * 1e6) / 1e6
+		: undefined;
+}
+
 /** models.dev prices in dollars-per-million-tokens as a plain number (e.g. 1.25), not per-token. */
 export function dollarsPerMillionToCentsPerMillion(
 	value: number | undefined,

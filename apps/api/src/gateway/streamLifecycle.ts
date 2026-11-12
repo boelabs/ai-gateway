@@ -51,6 +51,11 @@ export interface StreamObservation {
 	firstOutputAt: number | null;
 	lastEventAt: number | null;
 	maxInterEventGapMs: number;
+	/**
+	 * UTF-8 bytes of generated text seen so far (content, reasoning, refusal, tool calls). It is the
+	 * output bound settled when the upstream never reports usage; binary media is not counted.
+	 */
+	outputBytes: number;
 	usage: Usage | null;
 	transportTerminator:
 		| "eof"
@@ -122,6 +127,7 @@ function emptyObservation(): StreamObservation {
 		firstOutputAt: null,
 		lastEventAt: null,
 		maxInterEventGapMs: 0,
+		outputBytes: 0,
 		usage: null,
 		transportTerminator: null,
 		terminal: null,
@@ -169,6 +175,24 @@ function recordFrame(
 		default:
 			break;
 	}
+}
+
+function deltaTextBytes(
+	delta: CanonicalChatStreamChunk["choices"][number]["delta"],
+): number {
+	let bytes = 0;
+	for (const text of [delta.content, delta.reasoning, delta.refusal]) {
+		if (text) {
+			bytes += Buffer.byteLength(text, "utf8");
+		}
+	}
+	for (const call of delta.toolCalls ?? []) {
+		bytes += Buffer.byteLength(
+			(call.name ?? "") + (call.arguments ?? ""),
+			"utf8",
+		);
+	}
+	return bytes;
 }
 
 export function chatChunkSemantic(
@@ -366,6 +390,7 @@ export function observeChatStream(
 						hasTool: false,
 					};
 					const { delta } = choice;
+					observation.outputBytes += deltaTextBytes(delta);
 					const hasTool = (delta.toolCalls?.length ?? 0) > 0;
 					state.hasTool ||= hasTool;
 					state.hasOutput ||=
@@ -544,6 +569,9 @@ export function observeTranscriptionStream(
 					);
 				}
 				recordFrame(observation, event.kind === "delta" ? "content" : "usage");
+				if (event.kind === "delta") {
+					observation.outputBytes += Buffer.byteLength(event.delta, "utf8");
+				}
 				if (event.kind === "done") {
 					if (completed) {
 						throw protocolError(

@@ -13,13 +13,16 @@ El gateway valida su entorno al inicio y sale si falta una variable requerida o 
 | `ACTIVE_ENCRYPTION_KEY_ID` | Identificación de clave | Debe existir en `ENCRYPTION_KEYRING`; cifra cada sobre nuevo. |
 | `DATABASE_URL` | URL de conexión de Postgres | TLS sigue `sslmode` como en libpq; sin él, la conexión va en texto plano. |
 | `REDIS_URL` | URL de conexión de Redis | |
+| `DATABASE_STATEMENT_TIMEOUT_MS` | `30000` | Postgres cancela una sentencia de la ruta de solicitudes que dure más. Las listas y la analítica de administración usan un pool aparte de 4 conexiones con un límite de 120 s; toda conexión termina además las transacciones inactivas 60 s y se cierra tras 60 s sin uso. Los comandos y las conexiones de Redis expiran a los 5 s. |
+| `REDIS_TLS_CA` | — | CA que firma el certificado de un servidor `rediss://` (PEM, o `file:/path`). Si no, la verificación siempre está activa. |
+| `REDIS_TLS_INSECURE` | `false` | `true` omite la verificación del certificado de `rediss://`. |
 
 ## Servidor [#server]
 
 | Variables | Predeterminado | Controles |
 |---|---|---|
 | `PORT` | `4000` | Puerto de escucha HTTP. |
-| `TRUSTED_PROXY_HOPS` | `0` | Número de saltos de proxy controlados por el operador situados más a la derecha y confiables en `X-Forwarded-For`. `0` ignora el header. |
+| `TRUSTED_PROXY_HOPS` | `0` | Número de saltos de proxy controlados por el operador situados más a la derecha y confiables en `X-Forwarded-For`. `0` ignora el header. El dashboard es uno de esos saltos: reenvía el `X-Forwarded-For` y el `User-Agent` del operador, así que un gateway al que llama directamente necesita al menos `1`, o todos los inicios de sesión comparten una sola dirección para el throttle. |
 | `PUBLIC_MODELS_RPM` | `600` | Las solicitudes `/v1/models` anónimas por proceso se permiten cada minuto por IP de cliente resuelta. `0` desactiva el límite. |
 | `NODE_ENV` | `development` | `development` \| `test` \| `production`. |
 | `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error`. |
@@ -46,6 +49,8 @@ El gateway valida su entorno al inicio y sale si falta una variable requerida o 
 | `REALTIME_WEBSOCKET_MAX_CONNECTIONS` | `500` | Sesiones de transcripción `/v1/realtime` en vivo máximas por proceso de gateway. |
 | `REALTIME_WEBSOCKET_MAX_CONNECTIONS_PER_KEY` | `20` | Sesiones de transcripción `/v1/realtime` en vivo máximas para una virtual key (la master key tiene su propio alcance). |
 | `RESPONSES_WEBSOCKET_MAX_QUEUED_TURNS` | `64` | Giros máximos de `response.create` en cola por conexión; se procesa un turno a la vez. |
+| `WEBSOCKET_HEARTBEAT_INTERVAL_MS` | `30000` | Cada cuánto se envía un ping a cada WebSocket público (`/v1/realtime`, `/v1/responses`); un socket que no respondió al ping anterior se cierra. |
+| `WEBSOCKET_IDLE_TIMEOUT_MS` | `600000` | Un WebSocket público sin mensajes del cliente durante este tiempo se cierra. |
 | `RESPONSE_STATE_GC_INTERVAL_MS` | `3600000` (1h) | Con qué frecuencia el trabajo en proceso elimina el estado de respuesta caducado. |
 
 ## Extensiones de runtime [#runtime-extensions]

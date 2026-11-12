@@ -133,6 +133,22 @@ test("admin platform: rejects empty credential patches", () => {
 	assert.equal(parsed.success, false);
 });
 
+test("admin platform: an empty pricing override is rejected; null clears it", () => {
+	assert.equal(
+		updateDeploymentSchema.safeParse({ pricing: {} }).success,
+		false,
+	);
+	assert.equal(
+		updateDeploymentSchema.safeParse({ pricing: null }).success,
+		true,
+	);
+	assert.equal(
+		updateDeploymentSchema.safeParse({ pricing: { inputCentsPerMTokens: 1 } })
+			.success,
+		true,
+	);
+});
+
 test("admin platform: rejects legacy provider field", async () => {
 	const app = adminAppWithErrors();
 	const parsed = createDeploymentSchema.safeParse({
@@ -257,6 +273,28 @@ test("admin platform: validates adapter credential requirements before DB writes
 		error?: { param?: string };
 	};
 	assert.equal(baseUrlJson.error?.param, "credentials.baseUrl");
+
+	for (const [adapterKey, upstreamModel, baseUrl] of [
+		["openai", "gpt-image-2", "https://user:pass@api.example/v1"],
+		["openai", "gpt-image-2", "ftp://api.example/v1"],
+		[
+			"azureopenai",
+			"gpt-image-2",
+			"http://resource.openai.azure.com/openai/v1",
+		],
+	] as const) {
+		const invalid = await app.request("/deployments", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				publicModel: "x",
+				adapterKey,
+				upstreamModel,
+				credentials: { apiKey: "k", baseUrl },
+			}),
+		});
+		assert.equal(invalid.status, 400, `${adapterKey} ${baseUrl}`);
+	}
 });
 
 test("admin platform: rejects deployment metadata over the size limit", async () => {

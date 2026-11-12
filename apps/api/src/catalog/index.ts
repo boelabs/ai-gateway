@@ -117,9 +117,11 @@ export function resolveModelMetadata(
 	pricingOverride?: RuntimeModelMetadata["pricing"] | null,
 ): ResolvedModelMetadata {
 	const entry = getCatalogEntry(adapterKey, upstreamModel);
-	// A single per-operation source: the built-in catalog if the model is known, or the inline
-	// CatalogEntry the operator declares for a custom model. Both flatten the same way to the runtime view.
-	const selected = entry ?? customEntry ?? undefined;
+	// A single per-operation source: the inline CatalogEntry the operator declared for a custom model,
+	// or the built-in catalog. The declaration wins: a deployment created for a model the catalog did
+	// not know keeps the behaviour it was validated with when a later release adds that model, instead
+	// of silently switching to the catalog's description. Both flatten the same way.
+	const selected = customEntry ?? entry ?? undefined;
 	const operations = selected?.operations;
 	const info = operations
 		? profileToRuntimeMetadata({

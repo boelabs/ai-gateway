@@ -639,6 +639,9 @@
 					"supportsLanguageHints": true,
 					"maxFileBytes": 26214400
 				}
+			},
+			"pricing": {
+				"audioInputCentsPerSecond": 0.0075
 			}
 		},
 		"gpt-4o-transcribe": {
@@ -651,7 +654,8 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 250,
-				"outputCentsPerMTokens": 1000
+				"outputCentsPerMTokens": 1000,
+				"audioInputCentsPerMTokens": 250
 			},
 			"deprecated": true,
 			"notes": "OpenAI deprecated gpt-4o-transcribe; it shuts down on 2027-02-26 (replacement: gpt-transcribe or gpt-live-transcribe)."
@@ -666,7 +670,8 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 125,
-				"outputCentsPerMTokens": 500
+				"outputCentsPerMTokens": 500,
+				"audioInputCentsPerMTokens": 125
 			},
 			"deprecated": true,
 			"notes": "OpenAI deprecated gpt-4o-mini-transcribe; it shuts down on 2027-02-26 (replacement: gpt-transcribe or gpt-live-transcribe)."
@@ -763,7 +768,39 @@
 						"cacheReadCentsPerMTokens": 80,
 						"cacheWriteCentsPerMTokens": 1000
 					}
-				]
+				],
+				"serviceTiers": {
+					"fast": {
+						"inputCentsPerMTokens": 800,
+						"outputCentsPerMTokens": 4000,
+						"cacheReadCentsPerMTokens": 80,
+						"cacheWriteCentsPerMTokens": 1000,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 1600,
+								"outputCentsPerMTokens": 6000,
+								"cacheReadCentsPerMTokens": 160,
+								"cacheWriteCentsPerMTokens": 2000
+							}
+						]
+					},
+					"priority": {
+						"inputCentsPerMTokens": 800,
+						"outputCentsPerMTokens": 4000,
+						"cacheReadCentsPerMTokens": 80,
+						"cacheWriteCentsPerMTokens": 1000,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 1600,
+								"outputCentsPerMTokens": 6000,
+								"cacheReadCentsPerMTokens": 160,
+								"cacheWriteCentsPerMTokens": 2000
+							}
+						]
+					}
+				}
 			}
 		},
 		"gpt-5.6-terra": {
@@ -936,7 +973,8 @@
 						"temperature": true,
 						"stop": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1026,7 +1064,8 @@
 						"stop": true,
 						"reasoning_effort": true,
 						"verbosity": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1147,7 +1186,8 @@
 						"temperature": true,
 						"stop": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1225,7 +1265,8 @@
 						"stop": true,
 						"reasoning_effort": true,
 						"verbosity": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1427,7 +1468,8 @@
 						"temperature": true,
 						"stop": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1464,7 +1506,8 @@
 						"tools": true,
 						"temperature": true,
 						"stop": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1715,12 +1758,15 @@
 						"tools": true,
 						"top_logprobs": true,
 						"top_p": true
-					}
+					},
+					"transport": "chat_completions"
 				}
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 250,
-				"outputCentsPerMTokens": 1000
+				"outputCentsPerMTokens": 1000,
+				"audioInputCentsPerMTokens": 3200,
+				"audioOutputCentsPerMTokens": 6400
 			},
 			"deprecated": true,
 			"notes": "OpenAI deprecated gpt-audio; it shuts down on 2027-01-20 (replacement: gpt-audio-1.5)."
@@ -1752,12 +1798,15 @@
 						"tools": true,
 						"top_logprobs": true,
 						"top_p": true
-					}
+					},
+					"transport": "chat_completions"
 				}
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 60,
-				"outputCentsPerMTokens": 240
+				"outputCentsPerMTokens": 240,
+				"audioInputCentsPerMTokens": 1000,
+				"audioOutputCentsPerMTokens": 2000
 			},
 			"deprecated": true,
 			"notes": "OpenAI deprecated gpt-audio-mini; it shuts down on 2027-01-20 (replacement: gpt-audio-1.5)."
@@ -1787,7 +1836,8 @@
 						"stop": true,
 						"max_completion_tokens": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1856,7 +1906,8 @@
 						"stop": true,
 						"max_completion_tokens": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1922,7 +1973,8 @@
 						"stop": true,
 						"max_completion_tokens": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1958,7 +2010,8 @@
 						"stop": true,
 						"max_completion_tokens": true,
 						"reasoning_effort": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -1998,7 +2051,8 @@
 						"tools": true,
 						"top_logprobs": true,
 						"top_p": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -2038,7 +2092,8 @@
 						"tools": true,
 						"top_logprobs": true,
 						"top_p": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -2072,7 +2127,8 @@
 						"tools": true,
 						"temperature": true,
 						"stop": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -2202,7 +2258,8 @@
 						"response_format": true,
 						"seed": true,
 						"structured_outputs": true
-					}
+					},
+					"transport": "responses"
 				}
 			},
 			"pricing": {
@@ -2230,7 +2287,8 @@
 						"web_search_options": true,
 						"temperature": true,
 						"stop": true
-					}
+					},
+					"transport": "chat_completions"
 				}
 			},
 			"pricing": {
@@ -2256,7 +2314,8 @@
 						"response_format": true,
 						"structured_outputs": true,
 						"web_search_options": true
-					}
+					},
+					"transport": "chat_completions"
 				}
 			},
 			"pricing": {
@@ -2736,8 +2795,6 @@
 						"top_logprobs": true,
 						"response_format": true,
 						"structured_outputs": true,
-						"top_k": true,
-						"repetition_penalty": true,
 						"reasoning_effort": true
 					},
 					"capabilities": {
@@ -2745,7 +2802,8 @@
 						"vision": false,
 						"structuredOutputs": true,
 						"strictTools": true
-					}
+					},
+					"transport": "responses"
 				}
 			}
 		},
@@ -2762,7 +2820,6 @@
 						"tool_choice": true,
 						"reasoning": true,
 						"include_reasoning": true,
-						"top_k": true,
 						"top_p": true,
 						"structured_outputs": true,
 						"response_format": true,
@@ -2771,7 +2828,6 @@
 						"seed": true,
 						"frequency_penalty": true,
 						"presence_penalty": true,
-						"repetition_penalty": true,
 						"reasoning_effort": true
 					},
 					"capabilities": {
@@ -2779,7 +2835,8 @@
 						"vision": false,
 						"structuredOutputs": true,
 						"strictTools": true
-					}
+					},
+					"transport": "responses"
 				}
 			}
 		},
@@ -2827,7 +2884,69 @@
 						"cacheReadCentsPerMTokens": 200,
 						"cacheWriteCentsPerMTokens": 2500
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 500,
+						"outputCentsPerMTokens": 2500,
+						"cacheReadCentsPerMTokens": 50,
+						"cacheWriteCentsPerMTokens": 625,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 1000,
+								"outputCentsPerMTokens": 3750,
+								"cacheReadCentsPerMTokens": 100,
+								"cacheWriteCentsPerMTokens": 1250
+							}
+						]
+					},
+					"fast": {
+						"inputCentsPerMTokens": 2000,
+						"outputCentsPerMTokens": 10000,
+						"cacheReadCentsPerMTokens": 200,
+						"cacheWriteCentsPerMTokens": 2500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 4000,
+								"outputCentsPerMTokens": 15000,
+								"cacheReadCentsPerMTokens": 400,
+								"cacheWriteCentsPerMTokens": 5000
+							}
+						]
+					},
+					"priority": {
+						"inputCentsPerMTokens": 2000,
+						"outputCentsPerMTokens": 10000,
+						"cacheReadCentsPerMTokens": 200,
+						"cacheWriteCentsPerMTokens": 2500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 4000,
+								"outputCentsPerMTokens": 15000,
+								"cacheReadCentsPerMTokens": 400,
+								"cacheWriteCentsPerMTokens": 5000
+							}
+						]
+					},
+					"ultrafast": {
+						"inputCentsPerMTokens": 6000,
+						"outputCentsPerMTokens": 30000,
+						"cacheReadCentsPerMTokens": 600,
+						"cacheWriteCentsPerMTokens": 7500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 12000,
+								"outputCentsPerMTokens": 45000,
+								"cacheReadCentsPerMTokens": 1200,
+								"cacheWriteCentsPerMTokens": 15000
+							}
+						]
+					}
+				}
 			}
 		},
 		"gpt-6.1-sol": {
@@ -2874,7 +2993,69 @@
 						"cacheReadCentsPerMTokens": 20,
 						"cacheWriteCentsPerMTokens": 500
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 100,
+						"outputCentsPerMTokens": 500,
+						"cacheReadCentsPerMTokens": 5,
+						"cacheWriteCentsPerMTokens": 125,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 200,
+								"outputCentsPerMTokens": 750,
+								"cacheReadCentsPerMTokens": 10,
+								"cacheWriteCentsPerMTokens": 250
+							}
+						]
+					},
+					"fast": {
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 2000,
+						"cacheReadCentsPerMTokens": 20,
+						"cacheWriteCentsPerMTokens": 500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 800,
+								"outputCentsPerMTokens": 3000,
+								"cacheReadCentsPerMTokens": 40,
+								"cacheWriteCentsPerMTokens": 1000
+							}
+						]
+					},
+					"priority": {
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 2000,
+						"cacheReadCentsPerMTokens": 20,
+						"cacheWriteCentsPerMTokens": 500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 800,
+								"outputCentsPerMTokens": 3000,
+								"cacheReadCentsPerMTokens": 40,
+								"cacheWriteCentsPerMTokens": 1000
+							}
+						]
+					},
+					"ultrafast": {
+						"inputCentsPerMTokens": 1200,
+						"outputCentsPerMTokens": 6000,
+						"cacheReadCentsPerMTokens": 60,
+						"cacheWriteCentsPerMTokens": 1500,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 2400,
+								"outputCentsPerMTokens": 9000,
+								"cacheReadCentsPerMTokens": 120,
+								"cacheWriteCentsPerMTokens": 3000
+							}
+						]
+					}
+				}
 			}
 		},
 		"gpt-6.1-terra": {
@@ -2921,7 +3102,54 @@
 						"cacheReadCentsPerMTokens": 10,
 						"cacheWriteCentsPerMTokens": 250
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 50,
+						"outputCentsPerMTokens": 250,
+						"cacheReadCentsPerMTokens": 2.5,
+						"cacheWriteCentsPerMTokens": 62.5,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 100,
+								"outputCentsPerMTokens": 375,
+								"cacheReadCentsPerMTokens": 5,
+								"cacheWriteCentsPerMTokens": 125
+							}
+						]
+					},
+					"fast": {
+						"inputCentsPerMTokens": 200,
+						"outputCentsPerMTokens": 1000,
+						"cacheReadCentsPerMTokens": 10,
+						"cacheWriteCentsPerMTokens": 250,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 400,
+								"outputCentsPerMTokens": 1500,
+								"cacheReadCentsPerMTokens": 20,
+								"cacheWriteCentsPerMTokens": 500
+							}
+						]
+					},
+					"priority": {
+						"inputCentsPerMTokens": 200,
+						"outputCentsPerMTokens": 1000,
+						"cacheReadCentsPerMTokens": 10,
+						"cacheWriteCentsPerMTokens": 250,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 400,
+								"outputCentsPerMTokens": 1500,
+								"cacheReadCentsPerMTokens": 20,
+								"cacheWriteCentsPerMTokens": 500
+							}
+						]
+					}
+				}
 			}
 		},
 		"gpt-6-sol": {
@@ -3023,7 +3251,54 @@
 						"cacheReadCentsPerMTokens": 2,
 						"cacheWriteCentsPerMTokens": 25
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 5,
+						"outputCentsPerMTokens": 25,
+						"cacheReadCentsPerMTokens": 0.5,
+						"cacheWriteCentsPerMTokens": 6.25,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 10,
+								"outputCentsPerMTokens": 37.5,
+								"cacheReadCentsPerMTokens": 1,
+								"cacheWriteCentsPerMTokens": 12.5
+							}
+						]
+					},
+					"fast": {
+						"inputCentsPerMTokens": 20,
+						"outputCentsPerMTokens": 100,
+						"cacheReadCentsPerMTokens": 2,
+						"cacheWriteCentsPerMTokens": 25,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 40,
+								"outputCentsPerMTokens": 150,
+								"cacheReadCentsPerMTokens": 4,
+								"cacheWriteCentsPerMTokens": 50
+							}
+						]
+					},
+					"priority": {
+						"inputCentsPerMTokens": 20,
+						"outputCentsPerMTokens": 100,
+						"cacheReadCentsPerMTokens": 2,
+						"cacheWriteCentsPerMTokens": 25,
+						"tiers": [
+							{
+								"aboveInputTokens": 272000,
+								"inputCentsPerMTokens": 40,
+								"outputCentsPerMTokens": 150,
+								"cacheReadCentsPerMTokens": 4,
+								"cacheWriteCentsPerMTokens": 50
+							}
+						]
+					}
+				}
 			}
 		},
 		"gpt-realtime-2.1": {

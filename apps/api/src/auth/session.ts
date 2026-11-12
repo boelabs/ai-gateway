@@ -30,6 +30,7 @@ interface CachedSession {
 	sessionId: string;
 	userId: string | null;
 	role: DashboardRole;
+	mustChangePassword: boolean;
 	/** Epoch ms. */
 	expiresAt: number;
 	/** Epoch ms. */
@@ -50,6 +51,8 @@ export interface IssuedSession {
 /** Mints a session for an authenticated identity. `userId` is null for the environment-backed root. */
 export async function issueSession(opts: {
 	userId: string | null;
+	/** The user's `sessionEpoch` as read when the credentials were checked; null for root. */
+	userEpoch: number | null;
 	role: DashboardRole;
 	ip: string | null;
 	userAgent: string | null;
@@ -60,6 +63,7 @@ export async function issueSession(opts: {
 	await createDashboardSession({
 		tokenHash: hashSessionToken(token),
 		userId: opts.userId,
+		userEpoch: opts.userEpoch,
 		role: opts.role,
 		expiresAt,
 		ip: opts.ip,
@@ -99,20 +103,26 @@ export async function resolveSession(
 		return null;
 	}
 
-	// A user row can be disabled or deleted while sessions are live; the session must not outlive it.
+	// A user row can be disabled, deleted, demoted or have its password reset while sessions are
+	// live. Each of those bumps the user's epoch in the same UPDATE, so a session issued before it -
+	// even one whose login raced the change - no longer matches, and the role comes from the row.
+	let { role } = row;
+	let mustChangePassword = false;
 	if (row.userId !== null) {
 		const user = await getDashboardUserById(row.userId);
-		if (!user?.enabled) {
+		if (!user?.enabled || (row.userEpoch ?? 0) !== user.sessionEpoch) {
 			await revokeDashboardSession(row.id);
 			await redis.set(ck, "null", "EX", CACHE_TTL_SECONDS);
 			return null;
 		}
+		({ role, mustChangePassword } = user);
 	}
 
 	const entry: CachedSession = {
 		sessionId: row.id,
 		userId: row.userId,
-		role: row.role,
+		role,
+		mustChangePassword,
 		expiresAt: row.expiresAt.getTime(),
 		lastSeenAt: row.lastSeenAt.getTime(),
 	};
@@ -132,6 +142,8 @@ function hydrate(entry: CachedSession): SessionAuth {
 		userId: entry.userId,
 		role: entry.role,
 		isRoot: entry.userId === null,
+		// Entries cached before this field existed carry no flag.
+		mustChangePassword: entry.mustChangePassword === true,
 	};
 }
 

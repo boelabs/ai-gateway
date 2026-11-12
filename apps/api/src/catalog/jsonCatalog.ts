@@ -135,6 +135,30 @@ function validatePricing(value: unknown, path: string): void {
 	if (!isRecord(value)) {
 		fail(path, "must be an object");
 	}
+	validateTokenPricing(value, path);
+	if (value.serviceTiers !== undefined) {
+		if (!isRecord(value.serviceTiers)) {
+			fail(`${path}.serviceTiers`, "must be an object");
+		}
+		for (const [tier, rates] of Object.entries(value.serviceTiers)) {
+			if (!/^[a-z][a-z0-9_-]{0,31}$/u.test(tier)) {
+				fail(`${path}.serviceTiers.${tier}`, "is not a service tier name");
+			}
+			if (!isRecord(rates)) {
+				fail(`${path}.serviceTiers.${tier}`, "must be an object");
+			}
+			if (rates.serviceTiers !== undefined) {
+				fail(`${path}.serviceTiers.${tier}.serviceTiers`, "cannot be nested");
+			}
+			validateTokenPricing(rates, `${path}.serviceTiers.${tier}`);
+		}
+	}
+}
+
+function validateTokenPricing(
+	value: Record<string, unknown>,
+	path: string,
+): void {
 	for (const key of [
 		"inputCentsPerMTokens",
 		"outputCentsPerMTokens",
@@ -146,6 +170,8 @@ function validatePricing(value: unknown, path: string): void {
 		"audioOutputCentsPerMTokens",
 		"videoOutputCentsPerMTokens",
 		"searchUnitCents",
+		"imageOutputCentsPerImage",
+		"audioInputCentsPerSecond",
 	]) {
 		if (value[key] !== undefined) {
 			assertNumber(value[key], `${path}.${key}`);
@@ -155,6 +181,19 @@ function validatePricing(value: unknown, path: string): void {
 		value.cacheWriteCentsPerMTokensByTtl,
 		`${path}.cacheWriteCentsPerMTokensByTtl`,
 	);
+	if (value.imageOutputCentsPerImageByVariant !== undefined) {
+		if (!isRecord(value.imageOutputCentsPerImageByVariant)) {
+			fail(`${path}.imageOutputCentsPerImageByVariant`, "must be an object");
+		}
+		for (const [variant, cents] of Object.entries(
+			value.imageOutputCentsPerImageByVariant,
+		)) {
+			assertNumber(
+				cents,
+				`${path}.imageOutputCentsPerImageByVariant.${variant}`,
+			);
+		}
+	}
 	if (value.tiers !== undefined) {
 		if (!Array.isArray(value.tiers)) {
 			fail(`${path}.tiers`, "must be an array");

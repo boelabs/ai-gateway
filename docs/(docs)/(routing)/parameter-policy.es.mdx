@@ -21,6 +21,8 @@ El mapa `operations["text.generate"].parameters` de cada modelo marca cada pará
 
 Un `true`/`false` desnudo significa compatible/no compatible. Un objeto lo refina: `mode` (`supported`, `unsupported`, `ignored`, `range`, `mapped`), con `min`/`max`/`values` como rango o enumeración aceptado, `upstreamField` cuando el nombre del campo upstream difiere del canonical, y `notes` para cualquier cosa específica del proveedor. Un parámetro ausente en el mapa se trata como **desconocido**, no no compatible: el gateway no rechaza los datos faltantes del catálogo, solo en un modo *explícito* `unsupported`/`ignored`.
 
+Por debajo del catálogo, cada proveedor declara, por transporte, los parámetros que su formato no puede transportar: `top_k` en los transportes Chat Completions y Responses de OpenAI; `seed`, `presence_penalty`, `frequency_penalty` y `prompt_cache_key` en Anthropic Messages; y `user`, `parallel_tool_calls` y `prompt_cache_key` en Gemini `generateContent`. Cuentan como `unsupported` para todos los modelos de ese transporte salvo que la entrada del modelo diga otra cosa, así que la estrategia de abajo los elimina (y los registra en `droppedParameters`) o los rechaza en lugar de dejar que desaparezcan. `supported_parameters` en `/v1/models` refleja la misma vista.
+
 ## Las tres estrategias [#the-three-strategies]
 
 Configurado globalmente con `PUT /admin/router-settings` (`unsupportedParameterStrategy`); no hay anulación por modelo o por solicitud.

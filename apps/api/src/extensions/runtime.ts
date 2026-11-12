@@ -1,6 +1,7 @@
 import { getRegistryVersion } from "#db/repos/extensions.ts";
 import type { CallType } from "#core/callType.ts";
-import { GatewayError } from "#core/errors.ts";
+import { GatewayError, type ErrorClass } from "#core/errors.ts";
+import { ExtensionRejection, type ExtensionRejectionStatus } from "./sdk.ts";
 import { pathToFileURL } from "node:url";
 import { log } from "#logging/log.ts";
 import { env } from "#config/env.ts";
@@ -327,6 +328,44 @@ function hookError(
 	});
 }
 
+const REJECTION_CLASS: Record<ExtensionRejectionStatus, ErrorClass> = {
+	400: "bad_request",
+	403: "permission",
+	413: "bad_request",
+	422: "bad_request",
+	429: "rate_limit",
+};
+
+/**
+ * What a hook's thrown error means. A deliberate rejection passes through as the client's 4xx and
+ * leaves the breaker alone; so does a hook interrupted because the client went away, which says
+ * nothing about the extension. Anything else is the extension failing.
+ */
+function hookFailure(
+	instance: LoadedInstance,
+	hook: ExtensionHookName,
+	err: unknown,
+	requestSignal: AbortSignal,
+): GatewayError | unknown {
+	if (ExtensionRejection.is(err)) {
+		return new GatewayError({
+			class: REJECTION_CLASS[err.status],
+			status: err.status,
+			message: `Extension "${instance.definitionKey}" instance "${instance.id}" rejected the request in ${hook}: ${err.message}`,
+			publicMessage: err.message,
+			code: err.code,
+			failureKind: "request",
+			deploymentHealth: "neutral",
+			routingScope: "request",
+		});
+	}
+	if (requestSignal.aborted) {
+		return err;
+	}
+	recordFailure(instance, hook, err);
+	return hookError(instance, hook, err);
+}
+
 function disabledError(instance: LoadedInstance): GatewayError {
 	return new GatewayError({
 		class: "server",
@@ -396,6 +435,8 @@ class ExtensionRuntime {
 	private instances: LoadedInstance[] = [];
 	private loaded = false;
 	private loadedRegistryVersion = 0;
+	/** Reloads run one at a time: two interleaved swaps could each tear down what the other kept. */
+	private reloading: Promise<void> = Promise.resolve();
 
 	/** Loads the current database state and records the registry version it corresponds to. */
 	async loadFromDb(): Promise<void> {
@@ -431,7 +472,15 @@ class ExtensionRuntime {
 	 * success — a failure leaves the running state untouched. Definitions that were removed or replaced
 	 * by a different code version are torn down afterwards so reloads do not leak resources.
 	 */
-	private async buildAndSwap(source: ExtensionInstanceSource): Promise<void> {
+	private buildAndSwap(source: ExtensionInstanceSource): Promise<void> {
+		const next = this.reloading.then(() => this.buildAndSwapNow(source));
+		this.reloading = next.catch(() => undefined);
+		return next;
+	}
+
+	private async buildAndSwapNow(
+		source: ExtensionInstanceSource,
+	): Promise<void> {
 		const previous = this.definitions;
 		await this.loadFromSource(source, EXTENSIONS_CACHE_DIR);
 		await this.teardownReplaced(previous);
@@ -521,15 +570,20 @@ class ExtensionRuntime {
 				});
 				continue;
 			}
+			// The same key at the same content-addressed path is the same code, already set up:
+			// running setup again (without a teardown) would double whatever it acquired.
+			const unchanged = this.definitions.get(definition.key);
 			definitions.set(definition.key, {
 				definition,
 				modulePath,
 				order,
-				setupDone: false,
+				setupDone:
+					unchanged?.modulePath === modulePath ? unchanged.setupDone : false,
 			});
 		}
 
 		const instances = buildInstances(manifest.instances, definitions);
+		carryRuntimeState(this.instances, instances, this.definitions, definitions);
 		await setupDefinitions(definitions, instances);
 
 		this.definitions = definitions;
@@ -576,6 +630,26 @@ class ExtensionRuntime {
 		return selected;
 	}
 
+	/**
+	 * Realtime sessions have no extension hook points yet. Until they do, a session whose model an
+	 * active instance targets is refused rather than run with the extension silently skipped.
+	 */
+	assertNoInstanceTargets(scope: ExtensionScope): void {
+		const targeting = this.instances.find(
+			(instance) => instance.enabled && matchApplies(instance.match, scope),
+		);
+		if (targeting) {
+			throw new GatewayError({
+				class: "bad_request",
+				code: "extensions_unsupported_for_realtime",
+				message: `Extension instance ${targeting.id} (${targeting.definitionKey}) targets ${scope.publicModel ?? "this model"}, and realtime sessions cannot run extension hooks`,
+				publicMessage:
+					"This model has an active extension, which realtime sessions do not support.",
+				deploymentHealth: "neutral",
+			});
+		}
+	}
+
 	async runCanonicalRequest<T extends ExtensionCanonicalRequest>(
 		scope: ExtensionScope,
 		request: T,
@@ -599,8 +673,7 @@ class ExtensionRuntime {
 				}
 				recordSuccess(instance);
 			} catch (err) {
-				recordFailure(instance, "onCanonicalRequest", err);
-				throw hookError(instance, "onCanonicalRequest", err);
+				throw hookFailure(instance, "onCanonicalRequest", err, scope.signal);
 			}
 		}
 		return current as T;
@@ -628,8 +701,7 @@ class ExtensionRuntime {
 				}
 				recordSuccess(instance);
 			} catch (err) {
-				recordFailure(instance, "onCanonicalResponse", err);
-				throw hookError(instance, "onCanonicalResponse", err);
+				throw hookFailure(instance, "onCanonicalResponse", err, scope.signal);
 			}
 		}
 		return current as T;
@@ -654,8 +726,7 @@ class ExtensionRuntime {
 				}
 				recordSuccess(instance);
 			} catch (err) {
-				recordFailure(instance, "onStreamEvent", err);
-				throw hookError(instance, "onStreamEvent", err);
+				throw hookFailure(instance, "onStreamEvent", err, scope.signal);
 			}
 		}
 		return current as T;
@@ -679,8 +750,7 @@ class ExtensionRuntime {
 				}
 				recordSuccess(instance);
 			} catch (err) {
-				recordFailure(instance, "onImageOutput", err);
-				throw hookError(instance, "onImageOutput", err);
+				throw hookFailure(instance, "onImageOutput", err, scope.signal);
 			}
 		}
 		return current;
@@ -895,11 +965,48 @@ function validateInstance(
 	return null;
 }
 
+/**
+ * Keeps what the circuit breaker learned across a reload. An instance with the same id, definition
+ * code and configuration is the same instance: a reload triggered by some other change must not
+ * revive one the breaker tripped, nor forget the failures counted towards tripping it.
+ */
+function carryRuntimeState(
+	previous: LoadedInstance[],
+	next: LoadedInstance[],
+	previousDefinitions: Map<string, LoadedDefinition>,
+	nextDefinitions: Map<string, LoadedDefinition>,
+): void {
+	const byId = new Map(previous.map((instance) => [instance.id, instance]));
+	for (const instance of next) {
+		const old = byId.get(instance.id);
+		if (
+			!old ||
+			old.definitionKey !== instance.definitionKey ||
+			previousDefinitions.get(old.definitionKey)?.modulePath !==
+				nextDefinitions.get(instance.definitionKey)?.modulePath ||
+			JSON.stringify(old.config) !== JSON.stringify(instance.config) ||
+			instance.status !== "active"
+		) {
+			continue;
+		}
+		instance.failureCount = old.failureCount;
+		instance.lastError = old.lastError;
+		if (old.disabledKind === "breaker") {
+			instance.status = old.status;
+			instance.disabledReason = old.disabledReason;
+			instance.disabledKind = old.disabledKind;
+		}
+	}
+}
+
 async function setupDefinitions(
 	definitions: Map<string, LoadedDefinition>,
 	instances: LoadedInstance[],
 ): Promise<void> {
 	for (const loaded of definitions.values()) {
+		if (loaded.setupDone) {
+			continue;
+		}
 		const activeInstances = instances.filter(
 			(instance) =>
 				instance.definitionKey === loaded.definition.key &&

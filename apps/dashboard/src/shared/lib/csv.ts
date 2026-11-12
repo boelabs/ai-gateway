@@ -8,7 +8,13 @@ function cell(value: string | number | boolean | null | undefined): string {
 	if (value === null || value === undefined) {
 		return "";
 	}
-	const text = String(value);
+	let text = String(value);
+	// A spreadsheet runs a text cell that starts with one of these as a formula: an error message
+	// or a model name the gateway logged could call out or run anything. A leading quote keeps it
+	// text. Numbers stay numbers (a negative count is not a formula).
+	if (typeof value === "string" && /^[=+\-@\t\r]/u.test(text)) {
+		text = `'${text}`;
+	}
 	// A model id with a comma, or an error message with a quote, must not shift every later column.
 	return /[",\n\r]/u.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }

@@ -7,6 +7,7 @@ import type { EffectiveSettings } from "#router/settings.ts";
 import type { ChatExecResult } from "#gateway/executor.ts";
 import type { AdapterContext } from "#adapters/types.ts";
 import { resolveTransport } from "#router/transport.ts";
+import type { UpstreamTransport } from "#core/transport.ts";
 import { usageQuotaForRequest } from "./pipeline.ts";
 import { executeChat } from "#gateway/executor.ts";
 import { GatewayError } from "#core/errors.ts";
@@ -19,6 +20,8 @@ import {
 	applyUnsupportedParameterPolicy,
 	assertSupportedChatParameters,
 	type ParameterPolicyResult,
+	withRequestParameters,
+	withAdapterParameters,
 } from "#catalog/parameters.ts";
 
 import {
@@ -39,6 +42,28 @@ export type ChatCandidateExecutor = (
 	request: CanonicalChatRequest,
 ) => Promise<ChatExecResult>;
 
+/**
+ * The transport a chat request needs when an adapter's default cannot carry it: the client's own
+ * wire for features only that wire has, and Chat Completions for its portable controls that
+ * Responses lacks (`n` above one, `stop`, `seed`). A deployment override or the model's declared
+ * transport still wins; the parameter policy then handles whatever that transport cannot carry.
+ */
+export function preferredChatTransport(
+	req: CanonicalChatRequest,
+): UpstreamTransport | undefined {
+	if (req.requiresNativeWire) {
+		return req.publicWire ?? "chat_completions";
+	}
+	if (
+		(req.n ?? 1) > 1 ||
+		(req.stop?.length ?? 0) > 0 ||
+		req.seed !== undefined
+	) {
+		return "chat_completions";
+	}
+	return undefined;
+}
+
 export function parameterEligibility(
 	req: CanonicalChatRequest,
 	strategy: UnsupportedParameterStrategy,
@@ -46,16 +71,52 @@ export function parameterEligibility(
 	if (strategy !== "error") {
 		return undefined;
 	}
-	return (candidate) => assertSupportedChatParameters(req, candidate.meta);
+	return (candidate) =>
+		assertSupportedChatParameters(
+			req,
+			candidateParameterMeta(
+				candidate,
+				resolveTransport(candidate, "chat", preferredChatTransport(req)),
+				req,
+			),
+		);
+}
+
+/**
+ * The candidate's metadata as the parameter policy sees it for this request: its adapter's
+ * per-transport declarations underneath the catalog, and what the request itself rules out on top.
+ */
+export function candidateParameterMeta(
+	candidate: DeploymentCandidate,
+	transport: UpstreamTransport,
+	req: CanonicalChatRequest,
+) {
+	const meta = withAdapterParameters(
+		candidate.meta,
+		candidate.adapter.chatParameters?.[transport],
+	);
+	return withRequestParameters(
+		meta,
+		candidate.adapter.chatRequestParameters?.(req, {
+			upstreamModel: candidate.upstreamModel,
+			meta,
+			transport,
+		}),
+	);
 }
 
 export function requestForCandidate(
 	req: CanonicalChatRequest,
 	candidate: DeploymentCandidate,
+	transport: UpstreamTransport,
 	strategy: UnsupportedParameterStrategy,
 	record: ParameterPolicyRecorder,
 ): CanonicalChatRequest {
-	const result = applyUnsupportedParameterPolicy(req, candidate.meta, strategy);
+	const result = applyUnsupportedParameterPolicy(
+		req,
+		candidateParameterMeta(candidate, transport, req),
+		strategy,
+	);
 	record(result);
 	return result.request;
 }
@@ -100,8 +161,11 @@ export async function routeChat(
 		settings.unsupportedParameterStrategy,
 	);
 	const publicWire = canonical.publicWire ?? "chat_completions";
+	const preferredTransport = preferredChatTransport(canonical);
+	// The request's own input bound is the same for every candidate: computed once.
+	const requestInputTokens = estimateTokenReservation(canonical).inputTokens;
 	const transportForCandidate = (candidate: DeploymentCandidate) =>
-		resolveTransport(candidate, "chat");
+		resolveTransport(candidate, "chat", preferredTransport);
 	const candidateEligibility: NonNullable<
 		RouteOptions["candidateEligibility"]
 	> = (candidate) => {
@@ -149,15 +213,21 @@ export async function routeChat(
 					? { preferredDeploymentId: options.preferredDeploymentId }
 					: {}),
 				candidateEligibility,
-				tokenReservation: (candidate) =>
-					estimateTokenReservation(canonical, {
-						maxOutputTokens:
-							canonical.maxTokens ?? candidate.meta.maxOutputTokens ?? 0,
-						additionalInputTokens: contentInputResolver.hasOpaqueInputs
+				...(preferredTransport === undefined
+					? {}
+					: { preferredTransport: () => preferredTransport }),
+				tokenReservation: (candidate) => ({
+					inputTokens:
+						requestInputTokens +
+						(contentInputResolver.hasOpaqueInputs
 							? (candidate.meta.maxInputTokens ??
 								MAX_PORTABLE_CONTENT_INPUT_BYTES)
-							: 0,
-					}),
+							: 0),
+					outputTokens: Math.max(
+						0,
+						canonical.maxTokens ?? candidate.meta.maxOutputTokens ?? 0,
+					),
+				}),
 				usageQuota: usageQuotaForRequest(c),
 			},
 			async (cand, ctx) => {
@@ -169,6 +239,7 @@ export async function routeChat(
 				const candidateRequest = requestForCandidate(
 					resolved.request,
 					cand,
+					ctx.transport,
 					settings.unsupportedParameterStrategy,
 					(result) => {
 						parameterPolicy = result;

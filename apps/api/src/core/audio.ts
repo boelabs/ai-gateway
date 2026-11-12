@@ -60,14 +60,13 @@ export interface CanonicalTranscriptionRequest {
 }
 
 /**
- * Token-based transcription usage (gpt-4o-transcribe). Feeds the normal cost calc.
- *
- * Per-minute billing (whisper) is deliberately NOT supported: its duration-based usage variant is
- * omitted. Re-adding it later = one usage variant here + one pricing branch in the cost calc, both
- * localized (see the note at the end of the file).
+ * Transcription usage. `tokens` for token-billed models (gpt-4o-transcribe); `duration` for models
+ * billed by the second of input audio (gpt-transcribe, whisper), priced by `audioInputCentsPerSecond`.
  */
 export interface TranscriptionUsage {
-	type: "tokens";
+	type: "tokens" | "duration";
+	/** Seconds of input audio, for `duration` usage. */
+	seconds?: number;
 	inputTokens?: number;
 	outputTokens?: number;
 	totalTokens?: number;
@@ -159,12 +158,22 @@ export function transcriptionFeatures(
 export function transcriptionUsageToCore(
 	u: TranscriptionUsage | undefined,
 ): Usage | null {
+	if (u?.type === "duration" && u.seconds !== undefined) {
+		return {
+			promptTokens: 0,
+			completionTokens: 0,
+			totalTokens: 0,
+			inputAudioSeconds: u.seconds,
+		};
+	}
 	if (!u || u.totalTokens === undefined) {
 		return null;
 	}
+	const audioTokens = u.inputTokenDetails?.audioTokens;
 	return {
 		promptTokens: u.inputTokens ?? 0,
 		completionTokens: u.outputTokens ?? 0,
 		totalTokens: u.totalTokens,
+		...(audioTokens === undefined ? {} : { promptAudioTokens: audioTokens }),
 	};
 }

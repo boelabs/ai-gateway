@@ -1,4 +1,8 @@
-import { summaryVisible, toUpstreamReasoningEffort } from "#core/reasoning.ts";
+import {
+	toUpstreamReasoningEffort,
+	summaryVisible,
+	thinkingBudget,
+} from "#core/reasoning.ts";
 import { type BaseCreds, requireApiKeyCreds } from "#adapters/creds.ts";
 import { mapUpstreamHttpError } from "#adapters/upstreamError.ts";
 import { assertNoPrefixCachePolicy } from "#core/promptCache.ts";
@@ -18,7 +22,11 @@ import {
 	providerFieldsWithAnthropicThinking,
 	anthropicThinkingFromProviderFields,
 	type AnthropicThinkingBlock,
+	providerFieldsWithAnthropicStreamBlock,
+	providerFieldsWithAnthropicStopReason,
+	hasNonCanonicalAnthropicContent,
 	anthropicContentMatches,
+	isGatewayState,
 	mergeProviderFields,
 } from "#core/providerSpecificFields.ts";
 
@@ -31,9 +39,12 @@ import type {
 	CanonicalMessage,
 } from "#core/canonical.ts";
 
+import type { ParameterSupportMap } from "#catalog/parameters.ts";
+
 import type {
 	MessageTokenCountRequest,
 	MessageTokenCountHandler,
+	ChatSupportContext,
 	AdapterContext,
 	ProviderModule,
 	ChatHandler,
@@ -60,6 +71,8 @@ interface AnthropicUsage {
 		ephemeral_5m_input_tokens?: number;
 		ephemeral_1h_input_tokens?: number;
 	};
+	/** Requests to tools Anthropic runs itself: `web_search_requests`, `web_fetch_requests`, ... */
+	server_tool_use?: Record<string, unknown> | null;
 }
 
 interface AnthropicContentBlock {
@@ -93,6 +106,7 @@ interface AnthropicStreamEvent {
 		thinking?: string;
 		signature?: string;
 		partial_json?: string;
+		citation?: unknown;
 		stop_reason?: string | null;
 		stop_sequence?: string | null;
 	};
@@ -184,6 +198,9 @@ function partToAnthropic(part: CanonicalContentPart): Record<string, unknown> {
 		if (source !== null) {
 			return withPartCacheControl(part, { type: "image", source });
 		}
+	}
+	if (part.type === "file" && part.native !== undefined) {
+		return structuredClone(part.native);
 	}
 	if (part.type === "file") {
 		let source: Record<string, unknown> | null = null;
@@ -464,6 +481,13 @@ function applyReasoning(
 		"anthropic_adaptive",
 		"anthropic_budget",
 	]);
+	const outputEffort = req.messagesTransport?.outputEffort;
+	if (outputEffort !== undefined) {
+		// The response's own effort with thinking off, as the client sent it.
+		body.thinking = { type: "disabled" };
+		body.output_config = { effort: outputEffort };
+		return;
+	}
 	if (resolved === undefined) {
 		return;
 	}
@@ -487,9 +511,11 @@ function applyReasoning(
 		body.thinking = { type: "disabled" };
 		return;
 	}
-	const budget =
+	const budget = thinkingBudget(
+		req.reasoning,
 		spec.budgets?.[effort] ??
-		(effort === "max" ? undefined : DEFAULT_ANTHROPIC_BUDGETS[effort]);
+			(effort === "max" ? undefined : DEFAULT_ANTHROPIC_BUDGETS[effort]),
+	);
 	if (budget === undefined) {
 		throw new Error(
 			'Anthropic budget-based reasoning requires an explicit budget for effort "max"',
@@ -497,9 +523,134 @@ function applyReasoning(
 	}
 	body.thinking = {
 		type: "enabled",
-		budget_tokens: budget,
+		budget_tokens: budget.fromClient
+			? budget.tokens
+			: fitThinkingBudget(budget.tokens, Number(body.max_tokens)),
 		display,
 	};
+}
+
+/** Whether the request forces a tool call, which `tool_choice` any or tool means on Anthropic. */
+function forcesToolUse(choice: CanonicalChatRequest["toolChoice"]): boolean {
+	if (choice === undefined || typeof choice === "string") {
+		return choice === "required";
+	}
+	return "name" in choice || choice.mode === "required";
+}
+
+/** Which thinking the request turns on for this model, if any. */
+function thinkingMode(
+	req: CanonicalChatRequest,
+	ctx: ChatSupportContext,
+): "manual" | "adaptive" | undefined {
+	let resolved: ReturnType<typeof resolveAdapterReasoning>;
+	try {
+		resolved = resolveAdapterReasoning(
+			req,
+			{ ...ctx, credentials: {}, requestId: "" },
+			["anthropic_adaptive", "anthropic_budget"],
+		);
+	} catch {
+		// An unusable reasoning request is rejected when the request is built.
+		return undefined;
+	}
+	if (resolved === undefined || resolved.effort === "none") {
+		return undefined;
+	}
+	return resolved.spec.kind === "anthropic_budget" ? "manual" : "adaptive";
+}
+
+const THINKING_CONFLICT = "Not accepted by Anthropic while thinking is on.";
+
+/**
+ * Anthropic has no schema-less JSON mode: `output_config.format` takes a JSON schema whose objects
+ * must set `additionalProperties: false`, so an open object would only ever produce `{}`.
+ */
+const JSON_OBJECT_UNSUPPORTED =
+	'Anthropic has no JSON mode without a schema; use response_format "json_schema"';
+
+/**
+ * What this request makes unsupported, from Anthropic's documented limits. While thinking is on,
+ * temperature and top_k are rejected and top_p must lie between 0.95 and 1 (models that reject
+ * sampling parameters outright declare that in the catalog). Manual (budget) thinking cannot be
+ * combined with forced tool use, and a catalog `tool_choice` whose `values` leave out forcing marks a
+ * model that rejects it on every request. The parameter policy then drops and records these, or
+ * rejects them, instead of Anthropic answering with a 400.
+ */
+function anthropicRequestParameters(
+	req: CanonicalChatRequest,
+	ctx: ChatSupportContext,
+): ParameterSupportMap | undefined {
+	const parameters: ParameterSupportMap = {};
+	if (req.responseFormat?.type === "json_object") {
+		parameters.response_format = {
+			mode: "unsupported",
+			notes: JSON_OBJECT_UNSUPPORTED,
+		};
+	}
+	const forced = forcesToolUse(req.toolChoice);
+	const toolChoice =
+		ctx.meta.operations?.["text.generate"]?.parameters?.tool_choice;
+	if (
+		forced &&
+		typeof toolChoice === "object" &&
+		toolChoice.values !== undefined &&
+		!toolChoice.values.includes("required")
+	) {
+		parameters.tool_choice = {
+			mode: "unsupported",
+			notes: "This model rejects forced tool use.",
+		};
+	}
+	const thinking = thinkingMode(req, ctx);
+	if (thinking !== undefined) {
+		if (req.temperature !== undefined) {
+			parameters.temperature = {
+				mode: "unsupported",
+				notes: THINKING_CONFLICT,
+			};
+		}
+		if (req.topK !== undefined) {
+			parameters.top_k = { mode: "unsupported", notes: THINKING_CONFLICT };
+		}
+		if (req.topP !== undefined && (req.topP < 0.95 || req.topP > 1)) {
+			parameters.top_p = {
+				mode: "unsupported",
+				notes: "Must lie between 0.95 and 1 while thinking is on.",
+			};
+		}
+		if (thinking === "manual" && forced) {
+			parameters.tool_choice = {
+				mode: "unsupported",
+				notes: "Forced tool use is not accepted with budget-based thinking.",
+			};
+		}
+	}
+	return Object.keys(parameters).length > 0 ? parameters : undefined;
+}
+
+/** Anthropic's floor for `thinking.budget_tokens`. */
+const MIN_THINKING_BUDGET = 1024;
+
+/**
+ * Fits a budget the gateway chose for an effort into the request: Anthropic requires
+ * `budget_tokens` of at least 1024 and below `max_tokens`, which thinking counts against. A budget
+ * the client set is sent as given, for Anthropic to judge.
+ */
+function fitThinkingBudget(budget: number, maxTokens: number): number {
+	if (budget < maxTokens) {
+		return budget;
+	}
+	const fitted = maxTokens - 1;
+	if (fitted < MIN_THINKING_BUDGET) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_reasoning_budget",
+			param: "max_tokens",
+			message: `Thinking on this model needs max_tokens above ${MIN_THINKING_BUDGET}; raise max_tokens or turn reasoning off`,
+		});
+	}
+	return fitted;
 }
 
 function applyResponseFormat(
@@ -510,11 +661,17 @@ function applyResponseFormat(
 	if (format === undefined || format.type === "text") {
 		return;
 	}
+	if (format.type === "json_object") {
+		// Reaches here only under the allow strategy; the parameter policy drops or rejects it first.
+		throw new GatewayError({
+			class: "bad_request",
+			code: "unsupported_parameter",
+			param: "response_format",
+			message: JSON_OBJECT_UNSUPPORTED,
+		});
+	}
 	// Anthropic always decodes `output_config.format` under strict-mode schema limits.
-	const schema =
-		format.type === "json_schema"
-			? toAnthropicStrictSchema(format.schema)
-			: { type: "object" };
+	const schema = toAnthropicStrictSchema(format.schema);
 	const outputConfig = (body.output_config ?? {}) as Record<string, unknown>;
 	body.output_config = {
 		...outputConfig,
@@ -567,6 +724,14 @@ function buildBody(
 	if (req.messagesTransport?.metadata !== undefined) {
 		body.metadata = req.messagesTransport.metadata;
 	}
+	// The end user the request is for: OpenAI's `user` and Anthropic's `metadata.user_id` both mean
+	// an opaque, stable identifier of the end user. Native metadata from the client wins.
+	if (req.user !== undefined) {
+		const metadata = (body.metadata ?? {}) as Record<string, unknown>;
+		if (metadata.user_id === undefined) {
+			body.metadata = { ...metadata, user_id: req.user };
+		}
+	}
 	if (req.stop !== undefined) {
 		body.stop_sequences = req.stop;
 	}
@@ -610,8 +775,35 @@ function buildBody(
 			};
 		}
 	}
+	if (req.parallelToolCalls === false) {
+		// Anthropic spells it on tool_choice; `none` calls no tools, so there is nothing to limit.
+		const choice = (body.tool_choice ?? { type: "auto" }) as Record<
+			string,
+			unknown
+		>;
+		if (choice.type !== "none") {
+			body.tool_choice = { ...choice, disable_parallel_tool_use: true };
+		}
+	}
 	applyReasoning(body, req, ctx);
 	applyResponseFormat(body, req);
+	for (const [key, value] of Object.entries(
+		req.messagesTransport?.nativeFields ?? {},
+	)) {
+		if (
+			body[key] !== undefined &&
+			JSON.stringify(body[key]) !== JSON.stringify(value)
+		) {
+			// `speed` is set by the fast-mode aliases.
+			throw new GatewayError({
+				class: "bad_request",
+				code: "invalid_request_error",
+				param: key,
+				message: `${key} conflicts with the value the selected model requires`,
+			});
+		}
+		body[key] = structuredClone(value);
+	}
 	const extraBody = req.extraBody ? { ...req.extraBody } : undefined;
 	if (extraBody !== undefined) {
 		if (body.top_k === undefined && typeof extraBody.top_k === "number") {
@@ -663,8 +855,28 @@ function mapUsage(usage: AnthropicUsage | undefined): Usage {
 	if (usage?.output_tokens_details?.thinking_tokens != null) {
 		out.reasoningTokens = usage.output_tokens_details.thinking_tokens;
 	}
+	const serverToolCalls = serverToolCallsOf(usage?.server_tool_use);
+	if (serverToolCalls !== undefined) {
+		out.serverToolCalls = serverToolCalls;
+	}
 	return out;
 }
+
+/** `{ web_search_requests: 2 }` -> `{ web_search: 2 }`. */
+function serverToolCallsOf(
+	counters: Record<string, unknown> | null | undefined,
+): Record<string, number> | undefined {
+	const calls: Record<string, number> = {};
+	for (const [key, value] of Object.entries(counters ?? {})) {
+		if (typeof value === "number" && Number.isFinite(value)) {
+			calls[key.replace(/_requests$/u, "")] = value;
+		}
+	}
+	return Object.keys(calls).length > 0 ? calls : undefined;
+}
+
+/** Stop reasons the canonical finish reason folds into another, kept for the native wire. */
+const FOLDED_STOP_REASONS = new Set(["pause_turn"]);
 
 function mapFinishReason(
 	reason: string | null | undefined,
@@ -764,6 +976,11 @@ function parseResponse(
 	if (toolCalls.length > 0) {
 		outMessage.toolCalls = toolCalls;
 	}
+	if (message.stop_reason && FOLDED_STOP_REASONS.has(message.stop_reason)) {
+		const fields = providerFieldsWithAnthropicStopReason(message.stop_reason);
+		outMessage.providerFields =
+			mergeProviderFields(outMessage.providerFields, fields) ?? fields;
+	}
 	const response: CanonicalChatResponse = {
 		id: message.id ?? `msg_${randomUUID()}`,
 		created: Math.floor(Date.now() / 1000),
@@ -842,37 +1059,32 @@ function mergeStreamUsage(
 	return merged;
 }
 
-const REPLAYABLE_BLOCK_TYPES = new Set([
-	"text",
-	"thinking",
-	"redacted_thinking",
-	"tool_use",
-]);
-
 /**
- * The assistant content exactly as Anthropic returned it, when it carries thinking. Anthropic binds
- * each thinking signature to the content before it (block order included), so a later turn must
- * replay these blocks as they were. Content with blocks the canonical form cannot hold is skipped.
+ * The assistant content exactly as Anthropic returned it, whenever it holds something the canonical
+ * message cannot (thinking, server-tool calls and results, citations). Anthropic binds each thinking
+ * signature to the content before it and needs server-tool results (their `encrypted_content`) sent
+ * back unchanged, so a later turn must replay these blocks as they were.
  */
 function replayableContent(
 	blocks: Record<string, unknown>[],
 ): Record<string, unknown>[] | undefined {
-	return blocks.every((block) =>
-		REPLAYABLE_BLOCK_TYPES.has(String(block.type)),
-	) &&
-		blocks.some(
-			(block) =>
-				block.type === "thinking" || block.type === "redacted_thinking",
-		)
+	return hasNonCanonicalAnthropicContent(blocks)
 		? structuredClone(blocks)
 		: undefined;
+}
+
+/** Blocks whose input streams as input_json_delta: client, server and MCP tool calls. */
+function streamsInput(type: string | undefined): boolean {
+	return (
+		type === "tool_use" || type === "server_tool_use" || type === "mcp_tool_use"
+	);
 }
 
 /** Rebuilds streamed content blocks for `replayableContent`. */
 interface StreamedContent {
 	blocks: Map<number, Record<string, unknown>>;
 	json: Map<number, string>;
-	/** False once the stream carried something these blocks cannot reproduce (citations). */
+	/** False once a streamed input could not be parsed back, so the blocks are no longer exact. */
 	exact: boolean;
 }
 
@@ -883,19 +1095,19 @@ function startStreamedBlock(
 ): void {
 	if (block?.type === "text") {
 		content.blocks.set(index, { type: "text", text: block.text ?? "" });
-	} else if (block?.type === "tool_use") {
-		content.blocks.set(index, {
-			type: "tool_use",
-			id: block.id,
-			name: block.name,
-			input: {},
-		});
-		content.json.set(index, "");
 	} else if (block?.type === "redacted_thinking") {
 		content.blocks.set(index, { type: block.type, data: block.data });
 	} else {
-		// Thinking blocks are recorded whole when they stop; others are kept to fail the check.
-		content.blocks.set(index, { type: block?.type ?? "unknown" });
+		// Thinking blocks are replaced whole when they stop. Every other block (client and server
+		// tool calls, server-tool results, MCP blocks) starts complete except for a streamed input.
+		const started = structuredClone(
+			(block ?? { type: "unknown" }) as Record<string, unknown>,
+		);
+		if (streamsInput(block?.type)) {
+			started.input = {};
+			content.json.set(index, "");
+		}
+		content.blocks.set(index, started);
 	}
 }
 
@@ -912,8 +1124,9 @@ function streamedDelta(
 			index,
 			`${content.json.get(index) ?? ""}${delta.partial_json ?? ""}`,
 		);
-	} else if (delta.type === "citations_delta") {
-		content.exact = false;
+	} else if (delta.type === "citations_delta" && block?.type === "text") {
+		const citations = Array.isArray(block.citations) ? block.citations : [];
+		block.citations = [...citations, structuredClone(delta.citation)];
 	}
 }
 
@@ -928,7 +1141,7 @@ function stopStreamedBlock(
 	}
 	const block = content.blocks.get(index);
 	const json = content.json.get(index);
-	if (block?.type !== "tool_use" || json === undefined) {
+	if (block === undefined || json === undefined) {
 		return;
 	}
 	try {
@@ -1018,6 +1231,9 @@ async function* parseStream(
 							finishReason: null,
 						},
 					],
+					...(event.message?.usage === undefined
+						? {}
+						: { initialUsage: mapUsage(streamUsage) }),
 				},
 				{
 					...(event.message?.id ? { providerRequestId: event.message.id } : {}),
@@ -1168,7 +1384,10 @@ async function* parseStream(
 				}
 			} else if (
 				event.delta?.type === "input_json_delta" &&
-				event.delta.partial_json !== undefined
+				event.delta.partial_json !== undefined &&
+				// Only client tool calls reach the client as tool calls: a server tool's input is
+				// Anthropic's own and travels whole with its block when that block stops.
+				native.blocks.get(event.index ?? 0)?.type === "tool_use"
 			) {
 				const index = toolCallIndex(event.index ?? 0);
 				yield {
@@ -1197,6 +1416,29 @@ async function* parseStream(
 			const index = event.index ?? 0;
 			const block = thinkingBlocks.get(index);
 			stopStreamedBlock(native, index, block);
+			const stopped = native.blocks.get(index);
+			if (
+				block === undefined &&
+				stopped !== undefined &&
+				stopped.type !== "text" &&
+				hasNonCanonicalAnthropicContent([stopped])
+			) {
+				// A block the canonical delta cannot carry, handed on whole in its streamed position.
+				yield {
+					id,
+					created,
+					model,
+					choices: [
+						{
+							index: 0,
+							delta: {
+								providerFields: providerFieldsWithAnthropicStreamBlock(stopped),
+							},
+							finishReason: null,
+						},
+					],
+				};
+			}
 			if (block !== undefined) {
 				thinkingBlocks.delete(index);
 				yield {
@@ -1304,7 +1546,13 @@ async function* parseStream(
 				choices: [
 					{
 						index: 0,
-						delta: {},
+						delta: FOLDED_STOP_REASONS.has(terminal.originalTerminalReason)
+							? {
+									providerFields: providerFieldsWithAnthropicStopReason(
+										terminal.originalTerminalReason,
+									),
+								}
+							: {},
 						finishReason: terminal.finishReason,
 						stopSequence: terminal.stopSequence,
 					},
@@ -1358,7 +1606,11 @@ function addBetaHeader(headers: Record<string, string>, beta: string): void {
 
 function requestHeaders(
 	ctx: AdapterContext,
-	options: { fastMode?: boolean; providerFileId?: boolean } = {},
+	options: {
+		fastMode?: boolean;
+		providerFileId?: boolean;
+		betas?: readonly string[];
+	} = {},
 ): { base: string; headers: Record<string, string> } {
 	const c = creds(ctx);
 	const headers: Record<string, string> = {
@@ -1373,6 +1625,9 @@ function requestHeaders(
 	if (options.providerFileId) {
 		addBetaHeader(headers, "files-api-2025-04-14");
 	}
+	for (const beta of options.betas ?? []) {
+		addBetaHeader(headers, beta);
+	}
 	return {
 		base: (c.baseUrl ?? DEFAULT_BASE).replace(/\/+$/u, ""),
 		headers,
@@ -1384,6 +1639,25 @@ function buildTokenCountBody(
 	ctx: AdapterContext,
 ): Record<string, unknown> {
 	const body = structuredClone(req.rawBody);
+	// Gateway state carriers hold other providers' state for the client to replay; they mean nothing
+	// to Anthropic, which would count them as thinking.
+	if (Array.isArray(body.messages)) {
+		body.messages = body.messages.map((message: unknown) => {
+			const content = (message as { content?: unknown })?.content;
+			return Array.isArray(content)
+				? {
+						...(message as Record<string, unknown>),
+						content: content.filter(
+							(block: { type?: unknown; data?: unknown }) =>
+								!(
+									block?.type === "redacted_thinking" &&
+									isGatewayState(block.data)
+								),
+						),
+					}
+				: message;
+		});
+	}
 	const extraBody =
 		body.extra_body !== null &&
 		typeof body.extra_body === "object" &&
@@ -1420,6 +1694,9 @@ const chat: ChatHandler = {
 		const { base, headers } = requestHeaders(ctx, {
 			fastMode: FAST_MODE_ALIASES.has(ctx.upstreamModel),
 			providerFileId: requestUsesProviderFileId(req),
+			...(req.messagesTransport?.betas
+				? { betas: req.messagesTransport.betas }
+				: {}),
 		});
 		return {
 			method: "POST",
@@ -1477,6 +1754,17 @@ export const anthropicAdapter: Adapter = {
 		},
 	},
 	transports: { chat: { supported: ["messages"], default: "messages" } },
+	chatRequestParameters: anthropicRequestParameters,
+	// The Messages request has no sampling seed, no repetition penalties and no cache key (caching is
+	// marked per block with cache_control).
+	chatParameters: {
+		messages: {
+			seed: { mode: "unsupported" },
+			presence_penalty: { mode: "unsupported" },
+			frequency_penalty: { mode: "unsupported" },
+			prompt_cache_key: { mode: "unsupported" },
+		},
+	},
 };
 
 export const anthropicProvider: ProviderModule = { adapter: anthropicAdapter };

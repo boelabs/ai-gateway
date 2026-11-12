@@ -117,49 +117,69 @@ export const attemptOutcomeEnum = pgEnum("attempt_outcome", [
 
 /* ----------------------------------------------------------------- types */
 
-/** Model metadata: pricing, limits, supported modalities. Used by the cost calc. */
-export interface RuntimeModelMetadata {
-	pricing?: {
-		/** Cost in USD cents per 1M input tokens. */
+/** Token rates, shared by the standard pricing and each service tier's. */
+export interface TokenPricing {
+	/** Cost in USD cents per 1M input tokens. */
+	inputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M output tokens. */
+	outputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M tokens read from cache. */
+	cacheReadCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M tokens written to cache (cache creation). */
+	cacheWriteCentsPerMTokens?: number;
+	cacheWriteCentsPerMTokensByTtl?: Record<string, number>;
+	/** Cost in USD cents per 1M image input tokens. Absent: image input is billed as input. */
+	imageInputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M image output tokens. Absent: image output is billed as output. */
+	imageOutputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M audio input tokens. Absent: audio input is billed as input. */
+	audioInputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M audio output tokens. Absent: audio output is billed as output. */
+	audioOutputCentsPerMTokens?: number;
+	/** Cost in USD cents per 1M video output tokens. Absent: video output is billed as output. */
+	videoOutputCentsPerMTokens?: number;
+	/** Cost in USD cents per reranking search unit. */
+	searchUnitCents?: number;
+	/** Cost in USD cents per generated image, for models priced per image. */
+	imageOutputCentsPerImage?: number;
+	/**
+	 * Per-image prices that depend on the image: keys are `<quality>:<size>`, `<size>` or
+	 * `<quality>`, tried in that order before `imageOutputCentsPerImage`.
+	 */
+	imageOutputCentsPerImageByVariant?: Record<string, number>;
+	/** Cost in USD cents per second of input audio, for models priced by duration. */
+	audioInputCentsPerSecond?: number;
+	/**
+	 * TIERED rate by context size. When the input tokens (promptTokens, which include cache
+	 * read/write) exceed `aboveInputTokens`, the WHOLE request is charged at the tier's rates
+	 * (a step function, not marginal). E.g. GPT-5.5 >272k, Gemini Pro >200k, MiniMax-M3 >512k.
+	 * The highest `aboveInputTokens` tier the prompt exceeds is chosen; fields not defined in the
+	 * tier inherit the already-resolved base rate.
+	 */
+	tiers?: Array<{
+		aboveInputTokens: number;
 		inputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M output tokens. */
 		outputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M tokens read from cache. */
 		cacheReadCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M tokens written to cache (cache creation). */
 		cacheWriteCentsPerMTokens?: number;
 		cacheWriteCentsPerMTokensByTtl?: Record<string, number>;
-		/** Cost in USD cents per 1M image input tokens. Absent: image input is billed as input. */
 		imageInputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M image output tokens. Absent: image output is billed as output. */
 		imageOutputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M audio input tokens. Absent: audio input is billed as input. */
 		audioInputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M audio output tokens. Absent: audio output is billed as output. */
 		audioOutputCentsPerMTokens?: number;
-		/** Cost in USD cents per 1M video output tokens. Absent: video output is billed as output. */
-		videoOutputCentsPerMTokens?: number;
-		/** Cost in USD cents per reranking search unit. */
-		searchUnitCents?: number;
+	}>;
+}
+
+/** Model metadata: pricing, limits, supported modalities. Used by the cost calc. */
+export interface RuntimeModelMetadata {
+	pricing?: TokenPricing & {
 		/**
-		 * TIERED rate by context size. When the input tokens (promptTokens, which include cache
-		 * read/write) exceed `aboveInputTokens`, the WHOLE request is charged at the tier's rates
-		 * (a step function, not marginal). E.g. GPT-5.5 >272k, Gemini Pro >200k, MiniMax-M3 >512k.
-		 * The highest `aboveInputTokens` tier the prompt exceeds is chosen; fields not defined in the
-		 * tier inherit the already-resolved base rate.
+		 * Rates for non-standard service tiers, keyed by the tier name the provider reports it served
+		 * (OpenAI `service_tier`: `flex`, `fast`/`priority`, `ultrafast`). A request served at a tier
+		 * listed here is charged at that tier's rates, which replace the standard token rates and
+		 * context tiers; fields it leaves out fall back to the standard ones.
 		 */
-		tiers?: Array<{
-			aboveInputTokens: number;
-			inputCentsPerMTokens?: number;
-			outputCentsPerMTokens?: number;
-			cacheReadCentsPerMTokens?: number;
-			cacheWriteCentsPerMTokens?: number;
-			cacheWriteCentsPerMTokensByTtl?: Record<string, number>;
-			imageInputCentsPerMTokens?: number;
-			imageOutputCentsPerMTokens?: number;
-			audioInputCentsPerMTokens?: number;
-			audioOutputCentsPerMTokens?: number;
-		}>;
+		serviceTiers?: Record<string, TokenPricing>;
 	};
 	maxInputTokens?: number;
 	maxOutputTokens?: number;
@@ -580,7 +600,11 @@ export const upstreamAttempts = pgTable(
 	"upstream_attempts",
 	{
 		id: uuid("id").primaryKey().defaultRandom(),
-		operationId: uuid("operation_id").notNull(),
+		operationId: uuid("operation_id")
+			.notNull()
+			// Shipped NOT VALID (migration 0009): enforced for new rows, existing ones are checked
+			// by a later release after an orphan sweep.
+			.references(() => gatewayOperations.id, { onDelete: "cascade" }),
 		ordinal: integer("ordinal").notNull(),
 		deploymentId: uuid("deployment_id"),
 		deploymentLabel: text("deployment_label"),
@@ -635,7 +659,11 @@ export const payloadSamples = pgTable(
 	"payload_samples",
 	{
 		id: uuid("id").primaryKey().defaultRandom(),
-		operationId: uuid("operation_id").notNull(),
+		operationId: uuid("operation_id")
+			.notNull()
+			// Shipped NOT VALID (migration 0009): enforced for new rows, existing ones are checked
+			// by a later release after an orphan sweep.
+			.references(() => gatewayOperations.id, { onDelete: "cascade" }),
 		captureReason: text("capture_reason").notNull(),
 		envelope: jsonb("envelope").$type<EncEnvelope>().notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })
@@ -678,6 +706,8 @@ export const responseStates = pgTable(
 	{
 		id: text("id").primaryKey(),
 		virtualKeyId: uuid("virtual_key_id"),
+		/** The operator (`user:<uuid>`, `root`) that stored it through a session; null otherwise. */
+		ownerActor: text("owner_actor"),
 		publicModel: text("public_model").notNull(),
 		deploymentId: uuid("deployment_id"),
 		adapterKey: text("adapter_key"),
@@ -709,6 +739,27 @@ export const responseStates = pgTable(
 	],
 );
 
+/* ------------------------------------------------------------ spend_ledger */
+
+/**
+ * One row per spend applied to a virtual key, keyed by the charge's own id (a usage lease's
+ * settlement or one of its incremental charges). Inserting the row and adding the spend happen in
+ * one transaction, so a retried or reconciled write applies the spend exactly once. Rows are only
+ * needed while a write can still be retried and are pruned after a retention window.
+ */
+export const spendLedger = pgTable(
+	"spend_ledger",
+	{
+		id: text("id").primaryKey(),
+		virtualKeyId: uuid("virtual_key_id").notNull(),
+		cents: numeric("cents", { precision: 20, scale: 10 }).notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [index("spend_ledger_created_at_idx").on(t.createdAt)],
+);
+
 /* -------------------------------------------------------------- video_jobs */
 
 /** Budget lifecycle of one video job; `settling` is the claim a poller holds while it settles. */
@@ -716,6 +767,20 @@ export interface VideoJobBilling {
 	state: "reserved" | "settling" | "settled" | "released";
 	/** Present while the reservation is outstanding. */
 	lease?: VirtualKeyUsageLeaseSnapshot;
+	/** When the settling claim was taken; a stale claim is completed by the reconciler. */
+	claimedAt?: string;
+	/**
+	 * The settlement the claimant decided on, persisted with the claim so the reconciler can apply it
+	 * if the claimant dies before finishing. Spend writes are idempotent, so applying it twice is safe.
+	 */
+	outcome?:
+		| {
+				kind: "settle";
+				totalTokens: number;
+				costCents: number;
+				usage: Record<string, unknown>;
+		  }
+		| { kind: "release" };
 	/** Final cost in USD cents, once settled. */
 	costCents?: number;
 	/** Canonical usage the settlement was computed from, or null when it came from an estimate. */
@@ -728,6 +793,8 @@ export const videoJobs = pgTable(
 	{
 		id: text("id").primaryKey(),
 		virtualKeyId: uuid("virtual_key_id"),
+		/** The operator (`user:<uuid>`, `root`) that created it through a session; null otherwise. */
+		ownerActor: text("owner_actor"),
 		publicModel: text("public_model").notNull(),
 		deploymentId: uuid("deployment_id"),
 		adapterKey: text("adapter_key").notNull(),
@@ -921,6 +988,12 @@ export const dashboardUsers = pgTable(
 		mustChangePassword: boolean("must_change_password")
 			.notNull()
 			.default(false),
+		/**
+		 * Bumped in the same UPDATE that changes the role, the password or `enabled`. A session
+		 * carries the epoch it was issued at and stops resolving once the two differ, so no session
+		 * outlives one of those changes, whatever raced with it.
+		 */
+		sessionEpoch: integer("session_epoch").notNull().default(0),
 		lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
 		/** Actor that created the row ("root" or "user:<uuid>"). */
 		createdBy: text("created_by"),
@@ -955,6 +1028,8 @@ export const dashboardSessions = pgTable(
 		}),
 		/** Denormalized so a session keeps working while its row is being read. */
 		role: dashboardRoleEnum("role").notNull(),
+		/** The user's `session_epoch` at issue; null for root and for sessions issued before it existed. */
+		userEpoch: integer("user_epoch"),
 		/** Absolute expiry; see dashboard_settings.session_ttl_minutes. */
 		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 		/** Sliding idle expiry (dashboard_settings.session_idle_minutes) is derived from this. */

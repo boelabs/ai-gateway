@@ -1,5 +1,6 @@
 import { type VideoJobBilling, videoAssets, videoJobs } from "#db/schema.ts";
 import type { VideoAssetVariant, VideoStatus } from "#core/videos.ts";
+import type { StateScope } from "#auth/scope.ts";
 import { writtenRow } from "#db/returning.ts";
 import { env } from "#config/env.ts";
 import { db } from "#db/client.ts";
@@ -23,7 +24,7 @@ export type VideoAssetRow = typeof videoAssets.$inferSelect;
 
 export interface CreateVideoJobInput {
 	id: string;
-	virtualKeyId: string | null;
+	scope: StateScope;
 	publicModel: string;
 	deploymentId: string;
 	adapterKey: string;
@@ -64,13 +65,19 @@ export function videoAssetExpiresAt(now = new Date()): Date {
 }
 
 /**
- * Virtual keys only see their own jobs. The master key (null scope) is the operator and sees
- * every job, so it gets no filter.
+ * Virtual keys see their own jobs and operator sessions their user's. The master key (both null) is
+ * the operator of record and sees every job, so it gets no filter.
  */
-function scopeCondition(virtualKeyId: string | null) {
-	return virtualKeyId === null
-		? undefined
-		: eq(videoJobs.virtualKeyId, virtualKeyId);
+function scopeCondition(scope: StateScope) {
+	if (scope.virtualKeyId !== null) {
+		return eq(videoJobs.virtualKeyId, scope.virtualKeyId);
+	}
+	if (scope.ownerActor !== null) {
+		return and(
+			isNull(videoJobs.virtualKeyId),
+			eq(videoJobs.ownerActor, scope.ownerActor),
+		);
+	}
 }
 
 export async function createVideoJob(
@@ -81,7 +88,8 @@ export async function createVideoJob(
 		.insert(videoJobs)
 		.values({
 			id: input.id,
-			virtualKeyId: input.virtualKeyId,
+			virtualKeyId: input.scope.virtualKeyId,
+			ownerActor: input.scope.ownerActor,
 			publicModel: input.publicModel,
 			deploymentId: input.deploymentId,
 			adapterKey: input.adapterKey,
@@ -109,10 +117,10 @@ export async function createVideoJob(
 
 export async function getVideoJobForScope(
 	id: string,
-	virtualKeyId: string | null,
+	scope: StateScope,
 	opts: { includeDeleted?: boolean } = {},
 ): Promise<VideoJobRow | undefined> {
-	const conditions = [eq(videoJobs.id, id), scopeCondition(virtualKeyId)];
+	const conditions = [eq(videoJobs.id, id), scopeCondition(scope)];
 	if (!opts.includeDeleted) {
 		conditions.push(isNull(videoJobs.deletedAt));
 	}
@@ -136,17 +144,14 @@ export async function getVideoJobById(
 }
 
 export async function listVideosForScope(opts: {
-	virtualKeyId: string | null;
+	scope: StateScope;
 	limit: number;
 	after?: string;
 	order: "asc" | "desc";
 }): Promise<{ rows: VideoJobRow[]; hasMore: boolean }> {
-	const conditions = [
-		scopeCondition(opts.virtualKeyId),
-		isNull(videoJobs.deletedAt),
-	];
+	const conditions = [scopeCondition(opts.scope), isNull(videoJobs.deletedAt)];
 	if (opts.after) {
-		const after = await getVideoJobForScope(opts.after, opts.virtualKeyId);
+		const after = await getVideoJobForScope(opts.after, opts.scope);
 		if (after) {
 			// (createdAt, id) tuple comparison so createdAt ties cannot skip rows.
 			conditions.push(
@@ -187,11 +192,17 @@ export async function listVideosForScope(opts: {
  */
 export async function claimVideoJobBilling(
 	id: string,
+	outcome: NonNullable<VideoJobBilling["outcome"]>,
 ): Promise<VideoJobBilling | undefined> {
+	const claim = {
+		state: "settling",
+		claimedAt: new Date().toISOString(),
+		outcome,
+	};
 	const [row] = await db
 		.update(videoJobs)
 		.set({
-			billing: sql`jsonb_set(${videoJobs.billing}, '{state}', '"settling"')`,
+			billing: sql`${videoJobs.billing} || ${JSON.stringify(claim)}::jsonb`,
 		})
 		.where(
 			and(
@@ -210,6 +221,35 @@ export async function finishVideoJobBilling(
 	billing: VideoJobBilling,
 ): Promise<void> {
 	await db.update(videoJobs).set({ billing }).where(eq(videoJobs.id, id));
+}
+
+/**
+ * Jobs whose settling claim is older than `before`: the claimant died between taking the claim and
+ * finishing it. Claims taken before `claimedAt` existed are judged by the row's last update.
+ */
+export async function listStaleVideoBillingClaims(
+	before: Date,
+	limit = 100,
+): Promise<Array<{ id: string; billing: VideoJobBilling }>> {
+	const rows = await db
+		.select({ id: videoJobs.id, billing: videoJobs.billing })
+		.from(videoJobs)
+		.where(
+			and(
+				sql`${videoJobs.billing}->>'state' = 'settling'`,
+				or(
+					sql`(${videoJobs.billing}->>'claimedAt')::timestamptz < ${before.toISOString()}::timestamptz`,
+					and(
+						sql`${videoJobs.billing}->>'claimedAt' IS NULL`,
+						lte(videoJobs.updatedAt, before),
+					),
+				),
+			),
+		)
+		.limit(limit);
+	return rows.flatMap((row) =>
+		row.billing ? [{ id: row.id, billing: row.billing }] : [],
+	);
 }
 
 export async function updateVideoJobState(
@@ -254,7 +294,15 @@ export async function updateVideoJobState(
 				? {}
 				: { lastPolledAt: patch.lastPolledAt }),
 		})
-		.where(eq(videoJobs.id, id))
+		// Compare-and-set on the job still being live: a poller that read the job before another
+		// replica finished, failed or deleted it must not write its stale state back over that.
+		.where(
+			and(
+				eq(videoJobs.id, id),
+				isNull(videoJobs.deletedAt),
+				inArray(videoJobs.status, ["queued", "in_progress"]),
+			),
+		)
 		.returning();
 	return row;
 }
@@ -315,23 +363,39 @@ export async function getVideoAsset(
 
 export async function markVideoDeletedForScope(
 	id: string,
-	virtualKeyId: string | null,
-): Promise<{ row: VideoJobRow | undefined; assets: VideoAssetRow[] }> {
+	scope: StateScope,
+): Promise<{
+	row: VideoJobRow | undefined;
+	/** The job's status before the delete, which decides how its reservation settles. */
+	previousStatus: VideoJobRow["status"] | undefined;
+	assets: VideoAssetRow[];
+}> {
 	return db.transaction(async (tx) => {
 		const now = new Date();
+		const [previous] = await tx
+			.select({ status: videoJobs.status })
+			.from(videoJobs)
+			.where(
+				and(
+					eq(videoJobs.id, id),
+					scopeCondition(scope),
+					isNull(videoJobs.deletedAt),
+				),
+			)
+			.for("update");
 		const [row] = await tx
 			.update(videoJobs)
 			.set({ status: "deleted", deletedAt: now, updatedAt: now })
 			.where(
 				and(
 					eq(videoJobs.id, id),
-					scopeCondition(virtualKeyId),
+					scopeCondition(scope),
 					isNull(videoJobs.deletedAt),
 				),
 			)
 			.returning();
 		if (!row) {
-			return { row: undefined, assets: [] };
+			return { row: undefined, previousStatus: undefined, assets: [] };
 		}
 		const assets = await tx
 			.update(videoAssets)
@@ -340,7 +404,7 @@ export async function markVideoDeletedForScope(
 			.set({ expiresAt: now })
 			.where(and(eq(videoAssets.videoId, id), isNull(videoAssets.deletedAt)))
 			.returning();
-		return { row, assets };
+		return { row, previousStatus: previous?.status, assets };
 	});
 }
 
@@ -387,13 +451,17 @@ export async function claimDueVideoJobs(
 					or(isNull(videoJobs.nextPollAt), lte(videoJobs.nextPollAt, now)),
 				),
 			)
-			.orderBy(asc(videoJobs.createdAt))
+			// Most overdue first, so a backlog of new jobs cannot starve ones waiting longer to poll.
+			.orderBy(
+				sql`${videoJobs.nextPollAt} ASC NULLS FIRST`,
+				asc(videoJobs.createdAt),
+			)
 			.limit(limit)
 			.for("update", { skipLocked: true });
 		if (due.length === 0) {
 			return [];
 		}
-		return tx
+		const claimed = await tx
 			.update(videoJobs)
 			.set({ nextPollAt: new Date(now.getTime() + claimMs) })
 			.where(
@@ -403,5 +471,49 @@ export async function claimDueVideoJobs(
 				),
 			)
 			.returning();
+		// RETURNING has no order; keep the selection's, most overdue first.
+		const position = new Map(due.map((row, index) => [row.id, index]));
+		return claimed.sort(
+			(a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0),
+		);
 	});
+}
+
+/**
+ * Removes the rows of jobs that are gone for good: deleted or past their asset expiry for longer
+ * than `before`, with no stored object left to delete and no budget reservation still to settle
+ * (an unsettled one is the reconciler's to finish first). Their asset rows go with them (cascade).
+ * Asset rows whose object was deleted long ago are removed too. Batched; returns rows removed.
+ */
+export async function purgeFinishedVideoRows(
+	before: Date,
+	limit = 500,
+): Promise<number> {
+	const iso = before.toISOString();
+	const jobs = await db.execute(sql`
+		DELETE FROM ${videoJobs}
+		WHERE ${videoJobs.id} IN (
+			SELECT ${videoJobs.id} FROM ${videoJobs}
+			WHERE (
+				${videoJobs.deletedAt} < ${iso}::timestamptz
+				OR ${videoJobs.expiresAt} < ${iso}::timestamptz
+			)
+			AND COALESCE(${videoJobs.billing}->>'state', 'settled') NOT IN ('reserved', 'settling')
+			AND NOT EXISTS (
+				SELECT 1 FROM ${videoAssets}
+				WHERE ${videoAssets.videoId} = ${videoJobs.id}
+				AND ${videoAssets.deletedAt} IS NULL
+			)
+			LIMIT ${limit}
+		)
+		RETURNING ${videoJobs.id}`);
+	const assets = await db.execute(sql`
+		DELETE FROM ${videoAssets}
+		WHERE ${videoAssets.id} IN (
+			SELECT ${videoAssets.id} FROM ${videoAssets}
+			WHERE ${videoAssets.deletedAt} < ${iso}::timestamptz
+			LIMIT ${limit}
+		)
+		RETURNING ${videoAssets.id}`);
+	return jobs.length + assets.length;
 }

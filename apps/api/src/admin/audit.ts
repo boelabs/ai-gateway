@@ -23,8 +23,9 @@ export function auditMiddleware(): MiddlewareHandler<AppEnv> {
 		if (!MUTATING.includes(c.req.method)) {
 			return;
 		}
-		// Never audit a call that was rejected before it identified anyone.
-		if (c.res.status === 401 || c.res.status === 403) {
+		// A call rejected before it identified anyone names nobody. A permission refusal (403) does:
+		// someone tried to change something their role does not allow, which is worth a record.
+		if (c.res.status === 401) {
 			return;
 		}
 		void record(c);

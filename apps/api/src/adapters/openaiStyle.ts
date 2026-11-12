@@ -1,3 +1,4 @@
+import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { makeOpenAIResponsesWebSocketHandler } from "./openaiResponsesWebSocket.ts";
 import { makeOpenAIRealtimeConversationHandler } from "./openaiRealtime.ts";
 import { upstreamFetch } from "#gateway/instrumentedTransport.ts";
@@ -7,6 +8,7 @@ import { type BaseCreds, requireApiKeyCreds } from "./creds.ts";
 import type { CanonicalChatRequest } from "#core/canonical.ts";
 import type { ReasoningControlKind } from "#core/reasoning.ts";
 import type { UpstreamTransport } from "#core/transport.ts";
+import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import { mapUpstreamHttpError } from "./upstreamError.ts";
 import type { ImageOperation } from "#core/images.ts";
 import { mergeExtraBody } from "#core/extraBody.ts";
@@ -33,7 +35,6 @@ import {
 
 import {
 	responsesEventsToCanonicalChunks,
-	assertResponsesRequestSupported,
 	buildResponsesRequestBody,
 	parseResponsesResponse,
 } from "#contracts/openai/responsesTransport.ts";
@@ -64,6 +65,7 @@ import {
 } from "#contracts/openai/audioTransport.ts";
 
 import {
+	type BuildChatBodyOptions,
 	parseOpenAIChatResponse,
 	parseOpenAIChatChunk,
 	buildOpenAIChatBody,
@@ -104,6 +106,10 @@ export interface OpenAIStyleConfig {
 	supportsDeveloperRole?: boolean;
 	/** Emit top_k on Chat Completions. Defaults to false because OpenAI does not define it. */
 	supportsTopK?: boolean;
+	/** Send assistant `reasoning_content` back (see BuildChatBodyOptions.replayReasoningContent). */
+	replayReasoningContent?: boolean;
+	/** See BuildChatBodyOptions.assistantMessageFields. */
+	assistantMessageFields?: BuildChatBodyOptions["assistantMessageFields"];
 	/** OpenAI uses Bearer; Azure v1 with a key uses the api-key header. */
 	authScheme?: "bearer" | "api-key";
 	/** Base-URL-specific normalization/validation. */
@@ -258,6 +264,44 @@ interface ResolvedCreds {
 	headers?: Record<string, string>;
 }
 
+const TOP_K_UNSUPPORTED: ParameterSupportMap = {
+	top_k: {
+		mode: "unsupported",
+		notes: "Not part of the OpenAI Chat Completions or Responses request.",
+	},
+};
+
+const NOT_IN_RESPONSES =
+	"Chat Completions only; the Responses request has no such field.";
+
+/** Chat Completions controls the Responses request has no field for. */
+const RESPONSES_UNSUPPORTED: ParameterSupportMap = {
+	...TOP_K_UNSUPPORTED,
+	n: { mode: "unsupported", notes: NOT_IN_RESPONSES },
+	stop: { mode: "unsupported", notes: NOT_IN_RESPONSES },
+	seed: { mode: "unsupported", notes: NOT_IN_RESPONSES },
+};
+
+/**
+ * What these transports cannot carry. OpenAI defines no `top_k` on either wire; Chat Completions
+ * emits the common extension only for providers that opt in with `supportsTopK`. Responses has no
+ * `n`, `stop` or `seed`; requests that use them prefer Chat Completions where the model offers it.
+ */
+function openAIStyleChatParameters(
+	transports: readonly ("chat_completions" | "responses")[],
+	supportsTopK: boolean,
+): NonNullable<Adapter["chatParameters"]> {
+	const parameters: NonNullable<Adapter["chatParameters"]> = {};
+	for (const transport of transports) {
+		if (transport === "responses") {
+			parameters[transport] = RESPONSES_UNSUPPORTED;
+		} else if (!supportsTopK) {
+			parameters[transport] = TOP_K_UNSUPPORTED;
+		}
+	}
+	return parameters;
+}
+
 export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 	function resolveCreds(ctx: AdapterContext): ResolvedCreds {
 		const c = requireApiKeyCreds<Creds>(ctx.credentials, config.label);
@@ -268,9 +312,21 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 				message: `${config.label}: missing 'baseUrl' in credentials`,
 			});
 		}
-		const normalizedBase = config.normalizeBaseUrl
-			? config.normalizeBaseUrl(base)
-			: base.replace(/\/+$/u, "");
+		let normalizedBase: string;
+		try {
+			normalizedBase = config.normalizeBaseUrl
+				? config.normalizeBaseUrl(base)
+				: base.replace(/\/+$/u, "");
+		} catch (cause) {
+			// A stored base URL that no longer passes is the deployment's configuration, not the
+			// client's request: it fails over and quarantines like bad credentials.
+			throw new GatewayError({
+				class: "server",
+				failureKind: "configuration",
+				message: `${config.label}: the deployment's credentials.baseUrl is invalid: ${cause instanceof Error ? cause.message : String(cause)}`,
+				cause,
+			});
+		}
 		const resolved: ResolvedCreds = { apiKey: c.apiKey, base: normalizedBase };
 		if (c.organization !== undefined) {
 			resolved.organization = c.organization;
@@ -407,8 +463,17 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 					cause,
 				});
 			}
-			if (json !== null && typeof json === "object" && "error" in json) {
-				throw mapError({ status: 502, body: json }, ctx);
+			// `error: null` is a field some compatible servers send on every chunk; only an actual
+			// error object ends the stream.
+			if (
+				json !== null &&
+				typeof json === "object" &&
+				(json as { error?: unknown }).error != null
+			) {
+				throw mapUpstreamStreamError(
+					json as Record<string, unknown>,
+					config.label,
+				);
 			}
 			if (
 				json === null ||
@@ -532,6 +597,10 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 							? "developer"
 							: "system",
 						supportsTopK: config.supportsTopK === true,
+						replayReasoningContent: config.replayReasoningContent === true,
+						...(config.assistantMessageFields
+							? { assistantMessageFields: config.assistantMessageFields }
+							: {}),
 						...(ctx.meta.reasoning === undefined
 							? {}
 							: { reasoningSpec: ctx.meta.reasoning }),
@@ -1108,12 +1177,11 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 		},
 		supportedCallTypes,
 		chat,
-		assertChatRequestSupported(req, ctx) {
-			config.assertChatRequestSupported?.(req, ctx);
-			if (ctx.transport === "responses") {
-				assertResponsesRequestSupported(req);
-			}
-		},
+		// n, stop and seed on Responses go through the parameter policy (chatParameters), so a drop
+		// strategy can drop them; the body builder still refuses them if they arrive regardless.
+		...(config.assertChatRequestSupported
+			? { assertChatRequestSupported: config.assertChatRequestSupported }
+			: {}),
 		...(config.responsesWebSocket
 			? {
 					responsesWebSocket: makeOpenAIResponsesWebSocketHandler({
@@ -1131,6 +1199,19 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 					}),
 				}
 			: {}),
+		...(config.normalizeBaseUrl
+			? {
+					validateCredentials(credentials: Record<string, unknown>) {
+						if (typeof credentials.baseUrl === "string") {
+							config.normalizeBaseUrl?.(credentials.baseUrl);
+						}
+					},
+				}
+			: {}),
+		chatParameters: openAIStyleChatParameters(
+			chatTransports,
+			config.supportsTopK === true,
+		),
 		// The chat_completions transport emits reasoning_effort (openai_effort), top-level thinking
 		// (openai_body), ignores fixed reasoners, and supports chat_template_kwargs.
 		reasoningKinds: new Set<ReasoningControlKind>([

@@ -1,3 +1,4 @@
+import { mapUpstreamHttpError } from "#adapters/upstreamError.ts";
 import { normalizeExecutionPolicies } from "#core/executionPolicy.ts";
 import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
@@ -554,6 +555,74 @@ test("router: a request the upstream rejects ends after one attempt, as the prov
 		);
 		assert.equal(calls, 1);
 	} finally {
+		await cleanupDeployments(deployments);
+	}
+});
+
+test("router: an upstream 402 fails over to a sibling instead of ending the request", {
+	skip,
+}, async () => {
+	const publicModel = modelName("payment");
+	const deployments = [
+		await deployment(publicModel),
+		await deployment(publicModel),
+	];
+	const tried: string[] = [];
+	try {
+		const result = await route(
+			publicModel,
+			"chat",
+			{ clientSignal: new AbortController().signal, requestId: randomUUID() },
+			async (candidate) => {
+				tried.push(candidate.row.id);
+				if (tried.length === 1) {
+					throw mapUpstreamHttpError(
+						{
+							status: 402,
+							body: { error: { message: "Insufficient credits" } },
+						},
+						{ label: "P" },
+					);
+				}
+				return candidate.row.id;
+			},
+		);
+		assert.equal(result.attempts, 2);
+		assert.notEqual(tried[0], tried[1]);
+		await result.finish(null);
+	} finally {
+		await cleanupDeployments(deployments);
+	}
+});
+
+test("router: a client that leaves during a retry backoff ends the request without another attempt", {
+	skip,
+}, async () => {
+	await updateRouterSettings({ retryAfterSeconds: 2 });
+	const publicModel = modelName("backoff");
+	const deployments = [await deployment(publicModel)];
+	const client = new AbortController();
+	let calls = 0;
+	try {
+		setTimeout(() => client.abort(), 300);
+		const started = Date.now();
+		await assert.rejects(
+			route(
+				publicModel,
+				"chat",
+				{ clientSignal: client.signal, requestId: randomUUID() },
+				async () => {
+					calls += 1;
+					return fail("server");
+				},
+			),
+			(error: unknown) =>
+				GatewayError.is(error) && error.code === "client_closed_request",
+		);
+		assert.equal(calls, 1);
+		assert.ok(Date.now() - started < 1500);
+	} finally {
+		await updateRouterSettings({ retryAfterSeconds: 0 });
 		await cleanupDeployments(deployments);
 	}
 });

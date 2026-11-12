@@ -148,6 +148,8 @@ export const deepseekAdapter = makeOpenAIStyleAdapter({
 	supportedChatTransports: ["chat_completions", "responses"],
 	maxTokensField: "max_tokens",
 	supportsTopK: true,
+	// Its thinking models need their reasoning_content back in later requests.
+	replayReasoningContent: true,
 	refineBadRequest: contextWindowRefine,
 	assertChatRequestSupported: assertDeepSeekStrictRequest,
 	prepareChatRequest: prepareDeepSeekRequest,

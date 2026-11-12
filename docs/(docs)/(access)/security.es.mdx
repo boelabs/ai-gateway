@@ -27,9 +27,13 @@ Todos los demás operadores son una fila creada por un propietario existente a t
 
 **El panel no es una identidad.** No posee ninguna credencial propia ni autentica nada: transmite el inicio de sesión del operador y luego lleva su sesión. Un panel que apunta a un gateway donde no tiene cuenta es una pantalla de inicio de sesión que no puede pasar. Consulta [Panel del operador → Cómo se autentica](/docs/dashboard#how-it-authenticates), que también cubre el riesgo que se corre en sentido contrario: quien pueda cambiar el `GATEWAY_URL` del panel puede apuntar su formulario de inicio de sesión a otro lugar.
 
-**Las contraseñas** se codifican con Argon2id y nunca se almacenan ni se devuelven de ninguna forma. **Las sesiones** se almacenan como un hash SHA-256 del token, exactamente como las virtual keys, con una caducidad absoluta y una caducidad inactiva deslizante, ambas configuradas en **Configuración › Sesiones de operador**. Deshabilitar a un usuario, cambiar su función o restablecer su contraseña revoca cada sesión en vivo inmediatamente en lugar de esperar a que caduque.
+**Las contraseñas** se codifican con Argon2id y nunca se almacenan ni se devuelven de ninguna forma. **Las sesiones** se almacenan como un hash SHA-256 del token, exactamente como las virtual keys, con una caducidad absoluta y una caducidad inactiva deslizante, ambas configuradas en **Configuración › Sesiones de operador**. Deshabilitar a un usuario, cambiar su función o restablecer su contraseña revoca cada sesión en vivo inmediatamente en lugar de esperar a que caduque. El mismo cambio incrementa la época de sesión del usuario, y una sesión solo se resuelve mientras su época coincide, así que ni siquiera un inicio de sesión que compitió con el cambio conserva el rol o la contraseña anteriores; el rol de una sesión siempre se lee de la fila del usuario.
 
-Los **inicios de sesión fallidos** se cuentan por nombre de usuario *y* por IP de cliente, por lo que ni una cuenta bajo un ataque distribuido ni una dirección que pruebe muchos nombres de usuario alcanza el límite de intentos sin ser detectado. Luego, ambos contadores se bloquean para la ventana configurada. Cada rechazo devuelve el mismo mensaje genérico, y un nombre de usuario desconocido aún se verifica contra un hash real, por lo que ni la redacción ni el momento revelan si existe una cuenta.
+Un usuario marcado con **debe cambiar la contraseña** (lo predeterminado cuando un owner fija la contraseña de alguien) puede leer `GET /auth/session` y llamar a `POST /auth/password` con su sesión, y nada más: cualquier otra solicitud responde `403 password_change_required`. El dashboard lo lleva a una pantalla de cambio de contraseña antes de mostrar cualquier otra cosa.
+
+Una cookie de sesión nunca autentica un handshake de WebSocket (`401 session_websocket_refused`): un navegador envía cookies en un upgrade entre sitios, que es un `GET` que la comprobación CSRF no cubre, y ningún navegador abre sockets directamente al gateway. Los WebSockets de Realtime y Responses usan una API key o un client secret de realtime.
+
+Los **inicios de sesión fallidos** se cuentan de tres formas, y cada intento se reserva antes de comprobar la contraseña, así que los intentos concurrentes no pueden saltarse el límite. El *par* de nombre de usuario e IP de cliente se bloquea tras los intentos configurados; es el bloqueo que encuentra una persona, y nadie desde otra dirección puede provocarlo por ella. El nombre de usuario solo y la IP sola tienen un límite diez veces mayor, que frena una cuenta bajo un ataque distribuido y una dirección que prueba muchos nombres de usuario; el bloqueo del nombre de usuario duplica su ventana cada vez que se vuelve a superar el límite, hasta 24 horas. Un inicio de sesión correcto solo borra su propio par, así que entrar en una cuenta nunca reinicia los contadores acumulados contra otra. Cada rechazo devuelve el mismo mensaje genérico, y un nombre de usuario desconocido aún se verifica contra un hash real, por lo que ni la redacción ni el momento revelan si existe una cuenta.
 
 ### Roles [#roles]
 
@@ -62,11 +66,11 @@ Nada amplía esto. El panel no llama en absoluto al gateway desde el navegador; 
 
 ### Registro de auditoría [#audit-trail]
 
-Cada llamada mutante `/admin` se agrega a `admin_audit` con la identidad de actuación (`master-key`, `root` o `user:<uuid>`), la ruta, el destino, la identificación de la solicitud y el estado resultante. Las lecturas no se auditan (constituyen la mayor parte del tráfico de un panel y enterrarían lo que importa), con una excepción deliberada en la otra dirección: leer una muestra de carga útil es un `GET` que revela contenido real, y `payload_access_audit` lo registra por separado.
+Cada llamada mutante `/admin` se agrega a `admin_audit` con la identidad de actuación (`master-key`, `root` o `user:<uuid>`), la ruta, el destino, la identificación de la solicitud y el estado resultante, incluido un rechazo `403`, porque un intento de cambiar lo que el rol no permite merece quedar registrado. Las lecturas no se auditan (constituyen la mayor parte del tráfico de un panel y enterrarían lo que importa), con una excepción deliberada en la otra dirección: leer una muestra de carga útil es un `GET` que revela contenido real, y `payload_access_audit` lo registra por separado.
 
 Ambos registros se pueden leer a través de `GET /admin/audit` (`audit:read`, es decir, master key o propietario), fusionados en una línea de tiempo y filtrables por actor, acción y tiempo. El recorrido se puede agregar únicamente: ninguna ruta actualiza ni elimina una entrada.
 
-Las operaciones de inferencia llevan la misma identidad en `gateway_operations.actor`, por lo que el tráfico del operador (un playground, una prueba manual) es atribuible y aparece en `GET /admin/usage?groupBy=actor` en lugar de aparecer como gasto no atribuido.
+Las operaciones de inferencia llevan la misma identidad en `gateway_operations.actor`, por lo que el tráfico del operador (un playground, una prueba manual) es atribuible y aparece en `GET /admin/usage?groupBy=actor` en lugar de aparecer como gasto no atribuido. Una sesión de operador llega a la API pública solo con `inference:use` (admin y owner); la sesión de un viewer se rechaza con `403 insufficient_permission`. Las respuestas almacenadas y los trabajos de video creados con una sesión pertenecen a su usuario: ni la master key ni otro operador los alcanzan por `/v1`.
 
 ## Virtual keys en reposo [#virtual-keys-at-rest]
 
@@ -74,7 +78,7 @@ Una virtual key se autentica por su **hash SHA-256**; se conserva un prefijo de 
 
 Dos controles lo restringen aún más. Una clave **privada** solo almacena su hash, y volver privada una clave borra su secreto almacenado. `VIRTUAL_KEY_SECRET_ACCESS=sealed` rechaza toda copia, con cualquier credencial, como una decisión de despliegue que una cuenta de operador comprometida no puede revertir. Rota una clave con `POST /admin/keys/:id/rotate`: el secreto anterior deja de funcionar de inmediato. Consulta [Virtual keys](/docs/virtual-keys#copy-a-key-again).
 
-La respuesta de crear o rotar una clave también se recuerda durante un día cuando la solicitud lleva un `Idempotency-Key`, para que un reintento pueda repetirla; se guarda cifrada con el keyring, como toda respuesta recordada. Un volcado de la base de datos sin el keyring no revela ninguna clave.
+La respuesta de crear o rotar una clave nunca se guarda para un reintento con `Idempotency-Key`: el gateway solo recuerda que la llamada terminó y con qué estado, así que la clave en texto plano no existe en ningún otro lugar que en la única respuesta que la devolvió.
 
 ## Credenciales de deployment en reposo [#deployment-credentials-at-rest]
 

@@ -59,7 +59,7 @@ Nada aquí revela etiquetas de deployment, credenciales, identificaciones de bas
 
 ## `GET /v1/models/{model}/deployments` [#get-v1modelsmodeldeployments]
 
-Una entrada por deployment detrás del grupo, cada una con sus propias métricas:
+Una entrada por deployment detrás del grupo, cada una con sus propias métricas. Una virtual key restringida a otros modelos recibe `403`, igual que al llamar al modelo.
 
 ```json
 {

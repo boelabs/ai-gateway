@@ -1,3 +1,4 @@
+import { responsesAnnotationFromChat, logprobTokens } from "./outputText.ts";
 import { fileParserOptionsFromPlugins } from "#contracts/fileParser.ts";
 import { assertNoManagedExtraBodyKeys } from "#core/extraBody.ts";
 import type { ResponsesRequest } from "./responses.ts";
@@ -128,13 +129,26 @@ export function responseForClient(
 	}
 	const copy = structuredClone(response);
 	if (Array.isArray(copy.output)) {
-		copy.output = copy.output.map((item) =>
-			item !== null && typeof item === "object" && !Array.isArray(item)
-				? stripEncryptedReasoningItem(item as Record<string, unknown>)
-				: item,
-		);
+		// Gateway state carriers exist only for the stored copy when the client did not ask for them.
+		copy.output = copy.output
+			.filter((item) => !isGatewayStateItem(item))
+			.map((item) =>
+				item !== null && typeof item === "object" && !Array.isArray(item)
+					? stripEncryptedReasoningItem(item as Record<string, unknown>)
+					: item,
+			);
 	}
 	return copy;
+}
+
+/** Whether a stream event is about a gateway state carrier, which the client did not ask for. */
+export function isGatewayStateEvent(event: SSEEvent): boolean {
+	try {
+		const data = JSON.parse(event.data) as { item?: unknown };
+		return isGatewayStateItem(data.item);
+	} catch {
+		return false;
+	}
 }
 
 export function responseEventForClient(
@@ -183,6 +197,9 @@ function mapInputPart(
 		case "output_text":
 		case "text":
 			return { type: "text", text: String(part.text ?? "") };
+		case "refusal":
+			// The model's refusal, collected onto the assistant message by the caller.
+			return null;
 		case "input_image": {
 			const url = part.image_url;
 			if (typeof url === "string") {
@@ -262,35 +279,51 @@ function mapMessageContent(
 	return null;
 }
 
+/**
+ * A Responses tool choice in canonical form, or `native` when it names something only the Responses
+ * API knows (a hosted tool, an MCP or custom tool, an allowed list with such tools), which then
+ * travels as written.
+ */
 function mapToolChoice(
 	tc: ResponsesRequest["tool_choice"],
-): CanonicalToolChoice | undefined {
+): CanonicalToolChoice | "native" | undefined {
 	if (tc === undefined) {
 		return undefined;
 	}
 	if (typeof tc === "string") {
-		return tc === "auto" || tc === "none" || tc === "required" ? tc : "auto";
+		if (tc === "auto" || tc === "none" || tc === "required") {
+			return tc;
+		}
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_request_error",
+			param: "tool_choice",
+			message: `Unsupported tool_choice: ${tc}`,
+		});
 	}
-	const { name } = tc as { name?: string };
-	if (name) {
-		return { name };
-	}
-	const allowed = tc as {
+	const choice = tc as {
 		type?: string;
+		name?: string;
 		mode?: string;
 		tools?: Array<{ type?: string; name?: string }>;
 	};
-	if (allowed.type === "allowed_tools" && Array.isArray(allowed.tools)) {
+	if (choice.type === "function" && typeof choice.name === "string") {
+		return { name: choice.name };
+	}
+	if (choice.type === "allowed_tools" && Array.isArray(choice.tools)) {
+		if (
+			!choice.tools.every(
+				(tool) => tool.type === "function" && typeof tool.name === "string",
+			)
+		) {
+			return "native";
+		}
 		return {
-			allowedTools: allowed.tools.flatMap((tool) =>
-				tool.type === "function" && typeof tool.name === "string"
-					? [tool.name]
-					: [],
-			),
-			mode: allowed.mode === "required" ? "required" : "auto",
+			allowedTools: choice.tools.map((tool) => String(tool.name)),
+			mode: choice.mode === "required" ? "required" : "auto",
 		};
 	}
-	return "auto";
+	return "native";
 }
 
 export type ResponseInputItem = Record<string, unknown>;
@@ -418,10 +451,28 @@ function isGatewayStateItem(item: unknown): boolean {
 	);
 }
 
-/** Client input as forwarded verbatim: no gateway state carriers, no mirrored reasoning content. */
+/**
+ * A reasoning item with no encrypted content can only be resolved from an upstream store, and the
+ * gateway always calls the upstream with `store: false`, so OpenAI would answer that the item was not
+ * found. Its summary carries no state the model needs.
+ */
+function isUnresolvableReasoningItem(item: unknown): boolean {
+	const record = extraContent(item);
+	return (
+		record?.type === "reasoning" && typeof record.encrypted_content !== "string"
+	);
+}
+
+/**
+ * Client input as forwarded verbatim: no gateway state carriers, no reasoning items the stateless
+ * upstream cannot resolve, no mirrored reasoning content.
+ */
 export function withoutGatewayStateItems<T>(items: T[]): T[] {
 	return items
-		.filter((item) => !isGatewayStateItem(item))
+		.filter(
+			(item) =>
+				!(isGatewayStateItem(item) || isUnresolvableReasoningItem(item)),
+		)
 		.map(reasoningInputForUpstream);
 }
 
@@ -591,10 +642,25 @@ export function responsesRequestToCanonical(
 						role,
 						content: mapMessageContent(item.content),
 					};
+					const refusals = Array.isArray(item.content)
+						? item.content.filter(
+								(part) =>
+									(part as { type?: unknown } | null)?.type === "refusal",
+							)
+						: [];
+					if (role === "assistant" && refusals.length > 0) {
+						message.refusal = refusals
+							.map((part) =>
+								String((part as { refusal?: unknown }).refusal ?? ""),
+							)
+							.join("");
+					}
 					if (
 						Array.isArray(item.content) &&
 						Array.isArray(message.content) &&
-						message.content.length !== item.content.length
+						message.content.length +
+							(role === "assistant" ? refusals.length : 0) !==
+							item.content.length
 					) {
 						requiresNativeInput = true;
 					}
@@ -901,7 +967,10 @@ export function responsesRequestToCanonical(
 				? {}
 				: { contextManagement: req.context_management }),
 			...(requiresNativeInput && Array.isArray(req.input)
-				? { rawInput: withoutGatewayStateItems(structuredClone(req.input)) }
+				? {
+						rawInput: withoutGatewayStateItems(structuredClone(req.input)),
+						...(req.instructions ? { instructions: req.instructions } : {}),
+					}
 				: {}),
 		};
 	}
@@ -959,7 +1028,16 @@ export function responsesRequestToCanonical(
 		u.requiresNativeWire = true;
 	}
 	const tc = mapToolChoice(req.tool_choice);
-	if (tc !== undefined) {
+	if (tc === "native") {
+		u.responsesTransport = {
+			...u.responsesTransport,
+			rawToolChoice: structuredClone(req.tool_choice) as Record<
+				string,
+				unknown
+			>,
+		};
+		u.requiresNativeWire = true;
+	} else if (tc !== undefined) {
 		u.toolChoice = tc;
 	}
 
@@ -971,6 +1049,12 @@ export function responsesRequestToCanonical(
 export interface RenderOptions {
 	/** Original request (for echoing fields: instructions, tools, etc.). */
 	req: ResponsesRequest;
+	/**
+	 * Render message-bound state carriers even when the client did not ask for encrypted reasoning:
+	 * the stored copy needs them for `previous_response_id`, and `responseForClient` removes them
+	 * from what the client sees.
+	 */
+	retainState?: boolean;
 	/** Public model selected by the router. */
 	publicModel: string;
 	/**
@@ -1018,11 +1102,30 @@ function statusFor(finish: CanonicalFinishReason | null): {
 	return { status: "completed", incomplete: null };
 }
 
+/** The output_text part, with the annotations and log probabilities the canonical text carries. */
+function outputTextPart(
+	text: string,
+	annotations: Record<string, unknown>[] | undefined,
+	logprobs: unknown[] | undefined,
+): Record<string, unknown> {
+	return {
+		type: "output_text",
+		text,
+		annotations: (annotations ?? []).map(responsesAnnotationFromChat),
+		...(logprobs === undefined ? {} : { logprobs }),
+	};
+}
+
 function messageItem(
 	content: string,
 	id: string,
 	phase?: "commentary" | "final_answer",
 	providerFields?: Record<string, unknown>,
+	refusal?: string,
+	text?: {
+		annotations?: Record<string, unknown>[] | undefined;
+		logprobs?: unknown[] | undefined;
+	},
 ): Record<string, unknown> {
 	return {
 		type: "message",
@@ -1033,7 +1136,12 @@ function messageItem(
 		...(providerFields === undefined
 			? {}
 			: { provider_specific_fields: providerFields }),
-		content: [{ type: "output_text", text: content, annotations: [] }],
+		content: [
+			...(content || refusal === undefined
+				? [outputTextPart(content, text?.annotations, text?.logprobs)]
+				: []),
+			...(refusal === undefined ? [] : [{ type: "refusal", refusal }]),
+		],
 	};
 }
 
@@ -1050,7 +1158,8 @@ function messageStateItem(
 ): Record<string, unknown> | undefined {
 	if (
 		opts.messageState === undefined ||
-		opts.req.include?.includes(ENCRYPTED_REASONING_INCLUDE) !== true
+		(opts.retainState !== true &&
+			opts.req.include?.includes(ENCRYPTED_REASONING_INCLUDE) !== true)
 	) {
 		return undefined;
 	}
@@ -1210,7 +1319,8 @@ function buildResponse(
 		truncation: req.truncation ?? "disabled",
 		usage: parts.usage ? toResponsesUsage(parts.usage) : null,
 		metadata: req.metadata ?? {},
-		service_tier: req.service_tier ?? "default",
+		// The tier the response ran at when the provider reports it, not just the one requested.
+		service_tier: parts.usage?.serviceTier ?? req.service_tier ?? "default",
 		safety_identifier: req.safety_identifier ?? null,
 		prompt_cache_key: req.prompt_cache_key ?? null,
 		...(providerSpecificFields === undefined
@@ -1262,7 +1372,9 @@ export function canonicalToResponsesResponse(
 				reasoningItem(choice.message.reasoning, `rs_${randomUUID()}`),
 			);
 		}
-		const messageId = content ? `msg_${randomUUID()}` : undefined;
+		const refusal = choice?.message.refusal ?? undefined;
+		const messageId =
+			content || refusal !== undefined ? `msg_${randomUUID()}` : undefined;
 		if (messageId !== undefined) {
 			output.push(
 				messageItem(
@@ -1270,6 +1382,11 @@ export function canonicalToResponsesResponse(
 					messageId,
 					choice?.message.phase,
 					withoutOpenAIResponsesReasoningState(choice?.message.providerFields),
+					refusal,
+					{
+						annotations: choice?.message.annotations,
+						logprobs: logprobTokens(choice?.logprobs),
+					},
 				),
 			);
 		}
@@ -1427,6 +1544,14 @@ export async function* canonicalChunksToResponsesEvents(
 	let nextOutputIndex = 0;
 
 	let messageStarted = false;
+	// Content parts of the message item, numbered as they open: its text and its refusal.
+	let nextContentIndex = 0;
+	let textPart: number | undefined;
+	let refusalPart: number | undefined;
+	let refusal = "";
+	let messagePhase: "commentary" | "final_answer" | undefined;
+	const textAnnotations: Record<string, unknown>[] = [];
+	const textLogprobs: unknown[] = [];
 	let msgIndex = 0;
 	const msgId = `msg_${randomUUID()}`;
 
@@ -1557,6 +1682,13 @@ export async function* canonicalChunksToResponsesEvents(
 		}
 
 		const { delta } = choice;
+		if (delta.phase !== undefined) {
+			messagePhase = delta.phase;
+		}
+		const tokens = logprobTokens(choice.logprobs);
+		if (tokens !== undefined) {
+			textLogprobs.push(...tokens);
+		}
 		const streamOutput = openaiResponsesStreamOutputFromProviderFields(
 			delta.providerFields,
 		);
@@ -1706,27 +1838,30 @@ export async function* canonicalChunksToResponsesEvents(
 		)) {
 			nativeOutput.push(item);
 		}
+		if ((delta.content || delta.refusal) && !messageStarted) {
+			if (reasoningOpen) {
+				yield* reasoningSummaryDone();
+			}
+			messageStarted = true;
+			msgIndex = nextOutputIndex++;
+			yield sse("response.output_item.added", next(), {
+				output_index: msgIndex,
+				item: {
+					type: "message",
+					id: msgId,
+					status: "in_progress",
+					role: "assistant",
+					content: [],
+				},
+			});
+		}
 		if (delta.content) {
-			if (!messageStarted) {
-				if (reasoningOpen) {
-					yield* reasoningSummaryDone();
-				}
-				messageStarted = true;
-				msgIndex = nextOutputIndex++;
-				yield sse("response.output_item.added", next(), {
-					output_index: msgIndex,
-					item: {
-						type: "message",
-						id: msgId,
-						status: "in_progress",
-						role: "assistant",
-						content: [],
-					},
-				});
+			if (textPart === undefined) {
+				textPart = nextContentIndex++;
 				yield sse("response.content_part.added", next(), {
 					item_id: msgId,
 					output_index: msgIndex,
-					content_index: 0,
+					content_index: textPart,
 					part: { type: "output_text", text: "", annotations: [] },
 				});
 			}
@@ -1734,8 +1869,39 @@ export async function* canonicalChunksToResponsesEvents(
 			yield sse("response.output_text.delta", next(), {
 				item_id: msgId,
 				output_index: msgIndex,
-				content_index: 0,
+				content_index: textPart,
 				delta: delta.content,
+				...(tokens === undefined ? {} : { logprobs: tokens }),
+			});
+		}
+		if (delta.annotations !== undefined && textPart !== undefined) {
+			for (const annotation of delta.annotations) {
+				yield sse("response.output_text.annotation.added", next(), {
+					item_id: msgId,
+					output_index: msgIndex,
+					content_index: textPart,
+					annotation_index: textAnnotations.length,
+					annotation: responsesAnnotationFromChat(annotation),
+				});
+				textAnnotations.push(annotation);
+			}
+		}
+		if (delta.refusal) {
+			if (refusalPart === undefined) {
+				refusalPart = nextContentIndex++;
+				yield sse("response.content_part.added", next(), {
+					item_id: msgId,
+					output_index: msgIndex,
+					content_index: refusalPart,
+					part: { type: "refusal", refusal: "" },
+				});
+			}
+			refusal += delta.refusal;
+			yield sse("response.refusal.delta", next(), {
+				item_id: msgId,
+				output_index: msgIndex,
+				content_index: refusalPart,
+				delta: delta.refusal,
 			});
 		}
 
@@ -1807,19 +1973,49 @@ export async function* canonicalChunksToResponsesEvents(
 	}
 
 	if (messageStarted) {
-		yield sse("response.output_text.done", next(), {
-			item_id: msgId,
-			output_index: msgIndex,
-			content_index: 0,
-			text: content,
-		});
-		yield sse("response.content_part.done", next(), {
-			item_id: msgId,
-			output_index: msgIndex,
-			content_index: 0,
-			part: { type: "output_text", text: content, annotations: [] },
-		});
-		const item = messageItem(content, msgId, undefined, messageProviderFields);
+		if (textPart !== undefined) {
+			yield sse("response.output_text.done", next(), {
+				item_id: msgId,
+				output_index: msgIndex,
+				content_index: textPart,
+				text: content,
+			});
+			yield sse("response.content_part.done", next(), {
+				item_id: msgId,
+				output_index: msgIndex,
+				content_index: textPart,
+				part: outputTextPart(
+					content,
+					textAnnotations,
+					textLogprobs.length > 0 ? textLogprobs : undefined,
+				),
+			});
+		}
+		if (refusalPart !== undefined) {
+			yield sse("response.refusal.done", next(), {
+				item_id: msgId,
+				output_index: msgIndex,
+				content_index: refusalPart,
+				refusal,
+			});
+			yield sse("response.content_part.done", next(), {
+				item_id: msgId,
+				output_index: msgIndex,
+				content_index: refusalPart,
+				part: { type: "refusal", refusal },
+			});
+		}
+		const item = messageItem(
+			content,
+			msgId,
+			messagePhase,
+			messageProviderFields,
+			refusalPart === undefined ? undefined : refusal,
+			{
+				annotations: textAnnotations,
+				logprobs: textLogprobs.length > 0 ? textLogprobs : undefined,
+			},
+		);
 		output.push(item);
 		yield sse("response.output_item.done", next(), {
 			output_index: msgIndex,

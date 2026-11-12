@@ -126,3 +126,28 @@ test("nothing declared or configured falls back, and says so when it cannot run"
 		/falls back to the default transport "images"/u,
 	);
 });
+
+test("a request's preferred transport applies below overrides and declarations", () => {
+	const plain = candidate();
+	assert.equal(
+		resolveTransport(plain, "images.generations", "chat_completions"),
+		"chat_completions",
+	);
+	// A transport the adapter does not offer is no preference at all.
+	assert.equal(
+		resolveTransport(plain, "images.generations", "responses"),
+		"images",
+	);
+	const overridden = candidate();
+	overridden.row.transportOverrides = { "image.generate": "images" };
+	assert.equal(
+		resolveTransport(overridden, "images.generations", "chat_completions"),
+		"images",
+	);
+	const declared = candidate();
+	declared.meta.operations = { "image.generate": { transport: "images" } };
+	assert.equal(
+		resolveTransport(declared, "images.generations", "chat_completions"),
+		"images",
+	);
+});

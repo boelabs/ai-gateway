@@ -16,6 +16,8 @@ export interface CostBreakdown {
 	audioCents: number;
 	/** Cost of reranking search units, in USD cents. */
 	searchUnitCents: number;
+	/** Cost of per-unit prices (per generated image, per second of audio), in USD cents. */
+	unitCents: number;
 	/** Cost reported by the upstream, retained separately for reconciliation. */
 	providerReportedCents: number | null;
 	/** Total in USD cents. */
@@ -27,13 +29,14 @@ type PricingShape = NonNullable<ResolvedModelMetadata["pricing"]>;
 /**
  * Effective rates (cents per 1M) based on the prompt size. Starts from the base rate and applies the
  * highest `aboveInputTokens` tier that `promptTokens` exceeds (a step function over the WHOLE request).
- * cache read/write fall back to the input rate if they have no own rate at that level.
+ * Cache read/write without an explicit rate (base or tier) fall back to the EFFECTIVE input rate, so a
+ * tier that only changes the input rate also moves cached tokens with it.
  */
 function effectiveRates(p: PricingShape, promptTokens: number): PricingShape {
 	let input = p.inputCentsPerMTokens ?? 0;
 	let output = p.outputCentsPerMTokens ?? 0;
-	let cacheRead = p.cacheReadCentsPerMTokens ?? p.inputCentsPerMTokens ?? 0;
-	let cacheWrite = p.cacheWriteCentsPerMTokens ?? p.inputCentsPerMTokens ?? 0;
+	let cacheRead = p.cacheReadCentsPerMTokens;
+	let cacheWrite = p.cacheWriteCentsPerMTokens;
 	let cacheWriteByTtl = p.cacheWriteCentsPerMTokensByTtl;
 	// Image and audio rates are explicit or follow the effective text rates, tier by tier.
 	let imageInput = p.imageInputCentsPerMTokens;
@@ -75,8 +78,8 @@ function effectiveRates(p: PricingShape, promptTokens: number): PricingShape {
 	return {
 		inputCentsPerMTokens: input,
 		outputCentsPerMTokens: output,
-		cacheReadCentsPerMTokens: cacheRead,
-		cacheWriteCentsPerMTokens: cacheWrite,
+		cacheReadCentsPerMTokens: cacheRead ?? input,
+		cacheWriteCentsPerMTokens: cacheWrite ?? input,
 		imageInputCentsPerMTokens: imageInput ?? input,
 		imageOutputCentsPerMTokens: imageOutput ?? output,
 		audioInputCentsPerMTokens: audioInput ?? input,
@@ -91,6 +94,55 @@ function effectiveRates(p: PricingShape, promptTokens: number): PricingShape {
 	};
 }
 
+/** The per-image price for an image of this size and quality. */
+function imagePrice(
+	pricing: PricingShape,
+	size: string | undefined,
+	quality: string | undefined,
+): number {
+	const variants = pricing.imageOutputCentsPerImageByVariant ?? {};
+	const keys = [
+		quality !== undefined && size !== undefined ? `${quality}:${size}` : null,
+		size ?? null,
+		quality ?? null,
+	];
+	for (const key of keys) {
+		const price = key === null ? undefined : variants[key];
+		if (price !== undefined) {
+			return price;
+		}
+	}
+	return pricing.imageOutputCentsPerImage ?? 0;
+}
+
+/** Cost of the usage's per-unit quantities: generated images and seconds of input audio. */
+function perUnitCents(pricing: PricingShape, usage: Usage): number {
+	const images = Math.max(0, usage.outputImages ?? 0);
+	const seconds = Math.max(0, usage.inputAudioSeconds ?? 0);
+	return (
+		images *
+			imagePrice(pricing, usage.outputImageSize, usage.outputImageQuality) +
+		seconds * (pricing.audioInputCentsPerSecond ?? 0)
+	);
+}
+
+/**
+ * The pricing of the service tier the provider reports it served. A declared tier replaces the
+ * standard token rates and context tiers (its own `tiers`, if any, apply instead); what it leaves
+ * out falls back to the standard pricing. An undeclared or standard tier is the standard pricing.
+ */
+function servedPricing(
+	pricing: PricingShape,
+	serviceTier: string | undefined,
+): PricingShape {
+	const tier =
+		serviceTier === undefined ? undefined : pricing.serviceTiers?.[serviceTier];
+	if (tier === undefined) {
+		return pricing;
+	}
+	return { ...pricing, tiers: [], ...tier };
+}
+
 /**
  * Computes the cost from the model's pricing (cents per 1M tokens) and the usage.
  * `cacheReadTokens` and `cacheWriteTokens` are disjoint subsets of promptTokens: they are subtracted
@@ -103,7 +155,10 @@ export function computeCost(
 	meta: Pick<ResolvedModelMetadata, "pricing">,
 	usage: Usage,
 ): CostBreakdown {
-	const r = effectiveRates(meta.pricing ?? {}, usage.promptTokens);
+	const r = effectiveRates(
+		servedPricing(meta.pricing ?? {}, usage.serviceTier),
+		usage.promptTokens,
+	);
 	const inputRate = (r.inputCentsPerMTokens ?? 0) / 1_000_000;
 	const outputRate = (r.outputCentsPerMTokens ?? 0) / 1_000_000;
 	const cacheReadRate = (r.cacheReadCentsPerMTokens ?? 0) / 1_000_000;
@@ -178,6 +233,7 @@ export function computeCost(
 		videoCompletion * videoOutputRate;
 	const searchUnitCents =
 		(usage.searchUnits ?? 0) * (meta.pricing?.searchUnitCents ?? 0);
+	const unitCents = perUnitCents(meta.pricing ?? {}, usage);
 	const providerReportedCents = usage.providerCostCents ?? null;
 	const configuredPricing = meta.pricing;
 	const hasConfiguredPricing =
@@ -193,13 +249,17 @@ export function computeCost(
 			configuredPricing.audioOutputCentsPerMTokens !== undefined ||
 			configuredPricing.videoOutputCentsPerMTokens !== undefined ||
 			configuredPricing.searchUnitCents !== undefined ||
+			configuredPricing.imageOutputCentsPerImage !== undefined ||
+			configuredPricing.imageOutputCentsPerImageByVariant !== undefined ||
+			configuredPricing.audioInputCentsPerSecond !== undefined ||
 			(configuredPricing.tiers?.length ?? 0) > 0);
 	const calculatedCents =
 		inputCents +
 		cacheReadCents +
 		cacheWriteCents +
 		outputCents +
-		searchUnitCents;
+		searchUnitCents +
+		unitCents;
 
 	return {
 		inputCents,
@@ -209,6 +269,7 @@ export function computeCost(
 		imageCents,
 		audioCents,
 		searchUnitCents,
+		unitCents,
 		providerReportedCents,
 		totalCents: hasConfiguredPricing
 			? calculatedCents
@@ -225,12 +286,42 @@ export function estimateMaximumCostCents(
 	meta: Pick<ResolvedModelMetadata, "pricing">,
 	totalTokens: number,
 	searchUnits = 0,
+	outputImages = 0,
 ): number | null {
 	const { pricing } = meta;
 	if (pricing === undefined) {
 		return null;
 	}
-	const rates = [
+	const rates = [pricing, ...Object.values(pricing.serviceTiers ?? {})].flatMap(
+		tokenRates,
+	);
+	const imagePrices = [
+		pricing.imageOutputCentsPerImage,
+		...Object.values(pricing.imageOutputCentsPerImageByVariant ?? {}),
+	].filter((price): price is number => price !== undefined);
+	// Audio duration is unknown until the provider reports it, so a per-second price is charged at
+	// settlement without a reservation; it still makes the model priced for budgeted keys.
+	if (
+		rates.length === 0 &&
+		imagePrices.length === 0 &&
+		pricing.searchUnitCents === undefined &&
+		pricing.audioInputCentsPerSecond === undefined
+	) {
+		return null;
+	}
+	const maximumTokenRate = rates.length > 0 ? Math.max(...rates) : 0;
+	const maximumImagePrice =
+		imagePrices.length > 0 ? Math.max(...imagePrices) : 0;
+	return (
+		(Math.max(0, totalTokens) * maximumTokenRate) / 1_000_000 +
+		Math.max(0, searchUnits) * (pricing.searchUnitCents ?? 0) +
+		Math.max(0, outputImages) * maximumImagePrice
+	);
+}
+
+/** Every token rate a pricing declares, context tiers included. */
+function tokenRates(pricing: PricingShape): number[] {
+	return [
 		pricing.inputCentsPerMTokens,
 		pricing.outputCentsPerMTokens,
 		pricing.cacheReadCentsPerMTokens,
@@ -253,12 +344,4 @@ export function estimateMaximumCostCents(
 			...Object.values(tier.cacheWriteCentsPerMTokensByTtl ?? {}),
 		]),
 	].filter((rate): rate is number => rate !== undefined);
-	if (rates.length === 0 && pricing.searchUnitCents === undefined) {
-		return null;
-	}
-	const maximumTokenRate = rates.length > 0 ? Math.max(...rates) : 0;
-	return (
-		(Math.max(0, totalTokens) * maximumTokenRate) / 1_000_000 +
-		Math.max(0, searchUnits) * (pricing.searchUnitCents ?? 0)
-	);
 }

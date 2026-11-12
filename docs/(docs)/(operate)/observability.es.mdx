@@ -73,6 +73,8 @@ El gateway exporta el intervalo de operaciones desde el ingreso hasta el cierre 
 
 El uso de reordenación también incrementa `ai_gateway_search_units_total`; permanece independiente de `ai_gateway_tokens_total`.
 
+Un rechazo de promesa que llega al proceso sin manejador se registra como `error` (componente `process`) y se cuenta en `ai_gateway_unhandled_rejections_total`; el gateway sigue atendiendo. Cualquier valor distinto de cero es un error que conviene reportar.
+
 ## Alertas iniciales [#initial-alerts]
 
 - Cualquier operación exitosa/incompleta/bloqueada sin una terminal verificada, operación abandonada o pérdida de persistencia es crítica.

@@ -67,10 +67,12 @@ function relative(iso: string): string {
 export function LogsTable({
 	rows,
 	total,
+	totalIsLowerBound = false,
 	filters,
 }: {
 	rows: OperationRow[];
 	total: number;
+	totalIsLowerBound?: boolean;
 	filters: LogsFilters;
 }) {
 	const { set, clear } = useSearchWriter(filters);
@@ -245,6 +247,7 @@ export function LogsTable({
 					set({ offset: next === 0 ? undefined : next })
 				}
 				total={total}
+				totalIsLowerBound={totalIsLowerBound}
 			/>
 		</>
 	);

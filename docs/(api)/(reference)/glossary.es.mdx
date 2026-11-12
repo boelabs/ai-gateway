@@ -52,6 +52,10 @@ Una descripción declarativa 1:1 de un modelo upstream: operaciones, perfiles, r
 
 Declaración de una entrada de catálogo de *cómo* un modelo controla el reasoning: `kind` (uno de los ocho mecanismos del protocolo: `openai_effort`, `openai_body`, `anthropic_adaptive`, `anthropic_budget`, `gemini_level`, `gemini_budget`, `chat_template_flag`, `fixed`), `levels` (los niveles admitidos de la escala canonical `none < minimal < low < medium < high < xhigh < max` que acepta) y configuración específica del tipo (`bodyField`, `chatTemplateFlag`, `budgets`, `upstreamEffortMap`). Consulta [Reasoning](/docs/reasoning).
 
+## Reasoning Budget [#reasoning-budget]
+
+`reasoning.budgetTokens`: un presupuesto explícito de tokens de thinking (`thinking.budget_tokens` de Anthropic), que viaja junto al nivel de esfuerzo en que cae. Los modelos controlados por presupuesto reciben el número sin cambios; los controlados por nivel reciben el esfuerzo.
+
 ## Parameter Policy [#parameter-policy]
 
 El comportamiento configurado por el operador (`unsupportedParameterStrategy`: `drop`, `error` o `allow`) para un parámetro de solicitud que la entrada del catálogo de un deployment de destino declara no compatible. Global, vía `PUT /admin/router-settings`; Se aplica solo a los endpoints con forma de chat. Consulta [Política de parámetros](/docs/parameter-policy).
@@ -75,6 +79,18 @@ La representación interna independiente del proveedor en `src/core/canonical.ts
 ## Message State [#message-state]
 
 Estado opaco del proveedor ligado a un turno del asistente y no a una de sus llamadas de herramienta, como la firma de Gemini en una respuesta de texto o los bloques `thinking` firmados de Claude. Cuando un public endpoint no tiene un portador nativo para él, el gateway lo sella en un elemento `reasoning` cuyo `encrypted_content` empieza por `bfrs_`; los clientes lo reenvían y no se almacena nada. Consulta [Estado específico del proveedor](/docs/provider-specific-fields).
+
+## Estimated Usage [#estimated-usage]
+
+`Usage` marcado con `estimated: true`: los recuentos que el gateway liquida cuando un upstream aceptó una solicitud pero no informó el uso, la entrada reservada más la salida observada. Consulta [Contabilidad de costos](/docs/cost-accounting#when-the-provider-reports-no-usage).
+
+## Refusal [#refusal]
+
+La negativa del modelo a responder, que viaja separada del contenido en los mensajes, respuestas y deltas de streaming canonical: el `refusal` de Chat, una parte de contenido `refusal` y los eventos `response.refusal.*` en Responses. Una negativa servida por un wire llega a los clientes del otro como negativa.
+
+## Server Tool [#server-tool]
+
+Una herramienta que el proveedor ejecuta por su cuenta durante un turno, como la búsqueda web, web fetch o la ejecución de código de Anthropic. Sus bloques de llamada y de resultado no tienen forma canonical, así que viajan como contenido nativo del proveedor: `/v1/messages` los devuelve y los emite en streaming donde el modelo los produjo, y un cliente que reenvía el turno llega al proveedor con ellos intactos. `Usage.serverToolCalls` cuenta las llamadas por herramienta (`server_tool_use` en el wire de Messages).
 
 ## Fallback Policy [#fallback-policy]
 

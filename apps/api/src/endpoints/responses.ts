@@ -1,3 +1,8 @@
+import {
+	admitQueuedBytes,
+	queuedBytesError,
+	messageBytes,
+} from "./realtimeSockets.ts";
 import { ResponsesWebSocketUpstreams } from "#gateway/responsesWebSocketSessions.ts";
 import type { GatewayError as GatewayErrorType } from "#core/errors.ts";
 import { authenticateRequest, getAuth } from "#auth/middleware.ts";
@@ -6,6 +11,7 @@ import { hasContentInputs } from "#files/requestContentInputs.ts";
 import type { CanonicalChatRequest } from "#core/canonical.ts";
 import { OperationLogDraft } from "./runtime/operationLog.ts";
 import { messageStateCodec } from "./runtime/messageState.ts";
+import { assertWebSocketUpgrade } from "./realtimeSockets.ts";
 import type { EffectiveSettings } from "#router/settings.ts";
 import { RouteLifecycle } from "./runtime/routeLifecycle.ts";
 import { getEffectiveSettings } from "#router/settings.ts";
@@ -14,6 +20,7 @@ import { reasoningLogInfo } from "#core/reasoning.ts";
 import { upgradeWebSocket } from "@hono/node-server";
 import { tapFirstToken } from "#gateway/ttft.ts";
 import { GatewayError } from "#core/errors.ts";
+import { stateScopeOf } from "#auth/scope.ts";
 import type { AppEnv } from "#auth/types.ts";
 import type { Usage } from "#core/usage.ts";
 import { streamSSE } from "hono/streaming";
@@ -29,6 +36,7 @@ import {
 	responsesRequestToCanonical,
 	withoutGatewayStateItems,
 	responseEventForClient,
+	isGatewayStateEvent,
 	normalizeResponseInput,
 	type ResponseInputItem,
 	expandInputReferences,
@@ -107,10 +115,11 @@ interface PreparedResponsesRequest {
 	req: ResponsesRequest;
 	effectiveInput: ResponseInputItem[];
 	currentInput: ResponseInputItem[];
-}
-
-function authVirtualKeyId(auth: Auth): string | null {
-	return auth.type === "virtual" ? auth.key.id : null;
+	/**
+	 * The deployment that served the previous response. Its encrypted reasoning only decrypts on the
+	 * same account, so the continuation goes back to it while it is healthy and eligible.
+	 */
+	previousDeploymentId: string | null;
 }
 
 function outputItemsFromResponse(
@@ -136,8 +145,9 @@ async function prepareResponsesRequest(
 	auth: Auth,
 	connectionState?: ConnectionResponseState | null,
 ): Promise<PreparedResponsesRequest> {
-	const virtualKeyId = authVirtualKeyId(auth);
+	const scope = stateScopeOf(auth);
 	let previousItems: ResponseInputItem[] = [];
+	let previousDeploymentId: string | null = null;
 
 	if (req.previous_response_id != null) {
 		if (connectionState?.id === req.previous_response_id) {
@@ -148,7 +158,7 @@ async function prepareResponsesRequest(
 		} else {
 			const previous = await getResponseStateForScope(
 				req.previous_response_id,
-				virtualKeyId,
+				scope,
 			);
 			if (!previous) {
 				throw new GatewayError({
@@ -160,13 +170,14 @@ async function prepareResponsesRequest(
 				});
 			}
 			previousItems = [...previous.requestInput, ...previous.output];
+			previousDeploymentId = previous.deploymentId ?? null;
 		}
 	}
 
 	const currentInput = await expandInputReferences(
 		normalizeResponseInput(req.input),
 		previousItems,
-		(id) => findResponseItemByIdForScope(id, virtualKeyId),
+		(id) => findResponseItemByIdForScope(id, scope),
 	);
 	const effectiveInput = expandLocalCompactionItems([
 		...previousItems.map((item) => structuredClone(item)),
@@ -178,6 +189,7 @@ async function prepareResponsesRequest(
 		req: { ...req, input: effectiveInput, store },
 		effectiveInput,
 		currentInput,
+		previousDeploymentId,
 	};
 }
 
@@ -255,9 +267,10 @@ export async function compactResponseHandler(
 				message: "Compaction returned no summary",
 			});
 		}
-		await lifecycle.finish(response.usage);
+		const settledUsage =
+			(await lifecycle.finish(response.usage)) ?? response.usage;
 		const { meta } = routing.candidate;
-		const cost = computeUsageCost(meta, response.usage);
+		const cost = computeUsageCost(meta, settledUsage);
 		const metadata: Record<string, unknown> = candidateMetadata(
 			routing.candidate,
 		);
@@ -292,7 +305,7 @@ export async function compactResponseHandler(
 		log.write({
 			status: "success",
 			httpStatus: 200,
-			usage: response.usage,
+			usage: settledUsage,
 			cost,
 			firstOutputMs: null,
 			responseBody: body,
@@ -330,7 +343,7 @@ async function persistResponseState(opts: {
 	const id = responseId(opts.response);
 	await storeResponseState({
 		id,
-		virtualKeyId: authVirtualKeyId(opts.auth),
+		scope: stateScopeOf(opts.auth),
 		publicModel: opts.req.model,
 		deploymentId: opts.deploymentId,
 		adapterKey: opts.adapterKey,
@@ -398,6 +411,7 @@ function streamResponses(
 				publicModel: routing.candidate.row.publicModel,
 				reasoningEffort: reasoning?.effective ?? null,
 				messageState: messageStateCodec,
+				retainState: pipelineReq.store === true,
 			};
 			metadata = {
 				...candidateMetadata(routing.candidate),
@@ -453,6 +467,13 @@ function streamResponses(
 			for await (const ev of withSSEHeartbeats(events, () =>
 				writeSSEHeartbeat(stream, downstream),
 			)) {
+				// A state carrier rendered only for the stored copy is not the client's to see.
+				if (
+					!pipelineReq.include?.includes("reasoning.encrypted_content") &&
+					isGatewayStateEvent(ev)
+				) {
+					continue;
+				}
 				const clientEvent = responseEventForClient(ev, pipelineReq.include);
 				let eventData = clientEvent.data;
 				try {
@@ -599,8 +620,9 @@ function streamResponses(
 				}
 			}
 		} finally {
+			let settledUsage: Usage | null = usage;
 			if (routed) {
-				await routed.routing.finish(
+				settledUsage = await routed.routing.finish(
 					usage,
 					lastChunkAt ?? undefined,
 					streamError,
@@ -611,7 +633,7 @@ function streamResponses(
 				finishDownstreamWriteObservation(downstream, streamError?.code);
 			}
 			const cost = routed
-				? computeUsageCost(routed.routing.candidate.meta, usage)
+				? computeUsageCost(routed.routing.candidate.meta, settledUsage)
 				: null;
 			log.write({
 				status: streamError ? "error" : "success",
@@ -620,7 +642,7 @@ function streamResponses(
 					streamError?.code === "client_closed_request"
 						? 499
 						: 200,
-				usage,
+				usage: settledUsage,
 				cost,
 				firstOutputMs:
 					firstTokenAt === null ? null : firstTokenAt - log.startedAt,
@@ -680,6 +702,9 @@ export async function responsesHandler(c: Context<AppEnv>): Promise<Response> {
 			const routePromise = routeChat(c, canonical, log.requestId, settings, {
 				signal: log.clientSignal,
 				operationId: log.operationId,
+				...(prepared.previousDeploymentId
+					? { preferredDeploymentId: prepared.previousDeploymentId }
+					: {}),
 			});
 			await settleBeforeCommit(routePromise);
 			return streamResponses(
@@ -697,6 +722,9 @@ export async function responsesHandler(c: Context<AppEnv>): Promise<Response> {
 			await routeChat(c, canonical, log.requestId, settings, {
 				signal: log.clientSignal,
 				operationId: log.operationId,
+				...(prepared.previousDeploymentId
+					? { preferredDeploymentId: prepared.previousDeploymentId }
+					: {}),
 			});
 		log.applyRouting(routing);
 		lifecycle.attach(routing);
@@ -714,6 +742,7 @@ export async function responsesHandler(c: Context<AppEnv>): Promise<Response> {
 			publicModel: routing.candidate.row.publicModel,
 			reasoningEffort: reasoning?.effective ?? null,
 			messageState: messageStateCodec,
+			retainState: pipelineReq.store === true,
 		};
 		const metadata: Record<string, unknown> = {
 			...candidateMetadata(routing.candidate),
@@ -751,8 +780,8 @@ export async function responsesHandler(c: Context<AppEnv>): Promise<Response> {
 				routing.value.response,
 			);
 			const { usage } = response;
-			await lifecycle.finish(usage);
-			const cost = computeUsageCost(meta, usage);
+			const settledUsage = (await lifecycle.finish(usage)) ?? usage;
+			const cost = computeUsageCost(meta, settledUsage);
 			const internalRendered = canonicalToResponsesResponse(
 				response,
 				renderOpts,
@@ -769,12 +798,12 @@ export async function responsesHandler(c: Context<AppEnv>): Promise<Response> {
 				requestId: log.requestId,
 				metadata,
 			});
-			cache.store(rendered, usage);
+			cache.store(rendered, settledUsage);
 			const body = attachRoutingMetadata(rendered, routingMetadata);
 			log.write({
 				status: "success",
 				httpStatus: 200,
-				usage,
+				usage: settledUsage,
 				cost,
 				firstOutputMs: null,
 				responseBody: rendered,
@@ -818,7 +847,7 @@ async function loadStateOr404(c: Context<AppEnv>): Promise<{
 	row: NonNullable<Awaited<ReturnType<typeof getResponseStateForScope>>>;
 }> {
 	const id = requireId(c);
-	const row = await getResponseStateForScope(id, authVirtualKeyId(getAuth(c)));
+	const row = await getResponseStateForScope(id, stateScopeOf(getAuth(c)));
 	if (!row) {
 		throw new GatewayError({
 			class: "not_found",
@@ -831,12 +860,27 @@ async function loadStateOr404(c: Context<AppEnv>): Promise<{
 	return { id, row };
 }
 
-/** GET /v1/responses/{id} - returns the stored canonical `response` object. */
+/** The `include[]` values of a retrieval request (`include` and `include[]` both accepted). */
+function includeQuery(c: Context<AppEnv>): string[] {
+	return [
+		...(c.req.queries("include") ?? []),
+		...(c.req.queries("include[]") ?? []),
+	];
+}
+
+/**
+ * GET /v1/responses/{id} - the stored response. Its output is the stored copy, which keeps every
+ * item, shown as `include` asks: encrypted reasoning and gateway state only when requested.
+ */
 export async function retrieveResponseHandler(
 	c: Context<AppEnv>,
 ): Promise<Response> {
 	const { row } = await loadStateOr404(c);
-	return c.json(row.response as object);
+	const response = {
+		...(row.response as Record<string, unknown>),
+		output: row.output,
+	};
+	return c.json(responseForClient(response, includeQuery(c)));
 }
 
 /** DELETE /v1/responses/{id} - deletes the saved state. */
@@ -846,7 +890,7 @@ export async function deleteResponseHandler(
 	const id = requireId(c);
 	const deleted = await deleteResponseStateForScope(
 		id,
-		authVirtualKeyId(getAuth(c)),
+		stateScopeOf(getAuth(c)),
 	);
 	if (!deleted) {
 		throw new GatewayError({
@@ -860,22 +904,68 @@ export async function deleteResponseHandler(
 	return c.json({ id, object: "response.deleted", deleted: true });
 }
 
-/** GET /v1/responses/{id}/input_items - lists the stored input items. */
+const INPUT_ITEMS_DEFAULT_LIMIT = 20;
+const INPUT_ITEMS_MAX_LIMIT = 100;
+
+/**
+ * GET /v1/responses/{id}/input_items - the stored input items, paginated as OpenAI does (`limit`
+ * 1-100, default 20; `order` desc by default; `after` an item id), without gateway state and with
+ * encrypted reasoning only when `include` asks for it. Items the client sent without an id get one
+ * derived from the response and their position, so every item can be a cursor.
+ */
 export async function listResponseInputItemsHandler(
 	c: Context<AppEnv>,
 ): Promise<Response> {
-	const { row } = await loadStateOr404(c);
-	const items = row.requestInput;
-	const [first] = items;
-	const last = items.at(-1);
-	const idOf = (it: Record<string, unknown>): string | null =>
-		typeof it.id === "string" ? it.id : null;
+	const { id, row } = await loadStateOr404(c);
+	const limitParam = c.req.query("limit");
+	const limit =
+		limitParam === undefined ? INPUT_ITEMS_DEFAULT_LIMIT : Number(limitParam);
+	if (!Number.isInteger(limit) || limit < 1 || limit > INPUT_ITEMS_MAX_LIMIT) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_request_error",
+			param: "limit",
+			message: `limit must be an integer between 1 and ${INPUT_ITEMS_MAX_LIMIT}`,
+		});
+	}
+	const order = c.req.query("order") ?? "desc";
+	if (order !== "asc" && order !== "desc") {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_request_error",
+			param: "order",
+			message: "order must be asc or desc",
+		});
+	}
+	const visible = (
+		responseForClient({ output: row.requestInput }, includeQuery(c))
+			.output as Record<string, unknown>[]
+	).map((item, index) =>
+		typeof item.id === "string"
+			? item
+			: { ...item, id: `${id}_input_${index}` },
+	);
+	const ordered = order === "asc" ? visible : [...visible].reverse();
+	const after = c.req.query("after");
+	const start =
+		after === undefined
+			? 0
+			: ordered.findIndex((item) => item.id === after) + 1;
+	if (after !== undefined && start === 0) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_request_error",
+			param: "after",
+			message: `No input item with id ${after}`,
+		});
+	}
+	const data = ordered.slice(start, start + limit);
 	return c.json({
 		object: "list",
-		data: items,
-		first_id: first ? idOf(first) : null,
-		last_id: last ? idOf(last) : null,
-		has_more: false,
+		data,
+		first_id: (data[0]?.id as string | undefined) ?? null,
+		last_id: (data.at(-1)?.id as string | undefined) ?? null,
+		has_more: start + limit < ordered.length,
 	});
 }
 
@@ -883,17 +973,21 @@ export async function listResponseInputItemsHandler(
 
 const RESPONSES_WEBSOCKET_MAX_MS = 60 * 60 * 1000;
 const RESPONSES_WEBSOCKET_MAX_MESSAGE_BYTES = 16 * 1024 * 1024;
+/** A turn carries a whole input; a few may wait behind the one running. */
+const RESPONSES_WEBSOCKET_MAX_QUEUED_BYTES =
+	4 * RESPONSES_WEBSOCKET_MAX_MESSAGE_BYTES;
 
 interface ActiveResponsesWebSocket {
 	state: ConnectionResponseState | null;
 	upstreams: ResponsesWebSocketUpstreams;
 	queue: Promise<void>;
 	activeAbort: AbortController | null;
-	timer: ReturnType<typeof setTimeout>;
+	timer: ReturnType<typeof setTimeout> | undefined;
 	socket: WSContext | null;
 	preferredDeploymentId: string | null;
 	scopeKey: string;
 	queuedTurns: number;
+	queuedBytes: number;
 }
 
 const activeResponsesWebSockets = new Set<ActiveResponsesWebSocket>();
@@ -1080,6 +1174,7 @@ async function executeResponsesWebSocketTurn(
 			publicModel: routing.candidate.row.publicModel,
 			reasoningEffort: reasoning?.effective ?? null,
 			messageState: messageStateCodec,
+			retainState: pipelineReq.store === true,
 		};
 		const metadata: Record<string, unknown> = {
 			...candidateMetadata(routing.candidate),
@@ -1147,6 +1242,13 @@ async function executeResponsesWebSocketTurn(
 		);
 		try {
 			for await (const event of events) {
+				// A state carrier rendered only for the stored copy is not the client's to see.
+				if (
+					!pipelineReq.include?.includes("reasoning.encrypted_content") &&
+					isGatewayStateEvent(event)
+				) {
+					continue;
+				}
 				const clientEvent = responseEventForClient(event, pipelineReq.include);
 				let data: Record<string, unknown>;
 				try {
@@ -1214,15 +1316,16 @@ async function executeResponsesWebSocketTurn(
 			if (firstTokenAt !== null) {
 				log.upstreamTtftMs = firstTokenAt - upstreamStartedAt;
 			}
-			await lifecycle.finish(usage, streamError, {
-				...(lastChunkAt === null ? {} : { finishedAt: lastChunkAt }),
-				downstream,
-			});
-			const cost = computeUsageCost(meta, usage);
+			const settledUsage =
+				(await lifecycle.finish(usage, streamError, {
+					...(lastChunkAt === null ? {} : { finishedAt: lastChunkAt }),
+					downstream,
+				})) ?? usage;
+			const cost = computeUsageCost(meta, settledUsage);
 			log.write({
 				status: streamError ? "error" : "success",
 				httpStatus: streamError?.httpStatus ?? 200,
-				usage,
+				usage: settledUsage,
 				cost,
 				firstOutputMs:
 					firstTokenAt === null ? null : firstTokenAt - log.startedAt,
@@ -1266,24 +1369,34 @@ async function executeResponsesWebSocketTurn(
  * GET /v1/responses with Upgrade: websocket. Each connection owns one previous-response cache and a
  * sequential turn queue. The endpoint deliberately uses the same public resource as POST.
  */
+function responsesSocketsAtCapacity(scopeKey: string): boolean {
+	const connectionsForScope = [...activeResponsesWebSockets].filter(
+		(active) => active.scopeKey === scopeKey,
+	).length;
+	return (
+		activeResponsesWebSockets.size >= env.RESPONSES_WEBSOCKET_MAX_CONNECTIONS ||
+		connectionsForScope >= env.RESPONSES_WEBSOCKET_MAX_CONNECTIONS_PER_KEY
+	);
+}
+
+function responsesSocketLimitError(): GatewayError {
+	return new GatewayError({
+		class: "rate_limit",
+		code: "websocket_connection_limit_exceeded",
+		message: "Responses WebSocket connection concurrency limit exceeded",
+		publicMessage: "Responses WebSocket connection limit exceeded.",
+	});
+}
+
 export const responsesWebSocketHandler = upgradeWebSocket(
 	(c) => {
+		// Hono builds these handlers before it checks for the upgrade; nothing that needs releasing is
+		// created until the socket is open (`onOpen`), because a failed handshake never closes.
+		assertWebSocketUpgrade(c);
 		const auth = getAuth(c);
 		const scopeKey = auth.type === "virtual" ? auth.key.id : "master";
-		const connectionsForScope = [...activeResponsesWebSockets].filter(
-			(active) => active.scopeKey === scopeKey,
-		).length;
-		if (
-			activeResponsesWebSockets.size >=
-				env.RESPONSES_WEBSOCKET_MAX_CONNECTIONS ||
-			connectionsForScope >= env.RESPONSES_WEBSOCKET_MAX_CONNECTIONS_PER_KEY
-		) {
-			throw new GatewayError({
-				class: "rate_limit",
-				code: "websocket_connection_limit_exceeded",
-				message: "Responses WebSocket connection concurrency limit exceeded",
-				publicMessage: "Responses WebSocket connection limit exceeded.",
-			});
+		if (responsesSocketsAtCapacity(scopeKey)) {
+			throw responsesSocketLimitError();
 		}
 		const session: ActiveResponsesWebSocket = {
 			state: null,
@@ -1294,32 +1407,42 @@ export const responsesWebSocketHandler = upgradeWebSocket(
 			preferredDeploymentId: null,
 			scopeKey,
 			queuedTurns: 0,
-			timer: setTimeout(() => undefined, RESPONSES_WEBSOCKET_MAX_MS),
+			queuedBytes: 0,
+			timer: undefined,
 		};
-		clearTimeout(session.timer);
-		session.timer = setTimeout(() => {
-			const ws = session.socket;
-			if (!ws) {
-				return;
-			}
-			void sendWebSocketJson(
-				ws,
-				websocketError(
-					new GatewayError({
-						class: "bad_request",
-						code: "websocket_connection_limit_reached",
-						message: "Responses WebSocket connection reached 60 minutes",
-						publicMessage:
-							"Responses websocket connection limit reached (60 minutes). Create a new websocket connection to continue.",
-					}),
-				),
-			);
-			ws.close(1000, "60 minute connection limit");
-		}, RESPONSES_WEBSOCKET_MAX_MS);
-		activeResponsesWebSockets.add(session);
+		const startTimer = () =>
+			setTimeout(() => {
+				const ws = session.socket;
+				if (!ws) {
+					return;
+				}
+				void sendWebSocketJson(
+					ws,
+					websocketError(
+						new GatewayError({
+							class: "bad_request",
+							code: "websocket_connection_limit_reached",
+							message: "Responses WebSocket connection reached 60 minutes",
+							publicMessage:
+								"Responses websocket connection limit reached (60 minutes). Create a new websocket connection to continue.",
+						}),
+					),
+				);
+				ws.close(1000, "60 minute connection limit");
+			}, RESPONSES_WEBSOCKET_MAX_MS);
 		return {
 			onOpen(_event, ws) {
 				session.socket = ws;
+				if (responsesSocketsAtCapacity(scopeKey)) {
+					void sendWebSocketJson(
+						ws,
+						websocketError(responsesSocketLimitError()),
+					);
+					ws.close(1013, "connection limit");
+					return;
+				}
+				activeResponsesWebSockets.add(session);
+				session.timer = startTimer();
 			},
 			onMessage(event) {
 				if (session.queuedTurns >= env.RESPONSES_WEBSOCKET_MAX_QUEUED_TURNS) {
@@ -1338,6 +1461,21 @@ export const responsesWebSocketHandler = upgradeWebSocket(
 					}
 					return;
 				}
+				const admitted = admitQueuedBytes(
+					session,
+					messageBytes(event.data),
+					RESPONSES_WEBSOCKET_MAX_QUEUED_BYTES,
+				);
+				if (!admitted) {
+					if (session.socket) {
+						void sendWebSocketJson(
+							session.socket,
+							websocketError(queuedBytesError()),
+						);
+						session.socket.close(1008, "too much queued data");
+					}
+					return;
+				}
 				session.queuedTurns += 1;
 				session.queue = session.queue
 					.then(() => executeResponsesWebSocketTurn(c, session, event.data))
@@ -1352,6 +1490,7 @@ export const responsesWebSocketHandler = upgradeWebSocket(
 					})
 					.finally(() => {
 						session.queuedTurns -= 1;
+						admitted.release();
 					});
 			},
 			onClose() {

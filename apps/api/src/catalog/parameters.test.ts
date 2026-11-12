@@ -8,6 +8,7 @@ import {
 	applyUnsupportedParameterPolicy,
 	assertSupportedChatParameters,
 	supportedParameterNames,
+	withAdapterParameters,
 } from "./parameters.ts";
 
 const meta: ResolvedModelMetadata = {
@@ -134,4 +135,30 @@ test("prompt-cache policies participate in explicit model parameter support", ()
 		applyUnsupportedParameterPolicy(req, metadata, "allow").request,
 		req,
 	);
+});
+
+test("an adapter's declaration drops what its transport cannot carry", () => {
+	const adapterParameters = {
+		seed: { mode: "unsupported" as const },
+		stop: { mode: "unsupported" as const },
+		temperature: { mode: "supported" as const },
+	};
+	const view = withAdapterParameters(meta, adapterParameters);
+	const req: CanonicalChatRequest = { ...request(), seed: 7 };
+	const result = applyUnsupportedParameterPolicy(req, view, "drop");
+	assert.equal(result.request.seed, undefined);
+	// The model accepts stop, but a transport with no field for it cannot carry it there.
+	assert.equal(result.request.stop, undefined);
+	for (const name of ["seed", "stop", "temperature"]) {
+		assert.ok(result.droppedParameters.includes(name), name);
+	}
+	// What the model rejects stays rejected whatever the transport could carry.
+	assert.equal(result.request.temperature, undefined);
+	// The merged map is stable, so per-map caches stay effective.
+	assert.equal(
+		withAdapterParameters(meta, adapterParameters).operations?.["text.generate"]
+			?.parameters,
+		view.operations?.["text.generate"]?.parameters,
+	);
+	assert.equal(withAdapterParameters(meta, undefined), meta);
 });

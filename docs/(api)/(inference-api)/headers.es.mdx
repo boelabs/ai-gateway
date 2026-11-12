@@ -7,7 +7,7 @@ description: "Headers de autenticación, correlación, cache y rate limits."
 | header | Dónde | Efecto |
 |---|---|---|
 | `Authorization: Bearer <key>` o `x-api-key: <key>` | Todos `/v1/*`, todos `/admin/*` | Autenticación. master key en `/admin/*`; master key o virtual en `/v1/*`. |
-| `x-request-id` | Cualquier solicitud | Se hizo eco de la respuesta si la envía; de lo contrario, el gateway genera uno. Registre siempre esto; consulta [Solución de problemas](/docs/troubleshooting). |
+| `x-request-id` | Cualquier solicitud | Se devuelve en la respuesta si lo envías como un token simple (letras, dígitos, `.`, `_`, `:`, `-`; hasta 128 caracteres, empezando por letra o dígito); de lo contrario, el gateway genera uno. Regístralo siempre; consulta [Solución de problemas](/docs/troubleshooting). |
 | `x-unified-cache: true` (o `1`) | Solicitudes de chat e embeddings | Opte por el caching de respuestas para esta solicitud. Se ignora por completo para el tráfico de master key. |
 | `x-unified-cache-ttl: <seconds>` | Igual que arriba | TTL para una entrada de cache recién almacenada. Predeterminado `300`, máximo `86400`. Se ignora si `x-unified-cache` no está configurado también. |
 | `x-unified-routing-metadata: true` (o `1`/`yes`/`on`/`include`) | `/v1/chat/completions`, `/v1/messages`, `/v1/responses` | Agrega un objeto `unified_routing` al cuerpo de la respuesta (ver más abajo). |

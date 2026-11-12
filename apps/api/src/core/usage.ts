@@ -40,8 +40,30 @@ export interface Usage {
 	rejectedPredictionTokens?: number;
 	/** Provider-reported reranking search units. Independent from token counters. */
 	searchUnits?: number;
+	/**
+	 * Calls the provider made to tools it runs itself (web search, web fetch, code execution), keyed
+	 * by tool. Independent from token counters; billed separately by the provider.
+	 */
+	serverToolCalls?: Record<string, number>;
 	/** Upstream-reported request cost in USD cents, used only when configured pricing is absent. */
 	providerCostCents?: number;
+	/**
+	 * The upstream reported no usage, so these counts are the gateway's conservative estimate (reserved
+	 * input plus observed output) rather than the provider's figures. Absent on reported usage.
+	 */
+	estimated?: true;
+	/**
+	 * Service tier the provider reports it served the request at (OpenAI `service_tier`), which can
+	 * differ from the one requested. Selects that tier's rates when the pricing declares them.
+	 */
+	serviceTier?: string;
+	/** Images generated, for models priced per image. Independent from token counters. */
+	outputImages?: number;
+	/** Size and quality of those images, which select a per-image price variant. */
+	outputImageSize?: string;
+	outputImageQuality?: string;
+	/** Seconds of input audio, for models priced by duration. Independent from token counters. */
+	inputAudioSeconds?: number;
 }
 
 /** Does the usage satisfy the invariant total = prompt + completion? (helper for tests/dev). */

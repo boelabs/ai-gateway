@@ -143,3 +143,22 @@ test("the watchdog budget covers every phase of the sequence", () => {
 			timings.drainDelayMs + timings.drainTimeoutMs + TEARDOWN_TIMEOUT_MS,
 	);
 });
+
+test("a connection that will not release does not hold the shutdown", async () => {
+	const { steps, events, effects } = recorder({
+		releaseConnections: ({ idleOnly }) =>
+			idleOnly
+				? Promise.resolve()
+				: new Promise<void>(() => {
+						/* never settles */
+					}),
+	});
+	await runDrainSequence(effects, {
+		...timings,
+		drainDelayMs: 0,
+		teardownTimeoutMs: 20,
+	});
+	assert.ok(events.includes("release-timeout"));
+	assert.ok(steps.includes("close-all-connections"));
+	assert.ok(events.includes("complete"));
+});

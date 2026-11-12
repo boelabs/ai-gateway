@@ -3,6 +3,7 @@ import { currentSessionIfReachable } from "#/features/auth/api.ts";
 import { AiGatewayLogo } from "#/shared/components/AiGatewayLogo";
 import { ThemeSelect } from "#/shared/theme/ThemeSelect.tsx";
 import { SignInForm } from "#/features/auth/SignInForm.tsx";
+import { safeNextPath } from "#/features/auth/common.ts";
 import { redirect } from "next/navigation";
 
 /**
@@ -23,12 +24,8 @@ export default async function SignInPage(props: PageProps<"/auth">) {
 	}
 
 	const { next } = await props.searchParams;
-	// Only same-origin paths. A `next` of `//evil.example` or `https://…` would otherwise turn the
-	// login form into an open redirect.
-	const target =
-		typeof next === "string" && next.startsWith("/") && !next.startsWith("//")
-			? next
-			: "/";
+	// Only same-origin paths; anything else would turn the login form into an open redirect.
+	const target = safeNextPath(next);
 
 	return (
 		<main className="relative grid min-h-dvh place-items-center bg-muted/30 p-6">

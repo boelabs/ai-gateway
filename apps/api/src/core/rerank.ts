@@ -85,3 +85,24 @@ export function textFromRerankDocument(document: RerankDocument): string {
 	}
 	return document.text;
 }
+
+/**
+ * Fills in search units when the upstream omits them, from the documented documents-per-unit rule,
+ * so a provider that bills per search unit is never recorded as free. The result is flagged
+ * `estimated`; reported search units are returned untouched.
+ */
+export function withEstimatedSearchUnits(
+	usage: Usage | null,
+	documentCount: number,
+	profile: Pick<RerankProfile, "documentsPerSearchUnit"> | undefined,
+): Usage | null {
+	const perUnit = profile?.documentsPerSearchUnit;
+	if (usage?.searchUnits !== undefined || perUnit === undefined) {
+		return usage;
+	}
+	return {
+		...(usage ?? { promptTokens: 0, completionTokens: 0, totalTokens: 0 }),
+		searchUnits: Math.max(1, Math.ceil(documentCount / perUnit)),
+		estimated: true,
+	};
+}

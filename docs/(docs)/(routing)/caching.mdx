@@ -66,6 +66,11 @@ DELETE /admin/cache?callType=chat&namespace=<virtual-key-id>
 Both filters are optional; omitting them widens the match. The response reports how many entries were
 removed. Entries also expire on their own once the TTL elapses.
 
+The cache is also invalidated automatically whenever something that decides a response changes:
+creating, updating or deleting a deployment, the router settings, a fallback policy, or any
+extension. Other admin changes (virtual keys, users, settings that do not affect routing) leave it
+alone.
+
 ## When to use it
 
 Good fits: deterministic or low-temperature prompts, repeated embedding lookups, idempotent retries,

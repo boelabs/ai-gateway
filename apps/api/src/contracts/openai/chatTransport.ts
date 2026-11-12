@@ -151,7 +151,9 @@ function transportContent(
 function toTransportMessage(
 	m: CanonicalMessage,
 	developerRole: "developer" | "system",
+	opts: BuildChatBodyOptions = {},
 ): Record<string, unknown> {
+	const replayReasoningContent = opts.replayReasoningContent === true;
 	const content =
 		m.toolResultError === true ? markContentFailure(m.content) : m.content;
 	const out: Record<string, unknown> = {
@@ -171,6 +173,24 @@ function toTransportMessage(
 	if (m.toolCallId !== undefined) {
 		out.tool_call_id = m.toolCallId;
 	}
+	if (m.role === "assistant" && m.refusal !== undefined) {
+		out.refusal = m.refusal;
+	}
+	const reasoningContent =
+		m.role === "assistant" && replayReasoningContent
+			? assistantReasoningContent(m)
+			: undefined;
+	if (reasoningContent !== undefined) {
+		out.reasoning_content = reasoningContent;
+	}
+	if (m.role === "assistant") {
+		Object.assign(out, opts.assistantMessageFields?.(m) ?? {});
+	}
+	const audio = (m.providerFields?.openai as { audio?: unknown } | undefined)
+		?.audio;
+	if (m.role === "assistant" && audio !== undefined) {
+		out.audio = structuredClone(audio);
+	}
 	return out;
 }
 
@@ -185,6 +205,7 @@ const TOOL_MEDIA_PLACEHOLDER =
 function toTransportMessages(
 	messages: CanonicalMessage[],
 	developerRole: "developer" | "system",
+	opts: BuildChatBodyOptions = {},
 ): Record<string, unknown>[] {
 	const out: Record<string, unknown>[] = [];
 	let toolMedia: CanonicalContentPart[] = [];
@@ -197,13 +218,13 @@ function toTransportMessages(
 	for (const message of messages) {
 		if (message.role !== "tool") {
 			flushToolMedia();
-			out.push(toTransportMessage(message, developerRole));
+			out.push(toTransportMessage(message, developerRole, opts));
 			continue;
 		}
 		const parts = Array.isArray(message.content) ? message.content : [];
 		const media = parts.filter((part) => part.type !== "text");
 		if (media.length === 0) {
-			out.push(toTransportMessage(message, developerRole));
+			out.push(toTransportMessage(message, developerRole, opts));
 			continue;
 		}
 		const text = parts.filter((part) => part.type === "text");
@@ -257,7 +278,33 @@ export interface BuildChatBodyOptions {
 	developerRole?: "developer" | "system";
 	/** Emit the non-OpenAI top_k sampling extension. */
 	supportsTopK?: boolean;
+	/**
+	 * Send an assistant turn's `reasoning_content` back, for providers whose thinking models need
+	 * it in later requests (DeepSeek with tools, Kimi, GLM preserved thinking, MiniMax). OpenAI
+	 * defines no such field, so it is off unless the adapter says otherwise.
+	 */
+	replayReasoningContent?: boolean;
+	/**
+	 * Provider fields to add to an assistant message as it is written, from that message's own
+	 * provider state (Vercel's `reasoning_details`). The transport owns the mapping because only it
+	 * knows which wire message a canonical message became.
+	 */
+	assistantMessageFields?: (
+		message: CanonicalMessage,
+	) => Record<string, unknown> | undefined;
 	reasoningSpec?: ReasoningSpec;
+}
+
+/** An assistant turn's reasoning as the provider returned it, kept for the next request. */
+export function assistantReasoningContent(
+	message: CanonicalMessage,
+): string | undefined {
+	const chat = message.providerFields?.chat as
+		| { reasoning_content?: unknown }
+		| undefined;
+	return typeof chat?.reasoning_content === "string"
+		? chat.reasoning_content
+		: undefined;
 }
 
 function openAIReasoningEffort(
@@ -306,7 +353,7 @@ export function buildOpenAIChatBody(
 	const developerRole = opts.developerRole ?? "developer";
 	const body: Record<string, unknown> = {
 		model: upstreamModel,
-		messages: toTransportMessages(req.messages, developerRole),
+		messages: toTransportMessages(req.messages, developerRole, opts),
 		stream: req.stream,
 	};
 	// We ALWAYS request usage in streaming so we can account for it (TPM/budget/cost). If the client
@@ -525,9 +572,34 @@ interface TransportUsage {
 	cost?: number;
 }
 
+/**
+ * `completion_tokens` with reasoning included, as the canonical usage requires. OpenAI counts
+ * reasoning inside `completion_tokens`; some OpenAI-compatible providers (xAI) report it beside it,
+ * so that `total_tokens = prompt + completion + reasoning`. The provider's own total tells the two
+ * apart; without a total the reported figure is taken as inclusive, the OpenAI semantics.
+ */
+export function completionTokensWithReasoning(
+	promptTokens: number,
+	completionTokens: number,
+	reasoningTokens: number | undefined,
+	totalTokens: number | undefined,
+): number {
+	const reasoning = reasoningTokens ?? 0;
+	const excludesReasoning =
+		reasoning > 0 &&
+		totalTokens !== undefined &&
+		totalTokens === promptTokens + completionTokens + reasoning;
+	return excludesReasoning ? completionTokens + reasoning : completionTokens;
+}
+
 function mapUsage(u: TransportUsage | undefined | null): Usage {
 	const promptTokens = u?.prompt_tokens ?? 0;
-	const completionTokens = u?.completion_tokens ?? 0;
+	const completionTokens = completionTokensWithReasoning(
+		promptTokens,
+		u?.completion_tokens ?? 0,
+		u?.completion_tokens_details?.reasoning_tokens,
+		u?.total_tokens,
+	);
 	const usage: Usage = {
 		promptTokens,
 		completionTokens,
@@ -600,11 +672,50 @@ interface TransportResponse {
 		};
 	}>;
 	usage?: TransportUsage;
+	/** The tier the provider served the request at; it may differ from the one requested. */
+	service_tier?: string | null;
+}
+
+/** Usage with the service tier the response says it was served at. */
+function servedUsage(usage: Usage, serviceTier: unknown): Usage {
+	return typeof serviceTier === "string" && serviceTier.length > 0
+		? { ...usage, serviceTier }
+		: usage;
+}
+
+/**
+ * Usage for a response whose upstream sent none. Only the output is observable here, counted one token
+ * per UTF-8 byte; the router completes the input side from its reservation when it settles.
+ */
+function unreportedResponseUsage(
+	choices: CanonicalChatResponse["choices"],
+): Usage {
+	let bytes = 0;
+	for (const { message } of choices) {
+		const texts = [
+			typeof message.content === "string" ? message.content : "",
+			message.reasoning ?? "",
+			message.refusal ?? "",
+			...(message.toolCalls ?? []).map((call) => call.name + call.arguments),
+		];
+		for (const text of texts) {
+			bytes += Buffer.byteLength(text, "utf8");
+		}
+	}
+	return {
+		promptTokens: 0,
+		completionTokens: bytes,
+		totalTokens: bytes,
+		estimated: true,
+	};
 }
 
 export function parseOpenAIChatResponse(raw: unknown): CanonicalChatResponse {
-	const r = (raw ?? {}) as TransportResponse;
-	return {
+	const r = (raw ?? {}) as TransportResponse & { system_fingerprint?: unknown };
+	const response = {
+		...(typeof r.system_fingerprint === "string"
+			? { systemFingerprint: r.system_fingerprint }
+			: {}),
 		id: r.id ?? "",
 		created: r.created ?? Math.floor(Date.now() / 1000),
 		model: r.model ?? "",
@@ -643,7 +754,13 @@ export function parseOpenAIChatResponse(raw: unknown): CanonicalChatResponse {
 				message,
 			};
 		}),
-		usage: mapUsage(r.usage),
+	};
+	return {
+		...response,
+		usage: servedUsage(
+			r.usage ? mapUsage(r.usage) : unreportedResponseUsage(response.choices),
+			r.service_tier,
+		),
 	};
 }
 
@@ -667,11 +784,15 @@ interface TransportChunk {
 		};
 	}>;
 	usage?: TransportUsage | null;
+	service_tier?: string | null;
 }
 
 export function parseOpenAIChatChunk(raw: unknown): CanonicalChatStreamChunk {
-	const r = (raw ?? {}) as TransportChunk;
+	const r = (raw ?? {}) as TransportChunk & { system_fingerprint?: unknown };
 	const chunk: CanonicalChatStreamChunk = {
+		...(typeof r.system_fingerprint === "string"
+			? { systemFingerprint: r.system_fingerprint }
+			: {}),
 		id: r.id ?? "",
 		created: r.created ?? Math.floor(Date.now() / 1000),
 		model: r.model ?? "",
@@ -721,7 +842,9 @@ export function parseOpenAIChatChunk(raw: unknown): CanonicalChatStreamChunk {
 		}),
 	};
 	if (r.usage !== undefined) {
-		chunk.usage = r.usage ? mapUsage(r.usage) : null;
+		chunk.usage = r.usage
+			? servedUsage(mapUsage(r.usage), r.service_tier)
+			: null;
 	}
 	return chunk;
 }

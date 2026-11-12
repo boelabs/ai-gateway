@@ -1,16 +1,16 @@
 import { deriveActiveKey, decryptJson, encryptJson } from "#db/crypto.ts";
 import { EXECUTION_POLICY_MAX_TOTAL_MS } from "#core/executionPolicy.ts";
 import { providerErrorDetail, internalMessage } from "./errorRecord.ts";
-import { and, eq, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { PersistenceHealthTracker } from "./persistenceHealth.ts";
 import { purgeExpiredAuditEntries } from "#db/repos/audit.ts";
 import type { AdapterDiagnostics } from "#adapters/types.ts";
+import { db, sql as postgresClient } from "#db/client.ts";
 import type { OperationLogInput } from "./logger.ts";
 import { randomUUID } from "node:crypto";
 import { createHmac } from "node:crypto";
 import { redis } from "#cache/redis.ts";
 import { env } from "#config/env.ts";
-import { db } from "#db/client.ts";
 import { log } from "./log.ts";
 
 import {
@@ -30,14 +30,38 @@ import {
 const pending = new Set<Promise<void>>();
 const persistenceHealth = new PersistenceHealthTracker();
 const FINALIZATION_QUEUE_LIMIT = 10_000;
-const FINALIZATION_BATCH_SIZE = 100;
+/**
+ * Bytes the queued writes may hold. Each job keeps only the bounded, redacted forms of its payloads
+ * (never the raw bodies), and counts their size here, so a burst of large requests is bounded by
+ * memory rather than only by how many there are.
+ */
+const FINALIZATION_QUEUE_MAX_BYTES = 128 * 1024 * 1024;
+/** What a write with no payload is charged, so even those cannot grow the queue without bound. */
+const SMALL_JOB_BYTES = 512;
+/**
+ * Finalizations run in parallel up to half the pool, each a transaction holding a connection: more
+ * than the pool would only queue inside it, and starve request-path queries while doing so.
+ */
+const FINALIZATION_BATCH_SIZE = Math.max(
+	1,
+	Math.floor(env.DATABASE_POOL_MAX / 2),
+);
 const finalizationQueue: Array<{
 	run: () => Promise<void>;
 	resolve: () => void;
+	bytes: number;
+	/** Writes of one request run in the order they were queued; different requests in parallel. */
+	key: string;
 }> = [];
+let queuedBytes = 0;
 let drainingFinalizations = false;
+/**
+ * Keys whose values are credentials. "token" only as the end of a name (`access_token`, `idToken`,
+ * `x-auth-token`), so token counts (`max_tokens`, `prompt_tokens`, `usage.input_tokens`) stay
+ * readable in the logs.
+ */
 const SENSITIVE_KEY =
-	/authorization|api[-_]?key|token|secret|password|cookie/iu;
+	/authorization|api[-_]?key|token$|secret|password|cookie/iu;
 const OPERATION_LEASE_TTL_SECONDS =
 	Math.ceil(EXECUTION_POLICY_MAX_TOTAL_MS / 1000) + 300;
 const operationLeaseKey = (operationId: string) =>
@@ -52,12 +76,25 @@ async function drainFinalizations(): Promise<void> {
 		while (finalizationQueue.length > 0) {
 			const batch = finalizationQueue.splice(0, FINALIZATION_BATCH_SIZE);
 			recordPersistenceQueueDelta(-batch.length);
+			for (const job of batch) {
+				queuedBytes -= job.bytes;
+			}
+			// One operation's writes stay in order (its row before its attempts, which reference it);
+			// different operations' writes run concurrently.
+			const byKey = new Map<string, typeof batch>();
+			for (const job of batch) {
+				byKey.set(job.key, [...(byKey.get(job.key) ?? []), job]);
+			}
 			await Promise.allSettled(
-				batch.map(async (job) => {
-					try {
-						await job.run();
-					} finally {
-						job.resolve();
+				[...byKey.values()].map(async (jobs) => {
+					for (const job of jobs) {
+						try {
+							await job.run();
+						} catch {
+							// retry() already logged and counted it.
+						} finally {
+							job.resolve();
+						}
 					}
 				}),
 			);
@@ -73,18 +110,24 @@ async function drainFinalizations(): Promise<void> {
 function enqueueFinalization(
 	run: () => Promise<void>,
 	requestId: string,
+	bytes = SMALL_JOB_BYTES,
 ): Promise<void> {
-	if (finalizationQueue.length >= FINALIZATION_QUEUE_LIMIT) {
+	if (
+		finalizationQueue.length >= FINALIZATION_QUEUE_LIMIT ||
+		queuedBytes + bytes > FINALIZATION_QUEUE_MAX_BYTES
+	) {
 		persistenceHealth.recordDrop();
 		recordPersistenceLoss("dropped");
 		log.error("operation-log", "finalization queue is full", {
 			requestId,
 			queueDepth: finalizationQueue.length,
+			queuedBytes,
 		});
 		return Promise.resolve();
 	}
 	const task = new Promise<void>((resolve) => {
-		finalizationQueue.push({ run, resolve });
+		finalizationQueue.push({ run, resolve, bytes, key: requestId });
+		queuedBytes += bytes;
 		recordPersistenceQueueDelta(1);
 	});
 	queueMicrotask(drainFinalizations);
@@ -94,6 +137,17 @@ function enqueueFinalization(
 function track(task: Promise<void>): void {
 	pending.add(task);
 	void task.finally(() => pending.delete(task));
+}
+
+/**
+ * A small write (operation start, attempt start, progress, model), through the same bounded queue
+ * as finalizations so that no kind of operation write can pile up without limit.
+ */
+function enqueueWrite(
+	requestId: string,
+	write: () => Promise<void>,
+): Promise<void> {
+	return enqueueFinalization(() => retry(write, requestId), requestId);
 }
 
 async function retry(
@@ -158,11 +212,11 @@ function semanticByteCounts(value: unknown): {
 	return { outputBytes, reasoningBytes };
 }
 
-function safeSummary(value: unknown): Record<string, unknown> {
-	let json = "";
-	try {
-		json = JSON.stringify(value) ?? "";
-	} catch {
+function safeSummary(
+	value: unknown,
+	json: string | null,
+): Record<string, unknown> {
+	if (json === null) {
 		return { serializable: false };
 	}
 	const summary: Record<string, unknown> = {
@@ -217,7 +271,7 @@ function safeSummary(value: unknown): Record<string, unknown> {
 	return summary;
 }
 
-function redact(value: unknown): unknown {
+export function redact(value: unknown): unknown {
 	if (Array.isArray(value)) {
 		return value.map(redact);
 	}
@@ -259,15 +313,39 @@ export function decryptPayload(
 	return decryptJson(envelope, "observability-payload");
 }
 
-export function payloadFingerprint(value: unknown): string {
-	const fingerprintKey = deriveActiveKey("observability-fingerprint");
-	let serialized: string;
+function serialize(value: unknown): string | null {
 	try {
-		serialized = JSON.stringify(value) ?? "";
+		return JSON.stringify(value) ?? "";
 	} catch {
-		serialized = "[not_serializable]";
+		return null;
 	}
-	return createHmac("sha256", fingerprintKey).update(serialized).digest("hex");
+}
+
+function fingerprintOf(serialized: string | null): string {
+	const fingerprintKey = deriveActiveKey("observability-fingerprint");
+	return createHmac("sha256", fingerprintKey)
+		.update(serialized ?? "[not_serializable]")
+		.digest("hex");
+}
+
+export function payloadFingerprint(value: unknown): string {
+	return fingerprintOf(serialize(value));
+}
+
+/**
+ * A payload reduced to what is persisted: its summary and fingerprint, from one serialization, and
+ * its bounded, redacted form. Computed once per operation, so the raw body is not retained by the
+ * queued write and a retry does not redo the work.
+ */
+function reducePayload(value: unknown): {
+	summary: Record<string, unknown>;
+	bounded: unknown;
+} {
+	const json = serialize(value);
+	return {
+		summary: { ...safeSummary(value, json), fingerprint: fingerprintOf(json) },
+		bounded: boundedPayloadComponent(value),
+	};
 }
 
 export interface OperationStart {
@@ -286,7 +364,7 @@ export function newOperationId(): string {
 }
 
 export function beginOperation(input: OperationStart): Promise<void> {
-	const task = retry(async () => {
+	const task = enqueueWrite(input.requestId, async () => {
 		await db
 			.insert(gatewayOperations)
 			.values({
@@ -306,7 +384,7 @@ export function beginOperation(input: OperationStart): Promise<void> {
 			"EX",
 			OPERATION_LEASE_TTL_SECONDS,
 		);
-	}, input.requestId);
+	});
 	track(task);
 	return task;
 }
@@ -326,7 +404,7 @@ export function beginUpstreamAttempt(input: {
 	startedAt: Date;
 	requestId: string;
 }): void {
-	const task = retry(async () => {
+	const task = enqueueWrite(input.requestId, async () => {
 		await db
 			.insert(upstreamAttempts)
 			.values({
@@ -342,7 +420,7 @@ export function beginUpstreamAttempt(input: {
 				lastProgressAt: input.startedAt,
 			})
 			.onConflictDoNothing();
-	}, input.requestId);
+	});
 	track(task);
 }
 
@@ -614,6 +692,42 @@ export function completeOperation(
 	started: Promise<void>,
 	input: OperationLogInput,
 ): void {
+	// Reducing the payloads (serializing, redacting, encrypting) is real work on bodies that can be
+	// megabytes; it runs after the current turn, so the response is not held up by it.
+	const prepared = new Promise<void>((resolve) => {
+		setImmediate(() => {
+			try {
+				finalizeOperation(operationId, started, input);
+			} catch (err) {
+				log.error("operation-log", "failed to prepare an operation record", {
+					requestId: input.requestId,
+					err,
+				});
+			} finally {
+				resolve();
+			}
+		});
+	});
+	track(prepared);
+}
+
+function finalizeOperation(
+	operationId: string,
+	started: Promise<void>,
+	fullInput: OperationLogInput,
+): void {
+	const request = reducePayload(fullInput.requestBody);
+	const response = reducePayload(fullInput.responseBody);
+	const streamedBody =
+		fullInput.responseBody !== null &&
+		typeof fullInput.responseBody === "object" &&
+		(fullInput.responseBody as { streamed?: unknown }).streamed === true;
+	// From here on only the reduced forms are held; the raw bodies can be collected.
+	const input: OperationLogInput = {
+		...fullInput,
+		requestBody: null,
+		responseBody: null,
+	};
 	const lifecycle = input.metadata.streamLifecycle as
 		| {
 				firstEventAt?: number | null;
@@ -623,11 +737,7 @@ export function completeOperation(
 				terminal?: { outcome?: string } | null;
 		  }
 		| undefined;
-	const streamed =
-		lifecycle !== undefined ||
-		(input.responseBody !== null &&
-			typeof input.responseBody === "object" &&
-			(input.responseBody as { streamed?: unknown }).streamed === true);
+	const streamed = lifecycle !== undefined || streamedBody;
 	const terminal =
 		lifecycle?.terminal ??
 		(input.metadata.terminal as { outcome?: string } | undefined) ??
@@ -663,14 +773,23 @@ export function completeOperation(
 		(total, attempt) => total + (attempt.downstreamBytes ?? 0),
 		0,
 	);
-	const requestSummary: Record<string, unknown> = {
-		...safeSummary(input.requestBody),
-		fingerprint: payloadFingerprint(input.requestBody),
-	};
-	const responseSummary: Record<string, unknown> = {
-		...safeSummary(input.responseBody),
-		fingerprint: payloadFingerprint(input.responseBody),
-	};
+	const requestSummary = request.summary;
+	const responseSummary = response.summary;
+	// Every finished operation keeps a sample. Sampling the successful ones was a storage decision
+	// that cost the operator the one case they always need: the request that "worked" and still
+	// returned the wrong thing. What limits the exposure is retention, redaction and
+	// OBSERVABILITY_PAYLOAD_ACCESS - not luck.
+	const envelope = encryptJson(
+		{
+			request: request.bounded,
+			response: response.bounded,
+			error: boundedPayloadComponent(input.error),
+			attempts: boundedPayloadComponent(input.attempts),
+		},
+		"observability-payload",
+	);
+	const jobBytes =
+		Buffer.byteLength(JSON.stringify(envelope)) + SMALL_JOB_BYTES;
 	/** What the summary measured, for responses no attempt reported a byte count for. */
 	const summaryBytes =
 		typeof responseSummary.bytes === "number" ? responseSummary.bytes : null;
@@ -695,94 +814,113 @@ export function completeOperation(
 				retry(async () => {
 					// A finished parent must never be observable with stale in-progress attempts.
 					await db.transaction(async (tx) => {
-						await tx
-							.update(gatewayOperations)
-							.set({
-								publicModel: input.publicModel,
-								lifecycleState: "finished",
-								outcome,
-								degraded,
-								terminalVerified,
-								cacheHit: input.cacheHit,
-								stream: streamed,
-								httpStatus: input.httpStatus,
-								promptTokens: input.usage?.promptTokens ?? null,
-								completionTokens: input.usage?.completionTokens ?? null,
-								reasoningTokens: input.usage?.reasoningTokens ?? null,
-								cacheReadTokens: input.usage?.cacheReadTokens ?? null,
-								cacheWriteTokens: input.usage?.cacheWriteTokens ?? null,
-								totalTokens: input.usage?.totalTokens ?? null,
-								searchUnits: input.usage?.searchUnits ?? null,
-								consumerCostCents: input.cost?.totalCents.toFixed(10) ?? null,
-								upstreamCostCents:
-									(attempts.length > 0
-										? knownUpstreamCost
-										: input.cost?.totalCents
-									)?.toFixed(10) ?? null,
-								durationMs: input.durationMs,
-								firstOutputMs: firstOutputMsOf(
-									streamed,
-									lifecycle?.firstOutputAt ?? null,
-									input,
-								),
-								firstEventMs:
-									lifecycle?.firstEventAt == null
-										? null
-										: lifecycle.firstEventAt - input.startTime.getTime(),
-								firstReasoningMs:
-									lifecycle?.firstReasoningAt == null
-										? null
-										: lifecycle.firstReasoningAt - input.startTime.getTime(),
-								maxInterEventGapMs: lifecycle?.maxInterEventGapMs ?? null,
-								downstreamBlockedMs:
-									downstream?.maxBlockedMs ??
-									(attempts.length > 0
-										? Math.max(
-												...attempts.map(
-													(attempt) => attempt.downstreamBlockedMs ?? 0,
-												),
-											)
-										: null),
-								upstreamBytes: attempts.length > 0 ? upstreamBytes : null,
-								downstreamBytes:
-									downstreamBytes > 0 ? downstreamBytes : summaryBytes,
-								endedAt: input.endTime,
-								lastProgressAt: input.endTime,
-								reasoning: input.metadata.reasoning ?? null,
-								requestSummary,
-								responseSummary,
-								metadata: {
-									...input.metadata,
-									...(input.usage?.cacheWriteTokensByTtl === undefined
-										? {}
-										: {
-												cacheWriteTokensByTtl:
-													input.usage.cacheWriteTokensByTtl,
-											}),
-									client: {
-										ipFingerprint: payloadFingerprint(input.ip),
-										userAgentFingerprint: payloadFingerprint(input.userAgent),
-									},
-								},
-								error: input.error
-									? {
-											class: input.error.class,
-											code: input.error.code,
-											http_status: input.error.http_status,
-											failure_kind: input.error.failure_kind,
-											...(input.error.phase === undefined
-												? {}
-												: { phase: input.error.phase }),
-											...internalMessage(
-												typeof input.error.message === "string"
-													? input.error.message
-													: undefined,
-												payloadAccessIsOpen(),
+						// An upsert, not an update: the row opened at the start may never have been
+						// written (its write was dropped or failed), and the finished record must not
+						// be lost with it.
+						const finished: Partial<typeof gatewayOperations.$inferInsert> = {
+							publicModel: input.publicModel,
+							lifecycleState: "finished",
+							outcome,
+							degraded,
+							terminalVerified,
+							cacheHit: input.cacheHit,
+							stream: streamed,
+							httpStatus: input.httpStatus,
+							promptTokens: input.usage?.promptTokens ?? null,
+							completionTokens: input.usage?.completionTokens ?? null,
+							reasoningTokens: input.usage?.reasoningTokens ?? null,
+							cacheReadTokens: input.usage?.cacheReadTokens ?? null,
+							cacheWriteTokens: input.usage?.cacheWriteTokens ?? null,
+							totalTokens: input.usage?.totalTokens ?? null,
+							searchUnits: input.usage?.searchUnits ?? null,
+							consumerCostCents: input.cost?.totalCents.toFixed(10) ?? null,
+							upstreamCostCents:
+								(attempts.length > 0
+									? knownUpstreamCost
+									: input.cost?.totalCents
+								)?.toFixed(10) ?? null,
+							durationMs: input.durationMs,
+							firstOutputMs: firstOutputMsOf(
+								streamed,
+								lifecycle?.firstOutputAt ?? null,
+								input,
+							),
+							firstEventMs:
+								lifecycle?.firstEventAt == null
+									? null
+									: lifecycle.firstEventAt - input.startTime.getTime(),
+							firstReasoningMs:
+								lifecycle?.firstReasoningAt == null
+									? null
+									: lifecycle.firstReasoningAt - input.startTime.getTime(),
+							maxInterEventGapMs: lifecycle?.maxInterEventGapMs ?? null,
+							downstreamBlockedMs:
+								downstream?.maxBlockedMs ??
+								(attempts.length > 0
+									? Math.max(
+											...attempts.map(
+												(attempt) => attempt.downstreamBlockedMs ?? 0,
 											),
-										}
-									: missingTerminalError,
+										)
+									: null),
+							upstreamBytes: attempts.length > 0 ? upstreamBytes : null,
+							downstreamBytes:
+								downstreamBytes > 0 ? downstreamBytes : summaryBytes,
+							endedAt: input.endTime,
+							lastProgressAt: input.endTime,
+							reasoning: input.metadata.reasoning ?? null,
+							requestSummary,
+							responseSummary,
+							metadata: {
+								...input.metadata,
+								...(input.usage?.cacheWriteTokensByTtl === undefined
+									? {}
+									: {
+											cacheWriteTokensByTtl: input.usage.cacheWriteTokensByTtl,
+										}),
+								// The upstream reported no usage: the counts above are the gateway's estimate.
+								...(input.usage?.estimated ? { usageEstimated: true } : {}),
+								...(input.usage?.serviceTier === undefined
+									? {}
+									: { serviceTier: input.usage.serviceTier }),
+								client: {
+									ipFingerprint: payloadFingerprint(input.ip),
+									userAgentFingerprint: payloadFingerprint(input.userAgent),
+								},
+							},
+							error: input.error
+								? {
+										class: input.error.class,
+										code: input.error.code,
+										http_status: input.error.http_status,
+										failure_kind: input.error.failure_kind,
+										...(input.error.phase === undefined
+											? {}
+											: { phase: input.error.phase }),
+										...internalMessage(
+											typeof input.error.message === "string"
+												? input.error.message
+												: undefined,
+											payloadAccessIsOpen(),
+										),
+									}
+								: missingTerminalError,
+						};
+						await tx
+							.insert(gatewayOperations)
+							.values({
+								id: operationId,
+								requestId: input.requestId,
+								virtualKeyId: input.virtualKeyId,
+								actor: input.actor ?? null,
+								callType: input.callType,
+								startedAt: input.startTime,
+								...finished,
 							})
-							.where(eq(gatewayOperations.id, operationId));
+							.onConflictDoUpdate({
+								target: gatewayOperations.id,
+								set: finished,
+							});
 
 						if (attempts.length > 0) {
 							await tx
@@ -916,19 +1054,6 @@ export function completeOperation(
 							);
 					});
 
-					// Every finished operation keeps a sample. Sampling the successful ones was a
-					// storage decision that cost the operator the one case they always need: the
-					// request that "worked" and still returned the wrong thing. What limits the
-					// exposure is retention, redaction and OBSERVABILITY_PAYLOAD_ACCESS - not luck.
-					const envelope = encryptJson(
-						{
-							request: boundedPayloadComponent(input.requestBody),
-							response: boundedPayloadComponent(input.responseBody),
-							error: boundedPayloadComponent(input.error),
-							attempts: boundedPayloadComponent(input.attempts),
-						},
-						"observability-payload",
-					);
 					await db
 						.insert(payloadSamples)
 						.values({
@@ -945,6 +1070,7 @@ export function completeOperation(
 				}, input.requestId),
 			),
 		input.requestId,
+		jobBytes,
 	);
 	void task.finally(() => finishOperationChildTelemetry(persistenceTelemetry));
 	track(task);
@@ -952,7 +1078,7 @@ export function completeOperation(
 
 export function touchOperation(operationId: string, requestId: string): void {
 	const now = new Date();
-	const task = retry(async () => {
+	const task = enqueueWrite(requestId, async () => {
 		await Promise.all([
 			db
 				.update(gatewayOperations)
@@ -969,7 +1095,7 @@ export function touchOperation(operationId: string, requestId: string): void {
 				),
 			redis.expire(operationLeaseKey(operationId), OPERATION_LEASE_TTL_SECONDS),
 		]);
-	}, requestId);
+	});
 	track(task);
 }
 
@@ -979,20 +1105,23 @@ export function identifyOperation(
 	requestId: string,
 	publicModel: string | null,
 ): void {
-	const task = started.then(() =>
-		retry(async () => {
-			await db
-				.update(gatewayOperations)
-				.set({ publicModel })
-				.where(eq(gatewayOperations.id, operationId));
-		}, requestId),
-	);
+	const task = enqueueWrite(requestId, async () => {
+		await started;
+		await db
+			.update(gatewayOperations)
+			.set({ publicModel })
+			.where(eq(gatewayOperations.id, operationId));
+	});
 	track(task);
 }
 
 export async function flushOperationLogs(): Promise<void> {
-	await drainFinalizations();
-	await Promise.allSettled([...pending]);
+	// A record prepared after the response (see completeOperation) enqueues its write only once its
+	// preparation runs, so one pass is not enough: drain until nothing is pending or queued.
+	while (pending.size > 0 || finalizationQueue.length > 0) {
+		await drainFinalizations();
+		await Promise.allSettled([...pending]);
+	}
 }
 
 export function operationPersistenceStatus() {
@@ -1137,63 +1266,167 @@ export async function getPayloadSample(
 	return { outcome: "revealed", payload };
 }
 
-export function startOperationMaintenance(): () => void {
-	const run = async () => {
-		const abandoned = await reconcileAbandonedOperations();
-		if (abandoned > 0) {
-			log.error("operation-log", "reconciled abandoned operations", {
-				abandoned,
-			});
-		}
-		await db
-			.delete(payloadSamples)
-			.where(lte(payloadSamples.expiresAt, new Date()));
-		const retentionCutoff = new Date(
-			Date.now() - env.OBSERVABILITY_METADATA_RETENTION_DAYS * 86_400_000,
-		);
-		await db
-			.delete(payloadAccessAudit)
-			.where(lt(payloadAccessAudit.accessedAt, retentionCutoff));
-		const auditCutoff = new Date(
-			Date.now() - env.ADMIN_AUDIT_RETENTION_DAYS * 86_400_000,
-		);
-		const audited = await purgeExpiredAuditEntries(auditCutoff);
-		if (audited > 0) {
-			log.info("operation-log", "purged expired audit entries", { audited });
-		}
+/** Rows deleted per statement, and the most statements one maintenance pass may run per table. */
+const PURGE_BATCH = 1000;
+const MAX_PURGE_BATCHES = 50;
+const MAINTENANCE_INTERVAL_MS = 60_000;
+/** Shared by every replica, so only one runs maintenance at a time. Never change it. */
+const MAINTENANCE_LOCK_ID = 918_273_646;
+
+/** Expired operations, oldest first, along with their attempts and samples. Returns rows removed. */
+async function purgeExpiredOperations(cutoff: Date): Promise<number> {
+	let purged = 0;
+	for (let batch = 0; batch < MAX_PURGE_BATCHES; batch += 1) {
+		// Served by the partial index on (ended_at) WHERE lifecycle_state = 'finished'.
 		const expired = await db
 			.select({ id: gatewayOperations.id })
 			.from(gatewayOperations)
 			.where(
 				and(
 					eq(gatewayOperations.lifecycleState, "finished"),
-					lt(gatewayOperations.endedAt, retentionCutoff),
+					lt(gatewayOperations.endedAt, cutoff),
 				),
 			)
-			.limit(1000);
-		if (expired.length > 0) {
-			const ids = expired.map((row) => row.id);
-			await db.transaction(async (tx) => {
-				await tx
-					.delete(payloadSamples)
-					.where(inArray(payloadSamples.operationId, ids));
-				await tx
-					.delete(upstreamAttempts)
-					.where(inArray(upstreamAttempts.operationId, ids));
-				await tx
-					.delete(gatewayOperations)
-					.where(inArray(gatewayOperations.id, ids));
-			});
+			.orderBy(asc(gatewayOperations.endedAt))
+			.limit(PURGE_BATCH);
+		if (expired.length === 0) {
+			break;
+		}
+		const ids = expired.map((row) => row.id);
+		await db.transaction(async (tx) => {
+			await tx
+				.delete(payloadSamples)
+				.where(inArray(payloadSamples.operationId, ids));
+			await tx
+				.delete(upstreamAttempts)
+				.where(inArray(upstreamAttempts.operationId, ids));
+			await tx
+				.delete(gatewayOperations)
+				.where(inArray(gatewayOperations.id, ids));
+		});
+		purged += ids.length;
+		if (expired.length < PURGE_BATCH) {
+			break;
+		}
+	}
+	return purged;
+}
+
+/** Samples past their own expiry, in batches. */
+async function purgeExpiredSamples(now: Date): Promise<number> {
+	let purged = 0;
+	for (let batch = 0; batch < MAX_PURGE_BATCHES; batch += 1) {
+		const rows = await db.execute(sql`
+			DELETE FROM ${payloadSamples}
+			WHERE ${payloadSamples.id} IN (
+				SELECT ${payloadSamples.id} FROM ${payloadSamples}
+				WHERE ${payloadSamples.expiresAt} <= ${now.toISOString()}::timestamptz
+				LIMIT ${PURGE_BATCH}
+			)
+			RETURNING ${payloadSamples.id}`);
+		purged += rows.length;
+		if (rows.length < PURGE_BATCH) {
+			break;
+		}
+	}
+	return purged;
+}
+
+/**
+ * One maintenance pass. Each step runs on its own, so a failing one (a lock timeout on the audit
+ * table, say) does not skip the retention work after it.
+ */
+export async function runOperationMaintenance(now = new Date()): Promise<void> {
+	const retentionCutoff = new Date(
+		now.getTime() - env.OBSERVABILITY_METADATA_RETENTION_DAYS * 86_400_000,
+	);
+	const steps: [string, () => Promise<void>][] = [
+		[
+			"reconcile abandoned operations",
+			async () => {
+				const abandoned = await reconcileAbandonedOperations();
+				if (abandoned > 0) {
+					log.error("operation-log", "reconciled abandoned operations", {
+						abandoned,
+					});
+				}
+			},
+		],
+		[
+			"purge expired samples",
+			() => purgeExpiredSamples(now).then(() => undefined),
+		],
+		[
+			"purge payload access audit",
+			async () => {
+				await db
+					.delete(payloadAccessAudit)
+					.where(lt(payloadAccessAudit.accessedAt, retentionCutoff));
+			},
+		],
+		[
+			"purge admin audit",
+			async () => {
+				const audited = await purgeExpiredAuditEntries(
+					new Date(now.getTime() - env.ADMIN_AUDIT_RETENTION_DAYS * 86_400_000),
+				);
+				if (audited > 0) {
+					log.info("operation-log", "purged expired audit entries", {
+						audited,
+					});
+				}
+			},
+		],
+		[
+			"purge expired operations",
+			async () => {
+				const purged = await purgeExpiredOperations(retentionCutoff);
+				if (purged > 0) {
+					log.info("operation-log", "purged expired operations", { purged });
+				}
+			},
+		],
+	];
+	for (const [name, step] of steps) {
+		try {
+			await step();
+		} catch (err) {
+			log.error("operation-log", `maintenance step failed: ${name}`, { err });
+		}
+	}
+}
+
+/**
+ * Runs maintenance every minute on whichever replica holds the maintenance lock (others skip the
+ * pass), and schedules the next pass only once the current one has finished, so passes never
+ * overlap however long one takes.
+ */
+export function startOperationMaintenance(): () => void {
+	let stopped = false;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const pass = async () => {
+		try {
+			await postgresClient.lock(
+				MAINTENANCE_LOCK_ID,
+				() => runOperationMaintenance(),
+				{
+					wait: false,
+				},
+			);
+		} catch (err) {
+			if ((err as { code?: string }).code !== "LOCK_NOT_AVAILABLE") {
+				log.error("operation-log", "maintenance failed", { err });
+			}
+		} finally {
+			if (!stopped) {
+				timer = setTimeout(() => void pass(), MAINTENANCE_INTERVAL_MS);
+				timer.unref();
+			}
 		}
 	};
-	void run().catch((err: unknown) =>
-		log.error("operation-log", "maintenance failed", { err }),
-	);
-	const timer = setInterval(() => {
-		void run().catch((err: unknown) =>
-			log.error("operation-log", "maintenance failed", { err }),
-		);
-	}, 60_000);
-	timer.unref();
-	return () => clearInterval(timer);
+	void pass();
+	return () => {
+		stopped = true;
+		clearTimeout(timer);
+	};
 }

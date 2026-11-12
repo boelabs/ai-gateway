@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { gatewayUrl } from "#/shared/config/server.ts";
 import { z } from "zod/v4";
 
@@ -34,9 +35,12 @@ const readinessSchema = z.object({
 export type Readiness = z.infer<typeof readinessSchema>;
 
 export async function readiness(): Promise<Readiness | null> {
+	// Readiness is the state now, per request: never prerendered into a shell, never cached.
+	await connection();
 	try {
 		const response = await fetch(gatewayUrl("/health/ready"), {
 			headers: { accept: "application/json" },
+			cache: "no-store",
 		});
 		return readinessSchema.parse(await response.json());
 	} catch {

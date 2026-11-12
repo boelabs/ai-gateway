@@ -132,6 +132,10 @@ certificates, not TLS in general.
 - **Managed database with a public-CA certificate.** Providers like Neon, Aiven, Supabase (Postgres)
   and Upstash (Redis) present publicly-trusted certificates, which Bun connects to without issue. See
   [Setup → Managed database and Redis](/docs/setup#managed-database-and-redis).
+- **Trust the self-signed CA (Redis).** `rediss://` verifies the server certificate. Put the CA that
+  signed it in `REDIS_TLS_CA` (PEM text, or `file:/path/to/ca.pem`) instead of turning verification
+  off. `REDIS_TLS_INSECURE=true` skips verification entirely; use it only where the link is protected
+  some other way, since without it anyone on the path can impersonate the cache that holds budgets.
 - **TLS-terminating proxy (stunnel).** If you must reach a self-signed endpoint over an untrusted
   network from your own machine, run a local `stunnel` that speaks TLS upstream and exposes plaintext
   on `localhost`, then point the gateway at `localhost`.

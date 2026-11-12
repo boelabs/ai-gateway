@@ -111,3 +111,42 @@ test("toCanonical: preserves keyword and multilingual hints separately from prom
 	assert.deepEqual(req.languages, fields.languages);
 	assert.equal(req.prompt, fields.prompt);
 });
+
+test("duration transcription usage round-trips and bills by the second", async () => {
+	const { parseTranscriptionResponse } = await import("./audioTransport.ts");
+	const { transcriptionUsageToCore } = await import("#core/audio.ts");
+	const parsed = parseTranscriptionResponse({
+		text: "hi",
+		usage: { type: "duration", seconds: 42 },
+	});
+	assert.deepEqual(parsed.usage, { type: "duration", seconds: 42 });
+	assert.deepEqual(transcriptionUsageToCore(parsed.usage), {
+		promptTokens: 0,
+		completionTokens: 0,
+		totalTokens: 0,
+		inputAudioSeconds: 42,
+	});
+	const rendered = toOpenAITranscriptionResponse(parsed, "json") as {
+		usage?: unknown;
+	};
+	assert.deepEqual(rendered.usage, { type: "duration", seconds: 42 });
+});
+
+test("token transcription usage keeps its audio share for the audio rate", async () => {
+	const { transcriptionUsageToCore } = await import("#core/audio.ts");
+	assert.deepEqual(
+		transcriptionUsageToCore({
+			type: "tokens",
+			inputTokens: 30,
+			outputTokens: 5,
+			totalTokens: 35,
+			inputTokenDetails: { textTokens: 2, audioTokens: 28 },
+		}),
+		{
+			promptTokens: 30,
+			completionTokens: 5,
+			totalTokens: 35,
+			promptAudioTokens: 28,
+		},
+	);
+});

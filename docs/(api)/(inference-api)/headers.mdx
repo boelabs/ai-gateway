@@ -8,7 +8,7 @@ description: "Every request and response header the gateway reads or sets, in on
 | Header | Where | Effect |
 |---|---|---|
 | `Authorization: Bearer <key>` or `x-api-key: <key>` | All `/v1/*`, all `/admin/*` | Auth. Master key on `/admin/*`; master or virtual key on `/v1/*`. |
-| `x-request-id` | Any request | Echoed back on the response if you send it; otherwise the gateway generates one. Always log this — see [Troubleshooting](/docs/troubleshooting). |
+| `x-request-id` | Any request | Echoed back on the response if you send it as a plain token (letters, digits, `.`, `_`, `:`, `-`; up to 128 characters, starting with a letter or digit); otherwise the gateway generates one. Always log this — see [Troubleshooting](/docs/troubleshooting). |
 | `x-unified-cache: true` (or `1`) | Chat-shaped and embeddings requests | Opt in to response caching for this request. Ignored entirely for master-key traffic. |
 | `x-unified-cache-ttl: <seconds>` | Same as above | TTL for a newly stored cache entry. Default `300`, max `86400`. Ignored if `x-unified-cache` isn't also set. |
 | `x-unified-routing-metadata: true` (or `1`/`yes`/`on`/`include`) | `/v1/chat/completions`, `/v1/messages`, `/v1/responses` | Adds an `unified_routing` object to the response body (see below). |

@@ -14,6 +14,25 @@ import type { WSEvents } from "hono/ws";
 import type { Context } from "hono";
 
 import {
+	assertRealtimeSocketCapacity,
+	type RealtimeSocketEntry,
+	unregisterRealtimeSocket,
+	registerRealtimeSocket,
+	eventQueueLimitError,
+	revalidateConnection,
+	sessionExpiredError,
+	realtimeMessageJson,
+	capacityLimitError,
+	sendRealtimeEvent,
+	MAX_QUEUED_EVENTS,
+	admitQueuedBytes,
+	queuedBytesError,
+	messageBytes,
+	REALTIME_MAX_MS,
+	watchCredential,
+} from "./realtimeSockets.ts";
+
+import {
 	type RealtimeConversationSessionUpdate,
 	type RealtimeConversationClientEvent,
 	applyConversationSessionUpdate,
@@ -25,30 +44,19 @@ import {
 } from "#contracts/openai/realtimeConversation.ts";
 
 import {
-	type RealtimeSocketEntry,
-	unregisterRealtimeSocket,
-	registerRealtimeSocket,
-	eventQueueLimitError,
-	sessionExpiredError,
-	realtimeMessageJson,
-	sendRealtimeEvent,
-	MAX_QUEUED_EVENTS,
-	REALTIME_MAX_MS,
-} from "./realtimeSockets.ts";
-
-import {
-	finishDownstreamWriteObservation,
-	type DownstreamWriteObservation,
-	newDownstreamWriteObservation,
-} from "./runtime/sse.ts";
-
-import {
+	assertRealtimeExtensionsSupported,
 	assertFinalModelAllowed,
 	usageQuotaForRequest,
 	computeUsageCost,
 	toGatewayError,
 	preflight,
 } from "./runtime/pipeline.ts";
+
+import {
+	finishDownstreamWriteObservation,
+	type DownstreamWriteObservation,
+	newDownstreamWriteObservation,
+} from "./runtime/sse.ts";
 
 import {
 	type CanonicalRealtimeConversationConfig,
@@ -86,6 +94,8 @@ interface ConversationRun {
 	configKey: string;
 	downstream: DownstreamWriteObservation;
 	ended: boolean;
+	/** Completed responses already charged against the key, so each one is charged once. */
+	chargedResponses: number;
 }
 
 interface ConversationConnection {
@@ -96,6 +106,7 @@ interface ConversationConnection {
 	decoder: AudioInputDecoder;
 	queue: Promise<void>;
 	queued: number;
+	queuedBytes: number;
 	run: ConversationRun | null;
 	/**
 	 * The provider session failed to open. Later events report it instead of retrying (and logging)
@@ -103,6 +114,8 @@ interface ConversationConnection {
 	 */
 	failed: GatewayError | null;
 	timer: ReturnType<typeof setTimeout> | undefined;
+	/** Stops the periodic credential re-check (see `watchCredential`). */
+	stopCredentialWatch?: () => void;
 	closed: boolean;
 }
 
@@ -169,6 +182,13 @@ async function pump(connection: ConversationConnection, run: ConversationRun) {
 		for await (const event of run.session.events) {
 			run.log.progress();
 			connection.tracker.provider(event);
+			if (await budgetExhaustedAfterCharge(connection, run)) {
+				const exhausted = budgetExceededError();
+				sendError(connection, exhausted);
+				await endRun(connection, run, exhausted);
+				connection.entry.socket?.close(1008, "budget exceeded");
+				return;
+			}
 		}
 		await endRun(connection, run, null);
 	} catch (error) {
@@ -180,6 +200,50 @@ async function pump(connection: ConversationConnection, run: ConversationRun) {
 		await endRun(connection, run, gatewayError);
 		connection.entry.socket?.close(1011, "upstream session failed");
 	}
+}
+
+/** The session's usage so far: the provider's figures, or the gateway's estimate without them. */
+function sessionUsage(tracker: RealtimeConversationTracker): {
+	usage: RealtimeUsage | null;
+	estimated: boolean;
+} {
+	if (tracker.usage) {
+		return { usage: tracker.usage, estimated: false };
+	}
+	const usage = estimatedUsage(tracker);
+	return { usage, estimated: usage !== null };
+}
+
+/**
+ * Charges every newly completed response as it completes, so a long session is billed as it runs
+ * (in the current TPM window, and not lost if the process dies) and is stopped once the budget is
+ * spent rather than only checked when it opened.
+ */
+async function budgetExhaustedAfterCharge(
+	connection: ConversationConnection,
+	run: ConversationRun,
+): Promise<boolean> {
+	const { tracker } = connection;
+	if (tracker.completedResponses === run.chargedResponses) {
+		return false;
+	}
+	run.chargedResponses = tracker.completedResponses;
+	const core = realtimeUsageToCore(sessionUsage(tracker).usage);
+	if (!core) {
+		return false;
+	}
+	const { budgetExhausted } = await run.routing.charge(core);
+	return budgetExhausted;
+}
+
+function budgetExceededError(): GatewayError {
+	return new GatewayError({
+		class: "rate_limit",
+		code: "budget_exceeded",
+		message: "Budget exhausted for this API key during the realtime session",
+		failureKind: "request",
+		deploymentHealth: "neutral",
+	});
 }
 
 async function endRun(
@@ -195,12 +259,7 @@ async function endRun(
 	tracker.finish();
 	run.session.close();
 	run.abort.abort();
-	let { usage } = tracker;
-	let estimated = false;
-	if (!usage) {
-		usage = estimatedUsage(tracker);
-		estimated = usage !== null;
-	}
+	const { usage, estimated } = sessionUsage(tracker);
 	const core = realtimeUsageToCore(usage);
 	const terminal = error ? null : completedTerminal(core);
 	await run.routing.finish(core, undefined, error, terminal, run.downstream);
@@ -244,6 +303,8 @@ async function startRun(
 	log.requestBody = { session: renderConversationSession(connection.state) };
 	const abort = new AbortController();
 	try {
+		await revalidateConnection(c);
+		assertRealtimeExtensionsSupported(c, "realtime.conversation", config.model);
 		await preflight(c, config.model, { writeHeaders: false });
 		assertFinalModelAllowed(c, config.model);
 		const routing = await route(
@@ -279,6 +340,7 @@ async function startRun(
 			configKey: JSON.stringify(config),
 			downstream: newDownstreamWriteObservation(log.operationId),
 			ended: false,
+			chargedResponses: 0,
 		};
 	} catch (error) {
 		const gatewayError = toGatewayError(error);
@@ -492,11 +554,14 @@ async function closeConnection(
 	}
 	connection.closed = true;
 	clearTimeout(connection.timer);
+	connection.stopCredentialWatch?.();
 	unregisterRealtimeSocket(connection.entry);
-	await connection.queue.catch(() => undefined);
+	// End the provider run first: that aborts whatever a queued client event is waiting on and
+	// settles the session's usage. Waiting for the queue first could hang on that very event.
 	if (connection.run) {
 		await endRun(connection, connection.run, null);
 	}
+	await connection.queue.catch(() => undefined);
 }
 
 /** Builds the socket handlers for a conversation on `model`. Throws when the socket is refused. */
@@ -520,7 +585,7 @@ export function realtimeConversationSocket(
 		busy: () => connection.run !== null,
 		close: () => closeConnection(connection),
 	};
-	registerRealtimeSocket(entry);
+	assertRealtimeSocketCapacity(scopeKey);
 	const tracker = new RealtimeConversationTracker({
 		state: () => connection?.state ?? state,
 		emit: (event) => send(connection, event),
@@ -533,6 +598,7 @@ export function realtimeConversationSocket(
 		decoder: createAudioInputDecoder(state.inputFormat),
 		queue: Promise.resolve(),
 		queued: 0,
+		queuedBytes: 0,
 		run: null,
 		failed: null,
 		timer: undefined,
@@ -541,6 +607,12 @@ export function realtimeConversationSocket(
 	return {
 		onOpen(_event, ws) {
 			entry.socket = ws;
+			if (!registerRealtimeSocket(entry)) {
+				sendError(connection, capacityLimitError());
+				connection.closed = true;
+				ws.close(1013, "connection limit");
+				return;
+			}
 			send(connection, {
 				type: "session.created",
 				event_id: eventId(),
@@ -551,10 +623,20 @@ export function realtimeConversationSocket(
 				entry.socket?.close(1000, "60 minute session limit");
 			}, REALTIME_MAX_MS);
 			connection.timer.unref?.();
+			connection.stopCredentialWatch = watchCredential(c, (error) => {
+				sendError(connection, error);
+				entry.socket?.close(1008, "credential revoked");
+			});
 		},
 		onMessage(event) {
 			if (connection.queued >= MAX_QUEUED_EVENTS) {
 				sendError(connection, eventQueueLimitError());
+				return;
+			}
+			const admitted = admitQueuedBytes(connection, messageBytes(event.data));
+			if (!admitted) {
+				sendError(connection, queuedBytesError());
+				connection.entry.socket?.close(1008, "too much queued data");
 				return;
 			}
 			connection.queued += 1;
@@ -562,6 +644,7 @@ export function realtimeConversationSocket(
 				.then(() => handleMessage(connection, event.data))
 				.finally(() => {
 					connection.queued -= 1;
+					admitted.release();
 				});
 		},
 		onClose() {

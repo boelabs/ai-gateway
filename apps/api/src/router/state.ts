@@ -2,7 +2,7 @@ import { EXECUTION_POLICY_MAX_TOTAL_MS } from "#core/executionPolicy.ts";
 import { releaseCircuitPermit, closeCircuits } from "./circuit.ts";
 import type { CircuitPermit } from "./circuit.ts";
 import { randomUUID } from "node:crypto";
-import { redis } from "#cache/redis.ts";
+import { redis, runScript } from "#cache/redis.ts";
 
 /**
  * Router state in Redis. Keys per model (deployment):
@@ -162,7 +162,7 @@ export async function onAttemptStart(
 	const b = minuteBucket();
 	const leaseId = randomUUID();
 	const reservedTokens = positiveInteger(limits.reservedTokens);
-	const raw: unknown = await redis.eval(
+	const raw: unknown = await runScript(
 		START_ATTEMPT_LUA,
 		5,
 		kInflight(id),
@@ -196,7 +196,7 @@ async function settleAttempt(
 	lease: AttemptLease,
 	actualTokens: number,
 ): Promise<boolean> {
-	const raw: unknown = await redis.eval(
+	const raw: unknown = await runScript(
 		SETTLE_ATTEMPT_LUA,
 		4,
 		kInflight(id),

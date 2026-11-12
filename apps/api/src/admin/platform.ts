@@ -2,6 +2,7 @@ import { ADAPTER_KEY_PATTERN, ADAPTER_KEY_RULE } from "#adapters/key.ts";
 import { getAdapter, listAdapters } from "#adapters/registry.ts";
 import type { RuntimeModelMetadata } from "#db/schema.ts";
 import type { CatalogEntry } from "#catalog/types.ts";
+import { pageParams, uuidParam } from "./params.ts";
 import { MODEL_CATALOG } from "#adapters/index.ts";
 import { GatewayError } from "#core/errors.ts";
 import { parseJsonBody } from "#http/body.ts";
@@ -255,8 +256,7 @@ platformAdminApp.post("/deployments/resolve", async (c) => {
 });
 
 platformAdminApp.get("/deployments", async (c) => {
-	const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50), 1), 200);
-	const offset = Math.max(Number(c.req.query("offset") ?? 0), 0);
+	const { limit, offset } = pageParams(c, { defaultLimit: 50, maxLimit: 200 });
 	const result = await listDeploymentsPage({ limit, offset });
 	return c.json({
 		data: result.rows.map(deploymentView),
@@ -308,7 +308,7 @@ platformAdminApp.post("/deployments", async (c) => {
 });
 
 platformAdminApp.get("/deployments/:id", async (c) => {
-	const row = await getDeploymentById(c.req.param("id"));
+	const row = await getDeploymentById(uuidParam(c, "id", "Deployment"));
 	if (!row) {
 		throw new GatewayError({
 			class: "not_found",
@@ -352,7 +352,10 @@ platformAdminApp.patch("/deployments/:id", async (c) => {
 		...(input.tpmLimit === undefined ? {} : { tpmLimit: input.tpmLimit }),
 		...(input.rpmLimit === undefined ? {} : { rpmLimit: input.rpmLimit }),
 	};
-	const result = await updateDeployment(c.req.param("id"), patch);
+	const result = await updateDeployment(
+		uuidParam(c, "id", "Deployment"),
+		patch,
+	);
 	return ok(c, { ...deploymentView(result.row), resolved: result.preview });
 });
 
@@ -362,7 +365,7 @@ platformAdminApp.patch("/deployments/:id", async (c) => {
  * who has fixed the upstream needs a way to say so without waiting out the window.
  */
 platformAdminApp.delete("/deployments/:id/circuit", async (c) => {
-	const row = await getDeploymentById(c.req.param("id"));
+	const row = await getDeploymentById(uuidParam(c, "id", "Deployment"));
 	if (!row) {
 		throw new GatewayError({
 			class: "not_found",
@@ -377,7 +380,7 @@ platformAdminApp.delete("/deployments/:id/circuit", async (c) => {
 });
 
 platformAdminApp.delete("/deployments/:id", async (c) => {
-	const row = await getDeploymentById(c.req.param("id"));
+	const row = await getDeploymentById(uuidParam(c, "id", "Deployment"));
 	if (!row) {
 		throw new GatewayError({
 			class: "not_found",

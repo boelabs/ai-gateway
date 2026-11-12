@@ -1,15 +1,16 @@
-import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { db, sql as postgresClient } from "#db/client.ts";
+import type { StateScope } from "#auth/scope.ts";
 import { responseStates } from "#db/schema.ts";
 import { writtenRow } from "#db/returning.ts";
 import { log } from "#logging/log.ts";
 import { env } from "#config/env.ts";
-import { db } from "#db/client.ts";
 
 export type ResponseStateRow = typeof responseStates.$inferSelect;
 
 export interface StoreResponseStateInput {
 	id: string;
-	virtualKeyId: string | null;
+	scope: StateScope;
 	publicModel: string;
 	deploymentId: string | null;
 	adapterKey: string | null;
@@ -21,69 +22,108 @@ export interface StoreResponseStateInput {
 	metadata?: Record<string, unknown>;
 }
 
-let lastPruneAt = 0;
-const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
-
 function responseStateExpiresAt(now = new Date()): Date {
 	return new Date(
 		now.getTime() + env.RESPONSES_STATE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
 	);
 }
 
+const GC_BATCH = 1000;
+const GC_MAX_BATCHES = 100;
+/** Shared by every replica, so one of them collects at a time. Never change it. */
+const GC_LOCK_ID = 918_273_647;
+
+/**
+ * Deletes expired rows in batches (oldest expiry first) until a short batch or the per-run bound,
+ * so one run never holds a long delete. Returns rows removed.
+ */
 export async function deleteExpiredResponseStates(
 	now = new Date(),
 ): Promise<number> {
-	const rows = await db
-		.delete(responseStates)
-		.where(lte(responseStates.expiresAt, now))
-		.returning({ id: responseStates.id });
-	return rows.length;
-}
-
-// Opportunistic prune (best-effort, tied to having write traffic and throttled in memory per
-// instance): it only covers the gaps between ticks of the reliable, traffic-independent GC job
-// (startResponseStateGcJob, wired in src/index.ts).
-async function pruneExpiredOccasionally(): Promise<void> {
-	const now = Date.now();
-	if (now - lastPruneAt < PRUNE_INTERVAL_MS) {
-		return;
+	let deleted = 0;
+	for (let batch = 0; batch < GC_MAX_BATCHES; batch += 1) {
+		const rows = await db.execute(sql`
+			DELETE FROM ${responseStates}
+			WHERE ${responseStates.id} IN (
+				SELECT ${responseStates.id} FROM ${responseStates}
+				WHERE ${responseStates.expiresAt} <= ${now.toISOString()}::timestamptz
+				ORDER BY ${responseStates.expiresAt}
+				LIMIT ${GC_BATCH}
+			)
+			RETURNING ${responseStates.id}`);
+		deleted += rows.length;
+		if (rows.length < GC_BATCH) {
+			break;
+		}
 	}
-	lastPruneAt = now;
-	await deleteExpiredResponseStates(new Date());
+	return deleted;
 }
 
 /**
- * Reliable, traffic-independent GC: deletes expired response_states on a fixed interval (mirrors the
- * other in-process maintenance jobs). Runs once on start, then every RESPONSE_STATE_GC_INTERVAL_MS;
- * opportunistic prune above still covers the gaps between ticks. Returns a stop function.
+ * Traffic-independent GC on a fixed interval, off the request path. Only the replica holding the GC
+ * advisory lock runs a pass, and the next pass is scheduled when this one ends, so passes never
+ * overlap. Returns a stop function.
  */
 export function startResponseStateGcJob(): () => void {
-	const run = (): void => {
-		void deleteExpiredResponseStates(new Date())
-			.then((deleted) => {
-				if (deleted > 0) {
-					log.info("response-states", "gc deleted expired rows", { deleted });
-				}
-			})
-			.catch((err: unknown) => {
+	let stopped = false;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const pass = async () => {
+		try {
+			const deleted = await postgresClient.lock(
+				GC_LOCK_ID,
+				() => deleteExpiredResponseStates(new Date()),
+				{ wait: false },
+			);
+			if (deleted > 0) {
+				log.info("response-states", "gc deleted expired rows", { deleted });
+			}
+		} catch (err) {
+			if ((err as { code?: string }).code !== "LOCK_NOT_AVAILABLE") {
 				log.error("response-states", "gc failed", { err });
-			});
+			}
+		} finally {
+			if (!stopped) {
+				timer = setTimeout(
+					() => void pass(),
+					env.RESPONSE_STATE_GC_INTERVAL_MS,
+				);
+				timer.unref();
+			}
+		}
 	};
-	run();
-	const timer = setInterval(run, env.RESPONSE_STATE_GC_INTERVAL_MS);
-	timer.unref();
-	return () => clearInterval(timer);
+	void pass();
+	return () => {
+		stopped = true;
+		clearTimeout(timer);
+	};
+}
+
+/** Rows a scope owns. The master scope is what neither a key nor an operator session claims. */
+function scopeCondition(scope: StateScope) {
+	if (scope.virtualKeyId !== null) {
+		return eq(responseStates.virtualKeyId, scope.virtualKeyId);
+	}
+	if (scope.ownerActor !== null) {
+		return and(
+			isNull(responseStates.virtualKeyId),
+			eq(responseStates.ownerActor, scope.ownerActor),
+		);
+	}
+	return and(
+		isNull(responseStates.virtualKeyId),
+		isNull(responseStates.ownerActor),
+	);
 }
 
 export async function storeResponseState(
 	input: StoreResponseStateInput,
 ): Promise<ResponseStateRow> {
-	await pruneExpiredOccasionally();
 	const [row] = await db
 		.insert(responseStates)
 		.values({
 			id: input.id,
-			virtualKeyId: input.virtualKeyId,
+			virtualKeyId: input.scope.virtualKeyId,
+			ownerActor: input.scope.ownerActor,
 			publicModel: input.publicModel,
 			deploymentId: input.deploymentId,
 			adapterKey: input.adapterKey,
@@ -101,20 +141,17 @@ export async function storeResponseState(
 
 export async function getResponseStateForScope(
 	id: string,
-	virtualKeyId: string | null,
+	scope: StateScope,
 	now = new Date(),
 ): Promise<ResponseStateRow | undefined> {
-	const scope =
-		virtualKeyId === null
-			? isNull(responseStates.virtualKeyId)
-			: eq(responseStates.virtualKeyId, virtualKeyId);
+	const where = scopeCondition(scope);
 	const [row] = await db
 		.select()
 		.from(responseStates)
 		.where(
 			and(
 				eq(responseStates.id, id),
-				scope,
+				where,
 				eq(responseStates.store, true),
 				gt(responseStates.expiresAt, now),
 			),
@@ -134,13 +171,10 @@ export async function getResponseStateForScope(
  */
 export async function findResponseItemByIdForScope(
 	itemId: string,
-	virtualKeyId: string | null,
+	scope: StateScope,
 	now = new Date(),
 ): Promise<Record<string, unknown> | undefined> {
-	const scope =
-		virtualKeyId === null
-			? isNull(responseStates.virtualKeyId)
-			: eq(responseStates.virtualKeyId, virtualKeyId);
+	const where = scopeCondition(scope);
 	const needle = JSON.stringify([{ id: itemId }]);
 	const [row] = await db
 		.select({
@@ -150,7 +184,7 @@ export async function findResponseItemByIdForScope(
 		.from(responseStates)
 		.where(
 			and(
-				scope,
+				where,
 				eq(responseStates.store, true),
 				gt(responseStates.expiresAt, now),
 				sql`(${responseStates.output} @> ${needle}::jsonb OR ${responseStates.requestInput} @> ${needle}::jsonb)`,
@@ -168,16 +202,13 @@ export async function findResponseItemByIdForScope(
 /** Deletes a state within the key's scope. Returns true if it existed and was deleted. */
 export async function deleteResponseStateForScope(
 	id: string,
-	virtualKeyId: string | null,
+	scope: StateScope,
 ): Promise<boolean> {
-	const scope =
-		virtualKeyId === null
-			? isNull(responseStates.virtualKeyId)
-			: eq(responseStates.virtualKeyId, virtualKeyId);
+	const where = scopeCondition(scope);
 	const rows = await db
 		.delete(responseStates)
 		.where(
-			and(eq(responseStates.id, id), scope, eq(responseStates.store, true)),
+			and(eq(responseStates.id, id), where, eq(responseStates.store, true)),
 		)
 		.returning({ id: responseStates.id });
 	return rows.length > 0;

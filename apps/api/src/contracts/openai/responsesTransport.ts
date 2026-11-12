@@ -11,7 +11,9 @@
  * reasoning content for unstored responses.
  */
 
+import { chatAnnotationFromResponses, chatLogprobs } from "./outputText.ts";
 import { writePromptCachePolicy, writeCacheBreakpoint } from "./promptCache.ts";
+import { completionTokensWithReasoning } from "./chatTransport.ts";
 import { mergeExtraBody } from "#core/extraBody.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { SSEEvent } from "#core/sse.ts";
@@ -294,16 +296,20 @@ export function buildResponsesRequestBody(
 	assertResponsesRequestSupported(req);
 	const input: Record<string, unknown>[] = [];
 	const instructions: string[] = [];
+	const rawInput = req.responsesTransport?.rawInput;
 	const preserveInstructions =
-		req.responsesTransport?.rawInput === undefined &&
+		rawInput === undefined &&
 		req.messages.some(
 			(m) =>
 				Array.isArray(m.content) && m.content.some((p) => p.cacheBreakpoint),
 		);
+	// Only the leading run of system and developer messages becomes `instructions`; one later in the
+	// conversation stays an input item where it was, so the model reads it in order.
+	let leading = true;
 
 	for (const m of req.messages) {
 		if (m.role === "system" || m.role === "developer") {
-			if (preserveInstructions) {
+			if (preserveInstructions || !leading) {
 				input.push({
 					role: m.role,
 					content: contentToInput(m.content, "user"),
@@ -322,6 +328,7 @@ export function buildResponsesRequestBody(
 			}
 			continue;
 		}
+		leading = false;
 		if (m.role === "tool") {
 			const output = toolOutputOf(m.content);
 			input.push({
@@ -338,11 +345,16 @@ export function buildResponsesRequestBody(
 				[]) {
 				input.push(reasoningItemForRequest(item));
 			}
-			if (m.content) {
+			if (m.content || m.refusal !== undefined) {
 				input.push({
 					type: "message",
 					role: "assistant",
-					content: contentToInput(m.content, "assistant"),
+					content: [
+						...(m.content ? contentToInput(m.content, "assistant") : []),
+						...(m.refusal === undefined
+							? []
+							: [{ type: "refusal", refusal: m.refusal }]),
+					],
 					...(m.phase === undefined ? {} : { phase: m.phase }),
 				});
 			}
@@ -365,11 +377,16 @@ export function buildResponsesRequestBody(
 
 	const body: Record<string, unknown> = {
 		model: upstreamModel,
-		input: req.responsesTransport?.rawInput ?? input,
+		input: rawInput ?? input,
 		stream: req.stream,
 	};
-	if (instructions.length > 0) {
-		body.instructions = instructions.join("\n");
+	// Raw items already carry every message; only the request's own instructions are added.
+	const bodyInstructions =
+		rawInput === undefined
+			? instructions.join("\n")
+			: (req.responsesTransport?.instructions ?? "");
+	if (bodyInstructions.length > 0) {
+		body.instructions = bodyInstructions;
 	}
 	if (req.maxTokens !== undefined) {
 		body.max_output_tokens = req.maxTokens;
@@ -410,7 +427,9 @@ export function buildResponsesRequestBody(
 			...(t.strict === undefined ? {} : { strict: t.strict }),
 		}));
 	}
-	if (req.toolChoice !== undefined) {
+	if (req.responsesTransport?.rawToolChoice !== undefined) {
+		body.tool_choice = structuredClone(req.responsesTransport.rawToolChoice);
+	} else if (req.toolChoice !== undefined) {
 		if (typeof req.toolChoice === "string") {
 			body.tool_choice = req.toolChoice;
 		} else if ("name" in req.toolChoice) {
@@ -525,11 +544,17 @@ export interface ResponsesUsage {
 export function parseResponsesUsage(
 	u: ResponsesUsage | undefined | null,
 ): Usage {
+	const promptTokens = u?.input_tokens ?? 0;
+	const completionTokens = completionTokensWithReasoning(
+		promptTokens,
+		u?.output_tokens ?? 0,
+		u?.output_tokens_details?.reasoning_tokens,
+		u?.total_tokens,
+	);
 	const usage: Usage = {
-		promptTokens: u?.input_tokens ?? 0,
-		completionTokens: u?.output_tokens ?? 0,
-		totalTokens:
-			u?.total_tokens ?? (u?.input_tokens ?? 0) + (u?.output_tokens ?? 0),
+		promptTokens,
+		completionTokens,
+		totalTokens: u?.total_tokens ?? promptTokens + completionTokens,
 	};
 	if (u?.input_tokens_details?.cached_tokens != null) {
 		usage.cacheReadTokens = u.input_tokens_details.cached_tokens;
@@ -550,7 +575,13 @@ export function parseResponsesUsage(
 interface RWOutputItem {
 	[key: string]: unknown;
 	type?: string;
-	content?: Array<{ type?: string; text?: string }>;
+	content?: Array<{
+		type?: string;
+		text?: string;
+		refusal?: string;
+		annotations?: Record<string, unknown>[];
+		logprobs?: unknown[];
+	}>;
 	summary?: Array<{ type?: string; text?: string } | string>;
 	call_id?: string;
 	id?: string;
@@ -594,7 +625,31 @@ interface RWResponse {
 	incomplete_details?: { reason?: string };
 	output?: RWOutputItem[];
 	usage?: ResponsesUsage;
+	/** The tier the provider served the request at; it may differ from the one requested. */
+	service_tier?: string | null;
 	error?: Record<string, unknown>;
+}
+
+/** Response usage, tagged with the service tier the response reports. */
+function servedResponsesUsage(r: RWResponse): Usage {
+	const usage = parseResponsesUsage(r.usage);
+	return typeof r.service_tier === "string" && r.service_tier.length > 0
+		? { ...usage, serviceTier: r.service_tier }
+		: usage;
+}
+
+/** An annotation of a later output_text part, with its offsets moved into the joined text. */
+function shiftAnnotation(
+	annotation: Record<string, unknown>,
+	offset: number,
+): Record<string, unknown> {
+	const shifted = { ...annotation };
+	for (const key of ["start_index", "end_index"]) {
+		if (typeof shifted[key] === "number") {
+			shifted[key] = (shifted[key] as number) + offset;
+		}
+	}
+	return shifted;
 }
 
 function finishFrom(
@@ -631,6 +686,9 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 		});
 	}
 	let content = "";
+	let refusal = "";
+	const annotations: Record<string, unknown>[] = [];
+	const logprobs: unknown[] = [];
 	const reasoning: string[] = [];
 	const reasoningState: OpenAIReasoningStateItem[] = [];
 	const toolCalls: NonNullable<
@@ -643,7 +701,19 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 		if (item.type === "message") {
 			for (const c of item.content ?? []) {
 				if (c.type === "output_text") {
+					// Annotation offsets are relative to their part; the parts become one text.
+					const offset = content.length;
+					for (const annotation of c.annotations ?? []) {
+						annotations.push(
+							chatAnnotationFromResponses(
+								offset === 0 ? annotation : shiftAnnotation(annotation, offset),
+							),
+						);
+					}
+					logprobs.push(...(c.logprobs ?? []));
 					content += c.text ?? "";
+				} else if (c.type === "refusal") {
+					refusal += c.refusal ?? "";
 				}
 			}
 		} else if (item.type === "reasoning") {
@@ -666,6 +736,8 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 	const message: CanonicalChatResponse["choices"][number]["message"] = {
 		role: "assistant",
 		content: content.length > 0 ? content : null,
+		...(refusal.length > 0 ? { refusal } : {}),
+		...(annotations.length > 0 ? { annotations } : {}),
 	};
 	const responseMessage = output.find(
 		(item) => item.type === "message" && item.phase !== undefined,
@@ -696,9 +768,14 @@ export function parseResponsesResponse(raw: unknown): CanonicalChatResponse {
 		created: r.created_at ?? Math.floor(Date.now() / 1000),
 		model: r.model ?? "",
 		choices: [
-			{ index: 0, finishReason: finishFrom(r, toolCalls.length > 0), message },
+			{
+				index: 0,
+				finishReason: finishFrom(r, toolCalls.length > 0),
+				...(logprobs.length > 0 ? { logprobs: chatLogprobs(logprobs) } : {}),
+				message,
+			},
 		],
-		usage: parseResponsesUsage(r.usage),
+		usage: servedResponsesUsage(r),
 	};
 }
 
@@ -723,6 +800,19 @@ export async function* responsesEventsToCanonicalChunks(
 	// Encrypted reasoning item ids already forwarded as delta.providerFields (dedupes the final
 	// response against per-item events).
 	const reasoningStateSeen = new Set<string>();
+	// Chat's tool_calls[].index counts tool calls from zero; Responses' output_index counts every
+	// output item (reasoning and messages too). Each function call gets the next ordinal when it
+	// first appears.
+	const toolCallOrdinals = new Map<number, number>();
+	const toolCallOrdinal = (outputIndex: unknown): number => {
+		const key = Number(outputIndex ?? 0);
+		let ordinal = toolCallOrdinals.get(key);
+		if (ordinal === undefined) {
+			ordinal = toolCallOrdinals.size;
+			toolCallOrdinals.set(key, ordinal);
+		}
+		return ordinal;
+	};
 
 	const base = () => ({ id, created, model });
 
@@ -800,6 +890,19 @@ export async function* responsesEventsToCanonicalChunks(
 			continue;
 		}
 
+		if (type === "response.refusal.delta") {
+			const delta: CanonicalChatStreamChunk["choices"][number]["delta"] = {
+				providerFields: providerFieldsWithOpenAIResponsesStreamEvent(type, d),
+			};
+			if (!roleSent) {
+				delta.role = "assistant";
+				roleSent = true;
+			}
+			delta.refusal = String(d.delta ?? "");
+			yield { ...base(), choices: [{ index: 0, delta, finishReason: null }] };
+			continue;
+		}
+
 		if (type === "response.output_text.delta") {
 			const delta: CanonicalChatStreamChunk["choices"][number]["delta"] = {
 				providerFields: providerFieldsWithOpenAIResponsesStreamEvent(type, d),
@@ -809,7 +912,45 @@ export async function* responsesEventsToCanonicalChunks(
 				roleSent = true;
 			}
 			delta.content = String(d.delta ?? "");
-			yield { ...base(), choices: [{ index: 0, delta, finishReason: null }] };
+			const tokens = Array.isArray(d.logprobs) ? d.logprobs : [];
+			yield {
+				...base(),
+				choices: [
+					{
+						index: 0,
+						delta,
+						finishReason: null,
+						...(tokens.length > 0 ? { logprobs: chatLogprobs(tokens) } : {}),
+					},
+				],
+			};
+			continue;
+		}
+
+		if (type === "response.output_text.annotation.added") {
+			const { annotation } = d;
+			if (annotation !== null && typeof annotation === "object") {
+				yield {
+					...base(),
+					choices: [
+						{
+							index: 0,
+							delta: {
+								annotations: [
+									chatAnnotationFromResponses(
+										annotation as Record<string, unknown>,
+									),
+								],
+								providerFields: providerFieldsWithOpenAIResponsesStreamEvent(
+									type,
+									d,
+								),
+							},
+							finishReason: null,
+						},
+					],
+				};
+			}
 			continue;
 		}
 
@@ -878,7 +1019,12 @@ export async function* responsesEventsToCanonicalChunks(
 				providerFields: providerFieldsWithOpenAIResponsesStreamEvent(type, d),
 			};
 			if (item?.type === "function_call") {
-				const idx = Number(d.output_index ?? 0);
+				// A turn that only calls tools still opens with the assistant role, as Chat does.
+				if (!roleSent) {
+					delta.role = "assistant";
+					roleSent = true;
+				}
+				const idx = toolCallOrdinal(d.output_index);
 				delta.toolCalls = [
 					{
 						index: idx,
@@ -899,7 +1045,7 @@ export async function* responsesEventsToCanonicalChunks(
 		}
 
 		if (type === "response.function_call_arguments.delta") {
-			const idx = Number(d.output_index ?? 0);
+			const idx = toolCallOrdinal(d.output_index);
 			yield {
 				...base(),
 				choices: [
@@ -1014,7 +1160,7 @@ export async function* responsesEventsToCanonicalChunks(
 						finishReason,
 					},
 				],
-				usage: parseResponsesUsage(r.usage),
+				usage: servedResponsesUsage(r),
 			};
 			continue;
 		}

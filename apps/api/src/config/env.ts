@@ -80,7 +80,26 @@ export const env = createEnv({
 		 * its operation record, so a pool that is too small queues requests behind log writes.
 		 */
 		DATABASE_POOL_MAX: z.coerce.number().int().min(2).max(200).default(20),
+		/**
+		 * Longest a request-path statement may run before Postgres cancels it. Admin analytics run on
+		 * a pool of their own with a longer limit, so a heavy report cannot starve inference.
+		 */
+		DATABASE_STATEMENT_TIMEOUT_MS: z.coerce
+			.number()
+			.int()
+			.min(1000)
+			.default(30_000),
 		REDIS_URL: z.url(),
+		/**
+		 * A `rediss://` connection verifies the server certificate. REDIS_TLS_CA trusts a private CA
+		 * (PEM, inline or `file:/path`) for self-signed setups; REDIS_TLS_INSECURE skips verification
+		 * entirely and is for a link already protected some other way.
+		 */
+		REDIS_TLS_CA: z.string().min(1).optional(),
+		REDIS_TLS_INSECURE: z
+			.enum(["true", "false"])
+			.default("false")
+			.transform((value) => value === "true"),
 
 		/**
 		 * Who may read a retained request/response sample.
@@ -199,6 +218,18 @@ export const env = createEnv({
 			.int()
 			.positive()
 			.default(64),
+		/** Every public WebSocket is pinged this often; one that missed the last pong is dropped. */
+		WEBSOCKET_HEARTBEAT_INTERVAL_MS: z.coerce
+			.number()
+			.int()
+			.min(1000)
+			.default(30_000),
+		/** A public WebSocket with no client message for this long is closed. */
+		WEBSOCKET_IDLE_TIMEOUT_MS: z.coerce
+			.number()
+			.int()
+			.min(10_000)
+			.default(600_000),
 		/** Live `/v1/realtime` transcription sessions, per gateway process and per key. */
 		REALTIME_WEBSOCKET_MAX_CONNECTIONS: z.coerce
 			.number()

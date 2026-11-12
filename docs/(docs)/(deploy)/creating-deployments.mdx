@@ -27,7 +27,7 @@ Authorization: Bearer $MASTER_KEY
 | `adapterKey` | yes | The first-class adapter to execute (`openai`, `googleaistudio`, `openaicompatible`, etc.). |
 | `upstreamModel` | yes | The real id at the provider (catalog key, or the deployment name on Azure). |
 | `credentials` | yes | `{ apiKey, baseUrl?, ... }` depending on the adapter (see table). Encrypted at rest. On `PATCH`, the object is **merged** over the stored one — send only the fields you are changing, and `null` to remove one. |
-| `catalogEntry` | custom only | Inline catalog entry for a model **not** present in the catalog. Uses the same shape as `catalog.json`; for catalog models it **must be omitted**. |
+| `catalogEntry` | custom only | Inline catalog entry for a model **not** present in the catalog. Uses the same shape as `catalog.json`; for catalog models it **must be omitted**. If a later release adds the model to the catalog, an existing deployment keeps using its own entry. |
 | `pricing` | no | `{ inputCentsPerMTokens?, outputCentsPerMTokens?, cacheReadCentsPerMTokens?, cacheWriteCentsPerMTokens?, imageInputCentsPerMTokens?, imageOutputCentsPerMTokens?, audioInputCentsPerMTokens?, audioOutputCentsPerMTokens?, searchUnitCents? }`. |
 | `transportOverrides` | no | Per-operation transport override. The adapter default applies to every public endpoint. |
 | `label` | no | Human identifier to tell deployments of the same `publicModel` apart (e.g. which API key). Snapshotted into each operation log so you can see *which* deployment served a request. `null` clears it. |

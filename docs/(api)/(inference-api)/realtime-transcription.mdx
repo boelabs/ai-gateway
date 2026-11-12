@@ -84,4 +84,7 @@ Each provider session is logged as one `realtime.transcription` operation with i
 Gemini Live reports no usage for transcription sessions, so the gateway estimates it: input tokens
 from the audio duration (25 tokens per second, Google's published rate) and output tokens from the
 transcript length (about 4 characters per token). The operation is marked `usageEstimated`, and
-`completed` events carry no `usage`.
+`completed` events carry no `usage`. A virtual key is charged as the session runs, at every
+completed transcript, and once its budget is spent the gateway sends an `error` with code
+`budget_exceeded` and closes the socket with 1008. Credentials and extensions are handled as in
+[Realtime conversations](/docs/realtime-conversations#limits-and-billing).

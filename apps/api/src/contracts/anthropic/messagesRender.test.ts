@@ -406,6 +406,7 @@ test("request->canonical: thinking budget and output_config.effort are normalize
 		effort: "medium",
 		summary: "none",
 		display: "omitted",
+		budgetTokens: 10_000,
 	});
 
 	const effort = messagesRequestToCanonical(

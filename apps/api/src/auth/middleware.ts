@@ -1,4 +1,4 @@
-import type { AppEnv, Auth, VirtualKeyAuth } from "./types.ts";
+import type { AppEnv, Auth, SessionAuth, VirtualKeyAuth } from "./types.ts";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Context, MiddlewareHandler } from "hono";
 import { type Permission, roleHas } from "./roles.ts";
@@ -57,6 +57,32 @@ function extractKey(c: Context): string | undefined {
 	return offered ? offered.slice(INSECURE_KEY_PROTOCOL.length) : undefined;
 }
 
+/**
+ * A session whose user must set a new password may read who it is and change the password, and
+ * nothing else: the account was handed a password someone else knows. Signing out needs no session.
+ */
+export function passwordChangeGate(
+	method: string,
+	path: string,
+	session: SessionAuth,
+): void {
+	if (!session.mustChangePassword) {
+		return;
+	}
+	if (
+		(method === "GET" && path === "/auth/session") ||
+		(method === "POST" && path === "/auth/password")
+	) {
+		return;
+	}
+	throw new GatewayError({
+		class: "permission",
+		code: "password_change_required",
+		message: "This account must change its password before doing anything else",
+		publicMessage: "Change your password to continue.",
+	});
+}
+
 /** Resolves and revalidates request credentials. WebSocket sessions call this before every turn. */
 export async function authenticateRequest(c: Context): Promise<Auth> {
 	const key = extractKey(c);
@@ -67,6 +93,17 @@ export async function authenticateRequest(c: Context): Promise<Auth> {
 			? getCookie(c, SESSION_COOKIE)
 			: undefined;
 		if (sessionToken) {
+			// A browser attaches cookies to a cross-site WebSocket handshake, and an upgrade is a GET,
+			// so CSRF protection never runs on it. No browser here opens sockets to the gateway (the
+			// dashboard relays every browser call), so a cookie never authenticates an upgrade.
+			if (c.req.header("upgrade")?.toLowerCase() === "websocket") {
+				throw new GatewayError({
+					class: "auth",
+					code: "session_websocket_refused",
+					message:
+						"A session cookie cannot open a WebSocket; authenticate with an API key",
+				});
+			}
 			const session = await resolveSession(sessionToken);
 			if (!session) {
 				throw new GatewayError({
@@ -80,6 +117,7 @@ export async function authenticateRequest(c: Context): Promise<Auth> {
 				getCookie(c, CSRF_COOKIE),
 				c.req.header(CSRF_HEADER),
 			);
+			passwordChangeGate(c.req.method, c.req.path, session);
 			return { type: "session", session };
 		}
 		throw new GatewayError({
@@ -140,7 +178,7 @@ async function authenticateRealtimeSecret(
 			message: "Client secret is invalid or expired",
 		});
 	}
-	const realtimeSecret = { session: secret.session };
+	const realtimeSecret = { session: secret.session, keyHash: secret.keyHash };
 	if (secret.keyHash === null) {
 		return { type: "master", realtimeSecret };
 	}
@@ -148,6 +186,25 @@ async function authenticateRealtimeSecret(
 		await getCachedVirtualKeyByHash(secret.keyHash),
 	);
 	return { ...auth, realtimeSecret };
+}
+
+/**
+ * Re-checks a long-lived connection's credential: a disabled, expired or deleted key, or a revoked
+ * session, ends it rather than living as long as the socket. A realtime client secret only opens a
+ * session and may expire long before it ends, so what is re-checked is the key that minted it.
+ */
+export async function revalidateAuth(c: Context, auth: Auth): Promise<Auth> {
+	if (auth.type !== "session" && auth.realtimeSecret) {
+		const { keyHash } = auth.realtimeSecret;
+		if (keyHash === undefined || keyHash === null) {
+			return auth;
+		}
+		return {
+			...activeVirtualKey(await getCachedVirtualKeyByHash(keyHash)),
+			realtimeSecret: auth.realtimeSecret,
+		};
+	}
+	return authenticateRequest(c);
 }
 
 /** Resolves the identity (master key, virtual key, or session) and stores it in c.get('auth'). */
@@ -178,6 +235,27 @@ export function requirePermission(
 			code: "insufficient_permission",
 			message: `This operation requires the "${permission}" permission`,
 		});
+	};
+}
+
+/**
+ * The public API runs inference, so an operator session needs `inference:use` to call it. The
+ * master key and virtual keys are API credentials whose scope is enforced per request.
+ */
+export function requireInferenceAccess(): MiddlewareHandler<AppEnv> {
+	return async (c, next) => {
+		const auth = c.get("auth") as Auth | undefined;
+		if (
+			auth?.type === "session" &&
+			!roleHas(auth.session.role, "inference:use")
+		) {
+			throw new GatewayError({
+				class: "permission",
+				code: "insufficient_permission",
+				message: 'This operation requires the "inference:use" permission',
+			});
+		}
+		return next();
 	};
 }
 

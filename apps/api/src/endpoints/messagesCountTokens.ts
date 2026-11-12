@@ -80,6 +80,8 @@ export async function messagesCountTokensHandler(
 					clientSignal: log.clientSignal,
 					requestId: log.requestId,
 					operationId: log.operationId,
+					// Token counting is not billed by the providers that offer it.
+					unreportedUsage: "release",
 					candidateEligibility: (candidate) => {
 						if (!candidate.adapter.messageTokenCount) {
 							throw new GatewayError({

@@ -10,3 +10,31 @@ import type { components } from "#/shared/api/schema";
 export type OperatorIdentity = components["schemas"]["OperatorIdentity"];
 export type Permission = components["schemas"]["Permission"];
 export type Role = OperatorIdentity["user"]["role"];
+
+const SAME_ORIGIN = "http://dashboard.invalid";
+
+/**
+ * Where to go after signing in, as a path on this dashboard, or `/`. Parsed rather than pattern-
+ * matched: browsers read `/\evil.example` and `/%09/evil.example` as other hosts, so the value must
+ * resolve against this origin and stay on it, and only its re-serialised path and query are kept.
+ */
+export function safeNextPath(next: unknown): string {
+	if (
+		typeof next !== "string" ||
+		!next.startsWith("/") ||
+		next.includes("\\") ||
+		[...next].some((char) => {
+			const code = char.charCodeAt(0);
+			return code < 0x20 || code === 0x7f;
+		})
+	) {
+		return "/";
+	}
+	let url: URL;
+	try {
+		url = new URL(next, SAME_ORIGIN);
+	} catch {
+		return "/";
+	}
+	return url.origin === SAME_ORIGIN ? `${url.pathname}${url.search}` : "/";
+}

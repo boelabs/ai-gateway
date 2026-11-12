@@ -58,7 +58,8 @@ services:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgres://gateway:${POSTGRES_PASSWORD}@postgres:5432/ai_gateway}
+      # The password goes into a URL unescaped, so it must be URL-safe: generate it as hex.
+      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-gateway}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_gateway}}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       # Shutdown budget. The gateway stays unready-but-serving for DRAIN_DELAY_MS so the proxy can
       # take it out of rotation, then gives in-flight requests SHUTDOWN_TIMEOUT_MS to finish.

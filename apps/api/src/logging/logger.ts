@@ -9,6 +9,8 @@ export interface OperationLogInput {
 	operationId: string;
 	requestId: string;
 	virtualKeyId: string | null;
+	/** "master-key", "root", "user:<uuid>" or "key:<uuid>". */
+	actor?: string;
 	publicModel: string | null;
 	deploymentId: string | null;
 	adapterKey: string | null;

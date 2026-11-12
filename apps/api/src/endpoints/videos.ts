@@ -6,6 +6,7 @@ import { estimateTokenReservation } from "#router/tokenReservation.ts";
 import { withResolvedQuality } from "#gateway/qualityResolution.ts";
 import { candidateMetadata } from "#gateway/candidateMetadata.ts";
 import type { VirtualKeyUsageLease } from "#ratelimit/index.ts";
+import { type StateScope, stateScopeOf } from "#auth/scope.ts";
 import { OperationLogDraft } from "./runtime/operationLog.ts";
 import { getEffectiveSettings } from "#router/settings.ts";
 import type { AdapterContext } from "#adapters/types.ts";
@@ -66,9 +67,8 @@ import {
 	createVideoInputResolver,
 } from "#files/requestContentInputs.ts";
 
-function virtualKeyId(c: Context<AppEnv>): string | null {
-	const auth = getAuth(c);
-	return auth.type === "virtual" ? auth.key.id : null;
+function scopeOf(c: Context<AppEnv>): StateScope {
+	return stateScopeOf(getAuth(c));
 }
 
 function requireVideoId(c: Context<AppEnv>): string {
@@ -206,6 +206,7 @@ async function handleVideoCreate(
 		reserve: async (candidate, reservedTokens) => {
 			const inner = await baseQuota.reserve(candidate, reservedTokens);
 			return {
+				...(inner.charge === undefined ? {} : { charge: inner.charge }),
 				settle: inner.settle,
 				// The router releases at submit (no usage yet); the job settles the lease at its end.
 				release: () => (leaseAdopted ? Promise.resolve() : inner.release()),
@@ -249,6 +250,8 @@ async function handleVideoCreate(
 						resolveTransport(candidate, "videos.generations"),
 					);
 				},
+				// The job settles its held lease when it reaches a terminal state.
+				unreportedUsage: "release",
 				tokenReservation: (candidate) =>
 					// Redacted body: inline reference media would otherwise be reserved as megabytes of tokens.
 					estimateTokenReservation(sanitizeVideoRequestBody(req), {
@@ -289,7 +292,7 @@ async function handleVideoCreate(
 
 		const row = await createVideoJob({
 			id: newVideoId(),
-			virtualKeyId: virtualKeyId(c),
+			scope: scopeOf(c),
 			publicModel: req.model,
 			deploymentId: routing.candidate.row.id,
 			adapterKey: routing.candidate.adapter.key,
@@ -381,7 +384,7 @@ export async function videoRetrieveHandler(
 	c: Context<AppEnv>,
 ): Promise<Response> {
 	const id = requireVideoId(c);
-	const row = await loadAndRefreshVideo(id, virtualKeyId(c), c.req.raw.signal);
+	const row = await loadAndRefreshVideo(id, scopeOf(c), c.req.raw.signal);
 	return c.json(toOpenAIVideoObject(videoObjectFromRow(row)));
 }
 
@@ -390,7 +393,7 @@ export async function videoListHandler(c: Context<AppEnv>): Promise<Response> {
 	const order = parseOrder(c.req.query("order"));
 	const after = c.req.query("after");
 	const { rows, hasMore } = await listVideosForScope({
-		virtualKeyId: virtualKeyId(c),
+		scope: scopeOf(c),
 		limit,
 		order,
 		...(after === undefined ? {} : { after }),
@@ -407,7 +410,7 @@ export async function videoDeleteHandler(
 	c: Context<AppEnv>,
 ): Promise<Response> {
 	const id = requireVideoId(c);
-	const deleted = await markVideoDeletedForScope(id, virtualKeyId(c));
+	const deleted = await markVideoDeletedForScope(id, scopeOf(c));
 	if (!deleted.row) {
 		throw new GatewayError({
 			class: "not_found",
@@ -426,7 +429,7 @@ export async function videoDeleteHandler(
 		}
 	}
 	await markVideoAssetsDeleted(deletedAssetIds);
-	await removeUpstreamVideo(deleted.row);
+	await removeUpstreamVideo(deleted.row, deleted.previousStatus);
 	return c.json(toOpenAIVideoDeleted(id));
 }
 
@@ -435,7 +438,7 @@ export async function videoContentHandler(
 ): Promise<Response> {
 	const id = requireVideoId(c);
 	const variant = parseVariant(c.req.query("variant"));
-	const row = await loadAndRefreshVideo(id, virtualKeyId(c), c.req.raw.signal);
+	const row = await loadAndRefreshVideo(id, scopeOf(c), c.req.raw.signal);
 	const asset = await ensureVideoAsset(row, variant, c.req.raw.signal);
 	const stored = await readVideoAsset(asset, parseRange(c.req.header("range")));
 	const headers = new Headers(storedContentHeaders(asset));

@@ -185,3 +185,58 @@ test("an expired budget resets once before concurrent reservations", {
 		await deleteVirtualKey(k.id);
 	}
 });
+
+test("a long session is charged as it runs, then settles only the rest", {
+	skip,
+}, async () => {
+	const k = key({ maxBudgetCents: 10, tpm: 100_000 });
+	const bucket = Math.floor(Date.now() / 60_000);
+	try {
+		await redis.set(`ratelimit:v2:budget:${k.id}`, "0");
+		const lease = await reserveVirtualKeyUsage(k, 0, 0);
+		assert.deepEqual(await lease.charge(100, 6), { budgetExhausted: false });
+		assert.equal(Number(await redis.get(`ratelimit:v2:budget:${k.id}`)), 6);
+		assert.equal(
+			Number(await redis.get(`ratelimit:v2:tpm:${k.id}:${bucket}`)),
+			100,
+		);
+		assert.deepEqual(await lease.charge(50, 5), { budgetExhausted: true });
+		// The final settlement carries the whole session; only what was not charged is added.
+		await lease.settle(200, 12);
+		assert.equal(Number(await redis.get(`ratelimit:v2:budget:${k.id}`)), 12);
+	} finally {
+		await redis.del(
+			`ratelimit:v2:budget:${k.id}`,
+			`ratelimit:v2:budget-reserved:${k.id}`,
+			`ratelimit:v2:budget-leases:${k.id}`,
+			`ratelimit:v2:budget-amounts:${k.id}`,
+			...[bucket - 1, bucket, bucket + 1].flatMap((b) => [
+				`ratelimit:v2:tpm:${k.id}:${b}`,
+				`ratelimit:v2:tpm-reserved:${k.id}:${b}`,
+				`ratelimit:v2:tpm-leases:${k.id}:${b}`,
+				`ratelimit:v2:tpm-amounts:${k.id}:${b}`,
+			]),
+		);
+	}
+});
+
+test("a TPM reservation's keys expire with their minute", {
+	skip,
+}, async () => {
+	const k = key({ tpm: 100_000 });
+	const bucket = Math.floor(Date.now() / 60_000);
+	try {
+		const lease = await reserveVirtualKeyUsage(k, 50, 0);
+		for (const name of ["tpm-reserved", "tpm-leases", "tpm-amounts"]) {
+			const ttl = await redis.ttl(`ratelimit:v2:${name}:${k.id}:${bucket}`);
+			assert.ok(ttl > 0 && ttl <= 120, `${name} ttl ${ttl}`);
+		}
+		await lease.release();
+	} finally {
+		await redis.del(
+			...["tpm", "tpm-reserved", "tpm-leases", "tpm-amounts"].map(
+				(name) => `ratelimit:v2:${name}:${k.id}:${bucket}`,
+			),
+		);
+	}
+});

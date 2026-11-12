@@ -6,6 +6,7 @@ import {
 	markDownstreamTerminalWritten,
 	newDownstreamWriteObservation,
 	awaitWithSSEHeartbeats,
+	withSSEHeartbeats,
 	writeSSEHeartbeat,
 	writeSSE,
 } from "./sse.ts";
@@ -91,4 +92,61 @@ test("downstream observation does not count rejected writes as delivered bytes",
 	assert.equal(observation.bytes, 0);
 	assert.equal(observation.writes, 0);
 	assert.ok(observation.writeFailedAt !== null);
+});
+
+test("withSSEHeartbeats surfaces a read-ahead failure that happens while the consumer is busy", async () => {
+	const failure = new Error("upstream reset");
+	const unhandled: unknown[] = [];
+	const onUnhandled = (reason: unknown) => {
+		unhandled.push(reason);
+	};
+	process.on("unhandledRejection", onUnhandled);
+	try {
+		async function* upstream() {
+			yield "first";
+			throw failure;
+		}
+		const seen: string[] = [];
+		await assert.rejects(
+			async () => {
+				for await (const item of withSSEHeartbeats(
+					upstream(),
+					async () => {
+						/* intentionally empty */
+					},
+					1000,
+				)) {
+					seen.push(item);
+					// A slow client: the read-ahead rejects while this body is still running.
+					await new Promise((resolve) => setTimeout(resolve, 20));
+				}
+			},
+			(error: unknown) => error === failure,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		assert.deepEqual(seen, ["first"]);
+		assert.deepEqual(unhandled, []);
+	} finally {
+		process.off("unhandledRejection", onUnhandled);
+	}
+});
+
+test("withSSEHeartbeats sends heartbeats while the next item is pending", async () => {
+	let heartbeats = 0;
+	async function* upstream() {
+		await new Promise((resolve) => setTimeout(resolve, 30));
+		yield "late";
+	}
+	const seen: string[] = [];
+	for await (const item of withSSEHeartbeats(
+		upstream(),
+		async () => {
+			heartbeats += 1;
+		},
+		5,
+	)) {
+		seen.push(item);
+	}
+	assert.deepEqual(seen, ["late"]);
+	assert.ok(heartbeats >= 2);
 });

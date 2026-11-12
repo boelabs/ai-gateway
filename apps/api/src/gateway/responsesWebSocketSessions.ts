@@ -24,6 +24,44 @@ interface UpstreamBinding {
 
 export class ResponsesWebSocketUpstreams {
 	private readonly bindings = new Map<string, UpstreamBinding>();
+	/**
+	 * The lifetime of the upstream sockets: the public socket's, not a turn's. A turn's signal only
+	 * cancels that turn; it must not terminate a connection later turns continue on.
+	 */
+	private readonly lifetime = new AbortController();
+
+	/**
+	 * Opens an upstream session that outlives the turn opening it. The turn can still give up on
+	 * the opening; a session that opens after that is closed, not kept.
+	 */
+	private async connect(
+		connect: (ctx: AdapterContext) => Promise<ResponsesWebSocketSession>,
+		ctx: AdapterContext,
+	): Promise<ResponsesWebSocketSession> {
+		const { signal: turnSignal, watchdog: _turn, ...rest } = ctx;
+		const opening = connect({ ...rest, signal: this.lifetime.signal });
+		if (!turnSignal) {
+			return opening;
+		}
+		turnSignal.throwIfAborted();
+		return new Promise<ResponsesWebSocketSession>((resolve, reject) => {
+			const onAbort = () => {
+				reject(turnSignal.reason);
+				void opening.then((late) => late.close()).catch(() => undefined);
+			};
+			turnSignal.addEventListener("abort", onAbort, { once: true });
+			opening.then(
+				(session) => {
+					turnSignal.removeEventListener("abort", onAbort);
+					resolve(session);
+				},
+				(error: unknown) => {
+					turnSignal.removeEventListener("abort", onAbort);
+					reject(error);
+				},
+			);
+		});
+	}
 
 	async execute(
 		candidate: DeploymentCandidate,
@@ -84,7 +122,10 @@ export class ResponsesWebSocketUpstreams {
 		if (!binding || binding.session.closed) {
 			try {
 				binding = {
-					session: await handler.connect(ctx),
+					session: await this.connect(
+						(sessionCtx) => handler.connect(sessionCtx),
+						ctx,
+					),
 					latestPublicResponseId: null,
 					latestUpstreamResponseId: null,
 				};
@@ -217,5 +258,6 @@ export class ResponsesWebSocketUpstreams {
 			binding.session.close();
 		}
 		this.bindings.clear();
+		this.lifetime.abort();
 	}
 }

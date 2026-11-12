@@ -2,9 +2,12 @@ import { EXECUTION_POLICY_MAX_TOTAL_MS } from "#core/executionPolicy.ts";
 import { keySecretAccessIsOpen, revealKeySecret } from "./keySecrets.ts";
 import { invalidateRouterSettingsCache } from "#router/settings.ts";
 import { auditRevealMiddleware, auditMiddleware } from "./audit.ts";
+import { MIN_SESSION_IDLE_MINUTES } from "#auth/sessionPolicy.ts";
 import { Hono, type MiddlewareHandler, type Context } from "hono";
+import { invalidateResponseCache } from "#cache/responseCache.ts";
 import { invalidateVirtualKey } from "#auth/virtualKeyCache.ts";
 import { idempotencyMiddleware } from "#http/idempotency.ts";
+import { isUuid, pageParams, uuidParam } from "./params.ts";
 import { clearVirtualKeyBudget } from "#ratelimit/index.ts";
 import { configureFallback } from "#fallbacks/service.ts";
 import { aggregateMetrics } from "#db/repos/metrics.ts";
@@ -18,7 +21,6 @@ import { platformAdminApp } from "./platform.ts";
 import { GatewayError } from "#core/errors.ts";
 import { dashboardUsersApp } from "./users.ts";
 import { writtenRow } from "#db/returning.ts";
-import { parseJsonBody } from "#http/body.ts";
 import { env } from "#config/env.ts";
 import { z } from "zod/v4";
 
@@ -49,6 +51,7 @@ import {
 
 import {
 	aggregateOperationUsage,
+	decodeOperationCursor,
 	type OperationFilter,
 	getOperationDetail,
 	listOperationsPage,
@@ -88,9 +91,10 @@ import {
 } from "#db/repos/dashboardSettings.ts";
 
 import {
-	advanceResponseCacheEpoch,
-	invalidateResponseCache,
-} from "#cache/responseCache.ts";
+	ADMIN_JSON_BODY_MAX_BYTES,
+	readBodyBytes,
+	parseJsonBody,
+} from "#http/body.ts";
 
 import {
 	createKeySchema,
@@ -237,19 +241,56 @@ function parseLogFilter(c: import("hono").Context): OperationFilter {
 	};
 }
 
+const DAY_MS = 86_400_000;
+
+/**
+ * The time window of a log or usage query, always bounded: a missing `start` means the last
+ * `defaultDays`, and a span longer than `maxDays` is refused, so no request scans the whole table.
+ */
+function boundedWindow(
+	filter: OperationFilter,
+	options: { defaultDays: number; maxDays: number },
+): OperationFilter {
+	const end = filter.end ?? new Date();
+	const start =
+		filter.start ?? new Date(end.getTime() - options.defaultDays * DAY_MS);
+	if (end.getTime() - start.getTime() > options.maxDays * DAY_MS) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_window",
+			param: "start",
+			message: `The window between start and end may span at most ${options.maxDays} days`,
+			publicMessage: `The window between start and end may span at most ${options.maxDays} days.`,
+		});
+	}
+	return { ...filter, start, end };
+}
+
+function parseCursor(
+	c: import("hono").Context,
+): { startedAt: Date; id: string } | undefined {
+	const raw = c.req.query("cursor");
+	if (raw === undefined || raw === "") {
+		return undefined;
+	}
+	const cursor = decodeOperationCursor(raw);
+	if (!(cursor && isUuid(cursor.id))) {
+		throw new GatewayError({
+			class: "bad_request",
+			code: "invalid_cursor",
+			param: "cursor",
+			message: "cursor is not a value this endpoint returned",
+			publicMessage: "cursor is not a value this endpoint returned.",
+		});
+	}
+	return cursor;
+}
+
 function parsePage(c: import("hono").Context): {
 	limit: number;
 	offset: number;
 } {
-	const rawLimit = Number(c.req.query("limit") ?? DEFAULT_LIMIT);
-	const rawOffset = Number(c.req.query("offset") ?? 0);
-	const limit =
-		Number.isFinite(rawLimit) && rawLimit > 0
-			? Math.min(Math.trunc(rawLimit), MAX_LIMIT)
-			: DEFAULT_LIMIT;
-	const offset =
-		Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.trunc(rawOffset) : 0;
-	return { limit, offset };
+	return pageParams(c, { defaultLimit: DEFAULT_LIMIT, maxLimit: MAX_LIMIT });
 }
 
 /** Reads are viewer-visible for a resource; writes need the corresponding :write permission. */
@@ -282,12 +323,6 @@ export const adminApp = new Hono<AppEnv>();
 adminApp.use("*", authMiddleware(), requireOperator(), auditMiddleware());
 
 /**
- * After the identity is resolved, because an idempotency key is scoped to the actor that sent it, and
- * before the permission gates, so a replay is answered by the same rules that answered the original.
- */
-adminApp.use("*", idempotencyMiddleware());
-
-/**
  * Per-group permissions. The master key satisfies every one of them; a session must carry the
  * permission its role grants (see auth/roles.ts). Registered before the routes so Hono applies them
  * as middleware rather than as handlers.
@@ -318,25 +353,23 @@ adminApp.use("/fallbacks", methodPermission("settings"));
 adminApp.use("/cache", requirePermission("settings:write"));
 adminApp.use("/extensions/*", requirePermission("extensions:manage"));
 adminApp.use("/extensions", requirePermission("extensions:manage"));
+adminApp.use("/users/*", requirePermission("users:manage"));
+adminApp.use("/users", requirePermission("users:manage"));
+
+/**
+ * After the identity is resolved, because an idempotency key is scoped to the actor that sent it, and
+ * after the permission gates, so a replay is only answered to someone who may make the request now.
+ * Creating and rotating a key return its plaintext, so those responses are never stored.
+ */
+adminApp.use(
+	"*",
+	idempotencyMiddleware({
+		withholdsResponse: (method, path) =>
+			method === "POST" &&
+			(path === "/admin/keys" || /^\/admin\/keys\/[^/]+\/rotate$/u.test(path)),
+	}),
+);
 adminApp.route("/users", dashboardUsersApp);
-adminApp.use("*", async (c, next) => {
-	const mutatesConfiguration = ["POST", "PUT", "PATCH", "DELETE"].includes(
-		c.req.method,
-	);
-	const managesCacheDirectly = c.req.path === "/admin/cache";
-	if (mutatesConfiguration && !managesCacheDirectly) {
-		await advanceResponseCacheEpoch();
-	}
-	await next();
-	if (
-		mutatesConfiguration &&
-		!managesCacheDirectly &&
-		c.res.status >= 200 &&
-		c.res.status < 400
-	) {
-		await advanceResponseCacheEpoch();
-	}
-});
 // Model CRUD (with inline CatalogEntry for custom models) and adapter introspection.
 adminApp.route("/", platformAdminApp);
 
@@ -438,7 +471,7 @@ adminApp.post("/keys/:id/rotate", async (c) => {
 	const existing = await requireKey(c.req.param("id"));
 	// The body is optional: a bare POST keeps the key exactly as private as it was.
 	const input =
-		c.req.raw.body === null || c.req.header("content-length") === "0"
+		(await readBodyBytes(c, ADMIN_JSON_BODY_MAX_BYTES)).byteLength === 0
 			? {}
 			: await parseJsonBody(c, rotateKeySchema);
 	const rotated = await rotateVirtualKey(
@@ -495,7 +528,8 @@ adminApp.patch("/keys/:id", async (c) => {
 });
 
 adminApp.delete("/keys/:id", async (c) => {
-	const row = await getVirtualKeyById(c.req.param("id"));
+	const id = c.req.param("id");
+	const row = isUuid(id) ? await getVirtualKeyById(id) : undefined;
 	if (row) {
 		await deleteVirtualKey(row.id);
 		await invalidateVirtualKey(row.keyHash);
@@ -745,22 +779,29 @@ type OperationUsageGroupBy = (typeof USAGE_GROUP_BY)[number];
 
 adminApp.get("/logs", async (c) => {
 	const { limit, offset } = parsePage(c);
-	const filter = parseLogFilter(c);
-	const { rows, total } = await listOperationsPage({
+	const cursor = parseCursor(c);
+	const filter = boundedWindow(parseLogFilter(c), {
+		defaultDays: 7,
+		maxDays: 93,
+	});
+	const page = await listOperationsPage({
 		limit,
 		offset,
 		...filter,
+		...(cursor ? { cursor } : {}),
 	});
-	return paginated(c, rows, {
+	return paginated(c, page.rows, {
 		limit,
-		offset,
-		total,
-		nextOffset: offset + limit < total ? offset + limit : null,
+		offset: cursor ? 0 : offset,
+		total: page.total,
+		nextOffset: !cursor && page.nextCursor !== null ? offset + limit : null,
+		nextCursor: page.nextCursor,
+		totalIsLowerBound: page.totalIsLowerBound,
 	});
 });
 
 adminApp.get("/logs/:id/payload", async (c) => {
-	const id = c.req.param("id");
+	const id = uuidParam(c, "id", "Gateway operation");
 	const read = await getPayloadSample(id, {
 		requestId: getRequestId(c),
 		actor: actorOf(getAuth(c)),
@@ -800,7 +841,9 @@ adminApp.get("/logs/:id/payload", async (c) => {
 });
 
 adminApp.get("/logs/:id", async (c) => {
-	const detail = await getOperationDetail(c.req.param("id"));
+	const detail = await getOperationDetail(
+		uuidParam(c, "id", "Gateway operation"),
+	);
 	if (detail === null) {
 		throw new GatewayError({
 			class: "not_found",
@@ -920,7 +963,7 @@ adminApp.get("/usage", async (c) => {
 	}
 	const rows = await aggregateOperationUsage({
 		groupBy: groupByRaw as OperationUsageGroupBy,
-		...parseLogFilter(c),
+		...boundedWindow(parseLogFilter(c), { defaultDays: 30, maxDays: 400 }),
 	});
 	return ok(c, rows);
 });
@@ -1025,7 +1068,11 @@ adminApp.put("/router-settings", async (c) => {
 const dashboardSettingsSchema = z
 	.object({
 		sessionTtlMinutes: z.coerce.number().int().min(5).max(43_200),
-		sessionIdleMinutes: z.coerce.number().int().min(1).max(43_200),
+		sessionIdleMinutes: z.coerce
+			.number()
+			.int()
+			.min(MIN_SESSION_IDLE_MINUTES)
+			.max(43_200),
 		loginMaxAttempts: z.coerce.number().int().min(1).max(100),
 		loginLockoutMinutes: z.coerce.number().int().min(1).max(1440),
 	})

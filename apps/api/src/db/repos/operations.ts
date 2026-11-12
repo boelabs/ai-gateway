@@ -1,20 +1,8 @@
-import type { Page, PageResult } from "./deployments.ts";
+import { type SQL, count, desc, and, gte, lte, sql, eq, lt } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { cacheMetrics } from "./cacheMetrics.ts";
-import { db } from "#db/client.ts";
-
-import {
-	getTableColumns,
-	type SQL,
-	count,
-	desc,
-	and,
-	gte,
-	lte,
-	sql,
-	eq,
-	lt,
-} from "drizzle-orm";
+import { analyticsDb, db } from "#db/client.ts";
+import type { Page } from "./deployments.ts";
 
 import {
 	gatewayOperations,
@@ -136,11 +124,70 @@ export interface OperationFailureSummary {
 	providerCode: string | null;
 }
 
-export type OperationListRow = GatewayOperationRow & {
+/**
+ * The columns of a list row: scalars only. The JSON columns (request and response summaries,
+ * metadata, error) are what make a row heavy, and belong to the detail view.
+ */
+const listColumns = {
+	id: gatewayOperations.id,
+	requestId: gatewayOperations.requestId,
+	virtualKeyId: gatewayOperations.virtualKeyId,
+	actor: gatewayOperations.actor,
+	publicModel: gatewayOperations.publicModel,
+	callType: gatewayOperations.callType,
+	lifecycleState: gatewayOperations.lifecycleState,
+	outcome: gatewayOperations.outcome,
+	degraded: gatewayOperations.degraded,
+	terminalVerified: gatewayOperations.terminalVerified,
+	stream: gatewayOperations.stream,
+	cacheHit: gatewayOperations.cacheHit,
+	httpStatus: gatewayOperations.httpStatus,
+	promptTokens: gatewayOperations.promptTokens,
+	completionTokens: gatewayOperations.completionTokens,
+	totalTokens: gatewayOperations.totalTokens,
+	consumerCostCents: gatewayOperations.consumerCostCents,
+	durationMs: gatewayOperations.durationMs,
+	firstOutputMs: gatewayOperations.firstOutputMs,
+	startedAt: gatewayOperations.startedAt,
+	endedAt: gatewayOperations.endedAt,
+};
+
+export type OperationListRow = {
+	[K in keyof typeof listColumns]: GatewayOperationRow[K];
+} & {
 	attemptCount: number;
 	servedBy: string | null;
 	lastFailure: OperationFailureSummary | null;
 };
+
+/** Counting stops here: an exact count of a large window is a scan per page for a number nobody reads exactly. */
+export const OPERATION_COUNT_CAP = 10_000;
+
+/** Position after a row in (started_at DESC, id DESC) order; opaque to clients. */
+export function encodeOperationCursor(row: {
+	startedAt: Date;
+	id: string;
+}): string {
+	return Buffer.from(`${row.startedAt.toISOString()}|${row.id}`).toString(
+		"base64url",
+	);
+}
+
+export function decodeOperationCursor(
+	cursor: string,
+): { startedAt: Date; id: string } | null {
+	const [at, id] = Buffer.from(cursor, "base64url").toString("utf8").split("|");
+	const startedAt = new Date(at ?? "");
+	return id && !Number.isNaN(startedAt.getTime()) ? { startedAt, id } : null;
+}
+
+export interface OperationPageResult {
+	rows: OperationListRow[];
+	/** Exact up to OPERATION_COUNT_CAP; at the cap, `totalIsLowerBound` is true. */
+	total: number;
+	totalIsLowerBound: boolean;
+	nextCursor: string | null;
+}
 
 /**
  * Each row carries enough of its attempts to say what happened without opening it: how many there
@@ -167,22 +214,44 @@ const attemptSummary = {
 	) from ${upstreamAttempts} a where a.operation_id = ${operationIdColumn} and a.outcome = 'error' order by a.ordinal desc limit 1)`,
 };
 
+/**
+ * One page of operations, newest first. With a cursor it is keyset pagination on (started_at, id),
+ * which costs the same on page 500 as on page 1; offset is kept for existing clients. The count is
+ * capped so a page never scans its whole window.
+ */
 export async function listOperationsPage(
-	opts: Page & OperationFilter,
-): Promise<PageResult<OperationListRow>> {
+	opts: Page & OperationFilter & { cursor?: { startedAt: Date; id: string } },
+): Promise<OperationPageResult> {
 	const conds = conditions(opts);
 	const where = conds.length > 0 ? and(...conds) : undefined;
-	const [rows, totalRow] = await Promise.all([
-		db
-			.select({ ...getTableColumns(gatewayOperations), ...attemptSummary })
+	const after = opts.cursor
+		? sql`(${gatewayOperations.startedAt}, ${gatewayOperations.id}) < (${opts.cursor.startedAt.toISOString()}::timestamptz, ${opts.cursor.id}::uuid)`
+		: undefined;
+	const [rows, counted] = await Promise.all([
+		analyticsDb
+			.select({ ...listColumns, ...attemptSummary })
 			.from(gatewayOperations)
-			.where(where)
-			.orderBy(desc(gatewayOperations.startedAt))
-			.limit(opts.limit)
-			.offset(opts.offset),
-		db.select({ value: count() }).from(gatewayOperations).where(where),
+			.where(after ? and(where, after) : where)
+			.orderBy(desc(gatewayOperations.startedAt), desc(gatewayOperations.id))
+			.limit(opts.limit + 1)
+			.offset(opts.cursor ? 0 : opts.offset),
+		analyticsDb.execute<{ n: number }>(sql`
+			SELECT count(*)::int AS n FROM (
+				SELECT 1 FROM ${gatewayOperations}
+				${where ? sql`WHERE ${where}` : sql``}
+				LIMIT ${OPERATION_COUNT_CAP + 1}
+			) capped`),
 	]);
-	return { rows, total: Number(totalRow[0]?.value ?? 0) };
+	const page = rows.slice(0, opts.limit);
+	const counted0 = Number(counted[0]?.n ?? 0);
+	const last = page.at(-1);
+	return {
+		rows: page,
+		total: Math.min(counted0, OPERATION_COUNT_CAP),
+		totalIsLowerBound: counted0 > OPERATION_COUNT_CAP,
+		nextCursor:
+			rows.length > opts.limit && last ? encodeOperationCursor(last) : null,
+	};
 }
 
 /**
@@ -248,7 +317,7 @@ export async function operationSummary(since: Date, until?: Date) {
 		until === undefined
 			? gte(column, since)
 			: and(gte(column, since), lt(column, until));
-	const rows = await db
+	const rows = await analyticsDb
 		.select({
 			outcome: gatewayOperations.outcome,
 			requests: count(),
@@ -269,13 +338,13 @@ export async function operationSummary(since: Date, until?: Date) {
 		.from(gatewayOperations)
 		.where(started(gatewayOperations.startedAt))
 		.groupBy(gatewayOperations.outcome);
-	const [active] = await db
+	const [active] = await analyticsDb
 		.select({ value: count() })
 		.from(gatewayOperations)
 		.where(eq(gatewayOperations.lifecycleState, "in_progress"));
 	const [totals, byModel, byAdapter, byDeployment, protocolErrorOperations] =
 		await Promise.all([
-			db
+			analyticsDb
 				.select({
 					requests: count(),
 					// The first-output clause is streaming-only by construction: a non-progressive
@@ -294,22 +363,22 @@ export async function operationSummary(since: Date, until?: Date) {
 				})
 				.from(gatewayOperations)
 				.where(started(gatewayOperations.startedAt)),
-			db
+			analyticsDb
 				.select({ key: gatewayOperations.publicModel, requests: count() })
 				.from(gatewayOperations)
 				.where(started(gatewayOperations.startedAt))
 				.groupBy(gatewayOperations.publicModel),
-			db
+			analyticsDb
 				.select({ key: upstreamAttempts.adapterKey, attempts: count() })
 				.from(upstreamAttempts)
 				.where(started(upstreamAttempts.startedAt))
 				.groupBy(upstreamAttempts.adapterKey),
-			db
+			analyticsDb
 				.select({ key: upstreamAttempts.deploymentId, attempts: count() })
 				.from(upstreamAttempts)
 				.where(started(upstreamAttempts.startedAt))
 				.groupBy(upstreamAttempts.deploymentId),
-			db
+			analyticsDb
 				.select({
 					value: sql<number>`count(distinct ${upstreamAttempts.operationId})::int`,
 				})
@@ -386,13 +455,16 @@ export async function aggregateOperationUsage(
 		upstreamCostCents: sql<number>`coalesce(sum(${gatewayOperations.upstreamCostCents}), 0)::float8`,
 	};
 	if (filter.groupBy === "none") {
-		const [row] = await db.select(metrics).from(gatewayOperations).where(where);
+		const [row] = await analyticsDb
+			.select(metrics)
+			.from(gatewayOperations)
+			.where(where);
 		return [{ key: null, ...row }];
 	}
 	// `hour` exists for 24h dashboards: `day` collapses a whole day into one point, which is useless
 	// at that window. Both bucket in UTC so the series is stable regardless of the server's zone.
 	const key = groupKeyColumn(filter.groupBy);
-	return db
+	return analyticsDb
 		.select({ key, ...metrics })
 		.from(gatewayOperations)
 		.where(where)

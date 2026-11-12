@@ -1,9 +1,10 @@
 import { isUnauthenticated, unwrap as unwrapOrThrow } from "./errors.ts";
 import { CSRF_HEADER, CSRF_COOKIE, SAFE_METHODS } from "./csrf.ts";
+import { cookies, headers as incomingHeaders } from "next/headers";
 import { gatewayUrl } from "#/shared/config/server.ts";
+import { gatewayClientHeaders } from "./forwarded.ts";
 import { redirect } from "next/navigation";
 import createClient from "openapi-fetch";
-import { cookies } from "next/headers";
 import type { paths } from "./schema";
 
 /**
@@ -37,6 +38,9 @@ function resolve(request: Request): Request {
 async function withSession(request: Request): Promise<Response> {
 	const jar = await cookies();
 	const headers = new Headers(request.headers);
+	for (const [name, value] of gatewayClientHeaders(await incomingHeaders())) {
+		headers.set(name, value);
+	}
 	const cookie = jar.toString();
 	if (cookie) {
 		headers.set("cookie", cookie);

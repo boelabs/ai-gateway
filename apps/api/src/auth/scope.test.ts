@@ -1,5 +1,5 @@
+import { assertModelAllowed, stateScopeOf } from "./scope.ts";
 import type { Auth, VirtualKeyAuth } from "./types.ts";
-import { assertModelAllowed } from "./scope.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -48,4 +48,28 @@ test("rejection is permission class (403)", () => {
 		assert.equal((err as { class?: string }).class, "permission");
 		assert.equal((err as { httpStatus?: number }).httpStatus, 403);
 	}
+});
+
+test("each credential gets its own stored-state scope", () => {
+	assert.deepEqual(stateScopeOf({ type: "master" }), {
+		virtualKeyId: null,
+		ownerActor: null,
+	});
+	assert.deepEqual(stateScopeOf(vk([])), {
+		virtualKeyId: "1",
+		ownerActor: null,
+	});
+	assert.deepEqual(
+		stateScopeOf({
+			type: "session",
+			session: {
+				sessionId: "s",
+				userId: "u-1",
+				role: "admin",
+				isRoot: false,
+				mustChangePassword: false,
+			},
+		}),
+		{ virtualKeyId: null, ownerActor: "user:u-1" },
+	);
 });

@@ -1,5 +1,6 @@
+import { type SQL, and, asc, eq, gt, isNotNull, sql } from "drizzle-orm";
 import { IDEMPOTENCY_PURPOSE } from "#db/repos/idempotency.ts";
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import { closeDb, db } from "#db/client.ts";
 
 import {
@@ -21,226 +22,187 @@ import {
 
 const BATCH_SIZE = 100;
 
-async function rotateDeployments(): Promise<number> {
-	let rotated = 0;
-	while (true) {
-		const rows = await db
-			.select({
-				id: modelDeployments.id,
-				envelope: modelDeployments.credentials,
-			})
-			.from(modelDeployments)
-			.where(
-				sql`${modelDeployments.credentials}->>'kid' IS DISTINCT FROM ${activeEncryptionKeyId()}`,
-			)
-			.limit(BATCH_SIZE);
-		if (rows.length === 0) {
-			return rotated;
-		}
-		const batchRotated = await db.transaction(async (tx) => {
-			let updatedCount = 0;
-			for (const row of rows) {
-				const value = decryptRecord(row.envelope, "deployment-credentials");
-				const updated = await tx
-					.update(modelDeployments)
-					.set({ credentials: encryptJson(value, "deployment-credentials") })
-					.where(
-						and(
-							eq(modelDeployments.id, row.id),
-							eq(modelDeployments.credentials, row.envelope),
-						),
-					)
-					.returning({ id: modelDeployments.id });
-				updatedCount += updated.length;
-			}
-			return updatedCount;
-		});
-		rotated += batchRotated;
-	}
+/** A row whose envelope the keyring cannot open: reported, never rewritten, never fatal. */
+interface Orphan {
+	table: string;
+	id: string;
+	error: string;
 }
 
-async function rotateExtensions(): Promise<number> {
-	let rotated = 0;
-	while (true) {
-		const rows = await db
-			.select({ id: extensionArtifacts.id, envelope: extensionArtifacts.code })
-			.from(extensionArtifacts)
-			.where(
-				sql`${extensionArtifacts.code}->>'kid' IS DISTINCT FROM ${activeEncryptionKeyId()}`,
-			)
-			.limit(BATCH_SIZE);
-		if (rows.length === 0) {
-			return rotated;
-		}
-		const batchRotated = await db.transaction(async (tx) => {
-			let updatedCount = 0;
-			for (const row of rows) {
-				const value = decryptString(row.envelope, "extension-source");
-				const updated = await tx
-					.update(extensionArtifacts)
-					.set({ code: encryptJson(value, "extension-source") })
-					.where(
-						and(
-							eq(extensionArtifacts.id, row.id),
-							eq(extensionArtifacts.code, row.envelope),
-						),
-					)
-					.returning({ id: extensionArtifacts.id });
-				updatedCount += updated.length;
-			}
-			return updatedCount;
-		});
-		rotated += batchRotated;
-	}
-}
+const orphans: Orphan[] = [];
 
-async function rotatePayloadSamples(): Promise<number> {
-	let rotated = 0;
-	while (true) {
-		const rows = await db
-			.select({ id: payloadSamples.id, envelope: payloadSamples.envelope })
-			.from(payloadSamples)
-			.where(
-				sql`${payloadSamples.envelope}->>'kid' IS DISTINCT FROM ${activeEncryptionKeyId()}`,
-			)
-			.limit(BATCH_SIZE);
-		if (rows.length === 0) {
-			return rotated;
-		}
-		const batchRotated = await db.transaction(async (tx) => {
-			let updatedCount = 0;
-			for (const row of rows) {
-				const value = decryptJson(row.envelope, "observability-payload");
-				const updated = await tx
-					.update(payloadSamples)
-					.set({ envelope: encryptJson(value, "observability-payload") })
-					.where(
-						and(
-							eq(payloadSamples.id, row.id),
-							eq(payloadSamples.envelope, row.envelope),
-						),
-					)
-					.returning({ id: payloadSamples.id });
-				updatedCount += updated.length;
-			}
-			return updatedCount;
-		});
-		rotated += batchRotated;
-	}
+interface Rotation {
+	table: string;
+	from: PgTable;
+	id: PgColumn;
+	envelope: PgColumn;
+	/** Rows that still need resealing (besides the id cursor). */
+	pending: SQL;
+	/** Re-encrypts one envelope under the active key; throws when it cannot be opened. */
+	reseal: (envelope: EncEnvelope) => unknown;
 }
 
 /**
- * Rows live a day, but a key retired within that day would leave their replays unreadable. Only
- * sealed responses are selected: an empty body is NULL, and a row from before responses were sealed
- * has no `kid` to rotate.
+ * Reseals every row of one table under the active key, a batch at a time. Walks by id, so a row
+ * that cannot be opened is skipped (and reported) instead of being selected again forever or
+ * aborting the whole rotation; an update only lands if the envelope is still the one that was read.
  */
-async function rotateIdempotencyResponses(): Promise<number> {
+async function rotate(rotation: Rotation): Promise<number> {
 	let rotated = 0;
+	let after: string | null = null;
 	while (true) {
-		const rows = await db
-			.select({ id: idempotencyKeys.id, envelope: idempotencyKeys.response })
-			.from(idempotencyKeys)
+		const rows = (await db
+			.select({ id: rotation.id, envelope: rotation.envelope })
+			.from(rotation.from)
 			.where(
-				and(
-					sql`${idempotencyKeys.response}->>'purpose' = ${IDEMPOTENCY_PURPOSE}`,
-					sql`${idempotencyKeys.response}->>'kid' IS DISTINCT FROM ${activeEncryptionKeyId()}`,
-				),
+				after === null
+					? rotation.pending
+					: and(rotation.pending, gt(rotation.id, after)),
 			)
-			.limit(BATCH_SIZE);
-		if (rows.length === 0) {
+			.orderBy(asc(rotation.id))
+			.limit(BATCH_SIZE)) as { id: string; envelope: EncEnvelope | null }[];
+		const last = rows.at(-1);
+		if (!last) {
 			return rotated;
 		}
-		const batchRotated = await db.transaction(async (tx) => {
-			let updatedCount = 0;
-			for (const row of rows) {
-				const envelope = row.envelope as EncEnvelope;
-				const value = decryptJson(envelope, IDEMPOTENCY_PURPOSE);
-				const updated = await tx
-					.update(idempotencyKeys)
-					.set({ response: encryptJson(value, IDEMPOTENCY_PURPOSE) })
-					.where(
-						and(
-							eq(idempotencyKeys.id, row.id),
-							eq(idempotencyKeys.response, envelope),
-						),
-					)
-					.returning({ id: idempotencyKeys.id });
-				updatedCount += updated.length;
-			}
-			return updatedCount;
-		});
-		rotated += batchRotated;
-	}
-}
-
-async function rotateVirtualKeySecrets(): Promise<number> {
-	let rotated = 0;
-	while (true) {
-		// A private key has no envelope, and NULL is distinct from every key id: without the
-		// IS NOT NULL the same private rows would come back forever.
-		const rows = await db
-			.select({ id: virtualKeys.id, envelope: virtualKeys.secret })
-			.from(virtualKeys)
-			.where(
-				and(
-					isNotNull(virtualKeys.secret),
-					sql`${virtualKeys.secret}->>'kid' IS DISTINCT FROM ${activeEncryptionKeyId()}`,
-				),
-			)
-			.limit(BATCH_SIZE);
-		if (rows.length === 0) {
-			return rotated;
-		}
-		const batchRotated = await db.transaction(async (tx) => {
+		after = last.id;
+		rotated += await db.transaction(async (tx) => {
 			let updatedCount = 0;
 			for (const row of rows) {
 				if (row.envelope === null) {
 					continue;
 				}
-				const value = decryptString(row.envelope, "virtual-key-secret");
+				let resealed: unknown;
+				try {
+					resealed = rotation.reseal(row.envelope);
+				} catch (error) {
+					orphans.push({
+						table: rotation.table,
+						id: row.id,
+						error: error instanceof Error ? error.message : String(error),
+					});
+					continue;
+				}
 				const updated = await tx
-					.update(virtualKeys)
-					.set({ secret: encryptJson(value, "virtual-key-secret") })
+					.update(rotation.from)
+					.set({ [rotation.envelope.name]: resealed } as never)
 					.where(
-						and(
-							eq(virtualKeys.id, row.id),
-							eq(virtualKeys.secret, row.envelope),
-						),
+						and(eq(rotation.id, row.id), eq(rotation.envelope, row.envelope)),
 					)
-					.returning({ id: virtualKeys.id });
+					.returning({ id: rotation.id });
 				updatedCount += updated.length;
 			}
 			return updatedCount;
 		});
-		rotated += batchRotated;
 	}
 }
 
-async function run(): Promise<void> {
-	const [deployments, extensions, samples, idempotency, keys] =
-		await Promise.all([
-			rotateDeployments(),
-			rotateExtensions(),
-			rotatePayloadSamples(),
-			rotateIdempotencyResponses(),
-			rotateVirtualKeySecrets(),
-		]);
+function notActive(column: PgColumn): SQL {
+	return sql`${column}->>'kid' IS DISTINCT FROM ${activeEncryptionKeyId()}`;
+}
+
+const ROTATIONS: Record<string, Rotation> = {
+	deployments: {
+		table: "model_deployments",
+		from: modelDeployments,
+		id: modelDeployments.id,
+		envelope: modelDeployments.credentials,
+		pending: notActive(modelDeployments.credentials),
+		reseal: (envelope) =>
+			encryptJson(
+				decryptRecord(envelope, "deployment-credentials"),
+				"deployment-credentials",
+			),
+	},
+	extensions: {
+		table: "extension_artifacts",
+		from: extensionArtifacts,
+		id: extensionArtifacts.id,
+		envelope: extensionArtifacts.code,
+		pending: notActive(extensionArtifacts.code),
+		reseal: (envelope) =>
+			encryptJson(
+				decryptString(envelope, "extension-source"),
+				"extension-source",
+			),
+	},
+	payloadSamples: {
+		table: "payload_samples",
+		from: payloadSamples,
+		id: payloadSamples.id,
+		envelope: payloadSamples.envelope,
+		pending: notActive(payloadSamples.envelope),
+		reseal: (envelope) =>
+			encryptJson(
+				decryptJson(envelope, "observability-payload"),
+				"observability-payload",
+			),
+	},
+	/**
+	 * Rows live a day, but a key retired within that day would leave their replays unreadable. Only
+	 * sealed responses are selected: an empty body is NULL, and a row from before responses were
+	 * sealed has no `kid` to rotate.
+	 */
+	idempotencyResponses: {
+		table: "idempotency_keys",
+		from: idempotencyKeys,
+		id: idempotencyKeys.id,
+		envelope: idempotencyKeys.response,
+		pending: and(
+			sql`${idempotencyKeys.response}->>'purpose' = ${IDEMPOTENCY_PURPOSE}`,
+			notActive(idempotencyKeys.response),
+		) as SQL,
+		reseal: (envelope) =>
+			encryptJson(
+				decryptJson(envelope, IDEMPOTENCY_PURPOSE),
+				IDEMPOTENCY_PURPOSE,
+			),
+	},
+	// A private key has no envelope; NULL is distinct from every key id, so it is excluded.
+	virtualKeys: {
+		table: "virtual_keys",
+		from: virtualKeys,
+		id: virtualKeys.id,
+		envelope: virtualKeys.secret,
+		pending: and(
+			isNotNull(virtualKeys.secret),
+			notActive(virtualKeys.secret),
+		) as SQL,
+		reseal: (envelope) =>
+			encryptJson(
+				decryptString(envelope, "virtual-key-secret"),
+				"virtual-key-secret",
+			),
+	},
+};
+
+async function run(): Promise<boolean> {
+	const names = Object.keys(ROTATIONS);
+	const counts = await Promise.all(
+		names.map((name) => rotate(ROTATIONS[name] as Rotation)),
+	);
 	console.log(
 		JSON.stringify({
 			activeKeyId: activeEncryptionKeyId(),
-			rotated: {
-				deployments,
-				extensions,
-				payloadSamples: samples,
-				idempotencyResponses: idempotency,
-				virtualKeys: keys,
-			},
+			rotated: Object.fromEntries(names.map((name, i) => [name, counts[i]])),
+			unreadable: orphans,
 		}),
 	);
+	if (orphans.length > 0) {
+		console.error(
+			`${orphans.length} row(s) could not be decrypted with the keyring and were left as they are. Restore the key that sealed them, or remove the rows, then run the rotation again.`,
+		);
+	}
+	return orphans.length === 0;
 }
 
 run()
-	.then(() => closeDb())
+	.then(async (clean) => {
+		await closeDb();
+		if (!clean) {
+			process.exit(1);
+		}
+	})
 	.catch(async (error: unknown) => {
 		console.error(error instanceof Error ? error.message : error);
 		try {
