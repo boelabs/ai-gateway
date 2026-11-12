@@ -251,12 +251,16 @@ function publicOperations(metas: ResolvedModelMetadata[]): Array<{
 
 /**
  * The parameters a deployment actually carries: the catalog's view with what its adapter declares
- * for the deployment's chat transport underneath, the same view the parameter policy applies.
+ * for the deployment's chat transport underneath, the same view the parameter policy applies. They
+ * are chat parameters, so a model that does not generate text has none.
  */
 function deploymentParameterNames(
 	row: DeploymentRow,
 	meta: ResolvedModelMetadata,
 ): string[] {
+	if (!operationIds(meta).includes("text.generate")) {
+		return [];
+	}
 	const adapter = getAdapter(row.adapterKey);
 	if (!adapter?.chatParameters) {
 		return supportedParameterNames(meta);
@@ -292,7 +296,13 @@ function aggregateSupportedParameters(group: PublicModelGroup): string[] {
 function topProvider(metas: ResolvedModelMetadata[]): Record<string, unknown> {
 	return {
 		context_length:
-			Math.max(0, ...metas.map((meta) => meta.maxInputTokens ?? 0)) || null,
+			Math.max(
+				0,
+				...metas.map(
+					(meta) =>
+						meta.maxInputTokens ?? decisionProfileFor(meta)?.contextWindow ?? 0,
+				),
+			) || null,
 		max_completion_tokens:
 			Math.max(0, ...metas.map((meta) => meta.maxOutputTokens ?? 0)) || null,
 	};

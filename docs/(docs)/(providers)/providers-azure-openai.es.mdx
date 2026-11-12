@@ -25,6 +25,12 @@ Envía este cuerpo a `POST /admin/deployments` con credencial de operador. Reemp
 - **transport predeterminado**: API Responses para cada endpoint de texto público, incluidos Chat Completions y Messages; `embeddings` para empotrar. Configura `transportOverrides["text.generate"]` en `chat_completions` para optar por Azure Chat Completions. El endpoint público no selecciona el transport upstream. Hoy no hay transport de imágenes nativas.
 - Se emiten herramientas de función estricta tanto en Chat Completions como en Responses. Azure requiere `parallel_tool_calls: false` para este modo, por lo que el adapter proporciona ese valor predeterminado y rechaza un `true` explícito en lugar de debilitar la garantía.
 - Azure OpenAI y [Azure Foundry](/docs/providers-azure-foundry) son dos adapters y catálogos independientes, aunque ambos se encuentran bajo el paraguas de Azure; use este para los modelos que implementa a través de recursos de Azure OpenAI específicamente.
+- **Decisiones**: `gpt-6-luna` responde [decisiones](/docs/decisions) en
+  `POST {resource}/openai/v1/decisions`, con el nombre del deployment de Azure como `model` y sin
+  `api-version`. Azure solo documenta mensajes de usuario con texto e imágenes, así que la entrada viaja
+  como un único mensaje de usuario etiquetado, sin campos de caché ni de usuario final. Hasta 400
+  preguntas y 128 imágenes PNG, JPEG, WebP o GIF (32 MB en total) por solicitud. Microsoft está
+  habilitando la API en las regiones que ejecutan `gpt-6-luna`, excepto East US 2.
 - Catálogo: `src/adapters/azureopenai/catalog.json`.
 
 ## Próximos pasos [#next-steps]

@@ -1,6 +1,12 @@
 import type { Adapter, ProviderModule } from "#adapters/types.ts";
 import { makeAzureTranscriptionHandler } from "./audio.ts";
-import { makeAzurev1Adapter } from "#adapters/azurev1.ts";
+import { makeOpenAIDecisionsHandler } from "#adapters/decisions.ts";
+
+import {
+	normalizeAzurev1BaseUrl,
+	azureRefineBadRequest,
+	makeAzurev1Adapter,
+} from "#adapters/azurev1.ts";
 
 const LABEL = "Azure OpenAI v1";
 
@@ -37,13 +43,34 @@ export const azureopenaiAdapter: Adapter = {
 	supportedCallTypes: new Set([
 		...base.supportedCallTypes,
 		"audio.transcriptions",
+		"decisions",
 	]),
 	audioTranscription: makeAzureTranscriptionHandler(LABEL),
+	// POST {endpoint}/openai/v1/decisions; `model` is the Azure deployment name.
+	decisions: makeOpenAIDecisionsHandler({
+		label: LABEL,
+		authScheme: "api-key",
+		normalizeBaseUrl: normalizeAzurev1BaseUrl,
+		dialect: "azure",
+		refineBadRequest: azureRefineBadRequest,
+	}),
 	transports: {
 		...base.transports,
 		"audio.transcriptions": {
 			supported: ["azure_audio_transcriptions_legacy", "audio_transcriptions"],
 			default: "azure_audio_transcriptions_legacy",
+		},
+		decisions: { supported: ["openai_decisions"], default: "openai_decisions" },
+	},
+	// Up to 128 PNG, JPEG, WebP or GIF images per request, 32 MB together.
+	contentInputs: {
+		...base.contentInputs,
+		openai_decisions: {
+			image: {
+				sources: ["url", "data_url"],
+				mimeTypes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
+				maxBytes: 32_000_000,
+			},
 		},
 	},
 };
