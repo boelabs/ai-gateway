@@ -144,6 +144,11 @@ export const DEFAULT_EXECUTION_POLICIES: ExecutionPolicies = {
 		json: policy(2 * MINUTE, null, 5 * MINUTE, 3),
 		stream: policy(2 * MINUTE, null, 5 * MINUTE, 3),
 	},
+	// A decision answers in a few hundred milliseconds; long media inputs are the slow case.
+	decisions: {
+		json: policy(MINUTE, null, 3 * MINUTE, 3),
+		stream: policy(MINUTE, null, 3 * MINUTE, 3),
+	},
 	"videos.generations": {
 		json: policy(2 * MINUTE, null, 5 * MINUTE, 2),
 		stream: policy(2 * MINUTE, 2 * MINUTE, 15 * MINUTE, 2),

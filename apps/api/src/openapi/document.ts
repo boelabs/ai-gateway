@@ -14,6 +14,25 @@ const errorResponse = { $ref: "#/components/responses/Error" } as const;
 const rerankErrorResponse = {
 	$ref: "#/components/responses/OpenRouterError",
 } as const;
+const googleErrorResponse = {
+	$ref: "#/components/responses/GoogleError",
+} as const;
+const typeSafeErrorResponse = {
+	$ref: "#/components/responses/TypeSafeError",
+} as const;
+
+/**
+ * The failure statuses a decisions route can answer, all in that contract's error shape. Each is its
+ * own object: a shared one would serialize as a YAML alias, and parsers cap how many they expand.
+ */
+function decisionErrors(response: { $ref: string }) {
+	return Object.fromEntries(
+		["400", "401", "403", "404", "413", "429", "500", "502", "503"].map(
+			(status) => [status, { ...response }],
+		),
+	);
+}
+
 const cacheParams = [
 	{ $ref: "#/components/parameters/CacheHeader" },
 	{ $ref: "#/components/parameters/CacheTtlHeader" },
@@ -66,14 +85,14 @@ export function buildOpenApiDocument() {
 				"The master key is " +
 				"required for /admin/*.\n\n" +
 				"RESPONSE CONVENTIONS:\n" +
-				"- Inference (/v1/chat/completions, /v1/responses, /v1/images/*, /v1/videos*, /v1/embeddings, /v1/rerank, " +
+				"- Inference (/v1/chat/completions, /v1/responses, /v1/images/*, /v1/videos*, /v1/embeddings, /v1/rerank, /v1/decisions, " +
 				"/v1/models): documented OpenAI/OpenResponses-compatible contracts with explicit native-only features.\n" +
 				'- Management (/admin/*): envelope { "data": <object|array> }; lists: { "data": [...], ' +
 				'"pagination": {...} }; delete: 204 with no body; error: { "error": {...} }.\n\n' +
 				"RESPONSE HEADERS: x-request-id (all responses; echoed if sent on the request). " +
 				"Virtual-key inference responses can also include " +
 				"x-ratelimit-{limit,remaining,reset}-{requests,tokens,budget}.\n\n" +
-				"REQUEST LIMITS: public JSON bodies are capped at 72 MiB, admin JSON at 2 MiB, rerank JSON at 16 MiB, and multipart endpoints publish their own aggregate caps. Oversized input returns 413.",
+				"REQUEST LIMITS: public JSON bodies are capped at 72 MiB, admin JSON at 2 MiB, rerank JSON at 16 MiB, /v1/systemone at 32 MiB, and multipart endpoints publish their own aggregate caps. Oversized input returns 413.",
 		},
 		servers: [
 			{
@@ -94,7 +113,7 @@ export function buildOpenApiDocument() {
 					type: "http",
 					scheme: "bearer",
 					description:
-						"Master key or virtual key. Admin requires the master key or an operator session. Alternative: x-api-key header.",
+						"Master key or virtual key. Admin requires the master key or an operator session. Alternatives: the x-api-key header, or x-goog-api-key on /v1beta/decisions.",
 				},
 				sessionCookie: {
 					type: "apiKey",
@@ -168,6 +187,14 @@ export function buildOpenApiDocument() {
 				OpenRouterError: {
 					description: "OpenRouter-shaped rerank error",
 					content: { "application/json": { schema: c.OpenRouterError } },
+				},
+				GoogleError: {
+					description: "Google-shaped error (Gemini Decisions contract)",
+					content: { "application/json": { schema: c.GoogleError } },
+				},
+				TypeSafeError: {
+					description: "TypeSafe-shaped error (Jev contract)",
+					content: { "application/json": { schema: c.TypeSafeError } },
 				},
 			},
 		},
@@ -612,6 +639,116 @@ export function buildOpenApiDocument() {
 						"500": rerankErrorResponse,
 						"502": rerankErrorResponse,
 						"503": rerankErrorResponse,
+					},
+				},
+			},
+			"/v1/decisions": {
+				post: {
+					operationId: "createDecision",
+					tags: ["Inference"],
+					summary: "Score closed-set questions (OpenAI Decisions contract)",
+					description:
+						"Answers predicate, choice and score questions about one input with probabilities instead of generated text. Routes to any decisions deployment of the public model (OpenAI, Gemini, TypeSafe, OpenRouter) and translates between their protocols. No streaming.",
+					requestBody: jsonBody(c.OpenAIDecisionRequest, {
+						triage: {
+							value: {
+								model: "decide",
+								input: "My card was charged twice for the March invoice.",
+								questions: [
+									{
+										type: "predicate",
+										name: "wants_refund",
+										instructions: "The customer asks for money back.",
+									},
+									{
+										type: "choice",
+										name: "team",
+										instructions: "Which team owns this ticket?",
+										choices: [{ value: "billing" }, { value: "technical" }],
+									},
+								],
+							},
+						},
+					}),
+					responses: {
+						"200": {
+							description: "OpenAI-shaped decision",
+							content: {
+								"application/json": { schema: c.OpenAIDecisionResponse },
+							},
+						},
+						...decisionErrors(errorResponse),
+					},
+				},
+			},
+			"/v1beta/decisions": {
+				post: {
+					operationId: "createGeminiDecision",
+					tags: ["Inference"],
+					summary: "Score closed-set questions (Gemini Decisions contract)",
+					description:
+						"Google's Gemini Decisions shapes, so Google's SDKs work by changing only the base URL; the key may come as x-goog-api-key. A question refused upstream is left out of `answers`.",
+					requestBody: jsonBody(c.GeminiDecisionRequest, {
+						triage: {
+							value: {
+								model: "decide",
+								input: "My card was charged twice for the March invoice.",
+								questions: {
+									wants_refund: {
+										type: "noul",
+										instructions: "Is the customer asking for money back?",
+									},
+									urgency: {
+										type: "score",
+										instructions: "How urgent is this ticket?",
+										criteria: ["Routine.", "Same day.", "Churn risk."],
+									},
+								},
+							},
+						},
+					}),
+					responses: {
+						"200": {
+							description: "Gemini-shaped decision",
+							content: {
+								"application/json": { schema: c.GeminiDecisionResponse },
+							},
+						},
+						...decisionErrors(googleErrorResponse),
+					},
+				},
+			},
+			"/v1/systemone": {
+				post: {
+					operationId: "createSystemOneDecision",
+					tags: ["Inference"],
+					summary: "Score closed-set questions (TypeSafe Jev contract)",
+					description:
+						"TypeSafe's /v1/systemone shapes, as JSON or multipart/form-data (a `request` JSON part plus one part per image asset), capped at 32 MiB. Box questions need a Jev 1.14 deployment.",
+					requestBody: jsonBody(c.SystemOneRequest, {
+						triage: {
+							value: {
+								model: "decide",
+								state: { ticket: "My card was charged twice for March." },
+								questions: {
+									refund: {
+										type: "noul",
+										instructions: "The customer asks for money back.",
+									},
+									tone: {
+										type: "choice",
+										criteria: { angry: null, calm: null },
+									},
+								},
+							},
+						},
+					}),
+					responses: {
+						"200": {
+							description: "TypeSafe-shaped decision",
+							content: { "application/json": { schema: c.SystemOneResponse } },
+						},
+						...decisionErrors(typeSafeErrorResponse),
 					},
 				},
 			},

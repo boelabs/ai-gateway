@@ -6,7 +6,7 @@ Elige un adapter para el proveedor y la operación que necesita, luego crea un d
 
 ## Elige un adapter [#choose-an-adapter]
 
-La columna de transport describe el protocolo upstream. Su aplicación todavía utiliza la API pública de AI Gateway. OpenRouter actualmente solo admite la reranking.
+La columna de transport describe el protocolo upstream. Su aplicación todavía utiliza la API pública de AI Gateway. OpenRouter actualmente admite reranking y decisiones; TypeSafe solo admite decisiones.
 
 | Proveedor | Adapter key | Credenciales | transport predeterminado |
 |---|---|---|---|
@@ -21,6 +21,7 @@ La columna de transport describe el protocolo upstream. Su aplicación todavía 
 | [Z.AI](/docs/providers-zai) | `zai` | `apiKey` | Chat Completions |
 | [Vercel AI Gateway](/docs/providers-vercel) | `vercel` | `apiKey` | API Responses |
 | [OpenRouter](/docs/providers-openrouter) | `openrouter` | `apiKey` | Reranking |
+| [TypeSafe](/docs/providers-typesafe) | `typesafe` | `apiKey` | `systemone` (decisiones) |
 | [OpenAI-compatible](/docs/providers-openai-compatible) | `openaicompatible` | `apiKey`, `baseUrl` | Chat Completions |
 
 ## Configurar la conexión [#configura-the-connection]

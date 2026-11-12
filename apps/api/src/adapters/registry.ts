@@ -20,6 +20,7 @@ const HANDLER_KEY: Partial<Record<CallType, keyof Adapter>> = {
 	"realtime.conversation": "realtimeConversation",
 	embeddings: "embeddings",
 	rerank: "rerank",
+	decisions: "decisions",
 };
 const CONTENT_INPUT_SOURCES = new Set(["provider_file_id", "url", "data_url"]);
 

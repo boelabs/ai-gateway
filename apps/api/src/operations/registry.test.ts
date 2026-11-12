@@ -20,8 +20,15 @@ test("registry separates public operations from internal CallTypes", () => {
 			"audio.converse.realtime",
 			"embedding.create",
 			"rerank",
+			"decision.create",
 		],
 	);
+	assert.equal(callTypeForOperation("decision.create"), "decisions");
+	assert.deepEqual(operationForCallType("decisions")?.publicEndpoints, [
+		"/v1/decisions",
+		"/v1beta/decisions",
+		"/v1/systemone",
+	]);
 	assert.equal(callTypeForOperation("image.generate"), "images.generations");
 	assert.equal(callTypeForOperation("video.generate"), "videos.generations");
 	assert.equal(callTypeForOperation("embedding.create"), "embeddings");

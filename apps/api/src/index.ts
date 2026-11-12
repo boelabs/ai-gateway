@@ -1,13 +1,18 @@
+import {
+	systemOneDecisionsHandler,
+	geminiDecisionsHandler,
+	openAIDecisionsHandler,
+} from "./endpoints/decisions.ts";
 import { realtimeClientSecretsHandler } from "./endpoints/realtimeClientSecrets.ts";
 import { type WebSocketServerLike, serve } from "@hono/node-server";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { createSocketServer } from "#endpoints/socketServer.ts";
 import { GatewayError } from "./core/errors.ts";
 import { pingRedis } from "./cache/redis.ts";
 import { Hono, type Context } from "hono";
 import { pingDb } from "./db/client.ts";
 import { log } from "./logging/log.ts";
 import { env } from "./config/env.ts";
-import { createSocketServer } from "#endpoints/socketServer.ts";
 
 import {
 	DEPENDENCY_RETRY_AFTER_SECONDS,
@@ -20,12 +25,12 @@ import "./adapters/index.ts"; // registers the adapters (side-effect)
 import { messagesCountTokensHandler } from "./endpoints/messagesCountTokens.ts";
 import { publicizeManagementError, isManagementPath } from "./admin/errors.ts";
 import { authMiddleware, requireInferenceAccess } from "./auth/middleware.ts";
+import { type ErrorDialect, errorDialectFor } from "./http/errorDialect.ts";
 import { installProcessErrorHandlers } from "./runtime/processErrors.ts";
 import { startResponseStateGcJob } from "./db/repos/responseStates.ts";
 import { startSpendLedgerGcJob } from "./ratelimit/spendLedgerGc.ts";
 import { requestContextMiddleware } from "./http/requestContext.ts";
 import { lifecyclePhase, isDraining } from "./runtime/lifecycle.ts";
-import { usesAnthropicErrorDialect } from "./http/errorDialect.ts";
 import { authApp, dashboardConfigHandler } from "./auth/routes.ts";
 import { startDashboardSessionGcJob } from "./auth/sessionGc.ts";
 import { startIdempotencyGcJob } from "./http/idempotencyGc.ts";
@@ -172,20 +177,23 @@ function asGatewayError(err: unknown): GatewayError | null {
 }
 
 /** The same error, in whichever dialect the endpoint that failed speaks. */
-function errorBody(
-	error: GatewayError,
-	isAnthropic: boolean,
-	isOpenRouterRerank: boolean,
-) {
-	if (isAnthropic) {
-		return error.toAnthropic();
+function errorBody(error: GatewayError, dialect: ErrorDialect) {
+	switch (dialect) {
+		case "anthropic":
+			return error.toAnthropic();
+		case "openrouter":
+			return error.toOpenRouter();
+		case "google":
+			return error.toGoogle();
+		case "typesafe":
+			return error.toTypeSafe();
+		default:
+			return error.toOpenAI();
 	}
-	return isOpenRouterRerank ? error.toOpenRouter() : error.toOpenAI();
 }
 
 app.onError((err, c) => {
-	const isAnthropic = usesAnthropicErrorDialect(c.req.path);
-	const isOpenRouterRerank = c.req.path === "/v1/rerank";
+	const dialect = errorDialectFor(c.req.path);
 	// A reachable-dependency failure (Postgres/Redis down) becomes a 503 + Retry-After so clients back
 	// off and retry, instead of the opaque 500 a raw driver error would otherwise produce.
 	const raw = asGatewayError(err);
@@ -200,24 +208,18 @@ app.onError((err, c) => {
 		for (const [name, value] of Object.entries(gatewayError.headers ?? {})) {
 			c.header(name, value);
 		}
-		const body = errorBody(gatewayError, isAnthropic, isOpenRouterRerank);
+		const body = errorBody(gatewayError, dialect);
 		return c.json(body, gatewayError.httpStatus as ContentfulStatusCode);
 	}
 	log.error("http", "unhandled error", { err });
-	if (isAnthropic) {
-		return c.json(
-			{
-				type: "error",
-				error: { type: "api_error", message: "Internal server error" },
-			},
-			500,
-		);
-	}
-	if (isOpenRouterRerank) {
-		return c.json(
-			{ error: { code: 500, message: "Internal server error" } },
-			500,
-		);
+	if (dialect !== "openai") {
+		const internal = new GatewayError({
+			class: "server",
+			message: "Internal server error",
+			publicMessage: "Internal server error",
+			status: 500,
+		});
+		return c.json(errorBody(internal, dialect), 500);
 	}
 	return c.json(
 		{
@@ -356,6 +358,13 @@ app.delete("/v1/videos/:id", videoDeleteHandler);
 app.post("/v1/audio/transcriptions", transcriptionsHandler);
 app.post("/v1/embeddings", embeddingsHandler);
 app.post("/v1/rerank", rerankHandler);
+app.post("/v1/decisions", openAIDecisionsHandler);
+app.post("/v1/systemone", systemOneDecisionsHandler);
+
+// Gemini's API version prefix, so Google's SDKs reach the gateway by changing only the base URL.
+app.use("/v1beta/*", authMiddleware());
+app.use("/v1beta/*", requireInferenceAccess());
+app.post("/v1beta/decisions", geminiDecisionsHandler);
 
 const { server: webSocketServer, stop: stopSocketHeartbeat } =
 	createSocketServer();

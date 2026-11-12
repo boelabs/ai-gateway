@@ -1,8 +1,8 @@
 import type { UpstreamTransport, AdapterTransports } from "#core/transport.ts";
 import type { AttemptWatchdog } from "#gateway/attemptWatchdog.ts";
+import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import type { ReasoningControlKind } from "#core/reasoning.ts";
 import type { ResolvedModelMetadata } from "#catalog/types.ts";
-import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import type { GatewayError } from "#core/errors.ts";
 import type { CallType } from "#core/callType.ts";
 
@@ -44,6 +44,11 @@ import type {
 	CanonicalEmbeddingsResponse,
 	CanonicalEmbeddingsRequest,
 } from "#core/embeddings.ts";
+
+import type {
+	CanonicalDecisionResponse,
+	CanonicalDecisionRequest,
+} from "#core/decisions.ts";
 
 import type {
 	CanonicalRerankResponse,
@@ -342,6 +347,23 @@ export interface RerankHandler {
 	mapError: (err: unknown, ctx: AdapterContext) => GatewayError;
 }
 
+/**
+ * An adapter's canonical decisions handler. No streaming. `parseResponse` receives the request because
+ * upstreams that key answers by name are mapped back to the request's question order.
+ */
+export interface DecisionsHandler {
+	buildRequest: (
+		req: CanonicalDecisionRequest,
+		ctx: AdapterContext,
+	) => UpstreamHttpRequest;
+	parseResponse: (
+		raw: unknown,
+		ctx: AdapterContext,
+		req: CanonicalDecisionRequest,
+	) => CanonicalDecisionResponse;
+	mapError: (err: unknown, ctx: AdapterContext) => GatewayError;
+}
+
 export interface VideoJobRef {
 	upstreamJobId: string;
 	upstreamGenerationId?: string | null;
@@ -399,6 +421,7 @@ export interface Adapter {
 	realtimeConversation?: RealtimeConversationHandler;
 	embeddings?: EmbeddingsHandler;
 	rerank?: RerankHandler;
+	decisions?: DecisionsHandler;
 	/** Upstream transports per CallType. */
 	transports?: Partial<Record<CallType, AdapterTransports>>;
 	/** Native multimodal-input support by upstream transport. */

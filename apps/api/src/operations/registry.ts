@@ -11,13 +11,21 @@ export const OPERATION_IDS = [
 	"audio.converse.realtime",
 	"embedding.create",
 	"rerank",
+	"decision.create",
 ] as const;
 
 export type OperationId = (typeof OPERATION_IDS)[number];
 
 export interface OperationDefinition {
 	id: OperationId;
-	family: "text" | "image" | "video" | "audio" | "embedding" | "reranking";
+	family:
+		| "text"
+		| "image"
+		| "video"
+		| "audio"
+		| "embedding"
+		| "reranking"
+		| "decision";
 	label: string;
 	callType: CallType;
 	publicEndpoints: string[];
@@ -90,6 +98,13 @@ export const OPERATIONS: readonly OperationDefinition[] = [
 		label: "Reranking",
 		callType: "rerank",
 		publicEndpoints: ["/v1/rerank"],
+	},
+	{
+		id: "decision.create",
+		family: "decision",
+		label: "Decisions",
+		callType: "decisions",
+		publicEndpoints: ["/v1/decisions", "/v1beta/decisions", "/v1/systemone"],
 	},
 ] as const;
 

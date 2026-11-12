@@ -8,6 +8,7 @@ import {
 	realtimeConversationProfileFor,
 	transcriptionProfileFor,
 	embeddingProfileFor,
+	decisionProfileFor,
 	rerankProfileFor,
 	imageProfileFor,
 	videoProfileFor,
@@ -113,6 +114,9 @@ function resolveCandidates(
 				continue;
 			}
 			if (callType === "rerank" && !rerankProfileFor(meta)) {
+				continue;
+			}
+			if (callType === "decisions" && !decisionProfileFor(meta)) {
 				continue;
 			}
 			out.push({ row, adapter, upstreamModel, meta });

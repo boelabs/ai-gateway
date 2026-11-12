@@ -26,6 +26,7 @@ export const EXECUTION_CALL_TYPES = [
 	{ key: "realtime.conversation", label: "Realtime conversation" },
 	{ key: "embeddings", label: "Embeddings" },
 	{ key: "rerank", label: "Rerank" },
+	{ key: "decisions", label: "Decisions" },
 	{ key: "videos.generations", label: "Video jobs" },
 ] as const satisfies readonly { key: keyof ExecutionPolicies; label: string }[];
 

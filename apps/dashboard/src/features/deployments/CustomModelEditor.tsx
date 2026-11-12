@@ -403,6 +403,30 @@ function OperationFields({
 			/>
 		);
 	}
+	if (id === "decision.create") {
+		return (
+			<>
+				<ListInput
+					description="Comma-separated: binary, choice, score, box."
+					label="Question kinds"
+					onChange={(questionKinds) => onChange({ questionKinds })}
+					value={profile.questionKinds}
+				/>
+				<ListInput
+					description="Comma-separated: text, image, audio, video, document."
+					label="Input modalities"
+					onChange={(inputModalities) => onChange({ inputModalities })}
+					value={profile.inputModalities}
+				/>
+				<ProfileNumber
+					label="Maximum questions"
+					onChange={onChange}
+					profile={profile}
+					property="maxQuestions"
+				/>
+			</>
+		);
+	}
 	if (
 		id === "image.generate" ||
 		id === "image.edit" ||

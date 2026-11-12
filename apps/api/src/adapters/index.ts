@@ -12,6 +12,7 @@ import { azureopenaiProvider } from "./azureopenai/index.ts";
 import { openrouterProvider } from "./openrouter/index.ts";
 import type { Adapter, ProviderModule } from "./types.ts";
 import { anthropicProvider } from "./anthropic/index.ts";
+import { typesafeProvider } from "./typesafe/index.ts";
 import { deepseekProvider } from "./deepseek/index.ts";
 import { moonshotProvider } from "./moonshot/index.ts";
 import type { CatalogEntry } from "#catalog/types.ts";
@@ -74,6 +75,10 @@ const PROVIDER_REGISTRATIONS: readonly ProviderRegistration[] = [
 	{
 		provider: openrouterProvider,
 		catalogUrl: new URL("./openrouter/catalog.json", import.meta.url),
+	},
+	{
+		provider: typesafeProvider,
+		catalogUrl: new URL("./typesafe/catalog.json", import.meta.url),
 	},
 ];
 

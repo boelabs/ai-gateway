@@ -998,6 +998,7 @@ const routerSettingsSchema = z
 				"realtime.conversation",
 				"embeddings",
 				"rerank",
+				"decisions",
 			]),
 			z.object({
 				json: executionPolicySchema,

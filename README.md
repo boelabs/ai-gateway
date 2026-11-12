@@ -41,10 +41,11 @@ shared infrastructure, not a demo.
 ## Capabilities
 
 - **Public contracts** — exact OpenAI shapes for Chat Completions, Responses, Images, Embeddings,
-  Audio Transcriptions, Videos, Reranking, and Models; plus an Anthropic-compatible `/v1/messages`
-  rendered from the same canonical core.
+  Audio Transcriptions, Videos, Reranking, Decisions, and Models; plus an Anthropic-compatible
+  `/v1/messages` and the Gemini (`/v1beta/decisions`) and TypeSafe (`/v1/systemone`) decisions
+  contracts, all rendered from the same canonical core.
 - **Providers** — OpenAI, Anthropic, Google AI Studio, Azure OpenAI, Azure Foundry, Vercel AI
-  Gateway, OpenRouter, DeepSeek, MiniMax, Moonshot, ZAI, and any OpenAI-compatible endpoint.
+  Gateway, OpenRouter, TypeSafe, DeepSeek, MiniMax, Moonshot, ZAI, and any OpenAI-compatible endpoint.
 - **Routing** — public model aliases over weighted deployment pools, with cooldowns, retries,
   per-operation transports, and explicit fallback chains.
 - **Access control** — a master key for operations, virtual keys for clients, with model scopes,

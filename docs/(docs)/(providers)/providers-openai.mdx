@@ -38,6 +38,8 @@ credentials and choose a model available to your provider account. See
   `response_format` (see [Images](/docs/images)).
 - **Videos**: Sora profiles are included for OpenAI-shaped compatibility, but OpenAI's current docs
   mark the Sora 2 Videos API deprecated with shutdown scheduled for September 24, 2026.
+- **Decisions**: `gpt-6-luna` answers `POST /v1/decisions` through the `openai_decisions` transport,
+  for requests in any of the three decisions contracts (see [Decisions](/docs/decisions)).
 - Catalog: `src/adapters/openai/catalog.json`.
 
 ## Next steps

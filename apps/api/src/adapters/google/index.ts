@@ -1,11 +1,7 @@
-import {
-	toUpstreamReasoningEffort,
-	summaryVisible,
-	thinkingBudget,
-} from "#core/reasoning.ts";
 import { makeGeminiRealtimeConversationHandler } from "./liveConversation.ts";
 import { mergeExtraBody, mergeExtraBodyDeep } from "#core/extraBody.ts";
 import { type BaseCreds, requireApiKeyCreds } from "#adapters/creds.ts";
+import { makeGeminiDecisionsHandler } from "#adapters/decisions.ts";
 import { makeGeminiRealtimeTranscriptionHandler } from "./live.ts";
 import { mapUpstreamHttpError } from "#adapters/upstreamError.ts";
 import { upstreamFetch } from "#gateway/instrumentedTransport.ts";
@@ -67,6 +63,12 @@ import {
 	type CanonicalImageRequest,
 	resolveImageSize,
 } from "#core/images.ts";
+
+import {
+	toUpstreamReasoningEffort,
+	summaryVisible,
+	thinkingBudget,
+} from "#core/reasoning.ts";
 
 import {
 	adapterContextDiagnostics,
@@ -2470,6 +2472,7 @@ export const googleAdapter: Adapter = {
 		"realtime.transcription",
 		"realtime.conversation",
 		"embeddings",
+		"decisions",
 	]),
 	chat,
 	imageGeneration: imageHandler,
@@ -2485,6 +2488,11 @@ export const googleAdapter: Adapter = {
 		mapError: mapGoogleError,
 	}),
 	embeddings,
+	decisions: makeGeminiDecisionsHandler(
+		DEFAULT_BASE,
+		"Google AI Studio",
+		(err, ctx) => mapGoogleError(err, ctx),
+	),
 	reasoningKinds: new Set<ReasoningControlKind>([
 		"gemini_level",
 		"gemini_budget",
@@ -2528,6 +2536,39 @@ export const googleAdapter: Adapter = {
 				maxBytes: 20_000_000,
 			},
 		},
+		// Inline media up to 100 MB per request (50 MB for PDFs); a URL is a Files API URI or a
+		// public HTTPS URL Google fetches itself.
+		gemini_decisions: {
+			image: {
+				sources: ["url", "data_url"],
+				mimeTypes: [
+					"image/png",
+					"image/jpeg",
+					"image/webp",
+					"image/heic",
+					"image/heif",
+					"image/gif",
+					"image/bmp",
+					"image/tiff",
+				],
+				maxBytes: 100_000_000,
+			},
+			audio: {
+				sources: ["url", "data_url"],
+				mimeTypes: ["audio/*"],
+				maxBytes: 100_000_000,
+			},
+			video: {
+				sources: ["url", "data_url"],
+				mimeTypes: ["video/*"],
+				maxBytes: 100_000_000,
+			},
+			file: {
+				sources: ["url", "data_url"],
+				mimeTypes: ["application/pdf"],
+				maxBytes: 50_000_000,
+			},
+		},
 	},
 	// generateContent has no end-user identifier, no switch for parallel function calls and no cache
 	// key (explicit caching goes through cachedContent).
@@ -2567,6 +2608,10 @@ export const googleAdapter: Adapter = {
 		embeddings: {
 			supported: ["embed_content"],
 			default: "embed_content",
+		},
+		decisions: {
+			supported: ["gemini_decisions"],
+			default: "gemini_decisions",
 		},
 	},
 };

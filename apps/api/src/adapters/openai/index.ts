@@ -1,6 +1,7 @@
+import { makeOpenAIDecisionsHandler } from "#adapters/decisions.ts";
 import { makeOpenAIStyleAdapter } from "#adapters/openaiStyle.ts";
+import type { Adapter, ProviderModule } from "#adapters/types.ts";
 import { looksLikeContextWindowError } from "#core/httpError.ts";
-import type { ProviderModule } from "#adapters/types.ts";
 import type { ErrorClass } from "#core/errors.ts";
 
 /** Refines a 400 based on OpenAI's code (context window / content policy). */
@@ -23,7 +24,7 @@ function refineBadRequest(message: string, body: unknown): ErrorClass | null {
  * Adapter for the real OpenAI API. Its native UPSTREAM transport is /responses (whether the client
  * uses chat or responses, internally it speaks /responses). Error refinement by code.
  */
-export const openaiAdapter = makeOpenAIStyleAdapter({
+const openAIStyle = makeOpenAIStyleAdapter({
 	key: "openai",
 	label: "OpenAI",
 	defaultBaseUrl: "https://api.openai.com/v1",
@@ -56,5 +57,19 @@ export const openaiAdapter = makeOpenAIStyleAdapter({
 	realtime: true,
 	embeddings: true,
 });
+
+export const openaiAdapter: Adapter = {
+	...openAIStyle,
+	supportedCallTypes: new Set([...openAIStyle.supportedCallTypes, "decisions"]),
+	decisions: makeOpenAIDecisionsHandler("https://api.openai.com/v1", "OpenAI"),
+	transports: {
+		...openAIStyle.transports,
+		decisions: { supported: ["openai_decisions"], default: "openai_decisions" },
+	},
+	contentInputs: {
+		...openAIStyle.contentInputs,
+		openai_decisions: { image: { sources: ["url", "data_url"] } },
+	},
+};
 
 export const openaiProvider: ProviderModule = { adapter: openaiAdapter };

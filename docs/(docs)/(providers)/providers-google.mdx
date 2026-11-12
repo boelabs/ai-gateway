@@ -56,6 +56,9 @@ credentials and choose a model available to your provider account. See
   background, polls by interaction id, and fetches inline output into object storage without storing
   base64 in Postgres. Files API inputs, multi-turn `previous_interaction_id`, audio references, and
   URI-only 1080p/4K output are intentionally unsupported.
+- **Decisions**: `gemini-decision-1` answers through the `gemini_decisions` transport
+  (`POST /v1beta/decisions`), the only decisions upstream that accepts audio, video and PDF input
+  (see [Decisions](/docs/decisions)).
 - Catalog: `src/adapters/google/catalog.json` (folder is `google`; adapter key is `googleaistudio` —
   the one place today those two names don't match).
 

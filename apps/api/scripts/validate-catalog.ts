@@ -52,6 +52,10 @@ const catalogs = [
 		adapterKey: "openrouter",
 		url: new URL("../src/adapters/openrouter/catalog.json", import.meta.url),
 	},
+	{
+		adapterKey: "typesafe",
+		url: new URL("../src/adapters/typesafe/catalog.json", import.meta.url),
+	},
 ] as const;
 
 let total = 0;

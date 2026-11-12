@@ -18,7 +18,7 @@ Envía este cuerpo a `POST /admin/deployments` con credencial de operador. Reemp
 ## Comportamiento y restricciones [#behavior-and-limitations]
 
 - **Credenciales**: Se requiere `apiKey`. `baseUrl` y `headers` personalizado son opcionales. La URL base predeterminada es `https://openrouter.ai/api/v1`.
-- **Operación**: reranking solo en esta versión. El adapter envía `POST /rerank` a través del transport nativo `openrouter_rerank`.
+- **Operaciones**: reranking y decisiones. El adapter envía `POST /rerank` a través del transport nativo `openrouter_rerank`, y las decisiones a `POST /api/alpha/decisions` a través de `openrouter_decisions`, con la forma de body de TypeSafe. Las imágenes de decisiones deben ser PNG o JPEG inline.
 - **routing del proveedor**: el objeto público `provider` se conserva exactamente y hace que solo los deployments de OpenRouter sean elegibles para esa solicitud.
 - **ID de modelo**: utiliza los ID completos de OpenRouter, incluido el creador y los sufijos como `:free`.
 - **Catálogo**: el catálogo versionado se genera a partir del feed del modelo de OpenRouter filtrado por `output_modalities=rerank`. Ningún recuento de modelo esperado está codificado.
@@ -39,5 +39,6 @@ El informe señala la capacidad multimodal aún no habilitada, precios cero ambi
 ## Próximos pasos [#next-steps]
 
 - [Reranking](/docs/reranking): contrato público, routing, validación y ejemplos.
+- [Decisiones](/docs/decisions): los contratos de decisiones y los modelos de decisión de OpenRouter.
 - [Catálogo de modelos](/docs/model-catalog#openrouter-rerank-sync): sincronización de propiedad y esquema.
 - [Routing](/docs/routing): reintentos, respaldo, estado y estrategia de precios.

@@ -21,6 +21,9 @@ import "zod-openapi"; // ambient types for `.meta({ id, ... })`
 
 import { EXECUTION_POLICY_MAX_TOTAL_MS } from "#core/executionPolicy.ts";
 import { transcriptionFieldsSchema } from "#contracts/openai/audio.ts";
+import { openAIDecisionRequestSchema } from "#contracts/openai/decisions.ts";
+import { geminiDecisionRequestSchema } from "#contracts/google/decisions.ts";
+import { systemOneRequestSchema } from "#contracts/typesafe/systemone.ts";
 import { rerankRequestSchema } from "#contracts/openrouter/rerank.ts";
 import { OPERATION_IDS } from "#operations/registry.ts";
 import { CALL_TYPE_VALUES } from "#core/callType.ts";
@@ -510,6 +513,170 @@ export const RerankResponse = z
 	})
 	.strict()
 	.meta({ id: "RerankResponse" });
+
+/* ---------------------------------------------------------------- decisions */
+
+const probability = z.number().min(0).max(1);
+const decisionValue = z.union([z.string(), z.boolean()]);
+
+export const OpenAIDecisionRequest = openAIDecisionRequestSchema.meta({
+	id: "OpenAIDecisionRequest",
+	description:
+		"OpenAI Decisions request: one input scored against 1-400 predicate, choice or score questions.",
+});
+
+export const OpenAIDecisionAnswer = z
+	.discriminatedUnion("type", [
+		z.object({
+			type: z.literal("predicate"),
+			name: z.string().nullable(),
+			probability,
+		}),
+		z.object({
+			type: z.literal("choice"),
+			name: z.string().nullable(),
+			choice: decisionValue,
+			confidence: probability,
+			probabilities: z.array(z.object({ value: decisionValue, probability })),
+		}),
+		z.object({
+			type: z.literal("score"),
+			name: z.string().nullable(),
+			score: z.number(),
+			confidence: probability,
+			probabilities: z.array(
+				z.object({ label: z.string(), value: z.int(), probability }),
+			),
+		}),
+		z.object({ type: z.literal("refusal"), name: z.string().nullable() }),
+	])
+	.meta({ id: "OpenAIDecisionAnswer" });
+
+export const OpenAIDecisionResponse = z
+	.object({
+		model: z.string(),
+		answers: z.array(OpenAIDecisionAnswer),
+		usage: z.object({
+			input_tokens: z.int().nonnegative(),
+			input_tokens_details: z.object({
+				cached_tokens: z.int().nonnegative(),
+				cache_write_tokens: z.int().nonnegative(),
+			}),
+			output_tokens: z.int().nonnegative(),
+			output_tokens_details: z.object({
+				reasoning_tokens: z.int().nonnegative(),
+			}),
+			total_tokens: z.int().nonnegative(),
+		}),
+	})
+	.meta({ id: "OpenAIDecisionResponse" });
+
+export const GeminiDecisionRequest = geminiDecisionRequestSchema.meta({
+	id: "GeminiDecisionRequest",
+	description:
+		"Gemini Decisions request: one input scored against 1-1000 named noul, choice or score questions.",
+});
+
+export const GeminiDecisionResponse = z
+	.object({
+		answers: z.record(
+			z.string(),
+			z.discriminatedUnion("type", [
+				z.object({
+					type: z.literal("noul"),
+					noul: probability,
+					confidence: probability,
+				}),
+				z.object({
+					type: z.literal("choice"),
+					choice: z.string(),
+					probabilities: z.record(z.string(), probability),
+					confidence: probability,
+				}),
+				z.object({
+					type: z.literal("score"),
+					score: z.number(),
+					legend: z.record(z.string(), z.string()),
+					probabilities: z.record(z.string(), probability),
+					confidence: probability,
+				}),
+			]),
+		),
+		usage: z.object({
+			total_input_tokens: z.int().nonnegative(),
+			total_cached_tokens: z.int().nonnegative(),
+			total_output_tokens: z.int().nonnegative(),
+			total_thought_tokens: z.int().nonnegative(),
+			total_tokens: z.int().nonnegative(),
+		}),
+		prompt_feedback: z
+			.object({
+				block_reason: z.string(),
+				block_reason_message: z.string().optional(),
+			})
+			.optional(),
+	})
+	.meta({ id: "GeminiDecisionResponse" });
+
+export const SystemOneRequest = systemOneRequestSchema.meta({
+	id: "SystemOneRequest",
+	description:
+		"TypeSafe Jev request: a free-form state scored against named noul, choice, score or box questions. Images travel as `assets`.",
+});
+
+export const SystemOneResponse = z
+	.object({
+		model: z.string(),
+		answers: z.record(
+			z.string(),
+			z.discriminatedUnion("type", [
+				z.object({ type: z.literal("noul"), noul: probability }),
+				z.object({
+					type: z.literal("choice"),
+					choice: z.string(),
+					confidence: probability,
+					probabilities: z.record(z.string(), probability),
+				}),
+				z.object({
+					type: z.literal("score"),
+					score: z.number(),
+					confidence: probability,
+					legend: z.record(z.string(), z.unknown()),
+					probabilities: z.record(z.string(), probability),
+				}),
+				z.object({
+					type: z.literal("box"),
+					box: z.object({
+						top: probability,
+						bottom: probability,
+						left: probability,
+						right: probability,
+					}),
+					confidence: probability.nullable(),
+				}),
+				z.object({ type: z.literal("refusal") }),
+			]),
+		),
+		usage: z.object({
+			input_tokens: z.int().nonnegative(),
+			output_tokens: z.int().nonnegative(),
+		}),
+	})
+	.meta({ id: "SystemOneResponse" });
+
+export const GoogleError = z
+	.object({
+		error: z.object({
+			code: z.int(),
+			message: z.string(),
+			status: z.string(),
+		}),
+	})
+	.meta({ id: "GoogleError" });
+
+export const TypeSafeError = z
+	.object({ detail: z.string() })
+	.meta({ id: "TypeSafeError" });
 
 export const OpenRouterError = z
 	.object({
@@ -1037,6 +1204,7 @@ export const RouterSettings = z
 				"realtime.conversation": OperationExecutionPolicy,
 				embeddings: OperationExecutionPolicy,
 				rerank: OperationExecutionPolicy,
+				decisions: OperationExecutionPolicy,
 			})
 			.optional(),
 		routingStrategy: z

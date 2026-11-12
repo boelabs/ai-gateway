@@ -213,6 +213,36 @@ Un modelo de reranking declara la operación independiente `rerank`:
 
 Se requiere `documentModalities`. `imageSources` (`url` o `data_url`) está reservado en el esquema para futuros perfiles con capacidad de imagen, pero los catálogos actuales solo exponen `text`. Los límites de bytes y documentos se aplican antes de una llamada upstream. Los campos de token describen los límites documentados del proveedor y no activan la tokenización local aproximada.
 
+## Decisiones [#decisions]
+
+Un modelo de decisión declara la operación `decision.create`, que habilita `/v1/decisions`,
+`/v1beta/decisions` y `/v1/systemone`:
+
+```json
+{
+  "operations": {
+    "decision.create": {
+      "questionKinds": ["binary", "choice", "score"],
+      "inputModalities": ["text", "image", "audio", "video", "document"],
+      "maxQuestions": 1000,
+      "minChoices": 2,
+      "maxChoices": 255,
+      "minScoreLevels": 2,
+      "maxScoreLevels": 255,
+      "contextWindow": 262144
+    }
+  },
+  "pricing": { "inputCentsPerMTokens": 10, "outputCentsPerMTokens": 0 }
+}
+```
+
+`questionKinds` (`binary`, `choice`, `score`, `box`) e `inputModalities` (`text`, `image`, `audio`,
+`video`, `document`) son obligatorios. `instructionModalities` (`image`, `json`) indica qué pueden
+contener las preguntas además de texto. `maxQuestions`, `minChoices`, `maxChoices`, `minScoreLevels` y
+`maxScoreLevels` se aplican antes de llamar al upstream: el router omite un deployment cuyo perfil no
+encaja con la solicitud. `contextWindow` documenta el límite del proveedor y no activa una
+tokenización local. Ver [Decisiones](/docs/decisions).
+
 ## Sincronización del catálogo [#catalog-sync]
 
 La sincronización entre proveedores (`catalog:sync` y `catalog:sync:verify`) compara Vercel AI Gateway, OpenRouter y models.dev, y contrasta ambos catálogos de Azure con la lista de [modelos de Foundry vendidos por Azure](https://learn.microsoft.com/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure) de Microsoft, que los agregadores no cubren. Es solo para informes: escribe en `apps/api/.source/catalog-sync/` y nunca modifica un catálogo de proveedores. Úselo para investigar nuevos modelos y conflictos antes de realizar ediciones revisadas y específicas del proveedor.

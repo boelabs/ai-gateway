@@ -1,4 +1,5 @@
 import { assertRerankResponseValid } from "./rerankResponseValidation.ts";
+import { assertDecisionResponseValid } from "./decisionValidation.ts";
 import { assertTextRequestSupported } from "./textRequestValidation.ts";
 import type { AdapterDiagnostics } from "#adapters/types.ts";
 import { upstreamFetch } from "./instrumentedTransport.ts";
@@ -63,6 +64,11 @@ import type {
 	CanonicalRerankRequest,
 } from "#core/rerank.ts";
 
+import type {
+	CanonicalDecisionResponse,
+	CanonicalDecisionRequest,
+} from "#core/decisions.ts";
+
 export type ChatExecResult =
 	| {
 			kind: "json";
@@ -114,6 +120,13 @@ export interface EmbeddingsExecResult {
 export interface RerankExecResult {
 	kind: "json";
 	response: CanonicalRerankResponse;
+	terminal: CanonicalTerminal;
+	diagnostics: AdapterDiagnostics;
+}
+
+export interface DecisionsExecResult {
+	kind: "json";
+	response: CanonicalDecisionResponse;
 	terminal: CanonicalTerminal;
 	diagnostics: AdapterDiagnostics;
 }
@@ -507,6 +520,32 @@ export async function executeRerank(
 	);
 	const response = handler.parseResponse(await readBody(res, ctx), ctx);
 	assertRerankResponseValid(req, response);
+	return {
+		kind: "json",
+		response,
+		terminal: completedTerminal(),
+		diagnostics: adapterContextDiagnostics(ctx),
+	};
+}
+
+/** Executes a decisions call and validates every answer against its question. */
+export async function executeDecisions(
+	adapter: Adapter,
+	req: CanonicalDecisionRequest,
+	ctx: AdapterContext,
+): Promise<DecisionsExecResult> {
+	const handler = adapter.decisions;
+	if (!handler) {
+		throw new Error(`Adapter "${adapter.key}" does not implement decisions`);
+	}
+
+	const res = await dispatch(
+		handler.buildRequest(req, ctx),
+		ctx,
+		handler.mapError,
+	);
+	const response = handler.parseResponse(await readBody(res, ctx), ctx, req);
+	assertDecisionResponseValid(req, response);
 	return {
 		kind: "json",
 		response,

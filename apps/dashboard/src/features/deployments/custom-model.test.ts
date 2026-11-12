@@ -28,6 +28,7 @@ test("guided templates cover every operation without enabling speculative text c
 		"audio.transcribe",
 		"embedding.create",
 		"rerank",
+		"decision.create",
 	]) {
 		assert.deepEqual(
 			parseCustomEntry(

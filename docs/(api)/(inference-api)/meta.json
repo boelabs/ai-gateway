@@ -14,6 +14,8 @@
 		"---Search and vectors---",
 		"embeddings",
 		"reranking",
+		"---Decisions---",
+		"decisions",
 		"---Shared behavior---",
 		"models-discovery",
 		"file-inputs",

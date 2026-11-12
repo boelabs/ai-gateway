@@ -1,0 +1,42 @@
+---
+title: "TypeSafe"
+description: "Configura deployments de TypeSafe para los modelos de decisión Jev."
+---
+
+## Configurar un deployment [#configure-a-deployment]
+
+Envía este body a `POST /admin/deployments` con una credencial de operador. Reemplaza las credenciales
+de ejemplo. Consulta [Crear deployments](/docs/creating-deployments) para conocer los campos de
+configuración compartidos.
+
+```json
+{
+  "publicModel": "triage",
+  "adapterKey": "typesafe",
+  "upstreamModel": "jev-1.14.0",
+  "credentials": { "apiKey": "..." }
+}
+```
+
+## Comportamiento y restricciones [#behavior-and-limitations]
+
+- **Credenciales**: se requiere `apiKey`. `baseUrl` y `headers` personalizados son opcionales. La URL
+  base predeterminada es `https://api.typesafe.ai`.
+- **Operación**: solo decisiones. El adapter envía `POST /v1/systemone` a través del transport
+  `systemone`, sea cual sea el contrato público por el que llegó la solicitud.
+- **Modelos**: `jev-1.14.0`, `jev-1.13.0` y el alias `jev-latest`, que TypeSafe mueve a su versión
+  estable más reciente. Solo Jev 1.14 responde preguntas `box`.
+- **Imágenes**: solo PNG o JPEG inline, hasta 16 MiB cada una; no se aceptan URLs de imagen. El gateway
+  las envía como `assets` y añade `TypeSafe-Danger-Zone-Images: true` a las solicitudes con imágenes o
+  preguntas box.
+- **Contexto largo**: Jev lee 65,536 tokens por solicitud por defecto. Para subirlo a 262,144, define
+  `"headers": { "TypeSafe-Danger-Zone-Long-Context": "true" }` en las credenciales del deployment.
+- **Entrada**: Jev acepta un solo state, así que las conversaciones y los items de herramientas se
+  aplanan en una entrada etiquetada, y no se aceptan audio, video ni documentos.
+- **Precios**: $0.042 por millón de tokens de entrada; la salida es gratuita.
+
+## Próximos pasos [#next-steps]
+
+- [Decisiones](/docs/decisions) — los tres contratos públicos y cómo se traducen.
+- [Catálogo de modelos](/docs/model-catalog#decisions) — el perfil `decision.create`.
+- [Routing](/docs/routing) — reintentos, fallback, salud y estrategia por precio.

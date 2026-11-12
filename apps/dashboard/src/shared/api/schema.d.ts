@@ -522,6 +522,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Score closed-set questions (OpenAI Decisions contract)
+         * @description Answers predicate, choice and score questions about one input with probabilities instead of generated text. Routes to any decisions deployment of the public model (OpenAI, Gemini, TypeSafe, OpenRouter) and translates between their protocols. No streaming.
+         */
+        post: operations["createDecision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1beta/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Score closed-set questions (Gemini Decisions contract)
+         * @description Google's Gemini Decisions shapes, so Google's SDKs work by changing only the base URL; the key may come as x-goog-api-key. A question refused upstream is left out of `answers`.
+         */
+        post: operations["createGeminiDecision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/systemone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Score closed-set questions (TypeSafe Jev contract)
+         * @description TypeSafe's /v1/systemone shapes, as JSON or multipart/form-data (a `request` JSON part plus one part per image asset), capped at 32 MiB. Box questions need a Jev 1.14 deployment.
+         */
+        post: operations["createSystemOneDecision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/images/generations": {
         parameters: {
             query?: never;
@@ -2231,7 +2291,7 @@ export interface paths {
                     bucket?: "hour" | "day";
                     publicModel?: string;
                     deploymentId?: string;
-                    operation?: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.transcribe.realtime" | "audio.converse.realtime" | "embedding.create" | "rerank";
+                    operation?: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.transcribe.realtime" | "audio.converse.realtime" | "embedding.create" | "rerank" | "decision.create";
                 };
                 header?: never;
                 path?: never;
@@ -2918,6 +2978,416 @@ export interface components {
                 zdr?: boolean | null;
             };
         };
+        /** @description OpenAI Decisions request: one input scored against 1-400 predicate, choice or score questions. */
+        OpenAIDecisionRequest: {
+            model: string;
+            input: string | ({
+                /** @constant */
+                type?: "message";
+                /** @constant */
+                role: "user";
+                content: string | ({
+                    /** @constant */
+                    type: "input_text";
+                    text: string;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                } | {
+                    /** @constant */
+                    type: "input_image";
+                    image_url: string;
+                    detail?: ("low" | "high" | "auto" | "original") | null;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                } | {
+                    /** @constant */
+                    type: "input_json";
+                    data: {
+                        [key: string]: unknown;
+                    } | {
+                        [key: string]: unknown;
+                    }[];
+                })[];
+            } | {
+                /** @constant */
+                type?: "message";
+                /** @enum {string} */
+                role: "developer" | "system";
+                content: string | {
+                    /** @constant */
+                    type: "input_text";
+                    text: string;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                }[];
+            } | {
+                /** @constant */
+                type?: "message";
+                /** @constant */
+                role: "assistant";
+                content: string | ({
+                    /** @constant */
+                    type: "output_text";
+                    text: string;
+                } | {
+                    /** @constant */
+                    type: "refusal";
+                    refusal: string;
+                })[];
+                phase?: ("commentary" | "final_answer") | null;
+            } | {
+                /** @constant */
+                type: "function_call";
+                call_id: string;
+                name: string;
+                arguments: string;
+                id?: string | null;
+                namespace?: string | null;
+                status?: ("in_progress" | "completed" | "incomplete") | null;
+            } | {
+                /** @constant */
+                type: "function_call_output";
+                call_id: string;
+                output: string | ({
+                    /** @constant */
+                    type: "input_text";
+                    text: string;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                } | {
+                    /** @constant */
+                    type: "input_image";
+                    image_url: string;
+                    detail?: ("low" | "high" | "auto" | "original") | null;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                })[];
+                id?: string | null;
+                status?: ("in_progress" | "completed" | "incomplete") | null;
+            } | {
+                /** @constant */
+                type: "custom_tool_call";
+                call_id: string;
+                name: string;
+                input: string;
+                id?: string | null;
+                namespace?: string | null;
+                status?: ("in_progress" | "completed" | "incomplete") | null;
+            } | {
+                /** @constant */
+                type: "custom_tool_call_output";
+                call_id: string;
+                output: string | ({
+                    /** @constant */
+                    type: "input_text";
+                    text: string;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                } | {
+                    /** @constant */
+                    type: "input_image";
+                    image_url: string;
+                    detail?: ("low" | "high" | "auto" | "original") | null;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                })[];
+                id?: string | null;
+                status?: ("in_progress" | "completed" | "incomplete") | null;
+            })[];
+            questions: ({
+                /** @constant */
+                type: "predicate";
+                instructions: string | ({
+                    /** @constant */
+                    type: "input_text";
+                    text: string;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                } | {
+                    /** @constant */
+                    type: "input_image";
+                    image_url: string;
+                    detail?: ("low" | "high" | "auto" | "original") | null;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                } | {
+                    /** @constant */
+                    type: "input_json";
+                    data: {
+                        [key: string]: unknown;
+                    } | {
+                        [key: string]: unknown;
+                    }[];
+                })[];
+                name?: string;
+            } | {
+                /** @constant */
+                type: "choice";
+                instructions: string | ({
+                    /** @constant */
+                    type: "input_text";
+                    text: string;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                } | {
+                    /** @constant */
+                    type: "input_image";
+                    image_url: string;
+                    detail?: ("low" | "high" | "auto" | "original") | null;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                } | {
+                    /** @constant */
+                    type: "input_json";
+                    data: {
+                        [key: string]: unknown;
+                    } | {
+                        [key: string]: unknown;
+                    }[];
+                })[];
+                name?: string;
+                choices: {
+                    value: string | boolean;
+                    description?: string;
+                }[];
+            } | {
+                /** @constant */
+                type: "score";
+                instructions: string | ({
+                    /** @constant */
+                    type: "input_text";
+                    text: string;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                } | {
+                    /** @constant */
+                    type: "input_image";
+                    image_url: string;
+                    detail?: ("low" | "high" | "auto" | "original") | null;
+                    prompt_cache_breakpoint?: {
+                        /** @constant */
+                        mode: "explicit";
+                    } | null;
+                } | {
+                    /** @constant */
+                    type: "input_json";
+                    data: {
+                        [key: string]: unknown;
+                    } | {
+                        [key: string]: unknown;
+                    }[];
+                })[];
+                name?: string;
+                levels: {
+                    label: string;
+                    description?: string;
+                }[];
+            })[];
+            prompt_cache_key?: string | null;
+            prompt_cache_options?: {
+                mode?: ("implicit" | "explicit") | null;
+                ttl?: string;
+            } | null;
+            safety_identifier?: string | null;
+        };
+        /** @description Gemini Decisions request: one input scored against 1-1000 named noul, choice or score questions. */
+        GeminiDecisionRequest: {
+            model: string;
+            input: string | ({
+                /** @constant */
+                type: "text";
+                text: string;
+                annotations?: unknown[];
+            } | {
+                /** @constant */
+                type: "image";
+                data?: string;
+                uri?: string;
+                mime_type?: string;
+                /** @enum {string} */
+                resolution?: "low" | "medium" | "high" | "ultra_high";
+            } | {
+                /** @constant */
+                type: "audio";
+                data?: string;
+                uri?: string;
+                mime_type?: string;
+                channels?: number;
+                sample_rate?: number;
+            } | {
+                /** @constant */
+                type: "video";
+                data?: string;
+                uri?: string;
+                mime_type?: string;
+                /** @enum {string} */
+                resolution?: "low" | "medium" | "high" | "ultra_high";
+                processing?: unknown;
+                name?: string;
+            } | {
+                /** @constant */
+                type: "document";
+                data?: string;
+                uri?: string;
+                mime_type?: string;
+            }) | ({
+                /** @constant */
+                type: "text";
+                text: string;
+                annotations?: unknown[];
+            } | {
+                /** @constant */
+                type: "image";
+                data?: string;
+                uri?: string;
+                mime_type?: string;
+                /** @enum {string} */
+                resolution?: "low" | "medium" | "high" | "ultra_high";
+            } | {
+                /** @constant */
+                type: "audio";
+                data?: string;
+                uri?: string;
+                mime_type?: string;
+                channels?: number;
+                sample_rate?: number;
+            } | {
+                /** @constant */
+                type: "video";
+                data?: string;
+                uri?: string;
+                mime_type?: string;
+                /** @enum {string} */
+                resolution?: "low" | "medium" | "high" | "ultra_high";
+                processing?: unknown;
+                name?: string;
+            } | {
+                /** @constant */
+                type: "document";
+                data?: string;
+                uri?: string;
+                mime_type?: string;
+            })[];
+            questions: {
+                [key: string]: {
+                    /** @constant */
+                    type: "noul";
+                    instructions: string | {
+                        /** @constant */
+                        type: "text";
+                        text: string;
+                        annotations?: unknown[];
+                    } | {
+                        /** @constant */
+                        type: "text";
+                        text: string;
+                        annotations?: unknown[];
+                    }[];
+                    criteria?: {
+                        true_description?: string;
+                        false_description?: string;
+                    };
+                } | {
+                    /** @constant */
+                    type: "choice";
+                    instructions: string | {
+                        /** @constant */
+                        type: "text";
+                        text: string;
+                        annotations?: unknown[];
+                    } | {
+                        /** @constant */
+                        type: "text";
+                        text: string;
+                        annotations?: unknown[];
+                    }[];
+                    criteria: {
+                        [key: string]: string;
+                    };
+                } | {
+                    /** @constant */
+                    type: "score";
+                    instructions: string | {
+                        /** @constant */
+                        type: "text";
+                        text: string;
+                        annotations?: unknown[];
+                    } | {
+                        /** @constant */
+                        type: "text";
+                        text: string;
+                        annotations?: unknown[];
+                    }[];
+                    criteria: string[];
+                };
+            };
+        };
+        /** @description TypeSafe Jev request: a free-form state scored against named noul, choice, score or box questions. Images travel as `assets`. */
+        SystemOneRequest: {
+            model: string;
+            state: unknown;
+            questions: {
+                [key: string]: {
+                    /** @constant */
+                    type: "noul";
+                    instructions?: null | unknown;
+                    criteria?: {
+                        true?: null | unknown;
+                        false?: null | unknown;
+                    } | null;
+                } | {
+                    /** @constant */
+                    type: "choice";
+                    instructions?: null | unknown;
+                    criteria: {
+                        [key: string]: null | unknown;
+                    };
+                } | {
+                    /** @constant */
+                    type: "score";
+                    instructions?: null | unknown;
+                    criteria: unknown[];
+                } | {
+                    /** @constant */
+                    type: "box";
+                    instructions?: null | unknown;
+                };
+            };
+            assets?: {
+                [key: string]: {
+                    /** @constant */
+                    type?: "image";
+                    /** @enum {string} */
+                    format?: "png" | "jpg" | "jpeg";
+                    data_base64?: string;
+                    part?: string;
+                };
+            };
+        };
         ImageGenerationRequest: {
             /** @description public model */
             model: string;
@@ -3309,6 +3779,10 @@ export interface components {
                     json: components["schemas"]["ExecutionPolicy"];
                     stream: components["schemas"]["ExecutionPolicy"];
                 };
+                decisions: {
+                    json: components["schemas"]["ExecutionPolicy"];
+                    stream: components["schemas"]["ExecutionPolicy"];
+                };
             };
             /** @enum {string} */
             routingStrategy?: "simple-shuffle" | "least-busy" | "usage-based-tpm" | "usage-based-rpm" | "latency-based" | "throughput-based" | "price-based" | "health-aware";
@@ -3381,6 +3855,16 @@ export interface components {
                 code: number;
                 message: string;
             };
+        };
+        GoogleError: {
+            error: {
+                code: number;
+                message: string;
+                status: string;
+            };
+        };
+        TypeSafeError: {
+            detail: string;
         };
         ResponseObject: {
             id: string;
@@ -3522,6 +4006,139 @@ export interface components {
             relevance_score: number;
             document: {
                 text: string;
+            };
+        };
+        OpenAIDecisionResponse: {
+            model: string;
+            answers: components["schemas"]["OpenAIDecisionAnswer"][];
+            usage: {
+                input_tokens: number;
+                input_tokens_details: {
+                    cached_tokens: number;
+                    cache_write_tokens: number;
+                };
+                output_tokens: number;
+                output_tokens_details: {
+                    reasoning_tokens: number;
+                };
+                total_tokens: number;
+            };
+        };
+        OpenAIDecisionAnswer: {
+            /** @constant */
+            type: "predicate";
+            name: string | null;
+            probability: number;
+        } | {
+            /** @constant */
+            type: "choice";
+            name: string | null;
+            choice: string | boolean;
+            confidence: number;
+            probabilities: {
+                value: string | boolean;
+                probability: number;
+            }[];
+        } | {
+            /** @constant */
+            type: "score";
+            name: string | null;
+            score: number;
+            confidence: number;
+            probabilities: {
+                label: string;
+                value: number;
+                probability: number;
+            }[];
+        } | {
+            /** @constant */
+            type: "refusal";
+            name: string | null;
+        };
+        GeminiDecisionResponse: {
+            answers: {
+                [key: string]: {
+                    /** @constant */
+                    type: "noul";
+                    noul: number;
+                    confidence: number;
+                } | {
+                    /** @constant */
+                    type: "choice";
+                    choice: string;
+                    probabilities: {
+                        [key: string]: number;
+                    };
+                    confidence: number;
+                } | {
+                    /** @constant */
+                    type: "score";
+                    score: number;
+                    legend: {
+                        [key: string]: string;
+                    };
+                    probabilities: {
+                        [key: string]: number;
+                    };
+                    confidence: number;
+                };
+            };
+            usage: {
+                total_input_tokens: number;
+                total_cached_tokens: number;
+                total_output_tokens: number;
+                total_thought_tokens: number;
+                total_tokens: number;
+            };
+            prompt_feedback?: {
+                block_reason: string;
+                block_reason_message?: string;
+            };
+        };
+        SystemOneResponse: {
+            model: string;
+            answers: {
+                [key: string]: {
+                    /** @constant */
+                    type: "noul";
+                    noul: number;
+                } | {
+                    /** @constant */
+                    type: "choice";
+                    choice: string;
+                    confidence: number;
+                    probabilities: {
+                        [key: string]: number;
+                    };
+                } | {
+                    /** @constant */
+                    type: "score";
+                    score: number;
+                    confidence: number;
+                    legend: {
+                        [key: string]: unknown;
+                    };
+                    probabilities: {
+                        [key: string]: number;
+                    };
+                } | {
+                    /** @constant */
+                    type: "box";
+                    box: {
+                        top: number;
+                        bottom: number;
+                        left: number;
+                        right: number;
+                    };
+                    confidence: number | null;
+                } | {
+                    /** @constant */
+                    type: "refusal";
+                };
+            };
+            usage: {
+                input_tokens: number;
+                output_tokens: number;
             };
         };
         ImagesResponse: {
@@ -4248,6 +4865,24 @@ export interface components {
                 "application/json": components["schemas"]["OpenRouterError"];
             };
         };
+        /** @description Google-shaped error (Gemini Decisions contract) */
+        GoogleError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["GoogleError"];
+            };
+        };
+        /** @description TypeSafe-shaped error (Jev contract) */
+        TypeSafeError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["TypeSafeError"];
+            };
+        };
     };
     parameters: {
         IdPath: string;
@@ -4423,6 +5058,105 @@ export interface operations {
             500: components["responses"]["OpenRouterError"];
             502: components["responses"]["OpenRouterError"];
             503: components["responses"]["OpenRouterError"];
+        };
+    };
+    createDecision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenAIDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OpenAI-shaped decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenAIDecisionResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            413: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+            500: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+            503: components["responses"]["Error"];
+        };
+    };
+    createGeminiDecision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeminiDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Gemini-shaped decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeminiDecisionResponse"];
+                };
+            };
+            400: components["responses"]["GoogleError"];
+            401: components["responses"]["GoogleError"];
+            403: components["responses"]["GoogleError"];
+            404: components["responses"]["GoogleError"];
+            413: components["responses"]["GoogleError"];
+            429: components["responses"]["GoogleError"];
+            500: components["responses"]["GoogleError"];
+            502: components["responses"]["GoogleError"];
+            503: components["responses"]["GoogleError"];
+        };
+    };
+    createSystemOneDecision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SystemOneRequest"];
+            };
+        };
+        responses: {
+            /** @description TypeSafe-shaped decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemOneResponse"];
+                };
+            };
+            400: components["responses"]["TypeSafeError"];
+            401: components["responses"]["TypeSafeError"];
+            403: components["responses"]["TypeSafeError"];
+            404: components["responses"]["TypeSafeError"];
+            413: components["responses"]["TypeSafeError"];
+            429: components["responses"]["TypeSafeError"];
+            500: components["responses"]["TypeSafeError"];
+            502: components["responses"]["TypeSafeError"];
+            503: components["responses"]["TypeSafeError"];
         };
     };
     createImageGeneration: {

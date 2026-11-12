@@ -10,7 +10,7 @@ La ruta que llama un cliente, con el contrato exacto de esa API. Ejemplos: `/v1/
 
 ## Operation [#operation]
 
-El producto semántico que ofrece un modelo: `text.generate`, `image.generate`, `image.edit`, `audio.transcribe`, `embedding.create`, etc. Es el vocabulario estable del catálogo y la API de administración. La presencia de una operación en `catalogEntry.operations` declara soporte.
+El producto semántico que ofrece un modelo: `text.generate`, `image.generate`, `image.edit`, `audio.transcribe`, `embedding.create`, `decision.create`, etc. Es el vocabulario estable del catálogo y la API de administración. La presencia de una operación en `catalogEntry.operations` declara soporte.
 
 ## Public Model [#public-model]
 
@@ -36,11 +36,13 @@ Código que implementa controladores canonical y sabe cómo traducirlos a uno o 
 
 ## Transport [#transport]
 
-El protocolo que utiliza un adapter contra el proveedor: `chat_completions`, `responses`, `generate_content`, `messages`, `images`, `audio_transcriptions`, `azure_audio_transcriptions_legacy`, `embeddings`, `embed_content`, `openrouter_rerank`, o `cohere_rerank`. El tipo es `UpstreamTransport`, en `src/core/transport.ts`, y el contexto de ejecución usa `ctx.transport`.
+El protocolo que utiliza un adapter contra el proveedor: `chat_completions`, `responses`, `generate_content`, `messages`, `images`, `audio_transcriptions`, `azure_audio_transcriptions_legacy`, `embeddings`, `embed_content`, `openrouter_rerank`, `cohere_rerank`, `openai_decisions`, `gemini_decisions`, `systemone` u `openrouter_decisions`. El tipo es `UpstreamTransport`, en `src/core/transport.ts`, y el contexto de ejecución usa `ctx.transport`.
 
 `embeddings` es el transport `/embeddings` compatible con OpenAI; `embed_content` es el transport nativo de Google Gemini para `:embedContent` y `:batchEmbedContents`.
 
 `openrouter_rerank` es el contrato `/rerank` nativo de OpenRouter; `cohere_rerank` es el transport interno `/rerank` compatible con Cohere utilizado por Vercel AI Gateway. Ambos se normalizan en una operación canonical de reranking.
+
+`openai_decisions` (OpenAI `/decisions`), `gemini_decisions` (Gemini `/v1beta/decisions`), `systemone` (TypeSafe `/v1/systemone`) y `openrouter_decisions` (OpenRouter `/api/alpha/decisions`) transportan la misma operación canonical `decision.create`. Ver [Decisiones](/docs/decisions).
 
 `transportOverrides` le permite reemplazar el transport predeterminado del adapter por operación. Evita los nombres anteriores **wire** y **bindings**.
 
@@ -74,7 +76,7 @@ La categoría interna que conecta las operaciones ejecutables con el router y lo
 
 ## Canonical [#canonical]
 
-La representación interna independiente del proveedor en `src/core/canonical.ts`, `images.ts`, `audio.ts`, `embeddings.ts` y `rerank.ts`. Los contratos públicos se convierten a tipos canonical; los adapters convierten entre esos tipos y su transport. Evita el término anterior **Unified**.
+La representación interna independiente del proveedor en `src/core/canonical.ts`, `images.ts`, `audio.ts`, `embeddings.ts`, `rerank.ts` y `decisions.ts`. Los contratos públicos se convierten a tipos canonical; los adapters convierten entre esos tipos y su transport. Evita el término anterior **Unified**.
 
 ## Message State [#message-state]
 
