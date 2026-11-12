@@ -191,7 +191,9 @@
 				"cacheReadCentsPerMTokens": 125,
 				"imageInputCentsPerMTokens": 800,
 				"imageOutputCentsPerMTokens": 3000
-			}
+			},
+			"deprecated": true,
+			"notes": "OpenAI deprecated gpt-image-2; it shuts down on 2027-02-10 (replacement: gpt-image-2.6-sunburst or gpt-image-2.6-flare)."
 		},
 		"gpt-image-2.5-sunburst": {
 			"operations": {
@@ -263,6 +265,144 @@
 			}
 		},
 		"gpt-image-2.5-flare": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high", "xhigh", "max"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"arbitrarySize": {
+						"divisibleBy": 16,
+						"minAspectRatio": 0.3333333333333333,
+						"maxAspectRatio": 3,
+						"maxWidth": 3840,
+						"maxHeight": 3840,
+						"maxPixels": 8294400
+					},
+					"nativeResponseFormat": false
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high", "xhigh", "max"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"arbitrarySize": {
+						"divisibleBy": 16,
+						"minAspectRatio": 0.3333333333333333,
+						"maxAspectRatio": 3,
+						"maxWidth": 3840,
+						"maxHeight": 3840,
+						"maxPixels": 8294400
+					},
+					"nativeResponseFormat": false
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 500,
+				"outputCentsPerMTokens": 3000,
+				"cacheReadCentsPerMTokens": 125,
+				"imageInputCentsPerMTokens": 800,
+				"imageOutputCentsPerMTokens": 3000
+			}
+		},
+		"gpt-image-2.6-sunburst": {
+			"operations": {
+				"image.generate": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high", "xhigh", "max"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"arbitrarySize": {
+						"divisibleBy": 16,
+						"minAspectRatio": 0.3333333333333333,
+						"maxAspectRatio": 3,
+						"maxWidth": 3840,
+						"maxHeight": 3840,
+						"maxPixels": 8294400
+					},
+					"nativeResponseFormat": false
+				},
+				"image.edit": {
+					"maxPromptChars": 32000,
+					"maxInputImages": 16,
+					"maxImageBytes": 50000000,
+					"maxN": 10,
+					"supportsMask": true,
+					"supportsInputFidelity": true,
+					"supportsModeration": true,
+					"supportsTransparentBackground": true,
+					"supportsNativeStreaming": true,
+					"outputFormats": ["png", "jpeg", "webp"],
+					"qualities": ["low", "medium", "high", "xhigh", "max"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"sizes": {
+						"1024x1024": {},
+						"1024x1536": {},
+						"1536x1024": {}
+					},
+					"arbitrarySize": {
+						"divisibleBy": 16,
+						"minAspectRatio": 0.3333333333333333,
+						"maxAspectRatio": 3,
+						"maxWidth": 3840,
+						"maxHeight": 3840,
+						"maxPixels": 8294400
+					},
+					"nativeResponseFormat": false
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 500,
+				"outputCentsPerMTokens": 3000,
+				"cacheReadCentsPerMTokens": 125,
+				"imageInputCentsPerMTokens": 800,
+				"imageOutputCentsPerMTokens": 3000
+			}
+		},
+		"gpt-image-2.6-flare": {
 			"operations": {
 				"image.generate": {
 					"maxPromptChars": 32000,
@@ -1810,6 +1950,44 @@
 			},
 			"deprecated": true,
 			"notes": "OpenAI deprecated gpt-audio-mini; it shuts down on 2027-01-20 (replacement: gpt-audio-1.5)."
+		},
+		"gpt-audio-1.5": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": false,
+						"structuredOutputs": true,
+						"strictTools": true
+					},
+					"maxInputTokens": 128000,
+					"maxOutputTokens": 16384,
+					"parameters": {
+						"frequency_penalty": true,
+						"logit_bias": true,
+						"logprobs": true,
+						"max_tokens": true,
+						"presence_penalty": true,
+						"response_format": true,
+						"seed": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true,
+						"top_logprobs": true,
+						"top_p": true
+					},
+					"transport": "chat_completions"
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 250,
+				"outputCentsPerMTokens": 1000,
+				"audioInputCentsPerMTokens": 3200,
+				"audioOutputCentsPerMTokens": 6400
+			}
 		},
 		"gpt-5.2-codex": {
 			"operations": {

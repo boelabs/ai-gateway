@@ -161,6 +161,15 @@
 				}
 			}
 		},
+		"qwen/qwen3-reranker-0.6b": {
+			"operations": {
+				"rerank": {
+					"documentModalities": ["text"],
+					"maxDocuments": 1000,
+					"maxTokensPerDocument": 32768
+				}
+			}
+		},
 		"qwen/qwen3-reranker-8b": {
 			"operations": {
 				"rerank": {
