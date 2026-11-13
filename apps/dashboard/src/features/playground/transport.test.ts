@@ -703,3 +703,43 @@ test("Chat SSE usage and timestamps feed separate request and streaming rates", 
 	assert.equal(metrics.inputTokens, 4);
 	assert.equal(metrics.outputTokens, 11);
 });
+
+test("the system prompt reaches each contract where it expects instructions", async () => {
+	for (const endpoint of [
+		"chat.completions",
+		"responses",
+		"messages",
+	] as const) {
+		let body: Record<string, unknown> = {};
+		const transport = createPlaygroundTransport(endpoint, "model", settings, {
+			baseURL: "https://gateway.test/v1",
+			csrf: () => undefined,
+			fetch: async (_input, init) => {
+				body = JSON.parse(String(init?.body));
+				return sse([]);
+			},
+		});
+		const stream = await transport.sendMessages({
+			trigger: "submit-message",
+			chatId: "chat",
+			messageId: undefined,
+			messages: [userMessage()],
+			abortSignal: undefined,
+		});
+		await streamParts(stream);
+		if (endpoint === "messages") {
+			assert.deepEqual(body.system, [
+				{ type: "text", text: "You are helpful" },
+			]);
+		} else {
+			const first = (endpoint === "responses" ? body.input : body.messages) as
+				| unknown[]
+				| undefined;
+			assert.deepEqual(
+				first?.[0],
+				{ role: "system", content: "You are helpful" },
+				endpoint,
+			);
+		}
+	}
+});
