@@ -33,9 +33,9 @@ import {
 } from "./rerank";
 
 import {
-	ChevronDown as IconChevronDown,
-	RotateCcw as IconRotate2,
-} from "lucide-react";
+	CaretDownIcon as IconChevronDown,
+	ArrowCounterClockwiseIcon as IconRotate2,
+} from "@phosphor-icons/react/dist/ssr";
 
 /** One document per line, the same rule the embedding batch uses. */
 export function documentsFrom(draft: string): string[] {

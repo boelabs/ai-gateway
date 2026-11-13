@@ -1,7 +1,7 @@
 "use client";
 
 import { Select, SelectItem } from "#/components/ui/select";
-import { MoonIcon, SunIcon, CheckIcon } from "lucide-react";
+import { MoonIcon, SunIcon, CheckIcon } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "#/components/ui/button";
 import type { ThemePreference } from "./theme";
 import { useTheme } from "./ThemeProvider";

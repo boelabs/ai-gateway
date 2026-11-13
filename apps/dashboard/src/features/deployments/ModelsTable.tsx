@@ -31,15 +31,15 @@ import {
 } from "./modelTableState";
 
 import {
-	ChevronRight,
-	ChevronLeft,
-	Columns3,
-	FilterX,
-	Pencil,
-	Trash2,
-	Check,
-	Ban,
-} from "lucide-react";
+	CaretRightIcon as ChevronRight,
+	CaretLeftIcon as ChevronLeft,
+	ColumnsIcon as Columns3,
+	FunnelXIcon as FilterX,
+	PencilSimpleIcon as Pencil,
+	TrashIcon as Trash2,
+	CheckIcon as Check,
+	ProhibitIcon as Ban,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	TableHeader,
@@ -67,14 +67,16 @@ interface ModelsTableProps {
 
 /** Identity first, as in Billete's lists; the deployment's own id is the last, optional detail. */
 const COLUMNS = [
-	{ key: "publicModel", label: "Model", width: 280, visible: true },
-	{ key: "adapterKey", label: "Provider", width: 120, visible: true },
-	{ key: "enabled", label: "State", width: 110, visible: true },
+	{ key: "publicModel", label: "Public model", width: 200, visible: true },
+	{ key: "upstreamModel", label: "Upstream model", width: 160, visible: true },
+	{ key: "adapterKey", label: "Provider", width: 100, visible: true },
+	{ key: "label", label: "Label", width: 100, visible: true },
+	{ key: "enabled", label: "State", width: 100, visible: true },
 	{ key: "limits", label: "Limits", width: 140, visible: false },
 	{ key: "pricing", label: "Pricing", width: 170, visible: false },
-	{ key: "createdAt", label: "Created", width: 120, visible: true },
-	{ key: "updatedAt", label: "Updated", width: 120, visible: true },
-	{ key: "id", label: "Deployment ID", width: 140, visible: true },
+	{ key: "createdAt", label: "Created", width: 110, visible: true },
+	{ key: "updatedAt", label: "Updated", width: 120, visible: false },
+	{ key: "id", label: "Deployment ID", width: 110, visible: true },
 ] as const;
 type ColumnKey = (typeof COLUMNS)[number]["key"];
 const LOADING_ROWS = ["first", "second", "third", "fourth", "fifth"];
@@ -176,12 +178,10 @@ function CellContent({
 	deployment?: Deployment;
 }) {
 	if (!deployment) {
-		if (["publicModel", "pricing", "limits"].includes(column)) {
+		if (["pricing", "limits"].includes(column)) {
 			return (
 				<div className="flex flex-col gap-1">
-					<Skeleton
-						className={column === "publicModel" ? "h-3.5 w-3/4" : "h-4 w-3/4"}
-					/>
+					<Skeleton className="h-4 w-3/4" />
 					<Skeleton className="h-4 w-3/5" />
 				</div>
 			);
@@ -195,41 +195,43 @@ function CellContent({
 	switch (column) {
 		case "id":
 			return (
-				<div className="flex min-w-0 flex-col gap-1">
-					<code
-						className="w-fit rounded-md bg-muted px-1.5 text-xs text-muted-foreground"
-						title={deployment.id}
-					>
-						{deployment.id.slice(0, 8)}…
-					</code>
-					{deployment.label ? (
-						<span
-							className="truncate text-xs text-muted-foreground"
-							title={deployment.label}
-						>
-							{deployment.label}
-						</span>
-					) : null}
-				</div>
+				<code
+					className="w-fit rounded-md bg-muted px-1.5 text-xs text-muted-foreground"
+					title={deployment.id}
+				>
+					{deployment.id.slice(0, 8)}…
+				</code>
 			);
 		case "publicModel":
 			return (
-				<div className="flex min-w-0 flex-col gap-1">
-					{/* The row's link: it stretches over the whole row, under the row's own menu. */}
-					<Link
-						className="truncate font-medium outline-none after:absolute after:inset-0 after:rounded-[inherit] hover:underline focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
-						href={`/models/${deployment.id}`}
-						title={deployment.publicModel}
-					>
-						{deployment.publicModel}
-					</Link>
-					<span
-						className="truncate font-mono text-xs text-muted-foreground"
-						title={deployment.upstreamModel}
-					>
-						{deployment.upstreamModel}
-					</span>
-				</div>
+				// The row's link: it stretches over the whole row, under the row's own menu.
+				<Link
+					className="block truncate font-medium outline-none after:absolute after:inset-0 after:rounded-[inherit] hover:underline focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+					href={`/models/${deployment.id}`}
+					title={deployment.publicModel}
+				>
+					{deployment.publicModel}
+				</Link>
+			);
+		case "upstreamModel":
+			return (
+				<span
+					className="block truncate font-mono text-xs text-muted-foreground"
+					title={deployment.upstreamModel}
+				>
+					{deployment.upstreamModel}
+				</span>
+			);
+		case "label":
+			return deployment.label ? (
+				<span
+					className="block truncate text-muted-foreground"
+					title={deployment.label}
+				>
+					{deployment.label}
+				</span>
+			) : (
+				<span className="text-muted-foreground">—</span>
 			);
 		case "adapterKey":
 			return (

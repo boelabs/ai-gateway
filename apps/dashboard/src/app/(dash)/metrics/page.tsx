@@ -2,7 +2,8 @@ import { MetricsSkeleton } from "#/features/observability/MetricsSkeleton.tsx";
 import { RefreshControls } from "#/shared/components/RefreshControls.tsx";
 import { MetricsView } from "#/features/observability/MetricsView.tsx";
 import { RouteBoundary } from "#/shared/components/RouteBoundary.tsx";
-import { detailedMetrics } from "#/features/observability/api.ts";
+import { detailedMetrics, usage } from "#/features/observability/api.ts";
+import { listKeys } from "#/features/keys/api.ts";
 import { PageHeader } from "#/components/ui/page";
 import { connection } from "next/server";
 import { Suspense } from "react";
@@ -59,11 +60,39 @@ async function Window({
 	 * The unfiltered query only runs when a filter is set, and only to keep the pickers populated:
 	 * narrowing to one model must not remove every other model from the list that narrowed it.
 	 */
-	const [data, options] = await Promise.all([
+	const [data, options, actors, names] = await Promise.all([
 		detailedMetrics(filtered),
 		search.publicModel || search.deploymentId
 			? detailedMetrics(base)
 			: Promise.resolve(null),
+		// Usage accepts an inclusive end; the metrics window is [start, end).
+		usage({
+			groupBy: "actor",
+			start: window.start,
+			end: new Date(Date.parse(window.end) - 1).toISOString(),
+		}),
+		keyNames(),
 	]);
-	return <MetricsView data={data} options={options ?? data} search={search} />;
+	return (
+		<MetricsView
+			actors={actors}
+			data={data}
+			keyNames={names}
+			options={options ?? data}
+			search={search}
+		/>
+	);
+}
+
+/**
+ * Key names for the usage table. A role that cannot read keys gets none, and the table falls back
+ * to short ids: names are a courtesy, never a reason to fail the page.
+ */
+async function keyNames(): Promise<Record<string, string>> {
+	try {
+		const { data } = await listKeys({ limit: 200 });
+		return Object.fromEntries(data.map((key) => [key.id, key.name]));
+	} catch {
+		return {};
+	}
 }

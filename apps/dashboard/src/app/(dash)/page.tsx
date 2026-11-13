@@ -3,10 +3,11 @@ import { Overview, SystemStatus } from "#/features/observability/Overview.tsx";
 import { RefreshControls } from "#/shared/components/RefreshControls.tsx";
 import { RouteBoundary } from "#/shared/components/RouteBoundary.tsx";
 import { summary, usage } from "#/features/observability/api.ts";
+import { listKeys } from "#/features/keys/api.ts";
 import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
-import { rangeLabel, safeRange } from "#/shared/lib/range.ts";
+import { safeRange } from "#/shared/lib/range.ts";
 import { Section } from "#/shared/components/Section.tsx";
-import { Server as IconServer } from "lucide-react";
+import { HardDrivesIcon as IconServer } from "@phosphor-icons/react/dist/ssr";
 import { readiness } from "#/shared/api/health.ts";
 import { PageHeader } from "#/components/ui/page";
 import { Status } from "#/components/ui/status";
@@ -99,11 +100,12 @@ async function Usage({ searchParams }: { searchParams: Params }) {
 	const end = range.end ?? new Date().toISOString();
 	// Usage accepts an inclusive end; the series buckets use [start, end).
 	const window = { start, end: new Date(Date.parse(end) - 1).toISOString() };
-	const [health, byModel, byActor, byInterval] = await Promise.all([
+	const [health, byModel, byActor, byInterval, names] = await Promise.all([
 		summary({ start, end }),
 		usage({ groupBy: "public_model", ...window }),
 		usage({ groupBy: "actor", ...window }),
 		usage({ groupBy: range.bucket, ...window }),
+		keyNames(),
 	]);
 	return (
 		<Overview
@@ -113,8 +115,18 @@ async function Usage({ searchParams }: { searchParams: Params }) {
 			byModel={byModel}
 			end={end}
 			health={health}
-			rangeLabel={rangeLabel(filters, DEFAULT_PERIOD)}
+			keyNames={names}
 			start={start}
 		/>
 	);
+}
+
+/** Key names for the per-key breakdown; a role that cannot read keys sees short ids instead. */
+async function keyNames(): Promise<Record<string, string>> {
+	try {
+		const { data } = await listKeys({ limit: 200 });
+		return Object.fromEntries(data.map((key) => [key.id, key.name]));
+	} catch {
+		return {};
+	}
 }

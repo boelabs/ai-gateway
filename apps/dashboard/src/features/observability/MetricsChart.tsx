@@ -37,24 +37,32 @@ const views = {
 		label: "Tokens",
 		kind: "bar",
 		series: [
-			{ key: "promptTokens", label: "Input", color: "var(--chart-1)" },
-			{ key: "completionTokens", label: "Output", color: "var(--chart-2)" },
+			{ key: "promptTokens", label: "Input", color: "var(--chart-input)" },
+			{
+				key: "completionTokens",
+				label: "Output",
+				color: "var(--chart-output)",
+			},
 		],
 	},
 	cache: {
 		label: "Cache",
 		kind: "bar",
 		series: [
-			{ key: "cacheReadTokens", label: "Cached", color: "var(--chart-2)" },
+			{
+				key: "cacheReadTokens",
+				label: "Cached",
+				color: "var(--chart-input-cached)",
+			},
 			{
 				key: "uncachedInputTokens",
 				label: "Uncached",
-				color: "var(--chart-1)",
+				color: "var(--chart-input)",
 			},
 			{
 				key: "cacheUnreportedInputTokens",
 				label: "Unclassified",
-				color: "var(--chart-3)",
+				color: "var(--chart-input-unclassified)",
 			},
 		],
 	},
@@ -148,6 +156,8 @@ export function MetricsChart({
 				}
 				rows={[...points.values()]}
 				series={config.series}
+				// Input + output, and the parts of the input, are disjoint: one column per interval.
+				stacked={view === "tokens" || view === "cache"}
 			/>
 		</Panel>
 	);

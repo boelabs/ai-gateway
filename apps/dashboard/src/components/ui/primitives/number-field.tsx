@@ -5,7 +5,7 @@ import { controlRadiusVariants } from "#/components/ui/primitives/control-radius
 import { cva, type VariantProps } from "class-variance-authority";
 import { Label } from "#/components/ui/primitives/label";
 import { createContext, useId, useContext } from "react";
-import { MinusIcon, PlusIcon } from "lucide-react";
+import { MinusIcon, PlusIcon } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "#/shared/lib/classes";
 import type * as React from "react";
 
@@ -111,7 +111,7 @@ export function NumberFieldInput({
 	return (
 		<NumberFieldPrimitive.Input
 			className={cn(
-				"h-8.5 w-full min-w-0 grow bg-transparent px-[calc(--spacing(3)-1px)] text-center leading-8.5 tabular-nums outline-none [transition:background-color_5000000s_ease-in-out_0s] in-data-[size=lg]:h-9.5 in-data-[size=lg]:leading-9.5 in-data-[size=sm]:h-7.5 in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] in-data-[size=sm]:leading-7.5 sm:h-7.5 sm:leading-7.5 sm:in-data-[size=lg]:h-8.5 sm:in-data-[size=lg]:leading-8.5 sm:in-data-[size=sm]:h-6.5 sm:in-data-[size=sm]:leading-8.5",
+				"h-8.5 w-full min-w-0 grow bg-transparent px-[calc(--spacing(3)-1px)] text-center leading-8.5 tabular-nums outline-none [transition:background-color_5000000s_ease-in-out_0s] in-data-[size=lg]:h-9.5 in-data-[size=lg]:leading-9.5 in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)]",
 				className,
 			)}
 			data-slot="number-field-input"

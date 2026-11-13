@@ -18,14 +18,14 @@ import { useCopyKey } from "./useCopyKey.ts";
 import { useRouter } from "next/navigation";
 
 import {
-	KeyRound as IconKeyRound,
-	SearchX as IconSearchX,
-	Pencil as IconPencil,
-	Trash2 as IconTrash,
-	Check as IconCheck,
-	Copy as IconCopy,
-	Ban as IconBan,
-} from "lucide-react";
+	KeyIcon as IconKeyRound,
+	MagnifyingGlassMinusIcon as IconSearchX,
+	PencilSimpleIcon as IconPencil,
+	TrashIcon as IconTrash,
+	CheckIcon as IconCheck,
+	CopyIcon as IconCopy,
+	ProhibitIcon as IconBan,
+} from "@phosphor-icons/react/dist/ssr";
 
 /**
  * A key whose budget is gone stops working, and the first anyone hears about it is a client's 429.
@@ -108,7 +108,12 @@ export function KeysTable({
 				key.allowedModels.length === 0 ? (
 					<span className="text-fg-muted">All</span>
 				) : (
-					key.allowedModels.join(", ")
+					// A long list reads as a count; the names are the tooltip and the key's page.
+					<span title={key.allowedModels.join(", ")}>
+						{key.allowedModels.length === 1
+							? key.allowedModels[0]
+							: `${key.allowedModels.length} models`}
+					</span>
 				),
 		},
 		{
@@ -117,13 +122,17 @@ export function KeysTable({
 			align: "end",
 			render: (key) => (
 				<div className="flex flex-wrap items-center justify-end gap-2">
-					<span>
+					<span
+						className="tabular-nums"
+						title={
+							key.budgetReset ? `Budget resets ${key.budgetReset}` : undefined
+						}
+					>
 						{formatCents(key.spendCents)}
 						{key.maxBudgetCents === null ? null : (
 							<span className="text-fg-muted">
 								{" "}
 								/ {formatCents(key.maxBudgetCents)}
-								{key.budgetReset ? ` · ${key.budgetReset}` : ""}
 							</span>
 						)}
 					</span>

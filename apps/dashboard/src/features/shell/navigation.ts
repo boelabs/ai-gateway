@@ -1,18 +1,18 @@
 import type { Permission } from "#/features/auth/common.ts";
-import type { LucideIcon } from "lucide-react";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 import {
-	SlidersHorizontal,
-	MessagesSquare,
-	ChartColumn,
-	ShieldCheck,
-	ScrollText,
-	ChartLine,
-	KeyRound,
-	Boxes,
-	Users,
-	Plug,
-} from "lucide-react";
+	SlidersHorizontalIcon as SlidersHorizontal,
+	ChatsIcon as MessagesSquare,
+	ChartBarIcon as ChartColumn,
+	ShieldCheckIcon as ShieldCheck,
+	ScrollIcon as ScrollText,
+	ChartLineIcon as ChartLine,
+	KeyIcon as KeyRound,
+	CubeIcon as Boxes,
+	UsersIcon as Users,
+	PlugIcon as Plug,
+} from "@phosphor-icons/react/dist/ssr";
 
 /** A quiet sidebar row; the page open is `bg-primary/10 text-primary` (`aria-current`). */
 export const NAV_ROW =
@@ -21,7 +21,7 @@ export const NAV_ROW =
 export interface NavItem {
 	href: string;
 	label: string;
-	icon: LucideIcon;
+	icon: PhosphorIcon;
 	/** Every permission listed must be granted for the item to appear. */
 	requires: Permission[];
 	/** Active only on its own path, not on the pages nested under it. */

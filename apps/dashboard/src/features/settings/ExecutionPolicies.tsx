@@ -23,11 +23,14 @@ const FIELDS = [
 const fieldName = (callType: string, mode: string, field: string) =>
 	`policy:${callType}:${mode}:${field}`;
 
-/** The policy as the form shows it: seconds instead of milliseconds, an empty box for "no limit". */
+/** The policy as the form shows it: seconds instead of milliseconds, 0 for "no idle limit". */
 function displayValue(policy: ExecutionPolicy | undefined, field: string) {
 	const value = policy?.[field as keyof ExecutionPolicy];
-	if (value === null || value === undefined) {
+	if (value === undefined) {
 		return "";
+	}
+	if (value === null) {
+		return field === "idleMs" ? "0" : "";
 	}
 	return field === "maxAttempts" ? String(value) : String(value / 1000);
 }
@@ -46,7 +49,8 @@ export function readExecutionPolicies(form: FormData): Policies {
 		return {
 			responseMs: ms("responseMs") ?? 0,
 			// Idleness only exists between stream bytes; a JSON answer arrives whole.
-			idleMs: mode === "stream" ? ms("idleMs") : null,
+			// Zero is "no idle limit", which the gateway stores as null.
+			idleMs: mode === "stream" ? ms("idleMs") || null : null,
 			totalMs: ms("totalMs") ?? 0,
 			maxAttempts: number("maxAttempts") ?? 1,
 		};
@@ -108,12 +112,10 @@ export function ExecutionPoliciesEditor({
 											}
 											disabled={!editable || inapplicable}
 											key={field.key}
-											min={1}
+											min={field.key === "idleMs" ? 0 : 1}
 											name={fieldName(key, mode.key, field.key)}
-											placeholder={
-												inapplicable || field.key === "idleMs" ? "—" : undefined
-											}
-											required={!(inapplicable || field.key === "idleMs")}
+											placeholder={inapplicable ? "—" : undefined}
+											required={!inapplicable}
 											size="sm"
 											step={field.unit ? 0.1 : 1}
 											type="number"

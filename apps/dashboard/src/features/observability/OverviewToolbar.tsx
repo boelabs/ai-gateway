@@ -1,12 +1,12 @@
 "use client";
 
 import { OVERVIEW_PERIODS, DEFAULT_PERIOD } from "./overviewFilters.ts";
-import { RangeFilter } from "#/shared/components/RangeFilter.tsx";
+import {
+	RangeFilterSkeleton,
+	RangeFilter,
+} from "#/shared/components/RangeFilter.tsx";
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
-import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
 import type { OverviewFilters } from "./overviewFilters.ts";
-import { Select, SelectItem } from "#/components/ui/select";
-import { RANGES } from "#/shared/lib/range.ts";
 
 /**
  * The overview's range control, Billete's: the action of the "Summary" section above the tiles.
@@ -31,11 +31,5 @@ export function OverviewToolbar({ filters }: { filters: OverviewFilters }) {
 
 /** The control above while the URL it reads streams in: the default period, as a ghost. */
 export function OverviewToolbarSkeleton() {
-	return (
-		<GhostSkeleton>
-			<Select aria-label="Time range" disabled value={DEFAULT_PERIOD}>
-				<SelectItem value={DEFAULT_PERIOD}>{RANGES[DEFAULT_PERIOD]}</SelectItem>
-			</Select>
-		</GhostSkeleton>
-	);
+	return <RangeFilterSkeleton period={DEFAULT_PERIOD} />;
 }

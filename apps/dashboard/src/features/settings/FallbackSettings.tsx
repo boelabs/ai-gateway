@@ -2,7 +2,10 @@
 
 import { ButtonSkeleton, TableSkeleton } from "#/shared/components/Skeleton";
 import { type Column, DataTable, Mono } from "#/components/ui/datatable";
-import { Plus as IconPlus, Trash2 as IconTrash } from "lucide-react";
+import {
+	PlusIcon as IconPlus,
+	TrashIcon as IconTrash,
+} from "@phosphor-icons/react/dist/ssr";
 import { type FallbackPolicy, FALLBACK_KINDS } from "./common.ts";
 import { useNotify } from "#/shared/feedback/notifications.tsx";
 import { RowActions } from "#/shared/components/RowActions.tsx";

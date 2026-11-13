@@ -8,12 +8,12 @@ import { cn } from "#/shared/lib/classes";
 import type React from "react";
 
 import {
-	TriangleAlertIcon,
-	LoaderCircleIcon,
-	CircleAlertIcon,
-	CircleCheckIcon,
+	WarningIcon as TriangleAlertIcon,
+	SpinnerGapIcon as LoaderCircleIcon,
+	WarningCircleIcon as CircleAlertIcon,
+	CheckCircleIcon as CircleCheckIcon,
 	InfoIcon,
-} from "lucide-react";
+} from "@phosphor-icons/react/dist/ssr";
 
 export const toastVariants = cva(
 	"absolute z-[calc(9999-var(--toast-index))] h-(--toast-calc-height) w-full border bg-[color-mix(in_srgb,var(--popover),var(--color-black)_calc(1%*max(0,var(--toast-index,0))))] text-popover-foreground shadow-lg/5 select-none [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s,background-color_.5s] not-dark:bg-clip-padding before:pointer-events-none before:absolute before:inset-0 before:shadow-[0_1px_--theme(--color-black/4%)] data-expanded:bg-popover dark:bg-[color-mix(in_srgb,var(--popover),var(--color-black)_calc(6%*max(0,var(--toast-index,0))))] dark:before:shadow-[0_-1px_--theme(--color-white/6%)] dark:data-expanded:bg-popover",

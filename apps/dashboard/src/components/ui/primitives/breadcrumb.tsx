@@ -1,6 +1,9 @@
 "use client";
 
-import { ChevronRight, MoreHorizontal } from "lucide-react";
+import {
+	CaretRightIcon as ChevronRight,
+	DotsThreeIcon as MoreHorizontal,
+} from "@phosphor-icons/react/dist/ssr";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cn } from "#/shared/lib/classes";
@@ -102,7 +105,7 @@ export function BreadcrumbEllipsis({
 			role="presentation"
 			{...props}
 		>
-			<MoreHorizontal className="size-4" />
+			<MoreHorizontal className="size-4" weight="bold" />
 			<span className="sr-only">More</span>
 		</span>
 	);

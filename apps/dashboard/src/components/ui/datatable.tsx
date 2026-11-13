@@ -8,12 +8,12 @@ import { Input } from "./input";
 import Link from "next/link";
 
 import {
-	ChevronRight as IconChevronRight,
-	ChevronLeft as IconChevronLeft,
-	ChevronDown as IconChevronDown,
-	ChevronsUpDown as IconSelector,
-	ChevronUp as IconChevronUp,
-} from "lucide-react";
+	CaretRightIcon as IconChevronRight,
+	CaretLeftIcon as IconChevronLeft,
+	CaretDownIcon as IconChevronDown,
+	CaretUpDownIcon as IconSelector,
+	CaretUpIcon as IconChevronUp,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	type AppearanceProps,
@@ -252,7 +252,7 @@ export function DataTable<T>({
 			)}
 			{/* Contain the absolutely positioned screen-reader caption while scrolling. */}
 			<div
-				className={cn("relative overflow-x-auto", framed && "rounded-xl")}
+				className={cn("relative", framed && "rounded-xl")}
 				style={
 					{
 						borderRadius: radius,

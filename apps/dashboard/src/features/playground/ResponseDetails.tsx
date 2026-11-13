@@ -1,6 +1,6 @@
 import { MESSAGE_ACTION, MESSAGE_ACTION_ICON } from "./MessageParts";
 import { buttonStyles } from "#/components/ui/button";
-import { Info as IconInfoCircle } from "lucide-react";
+import { InfoIcon as IconInfoCircle } from "@phosphor-icons/react/dist/ssr";
 import type { ResponseMetrics } from "./transport";
 import { cn } from "#/shared/lib/classes";
 

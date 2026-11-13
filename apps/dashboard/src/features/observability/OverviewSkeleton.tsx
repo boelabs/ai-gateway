@@ -1,11 +1,11 @@
 import { TextSkeleton } from "#/shared/components/TextSkeleton";
-import { Section } from "#/shared/components/Section";
+import { ToggleGroup } from "#/components/ui/toggle-group";
 import { Panel } from "#/shared/components/Panel";
+import { Toggle } from "#/components/ui/toggle";
 
 import {
 	StatGridSkeleton,
-	ButtonSkeleton,
-	TableSkeleton,
+	GhostSkeleton,
 	Skeleton,
 } from "#/shared/components/Skeleton.tsx";
 
@@ -14,19 +14,6 @@ import {
 	ActivitySkeleton,
 	OutcomesSkeleton,
 } from "./ChartSkeleton";
-
-/** The same headers `usageColumns` and `actorColumns` render, so the tables land in place. */
-const BY_MODEL = [
-	"Public model",
-	"Requests",
-	"Total tokens",
-	"Cached input",
-	"Uncached input",
-	"Cache writes",
-	"Unclassified input",
-	"Cost",
-] as const;
-const BY_ACTOR = ["Actor", ...BY_MODEL.slice(1)] as const;
 
 /**
  * The overview while its numbers are in flight.
@@ -54,38 +41,6 @@ export function OverviewSkeleton() {
 			</div>
 
 			<CacheUsageSkeleton />
-			{[
-				{
-					headers: BY_MODEL,
-					title: "By public model",
-					description:
-						"Total = input + output. Cached, uncached and unclassified counts split the reported input.",
-				},
-				{
-					headers: BY_ACTOR,
-					title: "By actor",
-					description:
-						"Includes operator traffic from the playground and manual tests.",
-				},
-			].map(({ headers, title, description }) => (
-				<Section
-					action={<ButtonSkeleton label={6} />}
-					description={description}
-					key={title}
-					title={
-						<>
-							{title} · <TextSkeleton length={5} />
-						</>
-					}
-				>
-					<TableSkeleton
-						headers={headers}
-						pagination
-						rows={10}
-						widths={["60%", "40%", "45%", "50%"]}
-					/>
-				</Section>
-			))}
 		</div>
 	);
 }
@@ -97,67 +52,65 @@ export function CacheUsageSkeleton({
 }) {
 	return (
 		<Panel
+			action={
+				upstream ? null : (
+					<GhostSkeleton>
+						<ToggleGroup value={[]}>
+							{["By model", "By key"].map((option) => (
+								<Toggle
+									disabled
+									key={option}
+									size="xs"
+									value={option}
+									variant="ghost"
+								>
+									{option}
+								</Toggle>
+							))}
+						</ToggleGroup>
+					</GhostSkeleton>
+				)
+			}
 			description={
-				<>
-					{upstream
-						? "Includes retries and fallbacks. "
-						: "Recorded request usage. "}
-					Cache is part of input, already included in total tokens.
-				</>
+				upstream
+					? "Prompt cache across every deployment attempt, retries included."
+					: "Prompt cache across recorded requests."
 			}
-			title={
-				<h2>
-					{upstream
-						? "Provider cache · deployment attempts"
-						: "Input token usage"}
-				</h2>
-			}
+			title={<h2>{upstream ? "Provider cache" : "Input tokens"}</h2>}
 		>
-			<div className="@container">
-				<p className="text-2xl font-semibold tabular-nums">
-					<TextSkeleton length={5} />{" "}
-					<span className="text-xs font-normal">
+			<div className="flex flex-col gap-5">
+				<div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+					<p className="flex items-baseline gap-2">
+						<span className="text-2xl font-semibold tracking-tight tabular-nums">
+							<TextSkeleton length={5} />
+						</span>
+						<span className="text-sm">
+							<TextSkeleton length={32} />
+						</span>
+					</p>
+					<p className="text-sm">
 						<TextSkeleton length={30} />
-					</span>
-				</p>
-				<div className="mt-6 grid items-center gap-6 @min-[40rem]:grid-cols-[14rem_minmax(0,1fr)] @min-[40rem]:gap-8">
-					<div
-						aria-hidden
-						className="mx-auto my-2 size-52 animate-pulse rounded-full border-[24px] border-fg/10 motion-reduce:animate-none"
-					/>
-					<div className="min-w-0 divide-y divide-border/50">
-						{[0, 1, 2].map((row) => (
-							<div
-								className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-4 first:pt-0 last:pb-0"
-								key={row}
-							>
-								<div className="flex items-center gap-2 text-sm">
-									<Skeleton className="size-2.5 shrink-0 rounded-sm" />
-									<TextSkeleton length={16} />
-								</div>
-								<div className="flex items-baseline gap-x-3 font-semibold tabular-nums">
-									<TextSkeleton length={6} />
-									<span className="text-xs font-normal">
-										<TextSkeleton length={5} />
-									</span>
-								</div>
-								<p className="w-full text-xs">
-									<TextSkeleton length={40} />
-								</p>
-							</div>
-						))}
-					</div>
-				</div>
-				<div className="mt-6 flex flex-wrap justify-between gap-3 border-t border-border/50 pt-4 text-xs">
-					<p>
-						<TextSkeleton length={64} />
-					</p>
-					<p>
-						<TextSkeleton length={45} />
 					</p>
 				</div>
-				<p className="mt-3 text-xs">
-					<TextSkeleton length={106} />
+				<div aria-hidden className="flex flex-col gap-2.5">
+					{(upstream ? [100] : [100, 90, 86]).map((width) => (
+						<div className="flex h-7.5 items-center gap-2" key={width}>
+							{upstream ? null : (
+								<span className="w-[132px] shrink-0 text-right text-xs">
+									<TextSkeleton length={10} />
+								</span>
+							)}
+							<Skeleton
+								className="h-full rounded-[5px]"
+								width={
+									upstream ? "calc(100% - 64px)" : `calc(${width}% - 200px)`
+								}
+							/>
+						</div>
+					))}
+				</div>
+				<p className="text-xs">
+					<TextSkeleton length={44} />
 				</p>
 			</div>
 		</Panel>

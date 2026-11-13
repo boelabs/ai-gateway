@@ -1,8 +1,9 @@
 "use client";
 
+import { ActorUsage } from "./ActorUsage.tsx";
+import type { UsageRow } from "./api.ts";
 import { SearchableSelect, Select, SelectItem } from "#/components/ui/select";
 import { type Column, DataTable } from "#/components/ui/datatable";
-import { ContentPanel as Card } from "#/components/ui/card";
 import { cacheReuseRate, tokenCount } from "./cache-usage";
 import { Section } from "#/shared/components/Section";
 import { phaseLabel, kindLabel } from "./trace.ts";
@@ -10,19 +11,19 @@ import { Panel } from "#/shared/components/Panel";
 import { EmptyState } from "#/components/ui/page";
 import { Button } from "#/components/ui/button";
 import { MetricsChart } from "./MetricsChart";
-import { Input } from "#/components/ui/input";
+import { RangeFilter } from "#/shared/components/RangeFilter.tsx";
 import type { DetailedMetrics } from "./api";
 import { CacheUsage } from "./CacheUsage";
 import { StatCard } from "./StatCard";
-import { useState } from "react";
 
 import {
-	CircleCheck as IconCircleCheck,
-	Activity as IconActivity,
-	SearchX as IconSearchX,
-	Boxes as IconBoxes,
-	Route as IconRoute,
-} from "lucide-react";
+	CheckCircleIcon as IconCircleCheck,
+	PulseIcon as IconActivity,
+	MagnifyingGlassMinusIcon as IconSearchX,
+	CubeIcon as IconBoxes,
+	PathIcon as IconRoute,
+	XIcon as IconX,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	type MetricsSearch,
@@ -106,14 +107,14 @@ function Breakdown({ data }: { data: DetailedMetrics }) {
 				</div>
 			</Panel>
 			<Panel
-				description="Reported upstream usage, including retries. Reasoning and cache are subsets, not additional totals."
+				description="Upstream usage, retries included. Reasoning and cache are part of these totals."
 				title={<h2>Deployment token breakdown</h2>}
 			>
 				<div className="flex flex-col gap-4">
 					{(
 						[
-							["Input", tokens.promptTokens, "bg-chart-1"],
-							["Output", tokens.completionTokens, "bg-chart-2"],
+							["Input", tokens.promptTokens, "bg-chart-input"],
+							["Output", tokens.completionTokens, "bg-chart-output"],
 						] as const
 					).map(([label, value, color]) => (
 						<div key={label}>
@@ -154,13 +155,42 @@ function Breakdown({ data }: { data: DetailedMetrics }) {
 					))}
 				</dl>
 				<p className="mt-3 text-xs text-fg-muted">
-					Token totals reported by {count.format(tokens.usageReported)} of{" "}
-					{count.format(tokens.attempts)} attempts. Unreported usage is not
-					estimated.
+					Reported by {count.format(tokens.usageReported)} of{" "}
+					{count.format(tokens.attempts)} attempts.
 				</p>
 			</Panel>
 		</div>
 	);
+}
+
+/** Table amounts: cents are what a row is compared by; the exact figure is the tooltip. */
+const dollars = new Intl.NumberFormat("en-US", {
+	style: "currency",
+	currency: "USD",
+	minimumFractionDigits: 2,
+	maximumFractionDigits: 2,
+});
+
+const METRICS_PERIODS = ["today", "yesterday", "7d", "30d", "custom"] as const;
+
+const windowFormat = new Intl.DateTimeFormat("en-US", {
+	month: "short",
+	day: "numeric",
+	hour: "2-digit",
+	minute: "2-digit",
+	hourCycle: "h23",
+	timeZone: "UTC",
+});
+
+/** "Nov 12, 00:00 – 10:13 UTC": the exact window the numbers cover. */
+function windowLabel(start: string, end: string): string {
+	const [from, to] = [
+		windowFormat.format(new Date(start)),
+		windowFormat.format(new Date(end)),
+	];
+	const sameDay =
+		from.slice(0, from.indexOf(",")) === to.slice(0, to.indexOf(","));
+	return `${from} – ${sameDay ? to.slice(to.indexOf(",") + 2) : to} UTC`;
 }
 
 export function Metrics({
@@ -169,23 +199,19 @@ export function Metrics({
 	search,
 	refreshing,
 	onChange,
+	actors = [],
+	keyNames = {},
 }: {
 	data: DetailedMetrics;
+	/** Usage per API key or operator for the same window (unfiltered by model or deployment). */
+	actors?: readonly UsageRow[];
+	keyNames?: Readonly<Record<string, string>>;
 	options: Pick<DetailedMetrics, "models" | "deployments">;
 	search: MetricsSearch;
 	/** Covers a filter navigation as well as a refresh: both replace what is on screen. */
 	refreshing: boolean;
 	onChange: (patch: Partial<MetricsSearch>) => void;
 }) {
-	const [from, setFrom] = useState(search.from ?? data.start.slice(0, 10));
-	const [to, setTo] = useState(search.to ?? data.end.slice(0, 10));
-	const rangeValid =
-		from &&
-		to &&
-		from <= to &&
-		Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) <
-			31 * 86_400_000 &&
-		to <= new Date().toISOString().slice(0, 10);
 	const { requests } = data;
 	const { attempts } = data;
 	const modelOptions = options.models.flatMap((row) =>
@@ -221,21 +247,16 @@ export function Metrics({
 			key: "label",
 			header: "Deployment",
 			render: (row) => (
-				<div>
-					<Button
-						disabled={!row.key}
-						onClick={() => onChange({ deploymentId: row.key ?? undefined })}
-						size="sm"
-						title={row.key ?? undefined}
-						variant="link"
-					>
-						{row.label ?? row.key?.slice(0, 8) ?? "Unattributed"}
-					</Button>
-					<p className="mt-0.5 text-xs text-fg-muted">
-						{row.adapter ?? "Unknown adapter"} ·{" "}
-						{row.key?.slice(0, 8) ?? "No deployment"}
-					</p>
-				</div>
+				<Button
+					className="px-0"
+					disabled={!row.key}
+					onClick={() => onChange({ deploymentId: row.key ?? undefined })}
+					size="sm"
+					title={[row.adapter, row.key].filter(Boolean).join(" · ")}
+					variant="link"
+				>
+					{row.label ?? row.key?.slice(0, 8) ?? "Unattributed"}
+				</Button>
 			),
 			compare: (a, b) => (a.label ?? "").localeCompare(b.label ?? ""),
 		},
@@ -248,53 +269,51 @@ export function Metrics({
 		},
 		{
 			key: "tokens",
-			header: "Reported tokens",
+			header: "Tokens",
 			align: "end",
 			render: (row) => (
 				<span
-					title={`${row.usageReported} of ${row.attempts} attempts reported tokens`}
+					title={`${reportedTokens(row)} · ${row.usageReported} of ${row.attempts} attempts reported`}
 				>
-					{reportedTokens(row)}
+					{reportedTokens(row, true)}
 				</span>
 			),
 			compare: (a, b) => a.totalTokens - b.totalTokens,
 		},
 		{
 			key: "cache",
-			header: "Cached input",
+			header: "Cache reuse",
 			align: "end",
 			render: (row) => (
-				<div className="tabular-nums">
-					<div>{tokenCount(row.cacheReadTokens)}</div>
-					<div className="mt-1 text-xs text-fg-muted">
-						{cacheReuseRate(row) === null
-							? "—"
-							: rate(
-									row.cacheReadTokens ?? 0,
-									(row.cacheReadTokens ?? 0) + (row.uncachedInputTokens ?? 0),
-								)}{" "}
-						reuse · {tokenCount(row.cacheReadReported)}/{row.attempts} reported
-					</div>
-				</div>
-			),
-			compare: (a, b) => (a.cacheReadTokens ?? -1) - (b.cacheReadTokens ?? -1),
-		},
-		{
-			key: "errors",
-			header: "Errors",
-			align: "end",
-			render: (row) => (
-				<span className={row.errors ? "text-danger" : ""}>
-					{count.format(row.errors)}
+				<span
+					title={`${tokenCount(row.cacheReadTokens)} cached input tokens · reads reported by ${tokenCount(row.cacheReadReported)} of ${row.attempts} attempts`}
+				>
+					{cacheReuseRate(row) === null
+						? "—"
+						: rate(
+								row.cacheReadTokens ?? 0,
+								(row.cacheReadTokens ?? 0) + (row.uncachedInputTokens ?? 0),
+							)}
 				</span>
 			),
-			compare: (a, b) => a.errors - b.errors,
+			compare: (a, b) => (cacheReuseRate(a) ?? -1) - (cacheReuseRate(b) ?? -1),
 		},
 		{
 			key: "rate",
 			header: "Error rate",
 			align: "end",
-			render: (row) => rate(row.errors, row.finished),
+			render: (row) => (
+				<span
+					className={
+						row.finished && row.errors / row.finished >= 0.1
+							? "text-destructive-foreground"
+							: undefined
+					}
+					title={`${count.format(row.errors)} errors of ${count.format(row.finished)} finished attempts`}
+				>
+					{rate(row.errors, row.finished)}
+				</span>
+			),
 			compare: (a, b) =>
 				a.errors / (a.finished || 1) - b.errors / (b.finished || 1),
 		},
@@ -312,6 +331,7 @@ export function Metrics({
 			header: "Public model",
 			render: (row) => (
 				<Button
+					className="px-0"
 					disabled={!row.key}
 					onClick={() =>
 						onChange({
@@ -336,9 +356,11 @@ export function Metrics({
 		},
 		{
 			key: "tokens",
-			header: "Request tokens",
+			header: "Tokens",
 			align: "end",
-			render: (row) => reportedTokens(row),
+			render: (row) => (
+				<span title={reportedTokens(row)}>{reportedTokens(row, true)}</span>
+			),
 			compare: (a, b) => a.totalTokens - b.totalTokens,
 		},
 		{
@@ -350,9 +372,13 @@ export function Metrics({
 		},
 		{
 			key: "cost",
-			header: "Consumer cost",
+			header: "Cost",
 			align: "end",
-			render: (row) => money(row.consumerCostCents),
+			render: (row) => (
+				<span title={money(row.consumerCostCents)}>
+					{dollars.format(row.consumerCostCents / 100)}
+				</span>
+			),
 			compare: (a, b) => a.consumerCostCents - b.consumerCostCents,
 		},
 		{
@@ -376,18 +402,18 @@ export function Metrics({
 		{
 			key: "kind",
 			header: "Failure",
-			render: (row) => kindLabel(row.kind) ?? "Unclassified",
+			render: (row) => {
+				const kind = kindLabel(row.kind) ?? "Unclassified";
+				const label = kind.charAt(0).toUpperCase() + kind.slice(1);
+				return row.status ? `${label} · ${row.status}` : label;
+			},
 		},
 		{
 			key: "phase",
 			header: "Phase",
 			render: (row) => phaseLabel(row.phase) ?? "—",
 		},
-		{
-			key: "status",
-			header: "Provider status",
-			render: (row) => row.status ?? "—",
-		},
+
 		{
 			key: "count",
 			header: "Errors",
@@ -398,124 +424,63 @@ export function Metrics({
 	];
 	return (
 		<div aria-busy={refreshing} className="flex flex-col gap-6">
-			<Card className="p-5">
-				<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-					<Select
-						label="Period · UTC"
-						onValueChange={(period) => {
-							if (period) {
-								onChange({
-									period: period as MetricsSearch["period"],
-									...(period === "custom" ? { from, to } : {}),
-								});
-							}
-						}}
-						size="sm"
-						value={search.period}
-					>
-						{[
-							["today", "Today"],
-							["yesterday", "Yesterday"],
-							["7d", "Last 7 days"],
-							["30d", "Last 30 days"],
-							["custom", "Custom dates"],
-						].map(([value, label]) => (
-							<SelectItem key={value} value={value}>
-								{label}
-							</SelectItem>
-						))}
-					</Select>
-					<Select
-						label="Operation"
-						onValueChange={(value) =>
-							onChange({
-								operation:
-									value === "all"
-										? undefined
-										: (value as MetricsSearch["operation"]),
-								publicModel: undefined,
-								deploymentId: undefined,
-							})
-						}
-						size="sm"
-						value={search.operation ?? "all"}
-					>
-						<SelectItem value="all">All operations</SelectItem>
-						{operations.map(([value, label]) => (
-							<SelectItem key={value} value={value}>
-								{label}
-							</SelectItem>
-						))}
-					</Select>
-					<SearchableSelect
-						clearLabel="All public models"
-						items={modelOptions}
-						label="Public model"
-						onValueChange={(value) =>
-							onChange({
-								publicModel: value ?? undefined,
-								deploymentId: undefined,
-							})
-						}
-						searchPlaceholder="Search public models"
-						size="sm"
-						value={search.publicModel ?? null}
-					/>
-					<SearchableSelect
-						clearLabel="All deployments"
-						items={deploymentOptions}
-						label="Deployment"
-						onValueChange={(value) =>
-							onChange({ deploymentId: value ?? undefined })
-						}
-						searchPlaceholder="Search deployments"
-						size="sm"
-						value={search.deploymentId ?? null}
-					/>
-				</div>
-				{search.period === "custom" && (
-					<form
-						className="mt-4 flex flex-wrap items-end gap-3"
-						onSubmit={(event) => {
-							event.preventDefault();
-							if (rangeValid) {
-								onChange({ from, to });
-							}
-						}}
-					>
-						<Input
-							label="From (UTC)"
-							onChange={(event) => setFrom(event.target.value)}
-							required
-							size="sm"
-							type="date"
-							value={from}
-						/>
-						<Input
-							label="Through (UTC)"
-							onChange={(event) => setTo(event.target.value)}
-							required
-							size="sm"
-							type="date"
-							value={to}
-						/>
-						<Button
-							disabled={!rangeValid || refreshing}
-							size="sm"
-							type="submit"
-							variant="secondary"
-						>
-							Apply dates
-						</Button>
-						<p className="pb-2 text-xs text-fg-muted">
-							Up to 31 days. End date is included.
-						</p>
-					</form>
-				)}
+			{/* One row of filters, no frame: the controls are the toolbar. */}
+			<div className="flex flex-wrap items-center gap-2">
+				<RangeFilter
+					fallback="today"
+					onChange={(patch) => onChange(patch as Partial<MetricsSearch>)}
+					periods={METRICS_PERIODS}
+					value={search}
+				/>
+				<Select
+					aria-label="Operation"
+					onValueChange={(value) =>
+						onChange({
+							operation:
+								value === "all"
+									? undefined
+									: (value as MetricsSearch["operation"]),
+							publicModel: undefined,
+							deploymentId: undefined,
+						})
+					}
+					value={search.operation ?? "all"}
+					width="13rem"
+				>
+					<SelectItem value="all">All operations</SelectItem>
+					{operations.map(([value, label]) => (
+						<SelectItem key={value} value={value}>
+							{label}
+						</SelectItem>
+					))}
+				</Select>
+				<SearchableSelect
+					aria-label="Public model"
+					clearLabel="All public models"
+					items={modelOptions}
+					onValueChange={(value) =>
+						onChange({
+							publicModel: value ?? undefined,
+							deploymentId: undefined,
+						})
+					}
+					searchPlaceholder="Search public models"
+					value={search.publicModel ?? null}
+					width="13rem"
+				/>
+				<SearchableSelect
+					aria-label="Deployment"
+					clearLabel="All deployments"
+					items={deploymentOptions}
+					onValueChange={(value) =>
+						onChange({ deploymentId: value ?? undefined })
+					}
+					searchPlaceholder="Search deployments"
+					value={search.deploymentId ?? null}
+					width="15rem"
+				/>
 				{search.publicModel || search.deploymentId || search.operation ? (
 					<Button
-						aria-label="Clear model, deployment and operation filters"
-						className="mt-3"
 						onClick={() =>
 							onChange({
 								publicModel: undefined,
@@ -523,18 +488,20 @@ export function Metrics({
 								operation: undefined,
 							})
 						}
-						size="sm"
-						variant="link"
+						variant="ghost"
 					>
+						<IconX aria-hidden />
 						Clear filters
 					</Button>
 				) : null}
-				<p className="mt-3 text-xs text-fg-muted" role="status">
-					{new Date(data.start).toLocaleString("en-US", { timeZone: "UTC" })} –{" "}
-					{new Date(data.end).toLocaleString("en-US", { timeZone: "UTC" })} UTC
-					· retained records, grouped by request start
+				<p
+					className="ms-auto text-xs text-muted-foreground tabular-nums"
+					role="status"
+					title="Retained records, grouped by request start"
+				>
+					{windowLabel(data.start, data.end)}
 				</p>
-			</Card>
+			</div>
 			{search.deploymentId ? (
 				<p className="rounded-lg border border-border bg-secondary/40 p-3 text-sm text-fg-muted">
 					Request metrics cover requests that used this deployment, including
@@ -547,34 +514,35 @@ export function Metrics({
 				className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
 			>
 				<StatCard
-					detail={`${count.format(attempts.usageReported)} / ${count.format(attempts.attempts)} attempts reported usage · includes retries`}
+					detail="Includes retries"
 					exact={reportedTokens(attempts)}
 					label="Deployment tokens"
 					value={reportedTokens(attempts, true)}
 				/>
 				<StatCard
-					detail={`${rate(requests.success, requests.finished)} successful · ${count.format(requests.requests - requests.finished)} in progress`}
+					detail={`${rate(requests.success, requests.finished)} successful`}
 					exact={count.format(requests.requests)}
 					label="Requests"
 					value={compact.format(requests.requests)}
 				/>
 				<StatCard
-					detail={`${money(requests.upstreamCostCents)} recorded upstream cost · selected requests`}
+					detail={`${dollars.format(requests.upstreamCostCents / 100)} upstream`}
+					exact={money(requests.consumerCostCents)}
 					label="Consumer cost"
-					value={money(requests.consumerCostCents)}
+					value={dollars.format(requests.consumerCostCents / 100)}
 				/>
 				<StatCard
-					detail={`${rate(attempts.errors, attempts.finished)} of finished attempts · ${count.format(requests.errors)} final request errors`}
+					detail={`${rate(attempts.errors, attempts.finished)} of attempts`}
 					label="Deployment errors"
 					value={count.format(attempts.errors)}
 				/>
 				<StatCard
-					detail={`${duration(requests.p50DurationMs)} median · ${duration(requests.p95FirstOutputMs)} first output p95 (streamed)`}
+					detail={`${duration(requests.p50DurationMs)} median`}
 					label="Request latency · p95"
 					value={duration(requests.p95DurationMs)}
 				/>
 				<StatCard
-					detail={`${count.format(requests.cacheHits)} response-cache hits · ${count.format(requests.degraded)} degraded requests`}
+					detail={`${count.format(requests.cacheHits)} cache hits`}
 					exact={reportedTokens(requests)}
 					label="Request tokens"
 					value={reportedTokens(requests, true)}
@@ -595,7 +563,7 @@ export function Metrics({
 					<CacheUsage records={attempts.attempts} upstream usage={attempts} />
 					<Breakdown data={data} />
 					<Section
-						description="Select one to inspect its consumption and failures. Error rates use finished attempts; deleted deployments stay while their history is retained."
+						description="Select one to inspect it. Error rates use finished attempts."
 						title="By deployment"
 					>
 						<DataTable
@@ -630,7 +598,7 @@ export function Metrics({
 						/>
 					</Section>
 					<Section
-						description="The model name clients request. Each request is counted once, even if it required several attempts."
+						description="Each request counts once, however many attempts it took."
 						title="By public model"
 					>
 						<DataTable
@@ -662,6 +630,7 @@ export function Metrics({
 							}}
 						/>
 					</Section>
+					<ActorUsage keyNames={keyNames} rows={actors} />
 					<Section
 						description="Failed attempts, including failures recovered by retries or fallback."
 						title="Deployment failures"

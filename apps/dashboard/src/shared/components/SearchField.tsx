@@ -1,7 +1,10 @@
 "use client";
 
 import { useDebouncedValue } from "#/shared/lib/useDebouncedValue.ts";
-import { Search as IconSearch, X as IconX } from "lucide-react";
+import {
+	MagnifyingGlassIcon as IconSearch,
+	XIcon as IconX,
+} from "@phosphor-icons/react/dist/ssr";
 import { useEffect, useEffectEvent, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";

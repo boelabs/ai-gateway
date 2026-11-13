@@ -1,7 +1,7 @@
 "use client";
 
 import { TranscriptionWorkspace } from "./TranscriptionWorkspace";
-import { EmptyState, PageHeader } from "#/components/ui/page";
+import { EmptyState } from "#/components/ui/page";
 import { EmbeddingWorkspace } from "./EmbeddingWorkspace";
 import { RerankWorkspace } from "./RerankWorkspace";
 import { ImageWorkspace } from "./ImageWorkspace";
@@ -85,10 +85,6 @@ export function Playground({ models }: { models: PlaygroundModel[] }) {
 
 	return (
 		<div className="flex h-full min-h-0 flex-col" data-fill-viewport="">
-			<PageHeader
-				description="Try your models. Conversations stay in this session."
-				title="Playground"
-			/>
 			{selected && selection ? (
 				<Workspace
 					capability={selection.capability}

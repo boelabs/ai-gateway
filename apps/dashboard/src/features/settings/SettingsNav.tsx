@@ -2,23 +2,23 @@
 
 import type { Permission } from "#/features/auth/common.ts";
 import { useSession } from "#/features/auth/session.tsx";
-import type { LucideIcon } from "lucide-react";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 
 import {
-	DatabaseZap,
-	LockKeyhole,
-	TimerReset,
-	GitFork,
-	Route,
-} from "lucide-react";
+	DatabaseIcon as DatabaseZap,
+	LockKeyIcon as LockKeyhole,
+	TimerIcon as TimerReset,
+	GitForkIcon as GitFork,
+	PathIcon as Route,
+} from "@phosphor-icons/react/dist/ssr";
 
 interface SettingsSection {
 	href: string;
 	label: string;
-	icon: LucideIcon;
+	icon: PhosphorIcon;
 	/** Every permission listed must be granted for the section to appear. */
 	requires: Permission[];
 }

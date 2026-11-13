@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRightIcon, BookOpenIcon } from "lucide-react";
+import { ArrowUpRightIcon, BookOpenIcon } from "@phosphor-icons/react/dist/ssr";
 import { createContext, use } from "react";
 import { NAV_ROW } from "./navigation.ts";
 

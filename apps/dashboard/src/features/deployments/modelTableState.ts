@@ -8,7 +8,7 @@ export interface ModelFilters {
 
 /** The list's orders, as its order select offers them; the first is the default. */
 export const MODEL_ORDERS = [
-	{ value: "model", label: "Model (A–Z)" },
+	{ value: "model", label: "Name (A–Z)" },
 	{ value: "newest", label: "Newest" },
 	{ value: "oldest", label: "Oldest" },
 	{ value: "updated", label: "Recently updated" },

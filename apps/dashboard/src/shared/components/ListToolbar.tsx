@@ -1,6 +1,10 @@
 "use client";
 
-import { SlidersHorizontal, ArrowDownUp, ListFilter } from "lucide-react";
+import {
+	SlidersHorizontalIcon as SlidersHorizontal,
+	ArrowsDownUpIcon as ArrowDownUp,
+	FunnelSimpleIcon as ListFilter,
+} from "@phosphor-icons/react/dist/ssr";
 import { Button } from "#/components/ui/button";
 import { cn } from "#/shared/lib/classes";
 import type { ReactNode } from "react";

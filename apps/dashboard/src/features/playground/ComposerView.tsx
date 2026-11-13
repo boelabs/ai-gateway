@@ -31,7 +31,7 @@ export interface ComposerViewProps {
 }
 
 const COMPOSER_ACTION_SLOT_CLASS_NAME =
-	"flex h-9 min-w-0 self-center items-center gap-1";
+	"flex h-10 min-w-0 self-center items-center gap-1";
 const COMPOSER_ATTACHMENTS_SELECTOR = '[data-composer-attachments="true"]';
 const COMPOSER_FOCUS_EXCLUSION_SELECTOR = [
 	"button",
@@ -126,7 +126,9 @@ export function ComposerView({
 				<fieldset
 					aria-label="Compose a message"
 					className={cn(
-						"relative z-10 m-0 grid w-full min-w-0 cursor-text grid-cols-[auto_minmax(0,1fr)_auto] overflow-visible border-0 px-2 pt-2.5 pb-2 text-fg contain-inline-size max-sm:p-2",
+						// 6px of air on every side of the 40px actions: with the 26px radius they are concentric
+						// (26 = 20 + 6), compact or expanded.
+						"relative z-10 m-0 grid w-full min-w-0 cursor-text grid-cols-[auto_minmax(0,1fr)_auto] overflow-visible border-0 px-1.5 pt-2.5 pb-1.5 text-fg contain-inline-size max-sm:p-1.5",
 						"[grid-template-areas:'header_header_header'_'leading_primary_trailing'_'._footer_.']",
 						"motion-safe:transition-colors motion-safe:duration-200 motion-safe:ease-in-out sm:grid-rows-[auto_minmax(42px,auto)_auto]",
 						"max-sm:overflow-hidden max-sm:border max-sm:border-border max-sm:bg-surface-2 max-sm:shadow-none max-sm:transition-none",

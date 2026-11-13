@@ -1,5 +1,6 @@
 "use client";
 
+import { ScrollArea } from "./primitives/scroll-area";
 import { Combobox as BaseCombobox } from "@base-ui/react/combobox";
 import { selectTriggerVariants } from "./primitives/select";
 import { inputControlVariants } from "./primitives/input";
@@ -17,11 +18,11 @@ import {
 } from "./appearance";
 
 import {
-	ChevronsUpDown as IconSelector,
-	Search as IconSearch,
-	Check as IconCheck,
-	X as IconX,
-} from "lucide-react";
+	CaretUpDownIcon as IconSelector,
+	MagnifyingGlassIcon as IconSearch,
+	CheckIcon as IconCheck,
+	XIcon as IconX,
+} from "@phosphor-icons/react/dist/ssr";
 
 function Input({
 	className,
@@ -37,8 +38,8 @@ function Input({
 			<BaseCombobox.Input
 				{...props}
 				className={mergeClassName(
-					"h-8.5 w-full min-w-0 rounded-[inherit] bg-transparent px-[calc(--spacing(3)-1px)] outline-none placeholder:text-muted-foreground/72 sm:h-7.5" +
-						(size === "sm" ? "h-7.5 sm:h-6.5" : ""),
+					"h-8.5 w-full min-w-0 rounded-[inherit] bg-transparent px-[calc(--spacing(3)-1px)] outline-none placeholder:text-muted-foreground/72" +
+						(size === "sm" ? " px-[calc(--spacing(2.5)-1px)]" : ""),
 					className,
 				)}
 				style={mergeStyle({ borderRadius, width }, style)}
@@ -99,7 +100,7 @@ function Popup({
 		<BaseCombobox.Popup
 			{...props}
 			className={mergeClassName(
-				`${popupStyles} min-w-(--anchor-width)`,
+				`${popupStyles} min-w-(--anchor-width) p-0`,
 				className,
 			)}
 			style={mergeStyle({ borderRadius, width }, style)}
@@ -114,14 +115,19 @@ function List({
 	...props
 }: BaseCombobox.List.Props & AppearanceProps) {
 	return (
-		<BaseCombobox.List
-			{...props}
-			className={mergeClassName(
-				"max-h-64 overflow-auto outline-none empty:p-0",
-				className,
-			)}
-			style={mergeStyle({ borderRadius, width }, style)}
-		/>
+		// coss's scroll area, not the browser's scrollbar: a thin thumb inside the popup's padding.
+		<ScrollArea
+			className="h-auto"
+			scrollbar="popup"
+			scrollFade
+			viewportClassName="max-h-[min(var(--available-height,24rem),24rem)]"
+		>
+			<BaseCombobox.List
+				{...props}
+				className={mergeClassName("p-1 outline-none empty:p-0", className)}
+				style={mergeStyle({ borderRadius, width }, style)}
+			/>
+		</ScrollArea>
 	);
 }
 function Item({
@@ -377,15 +383,16 @@ function SearchInput({
 	...props
 }: Omit<BaseCombobox.Input.Props, "size" | "width">) {
 	return (
-		<div className="border-b border-border/60 p-2">
-			<InputGroup>
-				<IconSearch aria-hidden className="size-4 shrink-0 text-fg-muted" />
-				<BareInput
-					aria-label={placeholder}
-					placeholder={placeholder}
-					{...props}
-				/>
-			</InputGroup>
+		// Flush with the popup, a hairline below: a bordered box inside the popup's own border would
+		// need a radius of its own, and never lines up with the popup's corners.
+		<div className="flex h-10 items-center gap-2 border-b border-border/60 px-3">
+			<IconSearch aria-hidden className="size-4 shrink-0 text-fg-muted" />
+			<BareInput
+				aria-label={placeholder}
+				className="h-full text-base sm:text-sm"
+				placeholder={placeholder}
+				{...props}
+			/>
 		</div>
 	);
 }

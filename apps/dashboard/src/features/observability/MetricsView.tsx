@@ -3,7 +3,7 @@
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
 import { useRefresh } from "#/shared/lib/useRefresh.ts";
 import type { MetricsSearch } from "./metrics-data.ts";
-import type { DetailedMetrics } from "./api.ts";
+import type { DetailedMetrics, UsageRow } from "./api.ts";
 import { Metrics } from "./Metrics.tsx";
 
 /**
@@ -19,8 +19,12 @@ export function MetricsView({
 	data,
 	options,
 	search,
+	actors,
+	keyNames,
 }: {
 	data: DetailedMetrics;
+	actors: readonly UsageRow[];
+	keyNames: Readonly<Record<string, string>>;
 	options: Pick<DetailedMetrics, "models" | "deployments">;
 	search: MetricsSearch;
 }) {
@@ -28,7 +32,9 @@ export function MetricsView({
 	const { pending: refreshing } = useRefresh();
 	return (
 		<Metrics
+			actors={actors}
 			data={data}
+			keyNames={keyNames}
 			onChange={(patch) => set(patch)}
 			options={options}
 			refreshing={navigating || refreshing}

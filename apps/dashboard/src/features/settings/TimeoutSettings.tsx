@@ -19,8 +19,8 @@ import {
 const DEADLINES: SettingsCopy = {
 	title: "Deadlines",
 	description:
-		"In seconds, measured on the connection like an HTTP client, never on the model's output. Response: until the answer (JSON) or its headers (stream) arrive. Idle: the longest silence between stream bytes; empty means no limit. Total: the whole request, retries included.",
-	note: "Applies to every deployment.",
+		"In seconds. Response: until the answer starts. Idle: longest silence in a stream, 0 for none. Total: the whole request, retries included.",
+	note: "",
 };
 
 /** How long the gateway waits on an upstream, per call type and mode, saved as one policy. */

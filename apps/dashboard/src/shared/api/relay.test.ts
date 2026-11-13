@@ -1,6 +1,6 @@
 import { relay, relayPath } from "./relay.ts";
-import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
+import assert from "node:assert/strict";
 
 const realFetch = globalThis.fetch;
 afterEach(() => {

@@ -12,7 +12,7 @@ import { Toggle } from "#/components/ui/toggle";
 export const FILL_PANEL =
 	"*:data-[slot=frame-panel]:flex *:data-[slot=frame-panel]:flex-1 *:data-[slot=frame-panel]:flex-col";
 
-/** The chart's plot, legend, and disclosure reserve the same rows as TimeSeriesChart. */
+/** The chart's plot and legend reserve the same rows as TimeSeriesChart. */
 export function TimeSeriesSkeleton({ series }: { series: readonly string[] }) {
 	return (
 		<div aria-hidden className="flex min-w-0 flex-1 flex-col">
@@ -24,9 +24,6 @@ export function TimeSeriesSkeleton({ series }: { series: readonly string[] }) {
 						<TextSkeleton length={label.length} />
 					</span>
 				))}
-			</div>
-			<div className="mt-4 text-xs">
-				<TextSkeleton length={15} />
 			</div>
 		</div>
 	);
@@ -124,7 +121,7 @@ export function BreakdownSkeleton() {
 				</div>
 			</Panel>
 			<Panel
-				description="Reported upstream usage, including retries. Reasoning and cache are subsets, not additional totals."
+				description="Upstream usage, retries included. Reasoning and cache are part of these totals."
 				title={<h2>Deployment token breakdown</h2>}
 			>
 				<div className="flex flex-col gap-4">
@@ -149,7 +146,7 @@ export function BreakdownSkeleton() {
 					)}
 				</div>
 				<p className="mt-3 text-xs">
-					<TextSkeleton length={106} />
+					<TextSkeleton length={34} />
 				</p>
 			</Panel>
 		</div>
@@ -158,19 +155,16 @@ export function BreakdownSkeleton() {
 
 export function OutcomesSkeleton() {
 	return (
-		<Panel
-			description="Reliability across finished requests"
-			title={<h2>Request outcomes</h2>}
-		>
+		<Panel description="How finished requests ended." title={<h2>Outcomes</h2>}>
 			<div className="flex items-baseline gap-2">
 				<span className="text-[2rem] leading-none font-semibold tracking-tight tabular-nums">
 					<TextSkeleton length={5} />
 				</span>
-				<span className="text-xs">
+				<span className="text-sm">
 					<TextSkeleton length={12} />
 				</span>
 			</div>
-			<Skeleton className="mt-5 h-2.5 rounded-full" />
+			<Skeleton className="mt-5 h-8 rounded-[2px]" />
 			<div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-3.5">
 				{["Successful", "Errors"].map((label) => (
 					<div
@@ -196,7 +190,7 @@ export function OutcomesSkeleton() {
 export function ReliabilitySkeleton() {
 	return (
 		<Panel
-			description="What it took to finish them, across all attempts"
+			description="What it took to deliver them."
 			title={<h2>Delivery</h2>}
 		>
 			<div className="divide-y divide-border/50 text-sm">

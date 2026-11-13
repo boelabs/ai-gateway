@@ -5,6 +5,7 @@ import { ModelListInput } from "#/shared/components/ModelPicker.tsx";
 import { FormActions } from "#/shared/components/FormActions.tsx";
 import { FormSkeleton } from "#/shared/components/Skeleton.tsx";
 import { createKeyAction, updateKeyAction } from "./actions.ts";
+import { LimitField } from "#/shared/components/LimitField.tsx";
 import { Suspense, use, useState, useTransition } from "react";
 import { Select, SelectItem } from "#/components/ui/select";
 import { useConfirm } from "#/shared/feedback/confirm.tsx";
@@ -37,6 +38,12 @@ import {
 const LIST = "/keys";
 const RESET_PERIODS = ["hourly", "daily", "weekly", "monthly"] as const;
 const NO_RESET = "never";
+const RESET_LABELS: Record<(typeof RESET_PERIODS)[number], string> = {
+	hourly: "Every hour",
+	daily: "Every day",
+	weekly: "Every week",
+	monthly: "Every month",
+};
 
 /** What an existing key's panel says about its secret. */
 const SECRET_STATE: Record<SecretState, string> = {
@@ -294,6 +301,7 @@ function KeyFields({
 							autoFocus={!editing}
 							label="Name"
 							onValueChange={(value) => set("name", value)}
+							placeholder="e.g. production-backend"
 							required
 							value={draft.name}
 						/>
@@ -317,24 +325,22 @@ function KeyFields({
 					action={resetAction}
 					description={
 						spent === undefined
-							? "Empty fields mean no limit."
-							: `Spent ${spent} in the current period.`
+							? "Zero means no limit."
+							: `Spent ${spent} in the current period. Zero means no limit.`
 					}
 					title="Limits"
 				>
 					<div className="flex flex-col gap-4">
 						<div className="grid gap-4 sm:grid-cols-2">
-							<Input
-								description="Empty means no ceiling."
+							<LimitField
+								decimals={2}
 								label="Budget (USD)"
-								min={0}
-								onValueChange={(value) => set("budget", value)}
-								step="0.01"
-								type="number"
-								value={draft.budget}
+								onValueChange={(value) =>
+									set("budget", value === 0 ? "" : String(value))
+								}
+								value={Number(draft.budget || 0)}
 							/>
 							<Select
-								description="Without a period the budget is a lifetime total."
 								label="Budget resets"
 								onValueChange={(value) =>
 									set(
@@ -346,40 +352,40 @@ function KeyFields({
 								}
 								value={draft.budgetReset === "" ? NO_RESET : draft.budgetReset}
 							>
-								<SelectItem value={NO_RESET}>never</SelectItem>
+								<SelectItem value={NO_RESET}>Never (lifetime total)</SelectItem>
 								{RESET_PERIODS.map((period) => (
 									<SelectItem key={period} value={period}>
-										{period}
+										{RESET_LABELS[period]}
 									</SelectItem>
 								))}
 							</Select>
 						</div>
 						<div className="grid gap-4 sm:grid-cols-2">
-							<Input
-								label="Requests / minute"
-								min={0}
-								onValueChange={(value) => set("rpm", value)}
-								type="number"
-								value={draft.rpm}
+							<LimitField
+								label="Requests per minute"
+								onValueChange={(value) =>
+									set("rpm", value === 0 ? "" : String(value))
+								}
+								value={Number(draft.rpm || 0)}
 							/>
-							<Input
-								label="Tokens / minute"
-								min={0}
-								onValueChange={(value) => set("tpm", value)}
-								type="number"
-								value={draft.tpm}
+							<LimitField
+								label="Tokens per minute"
+								onValueChange={(value) =>
+									set("tpm", value === 0 ? "" : String(value))
+								}
+								step={1000}
+								value={Number(draft.tpm || 0)}
 							/>
 						</div>
 					</div>
 				</Panel>
 
 				<Panel
-					description="When the key stops working on its own."
+					description="Leave it empty and the key never expires. Times are in your timezone."
 					title="Expiry"
 				>
 					<Input
-						description="In your timezone. Empty means the key never expires on its own."
-						label="Expires"
+						label="Expires (optional)"
 						onValueChange={(value) => set("expiresAt", value)}
 						type="datetime-local"
 						value={draft.expiresAt}
@@ -409,7 +415,7 @@ function AllowedModels({
 }) {
 	return (
 		<ModelListInput
-			description="Leave empty to allow every public model. Names that are not deployed yet are accepted."
+			description="Empty allows every public model."
 			emptyHint="Press Enter to allow this model name."
 			label="Allowed public models"
 			models={models}

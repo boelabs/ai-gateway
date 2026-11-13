@@ -4,11 +4,11 @@ import type { DraftAttachment } from "./Composer";
 import { Button } from "#/components/ui/button";
 
 import {
-	ChevronRight as IconChevronRight,
-	ChevronLeft as IconChevronLeft,
-	FileText as IconFileText,
-	X as IconX,
-} from "lucide-react";
+	CaretRightIcon as IconChevronRight,
+	CaretLeftIcon as IconChevronLeft,
+	FileTextIcon as IconFileText,
+	XIcon as IconX,
+} from "@phosphor-icons/react/dist/ssr";
 
 export function ComposerAttachments({
 	files,
@@ -101,11 +101,7 @@ export function ComposerAttachments({
 								type="button"
 								variant="secondary"
 							>
-								<IconX
-									aria-hidden
-									className="size-4 md:size-3"
-									strokeWidth={2.75}
-								/>
+								<IconX aria-hidden className="size-4 md:size-3" weight="bold" />
 							</Button>
 						</motion.div>
 					))}

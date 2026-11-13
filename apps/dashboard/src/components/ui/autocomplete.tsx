@@ -1,7 +1,11 @@
 "use client";
 
+import { ScrollArea } from "./primitives/scroll-area";
 import { Autocomplete as BaseAutocomplete } from "@base-ui/react/autocomplete";
-import { ChevronsUpDown as IconSelector, X as IconX } from "lucide-react";
+import {
+	CaretUpDownIcon as IconSelector,
+	XIcon as IconX,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	type AppearanceProps,
@@ -66,7 +70,7 @@ function Popup({
 		<BaseAutocomplete.Popup
 			{...props}
 			className={mergeClassName(
-				`${popupStyles} min-w-(--anchor-width)`,
+				`${popupStyles} min-w-(--anchor-width) p-0`,
 				className,
 			)}
 			style={mergeStyle({ borderRadius, width }, style)}
@@ -81,14 +85,19 @@ function List({
 	...props
 }: BaseAutocomplete.List.Props & AppearanceProps) {
 	return (
-		<BaseAutocomplete.List
-			{...props}
-			className={mergeClassName(
-				"max-h-64 overflow-auto outline-none empty:p-0",
-				className,
-			)}
-			style={mergeStyle({ borderRadius, width }, style)}
-		/>
+		// coss's scroll area, not the browser's scrollbar: a thin thumb inside the popup's padding.
+		<ScrollArea
+			className="h-auto"
+			scrollbar="popup"
+			scrollFade
+			viewportClassName="max-h-[min(var(--available-height,24rem),24rem)]"
+		>
+			<BaseAutocomplete.List
+				{...props}
+				className={mergeClassName("p-1 outline-none empty:p-0", className)}
+				style={mergeStyle({ borderRadius, width }, style)}
+			/>
+		</ScrollArea>
 	);
 }
 function Item({

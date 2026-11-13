@@ -12,7 +12,7 @@ import type { UsersFilters } from "./filters.ts";
 import { ErrorNote } from "#/components/ui/page";
 import { createUserAction } from "./actions.ts";
 import { Button } from "#/components/ui/button";
-import { Plus as IconPlus } from "lucide-react";
+import { PlusIcon as IconPlus } from "@phosphor-icons/react/dist/ssr";
 import { Input } from "#/components/ui/input";
 import { Form } from "#/components/ui/form";
 import { useState } from "react";

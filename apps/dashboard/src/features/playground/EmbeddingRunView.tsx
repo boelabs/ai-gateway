@@ -1,8 +1,9 @@
 "use client";
 
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { MESSAGE_ACTION, MESSAGE_ACTION_ICON } from "./MessageParts";
 import { cosineSimilarity, type EmbeddingRun } from "./embeddings";
-import { RotateCcw as IconRotate2 } from "lucide-react";
+import { ArrowCounterClockwiseIcon as IconRotate2 } from "@phosphor-icons/react/dist/ssr";
 import { ResponseLoader } from "./ResponseLoader";
 import { ErrorNote } from "#/components/ui/page";
 import { Button } from "#/components/ui/button";
@@ -30,7 +31,7 @@ function preview(vector: number[]): string {
  */
 function Similarity({ vectors }: { vectors: number[][] }) {
 	return (
-		<div className="overflow-x-auto">
+		<ScrollArea className="h-auto" scrollbarGutter scrollFade>
 			<table className="border-collapse text-sm">
 				<caption className="pb-2 text-left text-xs text-fg-muted">
 					Cosine similarity
@@ -80,7 +81,7 @@ function Similarity({ vectors }: { vectors: number[][] }) {
 					))}
 				</tbody>
 			</table>
-		</div>
+		</ScrollArea>
 	);
 }
 
@@ -120,7 +121,9 @@ export function EmbeddingRunView({
 				aria-label="Assistant message"
 				className="flex w-full min-w-0 flex-col gap-3"
 			>
-				{run.state === "running" ? <ResponseLoader /> : null}
+				{run.state === "running" ? (
+					<ResponseLoader words={["Embedding the input"]} />
+				) : null}
 				{run.state === "stopped" ? (
 					<div className="text-xs text-fg-muted">
 						<Status tone="muted">Stopped</Status>

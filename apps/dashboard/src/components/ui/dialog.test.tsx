@@ -43,7 +43,8 @@ test("dialog sections keep footer outside the scroll region but inside the form"
 	);
 	assert.match(
 		html,
-		/<div(?=[^>]*data-slot="dialog-body")(?=[^>]*class="[^"]*min-h-0)(?=[^>]*class="[^"]*overflow-y-auto)(?=[^>]*class="[^"]*[\s"]scroll-p-6[\s"])(?=[^>]*class="[^"]*[\s"]p-6[\s"])[^>]*>/u,
+		// The body is the scroll region (coss's scroll area) and its viewport carries the padding.
+		/<div(?=[^>]*data-slot="dialog-body")(?=[^>]*class="[^"]*min-h-0)[^>]*><div(?=[^>]*data-slot="scroll-area-viewport")(?=[^>]*class="[^"]*[\s"]scroll-p-6[\s"])(?=[^>]*class="[^"]*[\s"]p-6[\s"])[^>]*>/u,
 	);
 	assert.match(html, /<input[^>]*name="name"/u);
 	assert.match(

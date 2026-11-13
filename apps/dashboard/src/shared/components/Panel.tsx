@@ -40,7 +40,11 @@ export function Panel({
 				</div>
 				{action}
 			</FrameHeader>
-			<FramePanel className={cn(flush && "p-0")}>{children}</FramePanel>
+			{/* The panel fills its frame: a frame stretched by a taller neighbour in a grid row must
+			    not show its empty tray under the content. */}
+			<FramePanel className={cn("flex-1", flush && "p-0")}>
+				{children}
+			</FramePanel>
 		</Frame>
 	);
 }

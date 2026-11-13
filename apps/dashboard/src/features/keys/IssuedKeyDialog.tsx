@@ -1,8 +1,9 @@
 "use client";
 
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { type CreatedVirtualKey, secretState } from "./common.ts";
 import { Button } from "#/components/ui/button";
-import { Copy as IconCopy } from "lucide-react";
+import { CopyIcon as IconCopy } from "@phosphor-icons/react/dist/ssr";
 import { useState } from "react";
 
 import {
@@ -65,9 +66,15 @@ export function IssuedKeyDialog({
 					</DialogDescription>
 				</DialogHeader>
 				<DialogBody>
-					<pre className="overflow-x-auto rounded-xl border border-border/50 bg-surface-2 px-3 py-2.5 font-mono text-xs text-fg">
-						{issued?.key}
-					</pre>
+					<ScrollArea
+						className="h-auto rounded-xl border border-border/50 bg-surface-2"
+						scrollbarGutter
+						scrollFade
+					>
+						<pre className="px-3 py-2.5 font-mono text-xs text-fg">
+							{issued?.key}
+						</pre>
+					</ScrollArea>
 				</DialogBody>
 				<DialogFooter>
 					<Button

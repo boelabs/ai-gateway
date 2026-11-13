@@ -11,10 +11,10 @@ type Params = PageProps<"/logs/[id]">["params"];
 
 /**
  * One operation, on a page of its own: what the caller received, every upstream attempt, and the
- * retained payload behind its own audited click.
+ * retained payload.
  *
- * The operation is read here, on the server; only the payload, which costs an access record, is
- * left for the operator to ask for.
+ * The operation is read here, on the server. The payload loads right after, from the client, for a
+ * role allowed to read it; the gateway records each read in its payload access audit.
  */
 export default function LogPage(props: PageProps<"/logs/[id]">) {
 	return (

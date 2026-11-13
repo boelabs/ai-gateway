@@ -20,11 +20,11 @@ import {
 } from "#/components/ui/primitives/menu";
 
 import {
-	ChevronsUpDownIcon,
-	SettingsIcon,
+	CaretUpDownIcon as ChevronsUpDownIcon,
+	GearSixIcon as SettingsIcon,
 	KeyboardIcon,
-	LogOutIcon,
-} from "lucide-react";
+	SignOutIcon as LogOutIcon,
+} from "@phosphor-icons/react/dist/ssr";
 
 /**
  * The foot while the gateway says who is signed in: the trigger's own row, so nothing moves when
