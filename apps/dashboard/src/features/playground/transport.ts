@@ -6,7 +6,7 @@ import type { ProviderMetadata } from "ai";
 import {
 	convertToModelMessages,
 	toUIMessageStream,
-	stepCountIs,
+	isStepCount,
 	streamText,
 } from "ai";
 
@@ -172,14 +172,16 @@ export function createPlaygroundTransport(
 					baseURL: options.baseURL ?? "/api/v1",
 				}),
 				messages: modelMessages,
-				...(settings.systemPrompt ? { system: settings.systemPrompt } : {}),
+				...(settings.systemPrompt
+					? { instructions: settings.systemPrompt }
+					: {}),
 				...(endpoint === "messages"
 					? { maxOutputTokens: settings.parameters.max_tokens ?? 1024 }
 					: {}),
 				providerOptions: providerOptionsFor(endpoint),
 				abortSignal,
 				maxRetries: 0,
-				stopWhen: stepCountIs(10),
+				stopWhen: isStepCount(10),
 				onError: () => {
 					/* The UI stream below delivers the original error to useChat. */
 				},
