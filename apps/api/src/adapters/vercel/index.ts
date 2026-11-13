@@ -1,6 +1,6 @@
+import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { parseOpenAIChatChunk } from "#contracts/openai/chatTransport.ts";
 import { mergeProviderFields } from "#core/providerSpecificFields.ts";
-import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { makeOpenAIStyleAdapter } from "#adapters/openaiStyle.ts";
 import { looksLikeContextWindowError } from "#core/httpError.ts";
 import { GatewayError, type ErrorClass } from "#core/errors.ts";

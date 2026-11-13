@@ -1,6 +1,10 @@
+import {
+	toUpstreamReasoningEffort,
+	summaryVisible,
+	thinkingBudget,
+} from "#core/reasoning.ts";
 import { type BaseCreds, requireApiKeyCreds } from "#adapters/creds.ts";
 import { mapUpstreamHttpError } from "#adapters/upstreamError.ts";
-import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import { assertNoPrefixCachePolicy } from "#core/promptCache.ts";
 import { looksLikeContextWindowError } from "#core/httpError.ts";
 import { resolveAdapterReasoning } from "#adapters/reasoning.ts";
@@ -15,15 +19,15 @@ import { parseSSE } from "#core/sse.ts";
 import {
 	anthropicContentBlocksFromProviderFields,
 	providerFieldsWithAnthropicContentBlocks,
-	providerFieldsWithAnthropicStreamBlock,
-	providerFieldsWithAnthropicStopReason,
 	providerFieldsWithAnthropicThinking,
 	anthropicThinkingFromProviderFields,
-	hasNonCanonicalAnthropicContent,
 	type AnthropicThinkingBlock,
+	providerFieldsWithAnthropicStreamBlock,
+	providerFieldsWithAnthropicStopReason,
+	hasNonCanonicalAnthropicContent,
 	anthropicContentMatches,
-	mergeProviderFields,
 	isGatewayState,
+	mergeProviderFields,
 } from "#core/providerSpecificFields.ts";
 
 import type {
@@ -34,6 +38,8 @@ import type {
 	CanonicalContentPart,
 	CanonicalMessage,
 } from "#core/canonical.ts";
+
+import type { ParameterSupportMap } from "#catalog/parameters.ts";
 
 import type {
 	MessageTokenCountRequest,
@@ -50,12 +56,6 @@ import {
 	adapterContextDiagnostics,
 	attachAdapterDiagnostics,
 } from "#adapters/diagnostics.ts";
-
-import {
-	toUpstreamReasoningEffort,
-	summaryVisible,
-	thinkingBudget,
-} from "#core/reasoning.ts";
 
 interface AnthropicCreds extends BaseCreds {
 	version?: string;

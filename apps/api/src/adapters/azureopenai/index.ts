@@ -1,6 +1,6 @@
-import { makeOpenAIDecisionsHandler } from "#adapters/decisions.ts";
 import type { Adapter, ProviderModule } from "#adapters/types.ts";
 import { makeAzureTranscriptionHandler } from "./audio.ts";
+import { makeOpenAIDecisionsHandler } from "#adapters/decisions.ts";
 
 import {
 	normalizeAzurev1BaseUrl,
