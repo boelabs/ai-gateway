@@ -18,9 +18,9 @@ import {
 } from "./logFilters.ts";
 
 import {
-	ScrollText as IconScrollText,
-	SearchX as IconSearchX,
-} from "lucide-react";
+	ScrollIcon as IconScrollText,
+	MagnifyingGlassMinusIcon as IconSearchX,
+} from "@phosphor-icons/react/dist/ssr";
 
 function errorCode(row: OperationRow): string | null {
 	const { error } = row as {
@@ -119,13 +119,8 @@ export function LogsTable({
 			header: "Public model",
 			render: (row) =>
 				row.publicModel ? (
-					<div className="flex min-w-0 flex-col">
-						<span className="truncate font-medium">{row.publicModel}</span>
-						<span className="truncate text-xs text-fg-muted">
-							{row.callType}
-							{row.servedBy ? ` · ${row.servedBy}` : ""}
-						</span>
-					</div>
+					// The call type and deployment are on the log's page; the row stays one line.
+					<span className="block truncate font-medium">{row.publicModel}</span>
 				) : (
 					<Dash />
 				),

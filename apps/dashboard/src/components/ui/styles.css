@@ -42,6 +42,11 @@
 	--chart-3: oklch(0.398 0.07 227.392);
 	--chart-4: oklch(0.828 0.189 84.429);
 	--chart-5: oklch(0.769 0.188 70.08);
+	/* Tokens always read the same way: input blue, output orange, in both themes. */
+	--chart-input: oklch(0.6 0.2 258);
+	--chart-input-cached: oklch(0.79 0.11 238);
+	--chart-input-unclassified: oklch(0.72 0.03 258);
+	--chart-output: oklch(0.7 0.17 48);
 }
 
 .dark {
@@ -91,6 +96,10 @@
 	--chart-3: oklch(0.769 0.188 70.08);
 	--chart-4: oklch(0.627 0.265 303.9);
 	--chart-5: oklch(0.645 0.246 16.439);
+	--chart-input: oklch(0.62 0.19 258);
+	--chart-input-cached: oklch(0.8 0.1 236);
+	--chart-input-unclassified: oklch(0.55 0.03 258);
+	--chart-output: oklch(0.72 0.17 50);
 }
 
 body {
@@ -118,6 +127,10 @@ body {
 	--color-chart-3: var(--chart-3);
 	--color-chart-2: var(--chart-2);
 	--color-chart-1: var(--chart-1);
+	--color-chart-input: var(--chart-input);
+	--color-chart-input-cached: var(--chart-input-cached);
+	--color-chart-input-unclassified: var(--chart-input-unclassified);
+	--color-chart-output: var(--chart-output);
 	--color-ring: var(--ring);
 	--color-input: var(--input);
 	--color-border: var(--border);
@@ -397,7 +410,8 @@ body {
 	--ui-radius-control: var(--radius-lg);
 	--ui-radius-surface: var(--radius-2xl);
 	--ui-radius-dialog: var(--radius-2xl);
-	--ui-radius-item: var(--radius-sm);
+	/* Items sit inside a radius-lg popup, past its 1px border and 4px padding: concentric radius. */
+	--ui-radius-item: calc(var(--radius-lg) - 5px);
 }
 @theme inline {
 	--color-surface: var(--surface);

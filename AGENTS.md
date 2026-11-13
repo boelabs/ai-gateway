@@ -137,8 +137,18 @@ bun test --preload ./tests/support/unitSetup.ts src/router/strategies.test.ts
   and compare them side by side: control sizes, paddings, gaps, radii, icon choices, label case,
   header and toolbar layout, empty and loading states. When the two disagree, port Billete's
   component or classes rather than approximating them.
-- Page and toolbar controls (search, filters, export, header buttons) use the default size, matching
-  the inputs beside them. Compact sizes belong inside table rows and popups.
+- **Every clickable or editable element is at least 36px tall** on every screen size (buttons,
+  inputs, selects, menu and option rows, tabs, toggles); prominent ones are 40–44px. The primitives
+  encode it; never shrink a control below 36px. Page and toolbar controls use the default size.
+- **Less text.** One short description per panel, labels without repeated units, human labels for
+  enum values, no help that explains internals. Numbers never sit empty or go negative: ceilings
+  use `LimitField`, where 0 means unlimited. Fields the system can derive are filled in for the
+  operator (the public model follows the upstream model until renamed).
+- Tokens are blue for input and orange for output in every chart and theme (`--chart-input`,
+  `--chart-output`). Date ranges use `RangeFilter` (presets + calendar), never a select of periods.
+- Scrolling inside the page (wide tables, payloads, chart data) uses coss's `ScrollArea`, never
+  the native scrollbar. Prefer coss particles for blocks; efferd, blocks.so and 7ovr inspire which
+  blocks to build, never their visual design.
 - **Dialogs only for short forms (six fields or fewer), confirmations and show-once secrets.**
   Longer editors are pages (`/models/new`, `/models/[deployment]`, `/keys/new`): Breadcrumbs →
   PageHeader → one `Panel` per group of fields → `FormActions`. Records are inspected on their own
@@ -153,7 +163,7 @@ bun test --preload ./tests/support/unitSetup.ts src/router/strategies.test.ts
 - On a form page, required panels come first and optional groups follow in their own panels,
   each optional field labelled "(optional)". Nothing optional hides behind a collapsed section.
 - Choose charts by the question: areas for activity over time, lines for latency, bars for interval
-  volumes or category comparisons, and donuts for mutually exclusive parts of one total. Never
+  volumes or category comparisons, and stacked meters (one bar split by share) for the parts of one total. Never
   stack overlapping subsets (cache writes, reasoning) or mix units on one axis. Missing measurements
   stay missing, never zero; show units, UTC intervals, exact values and readable legends.
 - Compare time series from a shared zero baseline: each curve's height must match its own tooltip

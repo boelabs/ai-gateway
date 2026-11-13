@@ -49,12 +49,12 @@ export function Input({
 				{...props}
 				className={mergeClassName(
 					cn(
-						"h-8.5 w-full min-w-0 rounded-[inherit] bg-transparent px-[calc(--spacing(3)-1px)] leading-8.5 outline-none placeholder:text-muted-foreground/72 sm:h-7.5 sm:leading-7.5",
+						"h-8.5 w-full min-w-0 rounded-[inherit] bg-transparent px-[calc(--spacing(3)-1px)] leading-8.5 outline-none placeholder:text-muted-foreground/72",
 						{
-							xs: "h-6.5 sm:h-5.5",
-							sm: "h-7.5 px-[calc(--spacing(2.5)-1px)] sm:h-6.5",
+							xs: "px-[calc(--spacing(2)-1px)]",
+							sm: "px-[calc(--spacing(2.5)-1px)]",
 							md: "",
-							lg: "h-9.5 sm:h-8.5",
+							lg: "h-9.5 leading-9.5",
 						}[size ?? "md"],
 					),
 					className,

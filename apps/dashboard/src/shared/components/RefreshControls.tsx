@@ -2,7 +2,7 @@
 
 import { useAutoRefresh } from "#/shared/lib/useAutoRefresh.ts";
 import { useRefresh } from "#/shared/lib/useRefresh.ts";
-import { RefreshCw as IconRefresh } from "lucide-react";
+import { ArrowsClockwiseIcon as IconRefresh } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "#/components/ui/button";
 
 /**

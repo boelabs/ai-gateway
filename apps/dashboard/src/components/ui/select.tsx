@@ -1,5 +1,6 @@
 "use client";
 
+import { ScrollArea } from "./primitives/scroll-area";
 import { Children, isValidElement, type ReactNode, useState } from "react";
 import { Select as BaseSelect } from "@base-ui/react/select";
 import { Combobox } from "./combobox";
@@ -14,9 +15,9 @@ import {
 } from "./appearance";
 
 import {
-	ChevronsUpDown as IconSelector,
-	Check as IconCheck,
-} from "lucide-react";
+	CaretUpDownIcon as IconSelector,
+	CheckIcon as IconCheck,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	selectTriggerVariants,
@@ -59,7 +60,7 @@ function Popup({
 		<BaseSelect.Popup
 			{...props}
 			className={mergeClassName(
-				`${selectPopupVariants()} p-1 outline-none`,
+				`${selectPopupVariants()} outline-none`,
 				className,
 			)}
 			style={mergeStyle({ borderRadius, width }, style)}
@@ -89,14 +90,19 @@ function List({
 	...props
 }: BaseSelect.List.Props & AppearanceProps) {
 	return (
-		<BaseSelect.List
-			{...props}
-			className={mergeClassName(
-				"max-h-64 overflow-auto outline-none",
-				className,
-			)}
-			style={mergeStyle({ borderRadius, width }, style)}
-		/>
+		// coss's scroll area, not the browser's scrollbar: a thin thumb inside the popup's padding.
+		<ScrollArea
+			className="h-auto"
+			scrollbar="popup"
+			scrollFade
+			viewportClassName="max-h-[min(var(--available-height,24rem),24rem)]"
+		>
+			<BaseSelect.List
+				{...props}
+				className={mergeClassName("p-1 outline-none", className)}
+				style={mergeStyle({ borderRadius, width }, style)}
+			/>
+		</ScrollArea>
 	);
 }
 export const SelectPrimitive = { ...BaseSelect, Trigger, Popup, Item, List };
@@ -175,7 +181,7 @@ export function Select<Value = string>({
 						placeholder={placeholder}
 					/>
 					<BaseSelect.Icon>
-						<IconSelector className="-me-1 size-4.5 shrink-0 opacity-80 sm:size-4" />
+						<IconSelector className="-me-1 size-4.5 shrink-0 text-muted-foreground sm:size-4" />
 					</BaseSelect.Icon>
 				</Trigger>
 				<BaseSelect.Portal>
@@ -276,7 +282,7 @@ export function SearchableSelect({
 					}
 					borderRadius={borderRadius}
 					className={mergeClassName(
-						`${label ? "w-full" : "w-fit"} justify-between font-normal`,
+						`${label || width !== undefined ? "w-full" : "w-fit"} justify-between font-normal`,
 						className,
 					)}
 					size={size}

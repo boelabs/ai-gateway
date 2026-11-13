@@ -2,23 +2,24 @@
 
 import { ListToolbar, ListSelect } from "#/shared/components/ListToolbar.tsx";
 import { ALL, AUDIT_PERIODS, DEFAULT_PERIOD, KINDS } from "./filters.ts";
-import { RangeFilter } from "#/shared/components/RangeFilter.tsx";
+import {
+	RangeFilterSkeleton,
+	RangeFilter,
+} from "#/shared/components/RangeFilter.tsx";
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
 import { SearchField } from "#/shared/components/SearchField.tsx";
 import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
 import { type AuditFilters, isFiltered } from "./filters.ts";
 import { createTableRows } from "#/shared/lib/tableRows.tsx";
-import { Select, SelectItem } from "#/components/ui/select";
 import { downloadCsv } from "#/shared/lib/csv.ts";
 import { Button } from "#/components/ui/button";
-import { RANGES } from "#/shared/lib/range.ts";
 import type { AuditEntry } from "./api.ts";
 import type { ReactNode } from "react";
 
 import {
-	FilterX as IconFilterOff,
-	Download as IconDownload,
-} from "lucide-react";
+	FunnelXIcon as IconFilterOff,
+	DownloadSimpleIcon as IconDownload,
+} from "@phosphor-icons/react/dist/ssr";
 
 const KIND_OPTIONS = [
 	{ value: ALL, label: "All entries" },
@@ -139,15 +140,7 @@ export function AuditToolbar({
 			selects={
 				<>
 					{loading ? (
-						// The period's ghost is a plain select: `RangeFilter` reads today's date, which
-						// the prerendered shell this fallback belongs to has no value for.
-						<GhostSkeleton>
-							<Select aria-label="Time range" value={DEFAULT_PERIOD}>
-								<SelectItem value={DEFAULT_PERIOD}>
-									{RANGES[DEFAULT_PERIOD]}
-								</SelectItem>
-							</Select>
-						</GhostSkeleton>
+						<RangeFilterSkeleton period={DEFAULT_PERIOD} />
 					) : (
 						<RangeFilter
 							fallback={DEFAULT_PERIOD}

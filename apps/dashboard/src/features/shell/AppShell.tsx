@@ -2,6 +2,7 @@
 
 import { CommandPalette, CommandPaletteTrigger } from "./CommandPalette";
 import { ScrollArea } from "#/components/ui/primitives/scroll-area";
+import { SIDE_PANEL_SLOT } from "#/shared/lib/sidePanel";
 import { AiGatewayLogo } from "#/shared/components/AiGatewayLogo";
 import type { OperatorIdentity } from "#/features/auth/common";
 import { SidebarNav, SidebarNavFallback } from "./SidebarNav";
@@ -12,7 +13,7 @@ import { UserMenu, UserMenuFallback } from "./UserMenu";
 import { Button } from "#/components/ui/button";
 import { Suspense, useState } from "react";
 import { CreateMenu } from "./CreateMenu";
-import { MenuIcon } from "lucide-react";
+import { ListIcon as MenuIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 
 import {
@@ -54,7 +55,7 @@ export function AppShell({
 							<div className="flex min-w-0 flex-1 flex-col">
 								<MobileBar />
 								<main
-									className="min-h-0 min-w-0 flex-1 [scrollbar-gutter:stable] overflow-y-auto"
+									className="min-h-0 min-w-0 flex-1 [scrollbar-gutter:stable] overflow-y-auto fill-viewport:[scrollbar-gutter:auto] fill-viewport:overflow-hidden"
 									id="main-content"
 									tabIndex={-1}
 								>
@@ -64,11 +65,19 @@ export function AppShell({
 									 * the DOM rather than the pathname, which would keep dynamic routes from
 									 * prerendering the shell.
 									 */}
-									<div className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 p-4 has-data-fill-viewport:h-full has-data-fill-viewport:min-h-0 sm:p-6">
+									{/*
+									 * The end of a scrolling page gets more room than its sides: with the same 24px,
+									 * the last panel reads as stuck to the window's edge. A page that fills the
+									 * viewport is a layout of its own (the playground): no frame, no padding, so its
+									 * scroll area reaches the column's edges and it places its own content.
+									 */}
+									<div className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 px-4 pt-4 pb-12 sm:px-6 sm:pt-6 sm:pb-16 fill-viewport:h-full fill-viewport:min-h-0 fill-viewport:max-w-none fill-viewport:p-0 sm:fill-viewport:p-0">
 										{children}
 									</div>
 								</main>
 							</div>
+							{/* The window's right edge, for a page's side panel (see SIDE_PANEL_SLOT). */}
+							<div className="contents" id={SIDE_PANEL_SLOT} />
 						</div>
 					</KeyboardShortcuts>
 				</CommandPalette>

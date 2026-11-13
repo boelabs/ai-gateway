@@ -1,11 +1,14 @@
 "use client";
 
-import { Switch } from "#/components/ui/switch";
-import { useId } from "react";
+import { RadioCard, RadioGroup } from "#/components/ui/radio";
+
+const STORED = "stored";
+const PRIVATE = "private";
 
 /**
  * The one choice a key's secret has: keep it, sealed, so it can be copied again, or show it once
  * and keep nothing. Shared by issuing a key and regenerating one, so both ask it in the same words.
+ * Two cards rather than a switch: both answers are legitimate, and each needs its consequence.
  */
 export function PrivateKeySwitch({
 	checked,
@@ -16,22 +19,24 @@ export function PrivateKeySwitch({
 	disabled?: boolean;
 	onCheckedChange: (checked: boolean) => void;
 }) {
-	const descriptionId = useId();
 	return (
-		<div className="flex flex-col gap-1.5">
-			<Switch
-				aria-describedby={descriptionId}
-				checked={checked}
-				{...(disabled === undefined ? {} : { disabled })}
-				onCheckedChange={onCheckedChange}
-			>
-				Private key
-			</Switch>
-			<p className="text-xs text-fg-muted" id={descriptionId}>
-				{checked
-					? "The secret is shown once and never stored. A lost one can only be replaced by regenerating the key."
-					: "The secret is stored encrypted, so it can be copied again from the key's page."}
-			</p>
-		</div>
+		<RadioGroup
+			aria-label="Secret storage"
+			className="grid gap-3 sm:grid-cols-2"
+			{...(disabled === undefined ? {} : { disabled })}
+			onValueChange={(value) => onCheckedChange(value === PRIVATE)}
+			value={checked ? PRIVATE : STORED}
+		>
+			<RadioCard
+				description="Stored encrypted, so you can copy it again later."
+				title="Copyable"
+				value={STORED}
+			/>
+			<RadioCard
+				description="Shown once and never stored. Losing it means regenerating the key."
+				title="Show once"
+				value={PRIVATE}
+			/>
+		</RadioGroup>
 	);
 }

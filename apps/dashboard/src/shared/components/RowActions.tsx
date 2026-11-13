@@ -1,6 +1,6 @@
 "use client";
 
-import { Ellipsis as IconDots } from "lucide-react";
+import { DotsThreeIcon as IconDots } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "#/components/ui/button";
 import type { ReactNode } from "react";
 
@@ -64,7 +64,7 @@ export function RowActions({
 				}
 				title="Actions"
 			>
-				<IconDots aria-hidden className="size-4" />
+				<IconDots aria-hidden className="size-4" weight="bold" />
 			</MenuTrigger>
 			<MenuPortal>
 				<MenuPositioner align="end" side="bottom" sideOffset={6}>

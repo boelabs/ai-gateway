@@ -29,12 +29,12 @@ import {
 } from "#/components/ui/command";
 
 import {
-	type LucideIcon,
 	BookOpenIcon,
-	HistoryIcon,
-	SearchIcon,
-	PinIcon,
-} from "lucide-react";
+	ClockCounterClockwiseIcon as HistoryIcon,
+	MagnifyingGlassIcon as SearchIcon,
+	PushPinIcon as PinIcon,
+} from "@phosphor-icons/react/dist/ssr";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 /**
  * Ties the search buttons (sidebar, mobile bar) to the palette without the palette's root wrapping
@@ -115,7 +115,7 @@ export function CommandPaletteTrigger() {
 interface PaletteItem {
 	href: string;
 	label: string;
-	icon: LucideIcon;
+	icon: PhosphorIcon;
 	detail?: string | undefined;
 	/** Outside the dashboard (the documentation): opens in a new tab, never in place of it. */
 	external?: boolean;

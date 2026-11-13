@@ -4,45 +4,68 @@
 @import "streamdown/styles.css";
 @import "katex/dist/katex.min.css";
 
+/*
+ * The shell holds a page that fills the viewport (the playground, `data-fill-viewport`). A page left
+ * behind by a navigation stays mounted, hidden with `display: none` (cacheComponents keeps it in an
+ * Activity), so only a page on screen counts: otherwise the next page would lose its frame.
+ */
+@custom-variant fill-viewport (
+	&:has([data-fill-viewport]:not([style*="display: none"]))
+);
+
 @source "../";
 @source "../../node_modules/streamdown/dist/*.js";
 @source "../../node_modules/@streamdown/math/dist/*.js";
 
-.playground-dotmatrix {
-	display: grid;
-	grid-template-columns: repeat(5, 3px);
-	grid-template-rows: repeat(5, 3px);
-	gap: 2px;
-	width: 24px;
-	height: 24px;
-}
-
-.playground-dotmatrix-dot {
-	border-radius: 50%;
-	background: currentColor;
-	opacity: 0.24;
-	animation: playground-diagonal-sweep 1500ms linear infinite;
-	animation-delay: var(--dot-delay);
-}
-
-@keyframes playground-diagonal-sweep {
-	0%,
-	100% {
-		opacity: 0.08;
+/* A highlight swept across the text of work still running (a step's title). */
+@keyframes text-shimmer {
+	from {
+		background-position:
+			100% center,
+			0 0;
 	}
-	14% {
-		opacity: 1;
-	}
-	30% {
-		opacity: 0.12;
+	to {
+		background-position:
+			0% center,
+			0 0;
 	}
 }
 
-@media (prefers-reduced-motion: reduce) {
-	.playground-dotmatrix-dot {
-		animation: none;
-		opacity: var(--dot-rest);
-	}
+@utility shimmer {
+	--shimmer-base: var(--color-muted-foreground);
+	--shimmer-highlight: var(--color-foreground);
+	--shimmer-spread: 3.5rem;
+
+	color: transparent;
+	-webkit-text-fill-color: transparent;
+	background-image:
+		linear-gradient(
+			90deg,
+			transparent calc(50% - var(--shimmer-spread)),
+			var(--shimmer-highlight),
+			transparent calc(50% + var(--shimmer-spread))
+		),
+		linear-gradient(var(--shimmer-base), var(--shimmer-base));
+	background-repeat: no-repeat, no-repeat;
+	background-size:
+		250% 100%,
+		100% 100%;
+	/* Prefixed only: every engine honours it, and the unprefixed form is not yet Baseline. */
+	-webkit-background-clip: text;
+	animation: text-shimmer 2.4s linear infinite;
+}
+
+@utility shimmer-none {
+	color: inherit;
+	-webkit-text-fill-color: currentColor;
+	background-image: none;
+	animation: none;
+}
+
+/* A side panel that opens by its width, like a sidebar. */
+@utility transition-sidebar {
+	transition: 0.1s ease-in-out;
+	transition-property: transform, width, left, opacity, color;
 }
 
 @theme inline {

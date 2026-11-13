@@ -7,6 +7,8 @@ import { saveRouterSettingsAction } from "./actions.ts";
 import { Input } from "#/components/ui/input";
 
 import {
+	PARAMETER_STRATEGY_LABELS,
+	ROUTING_STRATEGY_LABELS,
 	type RouterNumericKey,
 	ROUTER_NUMERIC_FIELDS,
 	PARAMETER_STRATEGIES,
@@ -24,6 +26,18 @@ import {
 	SettingRow,
 } from "./SettingsCard.tsx";
 
+const ERROR_CLASS_LABELS: Record<(typeof ERROR_CLASSES)[number], string> = {
+	timeout: "Timeout",
+	server: "Server error",
+	rate_limit: "Rate limit",
+	auth: "Authentication",
+	not_found: "Not found",
+	permission: "Permission",
+	content_policy: "Content policy",
+	context_window: "Context window",
+	bad_request: "Bad request",
+};
+
 /** The gateway stores a share; an operator reads a percentage. */
 const toPercent = (share: number) => Math.round(share * 1000) / 10;
 const toShare = (percent: number) => percent / 100;
@@ -34,30 +48,27 @@ const NEVER_SAVED =
 
 const ROUTING: SettingsCopy = {
 	title: "Routing",
-	description:
-		"How a request picks one deployment out of a public model's pool, and what happens to parameters the model does not support.",
-	note: "Applies to every public model.",
+	description: "How each request picks a deployment.",
+	note: "",
 };
 
 const QUARANTINE: SettingsCopy = {
 	title: "Taking a deployment out",
-	description:
-		"A deployment is quarantined on its failure rate, not on a raw count: an absolute threshold punishes a busy deployment for the same error rate a quiet one survives.",
-	note: "Applies to every deployment.",
+	description: "When a failing deployment is taken out of rotation.",
+	note: "",
 };
 
 const BUDGETS: SettingsCopy = {
 	title: "Budget per error class",
-	description:
-		"A timeout and a 502 are both transient, and an upstream you know well rarely deserves the same tolerance for each. Leave a box empty to inherit Allowed fails.",
-	note: "Applies to every deployment.",
+	description: "Allowed fails per kind of error. Empty inherits Allowed fails.",
+	note: "",
 };
 
 const COOLDOWN: SettingsCopy = {
 	title: "Cooldown",
 	description:
-		"How long a deployment stays out. The cooldown escalates on each failed recovery probe, up to the ceiling; a successful probe clears it at once.",
-	note: "Applies to every deployment.",
+		"How long a deployment stays out. It grows on each failed probe, up to the ceiling.",
+	note: "",
 };
 
 const fieldsIn = (group: RouterGroup) =>
@@ -99,27 +110,25 @@ function RoutingFields({ settings, editable }: FieldsProps) {
 		<div className="grid gap-4 sm:grid-cols-2">
 			<Select
 				defaultValue={settings?.routingStrategy ?? "simple-shuffle"}
-				description="How a request picks one deployment out of the pool."
 				disabled={!editable}
 				label="Routing strategy"
 				name="routingStrategy"
 			>
 				{ROUTING_STRATEGIES.map((value) => (
 					<SelectItem key={value} value={value}>
-						{value}
+						{ROUTING_STRATEGY_LABELS[value]}
 					</SelectItem>
 				))}
 			</Select>
 			<Select
 				defaultValue={settings?.unsupportedParameterStrategy ?? "drop"}
-				description="What happens when a request sends a parameter the target model does not support."
 				disabled={!editable}
 				label="Unsupported parameters"
 				name="unsupportedParameterStrategy"
 			>
 				{PARAMETER_STRATEGIES.map((value) => (
 					<SelectItem key={value} value={value}>
-						{value}
+						{PARAMETER_STRATEGY_LABELS[value]}
 					</SelectItem>
 				))}
 			</Select>
@@ -133,7 +142,7 @@ function QuarantineFields({ settings, editable }: FieldsProps) {
 			<div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
 				<Input
 					defaultValue={String(toPercent(settings?.failureRatePercent ?? 0.5))}
-					description="Share of the window's attempts that must fail. 50 means half of them."
+					description="Share of attempts that must fail."
 					disabled={!editable}
 					label="Failure rate (%)"
 					max={100}
@@ -152,7 +161,7 @@ function QuarantineFields({ settings, editable }: FieldsProps) {
 			</div>
 			<SettingRow
 				defaultChecked={settings?.protectLastDeployment ?? true}
-				description="When a public model has nowhere else to route, count the failure but keep serving. A 503 from this gateway is less useful to the caller than the upstream's own error."
+				description="Keep serving when it is the only one left; the caller gets the upstream's own error."
 				disabled={!editable}
 				label="Never quarantine the last deployment"
 				name="protectLastDeployment"
@@ -172,7 +181,7 @@ function BudgetFields({ settings, editable }: FieldsProps) {
 					defaultValue={budgets[cls] === undefined ? "" : String(budgets[cls])}
 					disabled={!editable}
 					key={cls}
-					label={cls}
+					label={ERROR_CLASS_LABELS[cls]}
 					min={0}
 					name={`class:${cls}`}
 					placeholder={String(ceiling)}

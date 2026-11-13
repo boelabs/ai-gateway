@@ -6,7 +6,7 @@ import { Can, useSession } from "#/features/auth/session.tsx";
 import { useConfirm } from "#/shared/feedback/confirm.tsx";
 import { useRowActions } from "#/shared/lib/mutation.ts";
 import { Button } from "#/components/ui/button";
-import { Plus as IconPlus } from "lucide-react";
+import { PlusIcon as IconPlus } from "@phosphor-icons/react/dist/ssr";
 import type { Deployment } from "./common.ts";
 import { useRouter } from "next/navigation";
 import { ModelsTable } from "./ModelsTable";

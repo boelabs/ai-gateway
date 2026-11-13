@@ -1,9 +1,9 @@
 import { MessageAttachments } from "./MessageAttachments";
-import { Reasoning, reasoningGroupAt } from "./Reasoning";
-import { RotateCcw as IconRotate2 } from "lucide-react";
+import { MessageLoading, ProcessRow } from "./Process";
+import { answerOf, settleSteps } from "./steps";
+import { ArrowCounterClockwiseIcon as IconRotate2 } from "@phosphor-icons/react/dist/ssr";
 import type { PlaygroundMessage } from "./transport";
 import { ResponseDetails } from "./ResponseDetails";
-import { ResponseLoader } from "./ResponseLoader";
 import { ErrorNote } from "#/components/ui/page";
 import { Button } from "#/components/ui/button";
 import { Status } from "#/components/ui/status";
@@ -18,7 +18,12 @@ import {
 
 /** Whether a streamed part has anything to show yet; until one does, the loader stands in. */
 function hasVisibleOutput(part: PlaygroundMessage["parts"][number]): boolean {
-	if (part.type === "reasoning") {
+	// A step takes the loader's line over: the process row shows it, on the same glyph.
+	if (
+		part.type === "reasoning" ||
+		part.type === "dynamic-tool" ||
+		part.type.startsWith("tool-")
+	) {
 		return true;
 	}
 	return part.type === "text" ? Boolean(part.text) : part.type === "file";
@@ -96,7 +101,10 @@ export function Conversation({
 							{message.role === "assistant" &&
 							isStreaming(message) &&
 							!message.parts.some(hasVisibleOutput) ? (
-								<ResponseLoader />
+								<MessageLoading />
+							) : null}
+							{message.role === "assistant" ? (
+								<AnswerProcess live={isStreaming(message)} message={message} />
 							) : null}
 							{message.parts.map((part, partIndex) => {
 								if (part.type === "text" && !part.text) {
@@ -120,28 +128,9 @@ export function Conversation({
 										/>
 									);
 								}
+								// Reasoning is a step: the process row above the answer opens it.
 								if (part.type === "reasoning") {
-									const steps = reasoningGroupAt(message.parts, partIndex);
-									if (!steps.length) {
-										return null;
-									}
-									return (
-										<Reasoning
-											hasFollowingText={message.parts
-												.slice(partIndex + 1)
-												.some(
-													(entry) =>
-														entry.type === "text" && Boolean(entry.text),
-												)}
-											interrupted={
-												message.metadata?.state === "stopped" ||
-												message.metadata?.state === "failed"
-											}
-											key={key}
-											steps={steps}
-											streaming={isStreaming(message)}
-										/>
-									);
+									return null;
 								}
 								if (part.type === "file" && message.role !== "user") {
 									return (
@@ -197,8 +186,10 @@ export function Conversation({
 								<ErrorNote width="fit-content">{error}</ErrorNote>
 							) : null}
 							{message.role === "assistant" ? (
+								// While the answer streams the actions keep their row, so nothing jumps when it
+								// ends, but stay hidden: copy or regenerate on half an answer is nothing to offer.
 								<div
-									className={`mt-1 -ml-2 flex h-10 shrink-0 items-center gap-0.5 lg:h-8 ${isStreaming(message) ? "pointer-events-none" : ""}`}
+									className={`mt-1 -ml-2 flex h-10 shrink-0 items-center gap-0.5 transition-[opacity,visibility] duration-200 lg:h-8 ${isStreaming(message) ? "invisible opacity-0" : "visible opacity-100"}`}
 								>
 									<CopyAction
 										disabled={isStreaming(message)}
@@ -241,6 +232,32 @@ export function Conversation({
 				</section>
 			) : null}
 		</div>
+	);
+}
+
+/** The process row of an answer that took steps; nothing for one that went straight to text. */
+function AnswerProcess({
+	message,
+	live,
+}: {
+	message: PlaygroundMessage;
+	live: boolean;
+}) {
+	const answer = answerOf(message.parts);
+	if (answer.steps.length === 0) {
+		return null;
+	}
+	const interrupted =
+		message.metadata?.state === "stopped" ||
+		message.metadata?.state === "failed";
+	return (
+		<ProcessRow
+			interrupted={interrupted}
+			isLive={live}
+			isWriting={live && answer.endsInText}
+			messageId={message.id}
+			steps={settleSteps(answer.steps, live, interrupted)}
+		/>
 	);
 }
 

@@ -1,3 +1,4 @@
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import type { CodeLine, HighlightResult } from "./codeHighlight";
 import { codeHighlightClient } from "./codeHighlightClient";
 
@@ -101,21 +102,28 @@ export function HighlightedCode({
 	return (
 		<CodeBlockContainer dir="ltr" isIncomplete={incomplete} language={language}>
 			<CodeBlockHeader language={language} />
-			<div
-				className="max-h-100 overflow-auto rounded-md border border-border bg-surface p-4 text-sm"
-				data-language={language}
-				data-streamdown="code-block-body"
-				onScroll={() => {
-					const element = body.current;
-					if (element) {
-						following.current =
-							element.scrollHeight - element.scrollTop - element.clientHeight <
-							8;
-					}
+			<ScrollArea
+				className="h-auto rounded-md border border-border bg-surface"
+				scrollbarGutter
+				scrollFade
+				viewportClassName="max-h-100"
+				viewportProps={{
+					"data-language": language,
+					"data-streamdown": "code-block-body",
+					onScroll: () => {
+						const element = body.current;
+						if (element) {
+							following.current =
+								element.scrollHeight -
+									element.scrollTop -
+									element.clientHeight <
+								8;
+						}
+					},
+					ref: body,
 				}}
-				ref={body}
 			>
-				<pre>
+				<pre className="p-4 text-sm">
 					<code className="playground-code-lines">
 						{rows.map((row) => (
 							<CodeRow
@@ -126,7 +134,7 @@ export function HighlightedCode({
 						))}
 					</code>
 				</pre>
-			</div>
+			</ScrollArea>
 		</CodeBlockContainer>
 	);
 }

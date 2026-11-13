@@ -4,17 +4,17 @@ import { Block, Streamdown } from "streamdown";
 import { math } from "@streamdown/math";
 
 import {
-	ExternalLink as IconExternalLink,
-	LoaderCircle as IconLoader2,
-	Download as IconDownload,
-	Maximize as IconMaximize,
-	RotateCcw as IconRotate2,
-	ZoomOut as IconZoomOut,
-	ZoomIn as IconZoomIn,
-	Check as IconCheck,
-	Copy as IconCopy,
-	X as IconX,
-} from "lucide-react";
+	ArrowSquareOutIcon as IconExternalLink,
+	SpinnerGapIcon as IconLoader2,
+	DownloadSimpleIcon as IconDownload,
+	ArrowsOutIcon as IconMaximize,
+	ArrowCounterClockwiseIcon as IconRotate2,
+	MagnifyingGlassMinusIcon as IconZoomOut,
+	MagnifyingGlassPlusIcon as IconZoomIn,
+	CheckIcon as IconCheck,
+	CopyIcon as IconCopy,
+	XIcon as IconX,
+} from "@phosphor-icons/react/dist/ssr";
 
 const plugins = { math };
 const icons: ComponentProps<typeof Streamdown>["icons"] = {
@@ -84,15 +84,21 @@ const components: ComponentProps<typeof Streamdown>["components"] = {
 export const Markdown = memo(function MarkdownBody({
 	text,
 	streaming = false,
+	compact = false,
 }: {
 	text: string;
 	streaming?: boolean;
+	/**
+	 * Secondary text at the surrounding size (a step in the process panel). An answer reads at the
+	 * body size, 16px on a 24px line, like the reader's own message.
+	 */
+	compact?: boolean;
 }) {
 	return (
 		<MarkdownBoundary text={text}>
 			<Streamdown
 				BlockComponent={MarkdownBlock}
-				className="playground-markdown w-full min-w-0 leading-7 wrap-break-word"
+				className={`playground-markdown w-full min-w-0 wrap-break-word ${compact ? "leading-relaxed" : "text-base leading-6"}`}
 				components={components}
 				controls={false}
 				dir="auto"

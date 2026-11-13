@@ -1,11 +1,16 @@
 "use client";
 
 import { PopoverRoot, PopoverTrigger, Popover } from "#/components/ui/popover";
+import {
+	CalendarBlankIcon as IconCalendar,
+	CaretDownIcon as ChevronDown,
+} from "@phosphor-icons/react/dist/ssr";
 import type { Query } from "#/shared/lib/useSearchWriter.ts";
-import { Select, SelectItem } from "#/components/ui/select";
-import { Calendar as IconCalendar } from "lucide-react";
+import { Calendar } from "#/components/ui/calendar";
 import { Button } from "#/components/ui/button";
-import { Input } from "#/components/ui/input";
+import type { DateRange } from "react-day-picker";
+import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
+import { cn } from "#/shared/lib/classes";
 import { useState } from "react";
 
 import {
@@ -14,6 +19,7 @@ import {
 	MAX_RANGE_DAYS,
 	type RangeKey,
 	RANGES,
+	DAY,
 } from "#/shared/lib/range.ts";
 
 const day = new Intl.DateTimeFormat("en-US", {
@@ -27,19 +33,30 @@ function dayLabel(iso: string): string {
 	return Number.isFinite(parsed) ? day.format(parsed) : iso;
 }
 
+function spanLabel(from: string, to: string): string {
+	return from === to ? dayLabel(from) : `${dayLabel(from)} – ${dayLabel(to)}`;
+}
+
+function toIso(date: Date): string {
+	return date.toISOString().slice(0, 10);
+}
+
+function fromIso(iso: string | undefined): Date | undefined {
+	if (!iso) {
+		return;
+	}
+	const parsed = Date.parse(`${iso}T00:00:00Z`);
+	return Number.isFinite(parsed) ? new Date(parsed) : undefined;
+}
+
 /**
- * The time range control, shared by every table that has one.
+ * The time range control, shared by every page that has one: one button that says which range is
+ * in force, opening coss's date picker with presets — the periods on the left, a calendar for
+ * custom dates on the right.
  *
- * Custom dates live in a popover rather than in the toolbar itself. Two labelled date fields, a
- * button and a hint are four controls of three different heights, and inline they push everything
- * beside them onto a second row — the toolbar stops being a row of filters and becomes a form. In a
- * popover the toolbar keeps one control of one height whatever the period is, and the trigger says
- * which dates are in force without opening anything.
- *
- * The period applies the moment it changes; the dates apply on submit, because a half-typed date is
- * not a range anybody asked for and re-running the page on each keystroke would fight the person
- * filling the second field. Neither is held here — the URL is what remembers, so a range survives a
- * reload and can be handed to someone else as a link.
+ * A preset applies the moment it is picked. Custom dates apply on *Apply*, because a range picked
+ * one end at a time is not a range anybody asked for until both ends are there. Nothing is held
+ * here beyond the draft: the URL is what remembers, so a range survives a reload and a link.
  */
 export function RangeFilter({
 	periods,
@@ -57,102 +74,141 @@ export function RangeFilter({
 	 * into the query string, and `Query` is the only shape `useSearchWriter` accepts.
 	 */
 	onChange: (patch: Query) => void;
-	/** Set on pages that label their controls; toolbars label by `aria-label` instead. */
+	/** A visible prefix inside the trigger ("Period"); the trigger is labelled either way. */
 	label?: string;
 }) {
 	const period = value.period ?? fallback;
-	const today = new Date().toISOString().slice(0, 10);
+	const now = new Date();
 	const [open, setOpen] = useState(false);
-	const [from, setFrom] = useState(value.from ?? today);
-	const [to, setTo] = useState(value.to ?? today);
+	const [draft, setDraft] = useState<DateRange | undefined>(() => {
+		const from = fromIso(value.from);
+		return from ? { from, to: fromIso(value.to) } : undefined;
+	});
+	const [month, setMonth] = useState<Date>(
+		() => fromIso(value.to) ?? new Date(),
+	);
+	const from = draft?.from ? toIso(draft.from) : undefined;
+	const to = draft?.to ? toIso(draft.to) : from;
 	const valid = customRangeIsValid(from, to);
-	const applied =
-		value.from && value.to
-			? `${dayLabel(value.from)} – ${dayLabel(value.to)}`
-			: "Pick dates";
+	const presets = periods.filter((key) => key !== "custom");
+	const allowsCustom = periods.includes("custom");
+	const current =
+		period === "custom" && value.from && value.to
+			? spanLabel(value.from, value.to)
+			: RANGES[period];
 
 	return (
-		<>
-			<Select
-				aria-label={label ? undefined : "Time range"}
-				icon={
-					<IconCalendar
-						aria-hidden
-						className="-ms-0.5 size-4.5 shrink-0 opacity-80 sm:size-4"
-					/>
-				}
-				{...(label ? { label } : {})}
-				onValueChange={(key) => {
-					if (!key) {
-						return;
-					}
-					const next = key as RangeKey;
-					if (next === "custom") {
-						// Opening the picker is the point of choosing "Custom dates"; applying whatever
-						// was last in the fields would answer a question nobody asked yet.
-						setOpen(true);
-						onChange({ period: next, from, to });
-						return;
-					}
-					onChange({ period: next, from: undefined, to: undefined });
-				}}
-				value={period}
+		<PopoverRoot onOpenChange={setOpen} open={open}>
+			<PopoverTrigger
+				aria-label={`${label ?? "Time range"}: ${current}`}
+				render={<Button className="justify-start" variant="secondary" />}
 			>
-				{periods.map((key) => (
-					<SelectItem key={key} value={key}>
-						{RANGES[key]}
-					</SelectItem>
-				))}
-			</Select>
-			{period === "custom" ? (
-				<PopoverRoot onOpenChange={setOpen} open={open}>
-					<PopoverTrigger
-						aria-label="Choose custom dates"
-						render={<Button variant="secondary" />}
-					>
-						<IconCalendar aria-hidden className="size-4" />
-						{applied}
-					</PopoverTrigger>
-					<Popover aria-label="Custom date range" className="w-72 p-4">
-						<form
-							className="flex flex-col gap-3"
-							onSubmit={(event) => {
-								event.preventDefault();
-								if (!valid) {
-									return;
-								}
-								onChange({ period: "custom", from, to });
-								setOpen(false);
-							}}
-						>
-							<Input
-								label="From (UTC)"
-								max={today}
-								onChange={(event) => setFrom(event.target.value)}
-								required
+				<IconCalendar aria-hidden />
+				{label ? (
+					<span className="font-normal text-muted-foreground">{label}</span>
+				) : null}
+				<span className="tabular-nums">{current}</span>
+				<ChevronDown aria-hidden className="ms-auto -me-1 opacity-60" />
+			</PopoverTrigger>
+			<Popover
+				aria-label="Time range"
+				className="w-auto max-w-[calc(100vw-2rem)] p-1"
+				positionerProps={{ align: "start", sideOffset: 6 }}
+			>
+				<div className="flex max-sm:flex-col">
+					<div className="flex flex-col gap-0.5 p-1 max-sm:order-1 max-sm:border-t sm:min-w-36 sm:border-e sm:pe-2">
+						{presets.map((key) => (
+							<Button
+								aria-pressed={period === key}
+								className={cn(
+									"w-full justify-start",
+									period === key && "bg-accent",
+								)}
+								key={key}
+								onClick={() => {
+									onChange({ period: key, from: undefined, to: undefined });
+									setOpen(false);
+								}}
 								size="sm"
-								type="date"
-								value={from}
-							/>
-							<Input
-								label="Through (UTC)"
-								max={today}
-								onChange={(event) => setTo(event.target.value)}
-								required
-								size="sm"
-								type="date"
-								value={to}
-							/>
-							<p className="text-xs text-fg-muted">
-								Up to {MAX_RANGE_DAYS} days. The end date is included.
-							</p>
-							<Button disabled={!valid} size="sm" type="submit">
-								Apply dates
+								variant="ghost"
+							>
+								{RANGES[key]}
 							</Button>
-						</form>
-					</Popover>
-				</PopoverRoot>
-			) : null}
-		</>
+						))}
+					</div>
+					{allowsCustom ? (
+						<div className="flex flex-col gap-2 p-1 sm:ps-2">
+							<Calendar
+								disabled={[
+									{ after: now },
+									...(draft?.from && !draft.to
+										? [
+												{
+													before: new Date(
+														draft.from.getTime() - (MAX_RANGE_DAYS - 1) * DAY,
+													),
+												},
+												{
+													after: new Date(
+														draft.from.getTime() + (MAX_RANGE_DAYS - 1) * DAY,
+													),
+												},
+											]
+										: []),
+								]}
+								mode="range"
+								month={month}
+								onMonthChange={setMonth}
+								onSelect={setDraft}
+								selected={draft}
+								timeZone="UTC"
+							/>
+							<div className="flex items-center justify-between gap-3 border-t px-1 pt-2">
+								<span className="text-xs text-muted-foreground">
+									{from
+										? `${spanLabel(from, to ?? from)} · UTC`
+										: `Up to ${MAX_RANGE_DAYS} days`}
+								</span>
+								<Button
+									disabled={!valid}
+									onClick={() => {
+										if (from && to && valid) {
+											onChange({ period: "custom", from, to });
+											setOpen(false);
+										}
+									}}
+									size="sm"
+								>
+									Apply
+								</Button>
+							</div>
+						</div>
+					) : null}
+				</div>
+			</Popover>
+		</PopoverRoot>
+	);
+}
+
+/**
+ * The trigger as a ghost, for a prerendered shell: `RangeFilter` reads today's date, which the
+ * shell has no value for, so the fallback draws the default period's button without it.
+ */
+export function RangeFilterSkeleton({
+	period,
+	label,
+}: {
+	period: RangeKey;
+	label?: string;
+}) {
+	return (
+		<GhostSkeleton>
+			<Button className="justify-start" variant="secondary">
+				<IconCalendar aria-hidden />
+				{label ? <span className="font-normal">{label}</span> : null}
+				<span>{RANGES[period]}</span>
+				<ChevronDown aria-hidden className="ms-auto -me-1" />
+			</Button>
+		</GhostSkeleton>
 	);
 }

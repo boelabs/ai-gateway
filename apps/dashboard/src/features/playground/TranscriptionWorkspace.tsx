@@ -1,5 +1,6 @@
 "use client";
 
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import type { ModelChoice, PlaygroundModel } from "./models";
 import { Select, SelectItem } from "#/components/ui/select";
 import { NumberField } from "#/components/ui/number-field";
@@ -39,11 +40,11 @@ import {
 } from "#/components/ui/dialog";
 
 import {
-	FileText as IconFileText,
-	RotateCcw as IconRotate2,
-	Play as IconPlayerPlay,
-	X as IconX,
-} from "lucide-react";
+	FileTextIcon as IconFileText,
+	ArrowCounterClockwiseIcon as IconRotate2,
+	PlayIcon as IconPlayerPlay,
+	XIcon as IconX,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	MESSAGE_ACTION_ICON,
@@ -115,9 +116,13 @@ function TranscriptText({
 }) {
 	if (subtitles) {
 		return (
-			<pre className="overflow-x-auto rounded-xl border border-border/50 bg-card p-3 font-mono text-xs leading-5">
-				{text}
-			</pre>
+			<ScrollArea
+				className="h-auto rounded-xl border border-border/50 bg-card"
+				scrollbarGutter
+				scrollFade
+			>
+				<pre className="p-3 font-mono text-xs leading-5">{text}</pre>
+			</ScrollArea>
 		);
 	}
 	return (

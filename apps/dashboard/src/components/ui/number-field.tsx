@@ -2,7 +2,10 @@
 
 import { NumberField as BaseNumberField } from "@base-ui/react/number-field";
 import { numberFieldGroupVariants } from "./primitives/number-field";
-import { Minus as IconMinus, Plus as IconPlus } from "lucide-react";
+import {
+	MinusIcon as IconMinus,
+	PlusIcon as IconPlus,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	type AppearanceProps,
@@ -42,15 +45,15 @@ function Group({
 			className={mergeClassName(
 				numberFieldGroupVariants({
 					className:
-						"gap-0 overflow-hidden p-0" +
+						"gap-0 overflow-hidden p-0 " +
 						{
-							xs: "min-h-7 sm:min-h-6",
-							sm: "min-h-8 sm:min-h-7",
-							md: "min-h-9 sm:min-h-8",
-							lg: "min-h-10 sm:min-h-9",
+							xs: "min-h-9",
+							sm: "min-h-9",
+							md: "min-h-9",
+							lg: "min-h-10",
 						}[size ?? "md"] +
 						(variant === "ghost"
-							? "border-transparent bg-transparent shadow-none"
+							? " border-transparent bg-transparent shadow-none"
 							: ""),
 				}),
 				className,
@@ -70,7 +73,7 @@ function Input({
 		<BaseNumberField.Input
 			{...props}
 			className={mergeClassName(
-				"h-8.5 w-full min-w-0 flex-1 bg-transparent px-2 text-center tabular-nums outline-none disabled:cursor-not-allowed sm:h-7.5",
+				"h-8.5 w-full min-w-0 flex-1 bg-transparent px-2 text-center tabular-nums outline-none disabled:cursor-not-allowed",
 				className,
 			)}
 			style={mergeStyle({ borderRadius, width }, style)}

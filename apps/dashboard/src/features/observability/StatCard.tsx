@@ -3,7 +3,7 @@
 import { Frame, FramePanel, FrameFooter } from "#/components/ui/frame";
 import type { StatusProps } from "#/components/ui/status";
 import { Status } from "#/components/ui/status";
-import type { LucideIcon } from "lucide-react";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 export interface StatNote {
 	text: string;
@@ -21,7 +21,7 @@ export function StatCard({
 	label: string;
 	value: string;
 	exact?: string;
-	icon?: LucideIcon;
+	icon?: PhosphorIcon;
 	note?: StatNote;
 	detail: string;
 }) {

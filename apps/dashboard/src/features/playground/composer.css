@@ -73,15 +73,6 @@
 	background: var(--secondary);
 }
 
-.playground-composer .composer-attach {
-	background: var(--field);
-}
-
-.playground-composer .composer-attach:hover {
-	background: var(--field-hover);
-	border-color: var(--fg-muted);
-}
-
 .playground-composer .composer-send,
 .playground-composer .composer-send:hover,
 .playground-composer .composer-send[data-pressed] {
@@ -103,10 +94,4 @@
 .playground-composer .composer-attachment-action:focus-visible {
 	outline: 2px solid var(--ring);
 	outline-offset: 2px;
-}
-
-@media (width < 40rem) {
-	.playground-composer .composer-attach:hover {
-		border-color: transparent;
-	}
 }

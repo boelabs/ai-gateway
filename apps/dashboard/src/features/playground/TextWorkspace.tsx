@@ -4,7 +4,7 @@ import { Select, SelectItem } from "#/components/ui/select";
 import { NumberField } from "#/components/ui/number-field";
 import { buttonStyles } from "#/components/ui/button";
 import { Textarea } from "#/components/ui/textarea";
-import { ModelSelect } from "./ModelSelect";
+import { defaultEffort, ModelSelect } from "./ModelSelect";
 import { ChatSession } from "./ChatSession";
 import { Tabs } from "#/components/ui/tabs";
 
@@ -58,6 +58,11 @@ export function initialSettings(
 	endpoint: PublicEndpoint,
 ): PlaygroundSettings {
 	const settings = emptySettings();
+	// Reasoning models always run on a stated effort; the picker never offers "default".
+	const effort = defaultEffort(reasoningEffortsFor(model, endpoint));
+	if (effort) {
+		settings.reasoningEffort = effort;
+	}
 	if (endpoint === "messages") {
 		const control = tunablesFor(model, endpoint).find(
 			(entry) => entry.key === "max_tokens",
@@ -134,6 +139,25 @@ export function TextWorkspace({
 					modelPicker={
 						<ModelSelect
 							capability="text"
+							effort={
+								efforts.length > 1
+									? {
+											value:
+												efforts.find(
+													(level) => level === settings.reasoningEffort,
+												) ??
+												defaultEffort(efforts) ??
+												efforts[0] ??
+												"medium",
+											options: efforts,
+											onChange: (level) =>
+												setSettings((current) => ({
+													...current,
+													reasoningEffort: level,
+												})),
+										}
+									: undefined
+							}
 							modelId={model.id}
 							models={models}
 							onSelect={onSelect}
@@ -145,7 +169,6 @@ export function TextWorkspace({
 				/>
 			</div>
 			<SettingsDialog
-				efforts={efforts}
 				endpoint={endpoint}
 				model={model}
 				onEndpoint={onEndpoint}
@@ -169,7 +192,6 @@ function SettingsDialog({
 	settings,
 	setSettings,
 	setParameter,
-	efforts,
 	tunables,
 }: {
 	open: boolean;
@@ -180,7 +202,6 @@ function SettingsDialog({
 	settings: PlaygroundSettings;
 	setSettings: Dispatch<SetStateAction<PlaygroundSettings>>;
 	setParameter: (key: string, value: number | null) => void;
-	efforts: string[];
 	tunables: ReturnType<typeof tunablesFor>;
 }) {
 	const advancedControls = TUNABLE.filter(
@@ -194,10 +215,9 @@ function SettingsDialog({
 		<DialogRoot onOpenChange={onOpenChange} open={open}>
 			<DialogContent className="md:w-xl" layout="sectioned">
 				<DialogHeader>
-					<DialogTitle>Model settings</DialogTitle>
+					<DialogTitle>Settings</DialogTitle>
 					<DialogDescription>
-						Only settings supported by the selected model and transport are
-						available.
+						Only what this model supports over this transport.
 					</DialogDescription>
 				</DialogHeader>
 				<DialogBody>
@@ -208,7 +228,6 @@ function SettingsDialog({
 					 * the composer.
 					 */}
 					<Select
-						description="The public contract this conversation is sent under. Only the ones this model exposes are offered."
 						label="Transport"
 						onValueChange={(value) => {
 							if (isPublicEndpoint(value)) {
@@ -238,30 +257,6 @@ function SettingsDialog({
 							) : null}
 						</Tabs.List>
 						<Tabs.Panel className="mt-4 flex flex-col gap-4" value="generation">
-							{efforts.length ? (
-								<Select
-									label="Reasoning effort"
-									onValueChange={(value) =>
-										setSettings((current) => {
-											const next = { ...current };
-											if (value === "default" || value === null) {
-												delete next.reasoningEffort;
-											} else {
-												next.reasoningEffort = value;
-											}
-											return next;
-										})
-									}
-									value={settings.reasoningEffort ?? "default"}
-								>
-									<SelectItem value="default">Default</SelectItem>
-									{efforts.map((effort) => (
-										<SelectItem key={effort} value={effort}>
-											{effort}
-										</SelectItem>
-									))}
-								</Select>
-							) : null}
 							{tunables.map((control) => (
 								<NumberField.Root
 									key={control.key}

@@ -2,18 +2,19 @@ import { useComposerTextarea } from "./useComposerTextarea";
 import { ComposerAttachments } from "./ComposerAttachments";
 import { type ReactNode, useRef, useState } from "react";
 import { useMobileComposer } from "./useMobileComposer";
+import { GhostSkeleton } from "#/shared/components/Skeleton";
 import { Button } from "#/components/ui/button";
 import { ComposerView } from "./ComposerView";
 import type { FileUIPart } from "ai";
 
 import {
-	SlidersHorizontal as IconAdjustmentsHorizontal,
-	LoaderCircle as IconLoader2,
-	Square as IconPlayerStop,
-	RotateCcw as IconRotate2,
-	ArrowUp as IconArrowUp,
-	Plus as IconPlus,
-} from "lucide-react";
+	SlidersHorizontalIcon as IconAdjustmentsHorizontal,
+	SpinnerGapIcon as IconLoader2,
+	SquareIcon as IconPlayerStop,
+	BroomIcon as IconClear,
+	ArrowUpIcon as IconArrowUp,
+	PlusIcon as IconPlus,
+} from "@phosphor-icons/react/dist/ssr";
 
 export type DraftAttachment = FileUIPart & { id: string };
 
@@ -35,6 +36,7 @@ export function Composer({
 	showAttach = true,
 	readOnly = false,
 	canSend,
+	loading = false,
 }: {
 	prompt: string;
 	onPrompt: (value: string) => void;
@@ -65,7 +67,18 @@ export function Composer({
 	readOnly?: boolean;
 	/** Overrides "there is a draft" as the test for whether this composer can be sent. */
 	canSend?: boolean;
+	/**
+	 * The playground's skeleton: the same box, with its controls ghosted where they stand. Nothing
+	 * moves when the real composer replaces it.
+	 */
+	loading?: boolean;
 }) {
+	const ghost = (node: ReactNode) =>
+		loading ? (
+			<GhostSkeleton className="rounded-full">{node}</GhostSkeleton>
+		) : (
+			node
+		);
 	const input = useRef<HTMLInputElement>(null);
 	const [dragging, setDragging] = useState(false);
 	const dragDepth = useRef(0);
@@ -122,88 +135,96 @@ export function Composer({
 			/>
 			<ComposerView
 				leftActions={
-					showAttach ? (
-						<Button
-							aria-label="Attach files"
-							className="composer-action composer-attach"
-							disabled={reading || busy || !accepted.length}
-							mode="icon"
-							onClick={() => input.current?.click()}
-							size="sm"
-							title={
-								accepted.length
-									? "Attach files"
-									: "This model does not support attachments"
-							}
-							type="button"
-							variant="secondary"
-						>
-							{reading ? (
-								<IconLoader2
-									aria-hidden
-									className="size-5 animate-spin motion-reduce:animate-none"
-								/>
-							) : (
-								<IconPlus aria-hidden className="size-5" strokeWidth={2.5} />
-							)}
-						</Button>
-					) : null
+					showAttach
+						? ghost(
+								<Button
+									aria-label="Attach files"
+									className="composer-action"
+									disabled={reading || busy || !accepted.length}
+									mode="icon"
+									onClick={() => input.current?.click()}
+									size="sm"
+									title={
+										accepted.length
+											? "Attach files"
+											: "This model does not support attachments"
+									}
+									type="button"
+									variant="ghost"
+								>
+									{reading ? (
+										<IconLoader2
+											aria-hidden
+											className="size-5 animate-spin motion-reduce:animate-none"
+										/>
+									) : (
+										<IconPlus aria-hidden className="size-5" weight="bold" />
+									)}
+								</Button>,
+							)
+						: null
 				}
 				onSurfaceClick={() => textarea.current?.focus()}
-				rightActions={
-					<>
-						{modelPicker}
-						<Button
-							aria-label="Open model settings"
-							className="composer-action"
-							mode="icon"
-							onClick={onSettings}
-							size="sm"
-							title="Model settings"
-							type="button"
-							variant="ghost"
-						>
-							<IconAdjustmentsHorizontal aria-hidden className="size-5" />
-						</Button>
-						<Button
-							aria-label="Reset conversation"
-							className="composer-action"
-							mode="icon"
-							onClick={onReset}
-							size="sm"
-							title="Reset conversation"
-							type="button"
-							variant="ghost"
-						>
-							<IconRotate2 aria-hidden className="size-5" />
-						</Button>
-						<Button
-							aria-label={busy ? "Stop response" : "Send message"}
-							className="composer-action composer-send"
-							disabled={
-								!busy &&
-								(reading ||
-									!(canSend ?? (prompt.trim().length > 0 || files.length > 0)))
-							}
-							mode="icon"
-							onClick={busy ? onStop : undefined}
-							size="sm"
-							title={busy ? "Stop response" : "Send message"}
-							type={busy ? "button" : "submit"}
-						>
-							{busy ? (
-								<IconPlayerStop
-									aria-hidden
-									className="size-4"
-									fill="currentColor"
-								/>
-							) : (
-								<IconArrowUp aria-hidden className="size-5" strokeWidth={2.5} />
-							)}
-						</Button>
-					</>
-				}
+				rightActions={ghost(
+					<Button
+						aria-label={busy ? "Stop response" : "Send message"}
+						className="composer-action composer-send"
+						disabled={
+							!busy &&
+							(reading ||
+								!(canSend ?? (prompt.trim().length > 0 || files.length > 0)))
+						}
+						mode="icon"
+						onClick={busy ? onStop : undefined}
+						size="sm"
+						title={busy ? "Stop response" : "Send message"}
+						type={busy ? "button" : "submit"}
+					>
+						{busy ? (
+							<IconPlayerStop
+								aria-hidden
+								className="size-4"
+								fill="currentColor"
+							/>
+						) : (
+							<IconArrowUp aria-hidden className="size-5" weight="bold" />
+						)}
+					</Button>,
+				)}
 				state={expanded ? "expanded" : "compact"}
+				supportingContent={
+					// Under the box, not in it: the box is for writing, the row for what it is sent to.
+					<div className="flex items-center justify-between gap-2 px-1 pt-2">
+						{ghost(
+							<Button
+								className="rounded-full text-muted-foreground hover:text-foreground"
+								onClick={onReset}
+								size="sm"
+								type="button"
+								variant="ghost"
+							>
+								<IconClear aria-hidden />
+								Clear
+							</Button>,
+						)}
+						<div className="flex min-w-0 items-center gap-1">
+							{modelPicker}
+							{ghost(
+								<Button
+									aria-label="Settings"
+									className="shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+									mode="icon"
+									onClick={onSettings}
+									title="Settings"
+									type="button"
+									variant="ghost"
+								>
+									<IconAdjustmentsHorizontal aria-hidden />
+								</Button>,
+							)}
+						</div>
+					</div>
+				}
 				textarea={
 					<textarea
 						aria-label="Message"
@@ -249,7 +270,7 @@ export function Composer({
 				topSectionLayoutKey={files.map((file) => file.id).join(":")}
 			/>
 			{dragging ? (
-				<div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-[28px] border-2 border-dashed border-primary bg-surface-2/95 text-sm text-fg">
+				<div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-[26px] border-2 border-dashed border-primary bg-surface-2/95 text-sm text-fg">
 					{accepted.length
 						? "Drop files here"
 						: "This model does not support attachments"}

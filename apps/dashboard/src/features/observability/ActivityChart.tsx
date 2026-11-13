@@ -76,8 +76,12 @@ export function ActivityChart({
 	const series =
 		metric === "totalTokens"
 			? [
-					{ key: "promptTokens", label: "Input", color: "var(--chart-1)" },
-					{ key: "completionTokens", label: "Output", color: "var(--chart-2)" },
+					{ key: "promptTokens", label: "Input", color: "var(--chart-input)" },
+					{
+						key: "completionTokens",
+						label: "Output",
+						color: "var(--chart-output)",
+					},
 				]
 			: [
 					{
@@ -90,21 +94,23 @@ export function ActivityChart({
 	return (
 		<Panel
 			action={
-				<ToggleGroup
-					aria-label="Activity metric"
-					onValueChange={(values) => {
-						if (values[0]) {
-							setMetric(values[0]);
-						}
-					}}
-					value={[metric]}
-				>
-					{(Object.keys(metrics) as Metric[]).map((key) => (
-						<Toggle key={key} size="xs" value={key} variant="ghost">
-							{metrics[key].label}
-						</Toggle>
-					))}
-				</ToggleGroup>
+				<div className="flex flex-wrap items-center justify-end gap-2">
+					<ToggleGroup
+						aria-label="Activity metric"
+						onValueChange={(values) => {
+							if (values[0]) {
+								setMetric(values[0]);
+							}
+						}}
+						value={[metric]}
+					>
+						{(Object.keys(metrics) as Metric[]).map((key) => (
+							<Toggle key={key} size="xs" value={key} variant="ghost">
+								{metrics[key].label}
+							</Toggle>
+						))}
+					</ToggleGroup>
+				</div>
 			}
 			className={FILL_PANEL}
 			description={
@@ -131,6 +137,7 @@ export function ActivityChart({
 					const row = rows.find((point) => point.timestamp === timestamp);
 					return row ? intervalLabel(row, bucket) : "";
 				}}
+				kind="bar"
 				label={`${metrics[metric].label} over time`}
 				rows={rows.map((row) => ({
 					timestamp: row.timestamp,
@@ -140,6 +147,7 @@ export function ActivityChart({
 					consumerCostCents: row.consumerCostCents,
 				}))}
 				series={series}
+				stacked={metric === "totalTokens"}
 			/>
 		</Panel>
 	);

@@ -5,13 +5,16 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { ModelInput } from "#/shared/components/ModelPicker.tsx";
 import { FormSkeleton } from "#/shared/components/Skeleton.tsx";
 import { useNotify } from "#/shared/feedback/notifications.tsx";
+import { LimitField } from "#/shared/components/LimitField.tsx";
 import { FormActions } from "#/shared/components/FormActions";
 import { SearchableSelect } from "#/components/ui/select";
 import { CustomModelEditor } from "./CustomModelEditor";
 import { parsePricing, type Pricing } from "./pricing";
+import { ArrowCounterClockwiseIcon as IconReset } from "@phosphor-icons/react/dist/ssr";
 import { Panel } from "#/shared/components/Panel.tsx";
 import { Textarea } from "#/components/ui/textarea";
 import { saveDeploymentAction } from "./actions.ts";
+import { Button } from "#/components/ui/button";
 import { PricingEditor } from "./PricingEditor";
 import { Status } from "#/components/ui/status";
 import { Switch } from "#/components/ui/switch";
@@ -40,9 +43,9 @@ function optionalText(raw: FormDataEntryValue | null): string | undefined {
 	return text ? text : undefined;
 }
 
-function optionalNumber(raw: FormDataEntryValue | null): number | undefined {
-	const text = String(raw ?? "").trim();
-	return text ? Number(text) : undefined;
+/** Zero is "no limit" in the form and `null` at the gateway. */
+function limitOrNull(value: number): number | null {
+	return value > 0 ? Math.floor(value) : null;
 }
 
 const CREDENTIAL_LABELS: Record<string, string> = {
@@ -70,6 +73,11 @@ export function DeploymentForm({
 	const [upstreamModel, setUpstreamModel] = useState(
 		existing?.upstreamModel ?? "",
 	);
+	const [publicModel, setPublicModel] = useState(existing?.publicModel ?? "");
+	const [rpmLimit, setRpmLimit] = useState(existing?.rpmLimit ?? 0);
+	const [tpmLimit, setTpmLimit] = useState(existing?.tpmLimit ?? 0);
+	/** Bumped to clear every pricing field at once when the override is dropped. */
+	const [pricingReset, setPricingReset] = useState(0);
 	const [customEntry, setCustomEntry] = useState(
 		() =>
 			existing?.catalogEntry ??
@@ -107,6 +115,21 @@ export function DeploymentForm({
 		? (existing?.transportOverrides ?? {})
 		: {};
 
+	/**
+	 * The public model follows the upstream model until the operator names it something else: an
+	 * empty name, or one still equal to the previous upstream id, is taken over; any other name was
+	 * typed on purpose and stays.
+	 */
+	function chooseUpstreamModel(next: string) {
+		if (
+			publicModel.trim() === "" ||
+			publicModel.trim() === upstreamModel.trim()
+		) {
+			setPublicModel(next.trim());
+		}
+		setUpstreamModel(next);
+	}
+
 	/** One snapshot for validation and saving. */
 	function readForm(form: FormData): CreateDeploymentInput {
 		if (!adapter) {
@@ -131,7 +154,7 @@ export function DeploymentForm({
 			: undefined;
 		const rates = parsePricing(pricing);
 		const body: CreateDeploymentInput = {
-			publicModel: String(form.get("publicModel")).trim(),
+			publicModel: publicModel.trim(),
 			adapterKey,
 			upstreamModel: upstreamModel.trim(),
 			credentials,
@@ -143,18 +166,14 @@ export function DeploymentForm({
 				? selectedTransports(entry, transports)
 				: catalogTransports,
 			enabled,
-			tpmLimit: optionalNumber(form.get("tpmLimit")) ?? null,
-			rpmLimit: optionalNumber(form.get("rpmLimit")) ?? null,
+			tpmLimit: limitOrNull(tpmLimit),
+			rpmLimit: limitOrNull(rpmLimit),
 		};
 		if (entry) {
 			body.catalogEntry = entry;
 		}
 		if (rates) {
 			body.pricing = rates;
-		}
-		const weight = optionalNumber(form.get("weight"));
-		if (weight !== undefined) {
-			body.weight = weight;
 		}
 		return body;
 	}
@@ -203,53 +222,39 @@ export function DeploymentForm({
 	return (
 		<Form className="flex flex-col gap-3" onSubmit={onSubmit}>
 			<Panel
-				description="The name clients send, and the provider model behind it."
+				description="Pick the provider and its model, then the name clients send."
 				title="Model"
 			>
-				<div className="flex flex-col gap-4">
-					<div className="grid gap-4 sm:grid-cols-2">
-						<Input
-							autoFocus={!editing}
-							defaultValue={existing?.publicModel ?? ""}
-							description="The name clients send as `model`."
-							label="Public model"
-							name="publicModel"
-							required
-						/>
-						<SearchableSelect
-							description={
-								editing ? "Fixed for an existing deployment." : undefined
+				<div className="grid gap-4 sm:grid-cols-2">
+					<SearchableSelect
+						disabled={editing}
+						items={adapters.map((entry) => ({
+							value: entry.id,
+							label: entry.id,
+						}))}
+						label="Adapter"
+						name="adapterKey"
+						onValueChange={(key) => {
+							if (!key || key === adapterKey) {
+								return;
 							}
-							disabled={editing}
-							items={adapters.map((entry) => ({
-								value: entry.id,
-								label: entry.id,
-							}))}
-							label="Adapter"
-							name="adapterKey"
-							onValueChange={(key) => {
-								if (!key || key === adapterKey) {
-									return;
-								}
-								setAdapterKey(key);
-								setUpstreamModel("");
-								setCustomEntry(
-									initialCustomEntry(
-										(
-											adapters.find((entry) => entry.id === key)?.operations ??
-											[]
-										).map((operation) => operation.id),
-									),
-								);
-								setTechnical(null);
-								setTransports({});
-							}}
-							placeholder="Choose an adapter"
-							required
-							searchPlaceholder="Search adapters"
-							value={adapterKey || null}
-						/>
-					</div>
+							setAdapterKey(key);
+							chooseUpstreamModel("");
+							setCustomEntry(
+								initialCustomEntry(
+									(
+										adapters.find((entry) => entry.id === key)?.operations ?? []
+									).map((operation) => operation.id),
+								),
+							);
+							setTechnical(null);
+							setTransports({});
+						}}
+						placeholder="Choose an adapter"
+						required
+						searchPlaceholder="Search adapters"
+						value={adapterKey || null}
+					/>
 
 					{catalog.length > 0 ? (
 						/**
@@ -259,11 +264,11 @@ export function DeploymentForm({
 						 * catalog — a select would make both impossible.
 						 */
 						<ModelInput
-							emptyHint="No catalog match. You can use this custom model id."
+							emptyHint="Not in the catalog. Press Enter to use it as a custom model."
 							label="Upstream model"
 							models={catalog.map((model) => model.id)}
-							onChange={setUpstreamModel}
-							placeholder="Pick a catalog model or type an id"
+							onChange={chooseUpstreamModel}
+							placeholder="Search the catalog or type an id"
 							renderItem={(id) => (
 								<>
 									{id}
@@ -279,7 +284,7 @@ export function DeploymentForm({
 						<Input
 							disabled={!adapter}
 							label="Upstream model"
-							onValueChange={setUpstreamModel}
+							onValueChange={chooseUpstreamModel}
 							placeholder={
 								adapter ? "Enter a model ID" : "Choose an adapter first"
 							}
@@ -287,6 +292,15 @@ export function DeploymentForm({
 							value={upstreamModel}
 						/>
 					)}
+
+					<Input
+						label="Public model"
+						name="publicModel"
+						onValueChange={setPublicModel}
+						placeholder="Same as the upstream model"
+						required
+						value={publicModel}
+					/>
 				</div>
 			</Panel>
 
@@ -298,7 +312,7 @@ export function DeploymentForm({
 				}
 				title="Credentials"
 			>
-				<div className="flex flex-col gap-4">
+				<div className="grid gap-4 sm:grid-cols-2">
 					{required.map((field) => (
 						<Input
 							autoComplete="off"
@@ -309,18 +323,20 @@ export function DeploymentForm({
 							type={field === "baseUrl" ? "url" : "password"}
 						/>
 					))}
-					<JsonField
-						description='Adapter-specific extras such as {"baseUrl": "https://…"}.'
-						label="Extra credentials (JSON, optional)"
-						name="credentialsExtra"
-						rows={2}
-					/>
+					<div className="sm:col-span-2">
+						<JsonField
+							label="Extra credentials (optional)"
+							name="credentialsExtra"
+							placeholder='{ "baseUrl": "https://…" }'
+							rows={2}
+						/>
+					</div>
 				</div>
 			</Panel>
 
 			{custom && upstreamModel.trim() ? (
 				<Panel
-					description="This ID is not in the adapter catalog. Enable only the operations and capabilities your upstream supports."
+					description="Not in the adapter's catalog: enable only what the upstream supports."
 					title="Custom model"
 				>
 					<CustomModelEditor
@@ -337,72 +353,73 @@ export function DeploymentForm({
 			) : null}
 
 			<Panel
-				description="How this deployment shares traffic with the others serving the same model."
-				title="Routing"
-			>
-				<div className="flex flex-col gap-4">
-					<div className="grid gap-4 sm:grid-cols-2">
-						<Input
-							defaultValue={existing?.label ?? ""}
-							description="Tells deployments of the same model apart, e.g. which API key."
-							label="Label (optional)"
-							name="label"
-						/>
-						<Input
-							defaultValue={existing?.failureDomain ?? ""}
-							description="Deployments sharing this value share upstream throttle state."
-							label="Failure domain (optional)"
-							name="failureDomain"
-						/>
-					</div>
-					<div className="grid gap-4 sm:grid-cols-3">
-						<Input
-							defaultValue={String(existing?.weight ?? 1)}
-							description="Share under simple-shuffle."
-							label="Weight"
-							min={0}
-							name="weight"
-							step={1}
-							type="number"
-						/>
-						<Input
-							defaultValue={
-								existing?.rpmLimit === null || existing?.rpmLimit === undefined
-									? ""
-									: String(existing.rpmLimit)
-							}
-							label="RPM limit (optional)"
-							name="rpmLimit"
-							type="number"
-						/>
-						<Input
-							defaultValue={
-								existing?.tpmLimit === null || existing?.tpmLimit === undefined
-									? ""
-									: String(existing.tpmLimit)
-							}
-							label="TPM limit (optional)"
-							name="tpmLimit"
-							type="number"
-						/>
-					</div>
+				action={
 					<Switch checked={enabled} onCheckedChange={setEnabled}>
 						Enabled
 					</Switch>
+				}
+				description="Traffic is balanced across the deployments of a public model automatically."
+				title="Routing"
+			>
+				<div className="grid gap-4 sm:grid-cols-2">
+					<Input
+						defaultValue={existing?.label ?? ""}
+						label="Label (optional)"
+						name="label"
+						placeholder="e.g. primary key, EU region"
+					/>
+					<Input
+						defaultValue={existing?.failureDomain ?? ""}
+						label="Shared quota (optional)"
+						name="failureDomain"
+						placeholder="e.g. openai-main-account"
+						title="Deployments with the same value share one provider quota: when one is throttled, all of them back off."
+					/>
+					<LimitField
+						label="Requests per minute"
+						onValueChange={setRpmLimit}
+						value={rpmLimit}
+					/>
+					<LimitField
+						label="Tokens per minute"
+						onValueChange={setTpmLimit}
+						step={1000}
+						value={tpmLimit}
+					/>
 				</div>
 			</Panel>
 
 			<Panel
-				description="USD cents: 100 cents = $1. Token rates are per million tokens; zero means free. An override replaces all catalog rates and blank fields are unset, not inherited. Clear it to use catalog pricing."
+				action={
+					pricing ? (
+						<Button
+							onClick={() => {
+								setPricingReset((count) => count + 1);
+								setPricing(undefined);
+							}}
+							type="button"
+							variant="ghost"
+						>
+							<IconReset aria-hidden />
+							Use catalog pricing
+						</Button>
+					) : null
+				}
+				description={
+					pricing
+						? "USD per million tokens. Replaces every catalog rate; blank rates are not charged."
+						: "USD per million tokens. Empty uses the catalog's pricing."
+				}
 				title="Pricing override"
 			>
-				<PricingEditor onChange={setPricing} value={pricing} />
+				<PricingEditor
+					key={pricingReset}
+					onChange={setPricing}
+					value={pricing}
+				/>
 			</Panel>
 
-			<Panel
-				description="Free-form operator annotations, up to 16 KiB. Stored and returned verbatim."
-				title="Metadata"
-			>
+			<Panel description="Your own notes, stored as JSON." title="Metadata">
 				<div className="flex flex-col gap-4">
 					<JsonField
 						defaultValue={
@@ -410,16 +427,14 @@ export function DeploymentForm({
 								? JSON.stringify(existing.metadata, null, 2)
 								: ""
 						}
-						label="Metadata (JSON, optional)"
+						label="Metadata (optional)"
 						name="metadata"
+						placeholder='{ "owner": "platform-team" }'
 						rows={4}
 					/>
 					{known && Object.keys(catalogTransports).length > 0 ? (
 						<div className="text-sm text-muted-foreground">
-							<p>
-								Stored transport overrides are preserved for this model
-								(read-only).
-							</p>
+							<p>Stored transport overrides (kept as they are):</p>
 							<ul className="mt-2 list-inside list-disc">
 								{Object.entries(catalogTransports).map(
 									([operation, transport]) => (
@@ -433,7 +448,6 @@ export function DeploymentForm({
 					) : null}
 				</div>
 			</Panel>
-
 			<FormActions
 				cancelHref={LIST}
 				error={error}
@@ -447,13 +461,13 @@ export function DeploymentForm({
 function JsonField({
 	name,
 	label,
-	description,
+	placeholder,
 	rows,
 	defaultValue,
 }: {
 	name: string;
 	label: string;
-	description?: string;
+	placeholder?: string;
 	rows: number;
 	defaultValue?: string;
 }) {
@@ -461,9 +475,9 @@ function JsonField({
 		<Textarea
 			className="resize-y font-mono text-xs"
 			defaultValue={defaultValue}
-			description={description}
 			label={label}
 			name={name}
+			placeholder={placeholder}
 			rows={rows}
 			spellCheck={false}
 		/>

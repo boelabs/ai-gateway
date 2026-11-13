@@ -13,10 +13,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
-	RefreshCw as IconRotate,
-	Trash2 as IconTrash,
-	Copy as IconCopy,
-} from "lucide-react";
+	ArrowsClockwiseIcon as IconRotate,
+	TrashIcon as IconTrash,
+	CopyIcon as IconCopy,
+} from "@phosphor-icons/react/dist/ssr";
 
 /**
  * A key page's header actions: copying it, regenerating it, turning it on or off, and deleting it.

@@ -7,7 +7,7 @@ import { type KeysFilters, KEY_STATES } from "./filters.ts";
 import { Can } from "#/features/auth/session.tsx";
 import { type ReactNode, Suspense } from "react";
 import { Button } from "#/components/ui/button";
-import { Plus as IconPlus } from "lucide-react";
+import { PlusIcon as IconPlus } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 
 import {

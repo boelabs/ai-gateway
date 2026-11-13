@@ -1,9 +1,12 @@
 "use client";
 
 import { ListToolbar, ListSelect } from "#/shared/components/ListToolbar.tsx";
-import { Select, SelectItem, SearchableSelect } from "#/components/ui/select";
+import { SearchableSelect } from "#/components/ui/select";
 import { RefreshControls } from "#/shared/components/RefreshControls.tsx";
-import { RangeFilter } from "#/shared/components/RangeFilter.tsx";
+import {
+	RangeFilterSkeleton,
+	RangeFilter,
+} from "#/shared/components/RangeFilter.tsx";
 import { SearchField } from "#/shared/components/SearchField.tsx";
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
 import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
@@ -11,7 +14,6 @@ import { createTableRows } from "#/shared/lib/tableRows.tsx";
 import { causeLabel, FAILURE_OWNERS } from "./trace.ts";
 import { downloadCsv } from "#/shared/lib/csv.ts";
 import { Button } from "#/components/ui/button";
-import { RANGES } from "#/shared/lib/range.ts";
 import type { OperationRow } from "./api.ts";
 import type { ReactNode } from "react";
 
@@ -25,9 +27,9 @@ import {
 } from "./logFilters.ts";
 
 import {
-	FilterX as IconFilterOff,
-	Download as IconDownload,
-} from "lucide-react";
+	FunnelXIcon as IconFilterOff,
+	DownloadSimpleIcon as IconDownload,
+} from "@phosphor-icons/react/dist/ssr";
 
 const OUTCOME_LABELS: Record<string, string> = {
 	success: "Success",
@@ -201,15 +203,7 @@ export function LogsToolbar({
 			selects={
 				<>
 					{loading ? (
-						// The period's ghost is a plain select: `RangeFilter` reads today's date, which
-						// the prerendered shell this fallback belongs to has no value for.
-						<GhostSkeleton>
-							<Select aria-label="Time range" value={DEFAULT_PERIOD}>
-								<SelectItem value={DEFAULT_PERIOD}>
-									{RANGES[DEFAULT_PERIOD]}
-								</SelectItem>
-							</Select>
-						</GhostSkeleton>
+						<RangeFilterSkeleton period={DEFAULT_PERIOD} />
 					) : (
 						<RangeFilter
 							fallback={DEFAULT_PERIOD}

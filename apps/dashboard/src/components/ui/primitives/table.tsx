@@ -1,3 +1,4 @@
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { cn } from "#/shared/lib/classes";
 import type * as React from "react";
 
@@ -11,10 +12,15 @@ export function Table({
 	variant?: TableVariant;
 }): React.ReactElement {
 	return (
-		<div
-			className="relative w-full overflow-x-auto"
+		// coss's scroll area instead of the browser's scrollbar: a thin thumb that shows while
+		// scrolling or hovering, and a fade on the side that has more columns.
+		<ScrollArea
+			className="relative h-auto w-full"
 			data-slot="table-container"
 			data-variant={variant}
+			// The horizontal bar gets its own strip under the last row instead of covering it.
+			scrollbarGutter
+			scrollFade
 		>
 			<table
 				className={cn(
@@ -24,7 +30,7 @@ export function Table({
 				data-slot="table"
 				{...props}
 			/>
-		</div>
+		</ScrollArea>
 	);
 }
 

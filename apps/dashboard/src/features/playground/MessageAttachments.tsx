@@ -1,4 +1,4 @@
-import { FileText as IconFileText } from "lucide-react";
+import { FileTextIcon as IconFileText } from "@phosphor-icons/react/dist/ssr";
 import type { FileUIPart } from "ai";
 
 import {

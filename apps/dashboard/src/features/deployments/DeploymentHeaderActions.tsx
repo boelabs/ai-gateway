@@ -7,7 +7,7 @@ import { Can } from "#/features/auth/session.tsx";
 import { Button } from "#/components/ui/button";
 import type { Deployment } from "./common.ts";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { TrashIcon as Trash2 } from "@phosphor-icons/react/dist/ssr";
 
 /**
  * A deployment page's header actions: turning it on or off, and deleting it. Only for roles that

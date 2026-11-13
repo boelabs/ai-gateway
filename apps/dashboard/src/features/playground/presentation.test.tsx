@@ -9,6 +9,8 @@ import { Metrics } from "./ResponseDetails";
 import type { VideoRun } from "./videos";
 import assert from "node:assert/strict";
 import { Markdown } from "./Markdown";
+import { ProcessTrace } from "./Process";
+import { stepsOf } from "./steps";
 import { test } from "node:test";
 
 const messages: PlaygroundMessage[] = [
@@ -80,14 +82,14 @@ test("pending response reserves disabled actions and places the loader inside th
 			}}
 		/>,
 	);
-	assert.match(html, /Generating response/u);
+	assert.match(html, /Sending the request/u);
 	assert.match(
 		html,
 		/<button(?=[^>]*aria-label="Regenerate response")(?=[^>]*disabled)[^>]*>/u,
 	);
 	assert.match(
 		html,
-		/<article aria-label="Assistant message"[^>]*><div(?=[^>]*role="status")[^>]*>/u,
+		/<article aria-label="Assistant message"[^>]*><div[^>]*data-role="waiting"[^>]*><span(?=[^>]*role="status")[^>]*>/u,
 	);
 	assert.equal((html.match(/aria-label="Copy message"/gu) ?? []).length, 2);
 	assert.equal((html.match(/aria-label="Copy response"/gu) ?? []).length, 2);
@@ -239,22 +241,12 @@ test("streaming repairs unfinished emphasis and reasoning uses Markdown", () => 
 		<Markdown streaming text="An **unfinished" />,
 	);
 	assert.match(html, /data-streamdown="strong"/u);
+	// Reasoning is read in the process panel, where each step's text is Markdown.
 	const reasoning = renderToStaticMarkup(
-		<Conversation
-			busy={false}
-			messages={[
-				{
-					id: "r",
-					role: "assistant",
-					parts: [{ type: "reasoning", text: "**Reasoning**", state: "done" }],
-				},
-			]}
-			onCopy={async () => {
-				/* intentionally empty */
-			}}
-			onRegenerate={() => {
-				/* intentionally empty */
-			}}
+		<ProcessTrace
+			steps={stepsOf([
+				{ type: "reasoning", text: "**Reasoning**", state: "done" },
+			])}
 		/>,
 	);
 	assert.match(reasoning, /data-streamdown="strong"[^>]*>Reasoning/u);
@@ -295,13 +287,11 @@ test("an empty assistant uses one loader in its content slot", () => {
 		/>,
 	);
 	assert.equal((html.match(/role="status"/gu) ?? []).length, 1);
-	assert.equal(
-		(html.match(/class="playground-dotmatrix-dot"/gu) ?? []).length,
-		25,
-	);
+	// One thinking glyph: the sparkle and its twinkle, drawn once.
+	assert.equal((html.match(/data-role="waiting"/gu) ?? []).length, 1);
 	assert.match(
 		html,
-		/<article aria-label="Assistant message"[^>]*><div(?=[^>]*role="status")[^>]*>/u,
+		/<article aria-label="Assistant message"[^>]*><div[^>]*data-role="waiting"[^>]*><span(?=[^>]*role="status")[^>]*>/u,
 	);
 });
 
@@ -325,15 +315,15 @@ test("reasoning starts visibly before text arrives and replaces the generic load
 			}}
 		/>,
 	);
-	assert.match(html, /Thinking/u);
-	assert.match(html, /Thinking\.\.\./u);
-	assert.doesNotMatch(html, />Ready</u);
-	assert.doesNotMatch(html, /The model did not return reasoning text/u);
-	assert.match(html, /aria-expanded="true"/u);
-	assert.doesNotMatch(html, /playground-dotmatrix/u);
+	// The process row takes the loader's line: it says what the model is doing, on the same glyph.
+	assert.match(html, /Thinking…/u);
+	assert.doesNotMatch(html, /data-role="waiting"/u);
+	assert.equal((html.match(/role="status"/gu) ?? []).length, 1);
+	assert.match(html, /<button[^>]*aria-expanded="false"/u);
+	assert.doesNotMatch(html, /Done in/u);
 });
 
-test("historical reasoning is collapsible and interrupted reasoning is not marked active", () => {
+test("interrupted reasoning is settled, not left thinking", () => {
 	const html = renderToStaticMarkup(
 		<Conversation
 			busy={false}
@@ -360,13 +350,15 @@ test("historical reasoning is collapsible and interrupted reasoning is not marke
 			}}
 		/>,
 	);
-	assert.match(html, /Reasoning interrupted/u);
-	assert.doesNotMatch(html, />Ready</u);
-	assert.match(html, /aria-expanded="false"/u);
-	assert.doesNotMatch(html, />Thinking</u);
+	assert.match(html, /Stopped after 1 step/u);
+	assert.doesNotMatch(html, /Thinking/u);
+	assert.doesNotMatch(html, /role="status"/u);
+	// Its text is the panel's, not the transcript's.
+	assert.doesNotMatch(html, /Partial thought/u);
+	assert.match(html, /Partial answer/u);
 });
 
-test("chain of thought groups reasoning across SDK step boundaries but separates answers", () => {
+test("one process row covers every step of an answer, wherever the model took it", () => {
 	const html = renderToStaticMarkup(
 		<Conversation
 			busy={false}
@@ -393,28 +385,22 @@ test("chain of thought groups reasoning across SDK step boundaries but separates
 			}}
 		/>,
 	);
-	assert.equal((html.match(/aria-label="Toggle reasoning"/gu) ?? []).length, 2);
-	assert.equal((html.match(/data-chain-step="complete"/gu) ?? []).length, 5);
-	assert.doesNotMatch(html, /Reasoning 1|Reasoning 2|2 steps/u);
-	assert.ok(html.indexOf("Second thought") < html.indexOf("First answer"));
-	assert.ok(html.indexOf("First answer") < html.indexOf("Third thought"));
+	assert.equal((html.match(/Done in 3 steps/gu) ?? []).length, 2);
+	assert.doesNotMatch(html, /First thought|Second thought|Third thought/u);
+	assert.ok(html.indexOf("Done in 3 steps") < html.indexOf("First answer"));
+	assert.ok(html.indexOf("First answer") < html.indexOf("Second answer"));
 });
 
-test("empty reasoning blocks retain visual feedback without numbered labels", () => {
+test("empty reasoning steps still count and show without detail", () => {
+	const parts: PlaygroundMessage["parts"] = [
+		{ type: "reasoning", text: "", state: "done" },
+		{ type: "reasoning", text: "  ", state: "done" },
+		{ type: "text", text: "Answer" },
+	];
 	const html = renderToStaticMarkup(
 		<Conversation
 			busy={false}
-			messages={[
-				{
-					id: "r",
-					role: "assistant",
-					parts: [
-						{ type: "reasoning", text: "", state: "done" },
-						{ type: "reasoning", text: "  ", state: "done" },
-						{ type: "text", text: "Answer" },
-					],
-				},
-			]}
+			messages={[{ id: "r", role: "assistant", parts }]}
 			onCopy={async () => {
 				/* intentionally empty */
 			}}
@@ -423,17 +409,15 @@ test("empty reasoning blocks retain visual feedback without numbered labels", ()
 			}}
 		/>,
 	);
-	assert.match(html, /Toggle reasoning/u);
-	assert.equal(
-		(html.match(/The model did not return reasoning text\./gu) ?? []).length,
-		2,
-	);
-	assert.equal((html.match(/data-chain-step="complete"/gu) ?? []).length, 3);
-	assert.doesNotMatch(html, /Reasoning [0-9]/u);
+	assert.match(html, /Done in 2 steps/u);
 	assert.match(html, /Answer/u);
+	const trace = renderToStaticMarkup(<ProcessTrace steps={stepsOf(parts)} />);
+	assert.equal((trace.match(/>Thought</gu) ?? []).length, 2);
+	// No detail to open: a step without text is a plain line, not a collapsible.
+	assert.doesNotMatch(trace, /data-slot="trace-collapsible"/u);
 });
 
-test("reasoning ends with a ready step and collapses once the answer starts", () => {
+test("once the answer starts, the row says it is writing and sits above the text", () => {
 	const html = renderToStaticMarkup(
 		<Conversation
 			busy
@@ -460,17 +444,9 @@ test("reasoning ends with a ready step and collapses once the answer starts", ()
 			}}
 		/>,
 	);
-	assert.match(html, />Ready</u);
-	assert.match(html, /aria-expanded="false"/u);
-	assert.match(html, /lucide-circle-check/u);
-	const header = html.match(
-		/<button[^>]*aria-label="Toggle reasoning"[^>]*>.*?<\/button>/u,
-	)?.[0];
-	assert.ok(header);
-	assert.match(header, />Reasoning</u);
-	assert.doesNotMatch(header, /Ready|lucide-circle-check/u);
-	assert.ok(html.indexOf("Considered the options.") < html.indexOf(">Ready<"));
-	assert.ok(html.indexOf(">Ready<") < html.indexOf(">Answer<"));
+	assert.match(html, /Writing the answer…/u);
+	assert.doesNotMatch(html, /Considered the options\./u);
+	assert.ok(html.indexOf("Writing the answer") < html.indexOf(">Answer<"));
 });
 
 test("a failed response is reported inside its own turn, above its regenerate button", () => {
@@ -540,7 +516,7 @@ test("the model picker names the current model and is reachable as a labelled co
 			}}
 		/>,
 	);
-	assert.match(html, /aria-label="Model"/u);
+	assert.match(html, /aria-label="Model: gpt-5"/u);
 	assert.match(html, /gpt-5/u);
 	// The list lives in a portal, so the closed trigger must not leak the other names.
 	assert.doesNotMatch(html, /claude-opus-5/u);

@@ -3,7 +3,7 @@
 import { useSession } from "#/features/auth/session.tsx";
 import { visibleCreateActions } from "./navigation.ts";
 import { Button } from "#/components/ui/button";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 
 import {

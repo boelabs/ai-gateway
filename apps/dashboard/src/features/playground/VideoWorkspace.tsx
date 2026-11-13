@@ -1,5 +1,6 @@
 "use client";
 
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import type { ModelChoice, PlaygroundModel } from "./models";
 import { Select, SelectItem } from "#/components/ui/select";
 import { VideoSettingsDialog } from "./VideoSettings";
@@ -7,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { VideoRunView } from "./VideoRunView";
 import { ModelSelect } from "./ModelSelect";
-import { X as IconX } from "lucide-react";
+import { XIcon as IconX } from "@phosphor-icons/react/dist/ssr";
 import { Workspace } from "./Workspace";
 import { Composer } from "./Composer";
 
@@ -69,75 +70,81 @@ function References({
 	disabled: boolean;
 }) {
 	return (
-		<ul className="playground-composer mb-2 flex gap-2 overflow-x-auto rounded-[28px] border border-border bg-surface-2 p-2 max-sm:rounded-2xl">
-			{references.map((reference) => {
-				const image = reference.mediaType.startsWith("image/");
-				return (
-					<li
-						className="flex shrink-0 items-center gap-2 rounded-2xl bg-surface p-2"
-						key={reference.id}
-					>
-						{image ? (
-							// biome-ignore lint/performance/noImgElement: a data: URL, which next/image cannot optimise
-							<img
-								alt={reference.filename}
-								className="size-11 rounded-lg object-cover"
-								src={reference.url}
-							/>
-						) : (
-							<video
-								className="size-11 rounded-lg bg-surface-2 object-cover"
-								muted
-								preload="metadata"
-								src={reference.url}
-							/>
-						)}
-						<div className="flex min-w-0 flex-col gap-1">
-							<span
-								className="max-w-36 truncate text-xs"
-								title={reference.filename}
-							>
-								{reference.filename}
-							</span>
-							{image ? (
-								<Select
-									aria-label={`What ${reference.filename} is for`}
-									disabled={disabled}
-									onValueChange={(value) => {
-										if (value) {
-											onRole(reference.id, value as ReferenceRole);
-										}
-									}}
-									size="xs"
-									value={reference.role}
-									variant="ghost"
-								>
-									<SelectItem value="reference">Reference</SelectItem>
-									<SelectItem value="first_frame">First frame</SelectItem>
-									<SelectItem value="last_frame">Last frame</SelectItem>
-								</Select>
-							) : (
-								<span className="px-1 text-[11px] text-fg-muted">
-									Reference
-								</span>
-							)}
-						</div>
-						<Button
-							aria-label={`Remove ${reference.filename}`}
-							disabled={disabled}
-							mode="icon"
-							onClick={() => onRemove(reference.id)}
-							size="sm"
-							title="Remove"
-							type="button"
-							variant="ghost"
+		<ScrollArea
+			className="playground-composer mb-2 h-auto rounded-[26px] border border-border bg-surface-2 max-sm:rounded-2xl"
+			scrollbarGutter
+			scrollFade
+		>
+			<ul className="flex w-max gap-2 p-2">
+				{references.map((reference) => {
+					const image = reference.mediaType.startsWith("image/");
+					return (
+						<li
+							className="flex shrink-0 items-center gap-2 rounded-2xl bg-surface p-2"
+							key={reference.id}
 						>
-							<IconX aria-hidden className="size-4" />
-						</Button>
-					</li>
-				);
-			})}
-		</ul>
+							{image ? (
+								// biome-ignore lint/performance/noImgElement: a data: URL, which next/image cannot optimise
+								<img
+									alt={reference.filename}
+									className="size-11 rounded-lg object-cover"
+									src={reference.url}
+								/>
+							) : (
+								<video
+									className="size-11 rounded-lg bg-surface-2 object-cover"
+									muted
+									preload="metadata"
+									src={reference.url}
+								/>
+							)}
+							<div className="flex min-w-0 flex-col gap-1">
+								<span
+									className="max-w-36 truncate text-xs"
+									title={reference.filename}
+								>
+									{reference.filename}
+								</span>
+								{image ? (
+									<Select
+										aria-label={`What ${reference.filename} is for`}
+										disabled={disabled}
+										onValueChange={(value) => {
+											if (value) {
+												onRole(reference.id, value as ReferenceRole);
+											}
+										}}
+										size="xs"
+										value={reference.role}
+										variant="ghost"
+									>
+										<SelectItem value="reference">Reference</SelectItem>
+										<SelectItem value="first_frame">First frame</SelectItem>
+										<SelectItem value="last_frame">Last frame</SelectItem>
+									</Select>
+								) : (
+									<span className="px-1 text-[11px] text-fg-muted">
+										Reference
+									</span>
+								)}
+							</div>
+							<Button
+								aria-label={`Remove ${reference.filename}`}
+								disabled={disabled}
+								mode="icon"
+								onClick={() => onRemove(reference.id)}
+								size="sm"
+								title="Remove"
+								type="button"
+								variant="ghost"
+							>
+								<IconX aria-hidden className="size-4" />
+							</Button>
+						</li>
+					);
+				})}
+			</ul>
+		</ScrollArea>
 	);
 }
 

@@ -206,9 +206,11 @@ describe("styled control composition", () => {
 	});
 
 	test("icon mode squares the button at its size and drops label padding", () => {
+		// `xs` is the affordance nested inside a 36px control; every other size is a target of its
+		// own and never drops below 36px, on any screen.
 		for (const [size, square] of [
 			["xs", "size-7"],
-			["sm", "size-8"],
+			["sm", "size-9"],
 			["md", "size-9"],
 			["lg", "size-10"],
 		] as const) {

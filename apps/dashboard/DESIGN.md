@@ -26,9 +26,21 @@ neutral), soft hairline borders, rounded panels, tabular numbers. Color only car
   Billete's vendored copy, which is the same source — into `primitives`, keeping Base UI's behavior
   and accessibility. Only build from scratch when coss has nothing suitable, following its geometry,
   states, focus and keyboard patterns.
-- **Icons:** `lucide-react` only, `aria-hidden` when decorative, sized with `size-*` classes. The
+- **Particles first.** coss particles (card radios, inputs with badges, segmented meters, stat
+  blocks…) are the default answer to "how should this block look". Reach for one before writing a
+  bespoke layout. [efferd](https://efferd.com), [blocks.so](https://blocks.so) and
+  [7ovr](https://7ovr.com) are references for *which blocks* to build (stat rows, meters, empty
+  states), never for their visual design: the result is always built from coss primitives and
+  these tokens.
+- **Icons:** [Phosphor](https://phosphoricons.com) only, imported from
+  `@phosphor-icons/react/dist/ssr` by their `…Icon` names (`CaretDownIcon`, not the deprecated
+  `CaretDown`) — the SSR build renders in Server and Client Components alike. Regular weight;
+  `weight="bold"` only where a small glyph must hold its own (the composer's send and attach).
+  `aria-hidden` when decorative, sized with `size-*` classes; the type of an icon prop is `Icon`
+  from `@phosphor-icons/react`. The
   AI Gateway logotype (`AiGatewayLogo`) is the one brand asset; never set the product name in the UI font.
-- **Charts:** `recharts` through `src/components/ui/chart.tsx`.
+- **Charts:** Rosen Charts' approach (rosencharts.com): `d3-scale`/`d3-shape` for the math only,
+  drawn as plain SVG + HTML in `src/components/ui/chart.tsx`. No charting library.
 - **Font:** Google Sans Flex, the only UI font, headings included (`src/shared/fonts`). Google Sans
   Code for identifiers and code. Never set a font family anywhere else.
 
@@ -70,23 +82,43 @@ Amounts, counts, durations and dates use `tabular-nums`.
   fields `gap-4`; inline items `gap-2`.
 - Radius comes from the primitives: outer surfaces `rounded-2xl`, inner panels `rounded-xl`,
   controls `rounded-lg`. Do not add radius classes to primitives.
+- **Nested radii are concentric:** an inner element's radius is its parent's radius minus the
+  inset between them (padding plus border). Popup options use `--ui-radius-item`
+  (`radius-lg − 5px`: a 1px border and 4px padding). Anything flush against a popup's edge (its
+  search field) has no radius or border of its own; a hairline separates it.
+- Options in a select, combobox or menu are as tall as the trigger that opened them (36px).
 - Elevation is the primitives' built-in hairline shadow. No extra shadows, except popovers'
   `shadow-lg/5` on things that float over content.
 
 ### Controls
 
-Desktop density changes at `sm`; mobile controls use 16px text so iOS does not zoom.
+**Every clickable or editable element is at least 36px tall** — buttons, inputs, selects,
+comboboxes, number fields, tabs, toggles, and the items of menus, selects and comboboxes — on
+every screen size. Controls that deserve more weight (a dialog's or sign-in's main action, a
+command palette's input) use 40–44px. The primitives encode this; never shrink a control below
+36px with a class. Mobile controls use 16px text so iOS does not zoom.
 
-| Adapter size | Mobile height | Desktop height |
+| Adapter size | Height | Use |
 | --- | --- | --- |
-| `xs` | 28px | 24px |
-| `sm` | 32px | 28px |
-| `md` (default) | 36px | 32px |
-| `lg` | 40px | 36px |
+| `xs`, `sm` | 36px, tighter padding and gap | inside table rows, popups and dense toolbars |
+| `md` (default) | 36px | page, form and toolbar controls |
+| `lg` | 40px | prominent actions |
+| `xl` (primitive) | 44px | hero actions |
+
+The only controls smaller than 36px are affordances *inside* another control (the × that clears a
+search field, a combobox's chevron, a chip's remove button): the 36px control around them is the
+target. Checkboxes, radios and switches are 16–20px marks, but their label is part of the hit
+target, so the row they sit in is at least 36px. The playground composer keeps its own geometry
+(§8).
 
 Page, form and toolbar controls (search, filters, export, header buttons) use the default size,
-matching the inputs beside them. Compact sizes (`sm`, `xs`) belong inside table rows and popups,
-never beside full-size inputs.
+matching the inputs beside them.
+
+**Dates are picked with `RangeFilter`** (`#/shared/components/RangeFilter`): one button saying the
+range in force, opening coss's popover with the presets on the left and a range `Calendar`
+(`#/components/ui/calendar`) on the right; presets apply at once, custom dates on *Apply*. Never a
+plain select of periods plus native date inputs. Filters sit in one toolbar row, never inside a
+card or frame of their own.
 
 Button variants (adapter names, coss names in parentheses):
 
@@ -117,6 +149,9 @@ Icon-only buttons are square (`mode="icon"`) and always have an `aria-label`.
   `DialogTitle` (20px, `leading-none`) and `DialogDescription` 8px under it, never a hand-written
   heading; the body starts 4px under the header; the close ✕ sits at the top right; the footer is
   the muted strip with *Cancel* (outline) and the single primary submit.
+- A `Panel`'s content fills its frame: panels side by side in a grid row share one height, and
+  the shorter one's panel stretches rather than leaving its tray empty below. No gutter is reserved
+  for a label that has nothing to name (one overall bar takes the full width).
 - Never nest a `Frame` inside a `Frame` or a `Card` inside a `Card`. Tables and empty states inside
   an existing panel use their plain variant. No decorative fieldsets.
 
@@ -127,7 +162,7 @@ Billete's shell, value for value (`src/features/shell`):
 ```
 ┌ Sidebar (268px) ──┬──────────────────────────────────────────────────┐
 │ ◠ AI Gateway      🔍 │                                                  │
-│ ───────────────── │  main: centered max-w-6xl, p-4 sm:p-6, gap-6     │
+│ ───────────────── │  main: max-w-6xl, p-4/6, pb-12/16, gap-6        │
 │ Overview          │                                                  │
 │ Metrics           │                                                  │
 │ Gateway           │                                                  │
@@ -139,6 +174,10 @@ Billete's shell, value for value (`src/features/shell`):
 └───────────────────┴──────────────────────────────────────────────────┘
 ```
 
+- **The page ends with room to spare.** The main column pads its sides and top 16/24px and its
+  bottom 48/64px (phone/desktop), in the shell, so no page adds its own: a last panel 24px from
+  the window's edge reads as stuck to it. Pages that fill the viewport (`data-fill-viewport`) keep
+  the tight padding.
 - **No header.** The desktop sidebar is `--app-sidebar-width` (268px, shared with Billete), with no
   collapsed mode. Top: the logo (link to Overview) and a quiet square search button, separated
   from the navigation by a hairline. Middle: the navigation groups in a `ScrollArea` with
@@ -228,7 +267,8 @@ own URL under `/settings`.
 
 **Overview and Metrics:** `PageHeader` with the period and refresh controls as its actions →
 `StatCard` grids (as many columns as cards, up to four; label, value and tray each on one line) →
-chart and table `Frame`s.
+chart and table `Frame`s. The Overview is a glance: tiles and charts only. Per-model, per-key and
+per-deployment tables belong to Metrics; an API key is named there by its name, never its id.
 
 ## 5. Shared components (use these, do not re-create them)
 
@@ -293,12 +333,34 @@ width. Build it from the page's own components and layout:
   Opening shows the options before typing; model fields that accept custom ids keep doing so.
 - Preserve server errors next to the submit (`FormActions`, `ErrorNote`) and field errors on their
   field.
+- **Numbers never sit empty and never go negative.** A ceiling (rate limits, budgets, idle
+  timeouts) is a `LimitField` (`#/shared/components/LimitField`): it starts at 0, refuses negatives,
+  and 0 means *no limit*, said by an *Unlimited* badge beside the label rather than by help text.
+  The form maps 0 to the API's `null`.
+- **Derive what the system can derive.** When one field is almost always a copy of another, fill
+  it in and let the operator override it: the public model follows the upstream model until it is
+  renamed by hand, and then stays. Don't expose knobs the gateway manages on its own (a
+  deployment's routing weight).
+- **Order fields by dependency.** A field that narrows the next comes first (adapter → upstream
+  model → public model).
+- **A choice between two meaningful outcomes is a pair of card radios** (`RadioCard` in
+  `#/components/ui/radio`), each with its consequence in one line — not a switch, whose *off*
+  state has no words.
+- Resetting actions of a panel (*Use catalog pricing*) are a quiet `ghost` button in the panel's
+  header, shown only when there is something to reset — never a full-width button under the
+  fields.
 - Destructive or irreversible actions confirm with `useConfirm`; cancel buttons in overlays are
   `secondary`.
 
 ## 7. Data display
 
-- Model rows show the public name above the upstream name; secondary details stay muted.
+- **A table holds only what is needed to compare rows, one value per cell.** Never stack a second
+  value under a cell's own (an id under a name, "in · out" under a total, a share under a cost):
+  that is a dictionary, not a table. What does not earn a column goes to the cell's tooltip
+  (`title`) or the record's page. Prefer a rate to a count and its rate side by side (*Error rate*,
+  the count in its tooltip); compact numbers (*466K*) with the exact value on hover; one column per
+  identity (*Public model*, *Upstream model*), the first one the row's link. Secondary values stay
+  muted.
 - Optional table columns live in a *Columns* menu; tables have row pagination and a visible count.
 - Repeat identifying context in each row rather than inserting group banners or nested tables.
 - Dates in tables: date over time, UTC, `tabular-nums`; exact timestamp on hover.
@@ -314,22 +376,78 @@ width. Build it from the page's own components and layout:
 
 ## 8. Charts
 
-Areas for activity over time, lines for latency, bars for interval volumes and comparisons,
-continuous donuts for mutually exclusive shares. Use `--chart-1` through `--chart-5`, UTC
+Built the Rosen way: a curve is one SVG in a `0 0 100 100` viewBox stretched to its box
+(`preserveAspectRatio="none"`, `vector-effect: non-scaling-stroke`), and everything else — bars,
+axis labels, gridlines, the tooltip — is HTML placed in percentages, so text is crisp, radii stay
+round and nothing needs measuring to render. One hover/focus state per chart drives a guide (or a
+band for bars), active dots and one `ChartTooltip` card that flips to the left past the middle; the
+plot takes the focus and the arrow keys walk the intervals. A click never draws an outline.
+
+Bars for volumes per interval (requests, tokens, cost), stacked only when the series are disjoint
+parts of one total (input + output), with a rounded top; lines for latency; bars for comparisons.
+Exact values are the tooltip's; the data table stays `sr-only` for screen readers. No visible
+*View chart data* disclosure and no chart/table toggle. Parts
+of one total are a **stacked meter** (one rounded bar split by share, with the figures above it) or
+a row of ticks for request outcomes — not a donut: a ring wastes the panel's width and hides the
+numbers. Success rates are green from 95%, amber below it and red only under 50%.
+
+**Tokens always read the same way, in both themes:** input is blue (`--chart-input`), output is
+orange (`--chart-output`); the parts of the input are blues — cached `--chart-input-cached`,
+uncached `--chart-input`, unclassified `--chart-input-unclassified`. Never use `--chart-1…5` for
+tokens: those change hue between themes. Use `--chart-1` through `--chart-5`, UTC
 intervals, units, exact values, readable legends and accessible data tables. Compare each series
 from zero; missing measurements stay missing, never zero. Container width decides the layout.
 
-The playground composer is an intentional exception to the shared control geometry (a 28px
-surface, 40px circular actions and a pill model picker); its palette is scoped to the composer.
+The playground composer is an intentional exception to the shared control geometry, after coss's
+composer particle: a 26px pill holding only the attach "+" and the round send, with what it is
+sent to in a quiet row underneath — *Clear* on the left; the model/effort picker and *Settings* on
+the right. The picker is one button (the model's id, truncated, and its effort) opening a popover:
+the effort slider over the levels the model supports (none → max, no "default"), under a row that
+slides over to the searchable model list; a model without effort, or a capability that is not chat,
+opens straight on the list. The settings dialog never repeats the model or the effort. An answer's
+reasoning and tool calls are its *process*: one line above the text (`ProcessRow`: the thinking
+glyph and phrases while it works, *Done in N steps ›* after) opens a side panel of the steps
+(`ProcessPanel`, `ProcessTrace`; a bottom sheet under 1024px). The panel is a sidebar, not a card
+in the page: 320px, portaled into the shell's right-edge slot (`SIDE_PANEL_SLOT`) so it spans the
+window's height, with the left sidebar's anatomy (40px header row over a hairline, edge scroll area).
+Opening it focuses the panel itself, never its close button.
+The playground is a layout of its own, not a page in the shell's frame: its root is marked
+`data-fill-viewport`, which drops the frame's max width and padding. The transcript is one
+`ScrollArea` across the whole column (its bar at the column's edge), the conversation and the
+composer are centred inside it, and the composer row ends 12px above the window's bottom.
+An answer reads at 16px on a 24px line, like the reader's own bubble; a step's text in the panel
+stays at the panel's 14px (`Markdown compact`). The steps are never unfolded inside
+the transcript, where they would bury the answer. Waiting for the first chunk uses the same glyph
+(`ThinkingIndicator`), so the first step takes over the line without a jump. Its
+palette is scoped to the composer.
 
 ## 9. Copy
+
+**Less text is the feature.** A panel has at most one short description; a field has a label and,
+only when the label cannot carry it, a placeholder example. Help under a field is for the rare line
+that changes a decision. Never repeat a unit on every label (*Input (cents / 1M tokens)* ten
+times): say it once in the panel's description. Never show raw enum values (`simple-shuffle`,
+`rate_limit`): give each option a human label. A paragraph that explains internals belongs in the
+docs, not the screen.
 
 English, second person, short and concrete: "Create a deployment to make its public model
 available", not "Here you can manage deployments". Buttons are verbs: *Create deployment*, *Save
 changes*, *Revoke key*. Domain words, used consistently: **public model**, **deployment**,
 **adapter**, **upstream model**, **API key** (virtual key), **operator**.
 
-## 10. Accessibility and verification
+## 10. Scrolling
+
+Anything that scrolls *inside* the page — tables wider than their panel, payload viewers, chart
+data tables, popups — scrolls through coss's `ScrollArea` (`#/components/ui/primitives/scroll-area`,
+`scrollFade` on, `viewportClassName` for a `max-h-*`), never the browser's own scrollbar. The page
+itself keeps the native scrollbar. Popups (selects, comboboxes, menus) keep one padding on every side, *inside* the scroll area,
+and the scroll area reaches the popup's border: the `scrollbar="popup"` thumb (2px) lives in that
+padding against the border, like the sidebar's, never in a gutter that shifts the options and never
+over them. Lists grow up to 24rem before they scroll. A horizontal bar is a 12px target holding a 6px
+thumb (8px on hover), 1px from the bottom edge, above the content; tables give it its own strip
+under the last row (`scrollbarGutter`), so dragging it never clicks a row.
+
+## 11. Accessibility and verification
 
 - Every control has a visible label or `aria-label`; overlays trap focus (primitives handle it).
 - Contrast comes from tokens; never lower text opacity below `text-muted-foreground`.

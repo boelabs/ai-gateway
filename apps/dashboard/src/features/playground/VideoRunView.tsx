@@ -7,11 +7,11 @@ import { Button } from "#/components/ui/button";
 import { Status } from "#/components/ui/status";
 
 import {
-	Download as IconDownload,
-	RefreshCw as IconRefresh,
-	RotateCcw as IconRotate2,
-	Play as IconPlayerPlay,
-} from "lucide-react";
+	DownloadSimpleIcon as IconDownload,
+	ArrowsClockwiseIcon as IconRefresh,
+	ArrowCounterClockwiseIcon as IconRotate2,
+	PlayIcon as IconPlayerPlay,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	type VideoReference,

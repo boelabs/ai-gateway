@@ -2,7 +2,7 @@
 
 import { Combobox } from "#/components/ui/combobox";
 import { Field } from "#/components/ui/field";
-import { ChevronsUpDown } from "lucide-react";
+import { CaretUpDownIcon as ChevronsUpDown } from "@phosphor-icons/react/dist/ssr";
 import { useMemo, useState } from "react";
 
 /**

@@ -17,15 +17,15 @@ import { Button } from "#/components/ui/button";
 import { Status } from "#/components/ui/status";
 
 import {
-	RefreshCw as IconRefresh,
-	Layers2 as IconVersions,
-	SquarePen as IconEdit,
-	Upload as IconUpload,
-	FileCode as IconCode,
-	Puzzle as IconPuzzle,
-	Trash2 as IconTrash,
-	Plus as IconPlus,
-} from "lucide-react";
+	ArrowsClockwiseIcon as IconRefresh,
+	StackSimpleIcon as IconVersions,
+	NotePencilIcon as IconEdit,
+	UploadSimpleIcon as IconUpload,
+	FileCodeIcon as IconCode,
+	PuzzlePieceIcon as IconPuzzle,
+	TrashIcon as IconTrash,
+	PlusIcon as IconPlus,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	loadArtifactVersionsAction,
@@ -316,14 +316,14 @@ export function ExtensionsView({
 			render: (row) => {
 				const live = runtimeById.get(row.id);
 				return (
-					<div className="flex flex-col">
-						<span className="font-medium">{row.id}</span>
-						{live?.hooks.length ? (
-							<span className="text-xs text-fg-muted">
-								{live.hooks.join(", ")}
-							</span>
-						) : null}
-					</div>
+					<span
+						className="font-medium"
+						title={
+							live?.hooks.length ? `Hooks: ${live.hooks.join(", ")}` : undefined
+						}
+					>
+						{row.id}
+					</span>
 				);
 			},
 		},
@@ -340,20 +340,14 @@ export function ExtensionsView({
 				if (!live) {
 					return <Status tone="muted">not loaded</Status>;
 				}
+				// The reason and the last error are the status's tooltip, not more lines in the row.
+				const why = [live.disabledReason, live.lastError]
+					.filter(Boolean)
+					.join(" · ");
 				return (
-					<div className="flex flex-col gap-1">
-						<div className="flex items-center gap-1.5">
-							<Status tone={instanceTone(live.status)}>{live.status}</Status>
-							{live.critical ? <Status tone="warning">critical</Status> : null}
-						</div>
-						{live.disabledReason ? (
-							<span className="text-xs text-fg-muted">
-								{live.disabledReason}
-							</span>
-						) : null}
-						{live.lastError ? (
-							<span className="text-xs text-danger">{live.lastError}</span>
-						) : null}
+					<div className="flex items-center gap-1.5" title={why || undefined}>
+						<Status tone={instanceTone(live.status)}>{live.status}</Status>
+						{live.critical ? <Status tone="warning">critical</Status> : null}
 					</div>
 				);
 			},

@@ -1,5 +1,6 @@
 "use client";
 
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import type { ReactNode, RefObject } from "react";
 import { ErrorNote } from "#/components/ui/page";
 import { useEffect } from "react";
@@ -49,11 +50,12 @@ export function Workspace({
 
 	return (
 		<div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-			<div
-				// Bleeding into the shell's padding puts the scrollbar against the window edge, where a
-				// scrollbar belongs; the padding is given back inside so the text stays where it was.
-				className="-mr-4 min-h-0 flex-1 scrollbar-gutter-stable overflow-y-auto overscroll-y-contain pt-6 pr-4 md:-mr-8 md:pr-8"
-				ref={scroll}
+			{/* The whole column scrolls, so the bar sits at its edge. */}
+			<ScrollArea
+				className="min-h-0 flex-1"
+				scrollbar="edge"
+				viewportClassName="pt-6"
+				viewportProps={{ ref: scroll }}
 			>
 				{empty ? (
 					<div className="flex h-full items-center justify-center px-4 pb-8 sm:hidden">
@@ -66,9 +68,9 @@ export function Workspace({
 						{transcript}
 					</div>
 				)}
-			</div>
+			</ScrollArea>
 			<div
-				className={`relative mx-auto w-full shrink-0 px-2 pt-3 pb-2 sm:max-w-2xl sm:px-0 sm:pb-4 xl:max-w-3xl ${
+				className={`relative mx-auto w-full shrink-0 px-2 pt-3 pb-3 sm:max-w-[calc(var(--container-2xl)+3rem)] sm:px-6 xl:max-w-[calc(var(--container-3xl)+3rem)] ${
 					empty
 						? "sm:absolute sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2"
 						: ""

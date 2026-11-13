@@ -1,8 +1,9 @@
 "use client";
 
+import { ScrollArea } from "./primitives/scroll-area";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import type { ComponentProps } from "react";
-import { X as IconX } from "lucide-react";
+import { XIcon as IconX } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "#/shared/lib/classes";
 import { Button } from "./button";
 
@@ -173,18 +174,20 @@ export function DialogBody({
 	...props
 }: DialogSectionProps) {
 	return (
-		<div
+		// coss's scroll area: the body's padding is inside it, and its thin thumb sits in that padding
+		// against the dialog's edge rather than the browser's scrollbar eating into the content.
+		<ScrollArea
 			{...props}
-			className={cn(
-				// coss's DialogPanel: right under its header, the header's own bottom padding is the gap.
-				"min-h-0 min-w-0 flex-1 scroll-p-6 scrollbar-gutter-stable overflow-y-auto overscroll-contain p-6 in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-1",
-				className,
-			)}
+			className={cn("h-auto min-h-0 min-w-0 flex-1", className)}
 			data-slot="dialog-body"
+			scrollbar="edge"
+			scrollFade
 			style={appearanceStyle({ borderRadius, width }, style)}
+			viewportClassName="scroll-p-6 overscroll-contain p-6 in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-1"
 		>
+			{/* coss's DialogPanel: right under its header, the header's own bottom padding is the gap. */}
 			<div className="flex min-w-0 flex-col gap-4">{children}</div>
-		</div>
+		</ScrollArea>
 	);
 }
 

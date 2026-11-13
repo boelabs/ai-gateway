@@ -1,27 +1,25 @@
 import { ActivitySkeleton, BreakdownSkeleton } from "./ChartSkeleton";
-import { TextSkeleton } from "#/shared/components/TextSkeleton";
 import { CacheUsageSkeleton } from "./OverviewSkeleton";
 import { Section } from "#/shared/components/Section";
-import { ContentPanel } from "#/components/ui/card";
+import { RangeFilterSkeleton } from "#/shared/components/RangeFilter.tsx";
 
 import {
 	StatGridSkeleton,
+	ButtonSkeleton,
 	TableSkeleton,
 	Skeleton,
 } from "#/shared/components/Skeleton.tsx";
 
-/** The three tables `Metrics` renders, with the headings and headers it gives them. */
+/** The tables `Metrics` renders, with the headings and headers it gives them. */
 const TABLES = [
 	{
 		title: "By deployment",
-		description:
-			"Select one to inspect its consumption and failures. Error rates use finished attempts; deleted deployments stay while their history is retained.",
+		description: "Select one to inspect it. Error rates use finished attempts.",
 		headers: [
 			"Deployment",
 			"Attempts",
-			"Reported tokens",
-			"Cached input",
-			"Errors",
+			"Tokens",
+			"Cache reuse",
 			"Error rate",
 			"Latency p95",
 		],
@@ -29,23 +27,29 @@ const TABLES = [
 	},
 	{
 		title: "By public model",
-		description:
-			"The model name clients request. Each request is counted once, even if it required several attempts.",
+		description: "Each request counts once, however many attempts it took.",
 		headers: [
 			"Public model",
 			"Requests",
-			"Request tokens",
+			"Tokens",
 			"Errors",
-			"Consumer cost",
+			"Cost",
 			"Latency p95",
 		],
 		toolbar: true,
 	},
 	{
+		title: "By API key",
+		description: "Spend per API key or operator, playground included.",
+		headers: ["Name", "Requests", "Tokens", "Cache reuse", "Cost"],
+		toolbar: true,
+		action: true,
+	},
+	{
 		title: "Deployment failures",
 		description:
 			"Failed attempts, including failures recovered by retries or fallback.",
-		headers: ["Deployment", "Failure", "Phase", "Provider status", "Errors"],
+		headers: ["Deployment", "Failure", "Phase", "Errors"],
 		toolbar: false,
 	},
 ];
@@ -58,21 +62,17 @@ export function MetricsSkeleton() {
 			className="flex flex-col gap-6"
 			role="status"
 		>
-			<ContentPanel className="@container min-w-0 p-5">
-				<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-					{["Period · UTC", "Operation", "Public model", "Deployment"].map(
-						(label) => (
-							<div key={label}>
-								<div className="mb-2 text-sm font-medium">
-									<TextSkeleton length={label.length} />
-								</div>
-								<Skeleton className="h-8 rounded-lg sm:h-7" />
-							</div>
-						),
-					)}
-				</div>
-				<Skeleton className="mt-3 h-3" width="min(100%, 36rem)" />
-			</ContentPanel>
+			<div className="flex flex-wrap items-center gap-2">
+				<RangeFilterSkeleton period="today" />
+				{["13rem", "13rem", "15rem"].map((width, index) => (
+					<Skeleton
+						className="h-9 rounded-lg"
+						// biome-ignore lint/suspicious/noArrayIndexKey: fixed, positional placeholders.
+						key={index}
+						width={width}
+					/>
+				))}
+			</div>
 			<StatGridSkeleton
 				className="grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
 				count={6}
@@ -85,8 +85,13 @@ export function MetricsSkeleton() {
 			</div>
 			<CacheUsageSkeleton upstream />
 			<BreakdownSkeleton />
-			{TABLES.map(({ title, description, headers, toolbar }) => (
-				<Section description={description} key={title} title={title}>
+			{TABLES.map(({ title, description, headers, toolbar, ...rest }) => (
+				<Section
+					action={"action" in rest ? <ButtonSkeleton label={6} /> : undefined}
+					description={description}
+					key={title}
+					title={title}
+				>
 					<TableSkeleton
 						headers={headers}
 						pagination

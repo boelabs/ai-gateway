@@ -3,9 +3,9 @@
 import { Button } from "#/components/ui/button";
 
 import {
-	ChevronRight as IconChevronRight,
-	ChevronLeft as IconChevronLeft,
-} from "lucide-react";
+	CaretRightIcon as IconChevronRight,
+	CaretLeftIcon as IconChevronLeft,
+} from "@phosphor-icons/react/dist/ssr";
 
 const count = new Intl.NumberFormat("en-US");
 

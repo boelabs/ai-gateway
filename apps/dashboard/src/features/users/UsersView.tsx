@@ -18,13 +18,13 @@ import { Button } from "#/components/ui/button";
 import { useState } from "react";
 
 import {
-	SearchX as IconSearchX,
-	Trash2 as IconTrash,
-	KeyRound as IconKey,
-	Check as IconCheck,
-	Users as IconUsers,
-	Ban as IconBan,
-} from "lucide-react";
+	MagnifyingGlassMinusIcon as IconSearchX,
+	TrashIcon as IconTrash,
+	KeyIcon as IconKey,
+	CheckIcon as IconCheck,
+	UsersIcon as IconUsers,
+	ProhibitIcon as IconBan,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	setPasswordAction,

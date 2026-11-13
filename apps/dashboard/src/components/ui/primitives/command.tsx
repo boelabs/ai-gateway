@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog as CommandDialogPrimitive } from "@base-ui/react/dialog";
-import { SearchIcon } from "lucide-react";
+import { MagnifyingGlassIcon as SearchIcon } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "#/shared/lib/classes";
 import type * as React from "react";
 

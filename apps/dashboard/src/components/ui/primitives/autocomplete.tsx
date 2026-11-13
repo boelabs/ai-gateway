@@ -5,7 +5,10 @@ import { controlRadiusVariants } from "#/components/ui/primitives/control-radius
 import { Input, type InputProps } from "#/components/ui/primitives/input";
 import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { cva, type VariantProps } from "class-variance-authority";
-import { ChevronsUpDownIcon, XIcon } from "lucide-react";
+import {
+	CaretUpDownIcon as ChevronsUpDownIcon,
+	XIcon,
+} from "@phosphor-icons/react/dist/ssr";
 import { cn } from "#/shared/lib/classes";
 import type React from "react";
 
@@ -153,7 +156,7 @@ export function AutocompleteItem({
 	return (
 		<AutocompletePrimitive.Item
 			className={cn(
-				"flex min-h-8 cursor-default items-center rounded-sm px-2 py-1 text-base outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground sm:min-h-7 sm:text-sm data-disabled:pointer-events-none data-disabled:opacity-64",
+				"flex min-h-9 cursor-default items-center rounded-(--ui-radius-item) px-2 py-1 text-base outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground sm:text-sm data-disabled:pointer-events-none data-disabled:opacity-64",
 				className,
 			)}
 			data-slot="autocomplete-item"

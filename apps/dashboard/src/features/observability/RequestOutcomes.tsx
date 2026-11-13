@@ -22,6 +22,53 @@ function share(rate: number | null): string {
  * one because they answer different questions — what the caller got back, and what the gateway had
  * to do to deliver it — and stacking them fills the column the chart sets the height of.
  */
+const TICKS = 40;
+
+/**
+ * The outcomes as a row of ticks, each a fortieth of the finished requests, coloured by how they
+ * ended. A share under one tick still gets one, so a single error is never invisible.
+ */
+function OutcomeTicks({
+	outcomes,
+	total,
+}: {
+	outcomes: { label: string; value: number; color: string }[];
+	total: number;
+}) {
+	const present = outcomes.filter((row) => row.value > 0);
+	const counts = present.map((row) =>
+		Math.max(1, Math.round((row.value / Math.max(total, 1)) * TICKS)),
+	);
+	/** Rounding and the one-tick floor can overshoot; the largest share gives the difference back. */
+	const overflow = counts.reduce((sum, n) => sum + n, 0) - TICKS;
+	if (overflow !== 0 && counts.length > 0) {
+		const largest = counts.indexOf(Math.max(...counts));
+		counts[largest] = Math.max(1, (counts[largest] ?? 0) - overflow);
+	}
+	const ticks = present.flatMap((row, index) =>
+		Array.from({ length: counts[index] ?? 0 }, () => row.color),
+	);
+	return (
+		<div aria-hidden className="mt-5 flex h-8 gap-[3px]">
+			{total > 0
+				? ticks.map((color, index) => (
+						<span
+							className={`min-w-0 flex-1 rounded-[2px] ${color}`}
+							// biome-ignore lint/suspicious/noArrayIndexKey: ticks are positional.
+							key={index}
+						/>
+					))
+				: Array.from({ length: TICKS }, (_, index) => (
+						<span
+							className="min-w-0 flex-1 rounded-[2px] bg-muted"
+							// biome-ignore lint/suspicious/noArrayIndexKey: ticks are positional.
+							key={index}
+						/>
+					))}
+		</div>
+	);
+}
+
 export function RequestOutcomes({ metrics }: { metrics: Metrics }) {
 	const outcomes = [
 		{
@@ -53,33 +100,14 @@ export function RequestOutcomes({ metrics }: { metrics: Metrics }) {
 	);
 
 	return (
-		<Panel
-			description="Reliability across finished requests"
-			title={<h2>Request outcomes</h2>}
-		>
+		<Panel description="How finished requests ended." title={<h2>Outcomes</h2>}>
 			<div className="flex items-baseline gap-2">
 				<span className="text-[2rem] leading-none font-semibold tracking-tight tabular-nums">
 					{share(metrics.successRate)}
 				</span>
-				<span className="text-xs text-fg-muted">success rate</span>
+				<span className="text-sm text-muted-foreground">success rate</span>
 			</div>
-			<div
-				aria-hidden
-				className="mt-5 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-surface-2"
-			>
-				{outcomes.map(
-					(row) =>
-						row.value > 0 && (
-							<span
-								className={row.color}
-								key={row.label}
-								style={{
-									width: `${metrics.finishedRequests > 0 ? (row.value / metrics.finishedRequests) * 100 : 0}%`,
-								}}
-							/>
-						),
-				)}
-			</div>
+			<OutcomeTicks outcomes={outcomes} total={metrics.finishedRequests} />
 			<dl className="mt-5 grid grid-cols-2 gap-x-5 gap-y-3.5">
 				{outcomes.map((row) => (
 					<div
@@ -131,7 +159,7 @@ export function Reliability({ metrics }: { metrics: Metrics }) {
 	];
 	return (
 		<Panel
-			description="What it took to finish them, across all attempts"
+			description="What it took to deliver them."
 			title={<h2>Delivery</h2>}
 		>
 			<dl className="divide-y divide-border/50 text-sm">

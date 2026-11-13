@@ -7,9 +7,9 @@ import { Status } from "#/components/ui/status";
 import type { ImageRun } from "./images";
 
 import {
-	Download as IconDownload,
-	RotateCcw as IconRotate2,
-} from "lucide-react";
+	DownloadSimpleIcon as IconDownload,
+	ArrowCounterClockwiseIcon as IconRotate2,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	MESSAGE_ACTION_ICON,
@@ -79,7 +79,15 @@ export function ImageRunView({
 				aria-label="Assistant message"
 				className="flex w-full min-w-0 flex-col gap-2"
 			>
-				{run.state === "running" ? <ResponseLoader /> : null}
+				{run.state === "running" ? (
+					<ResponseLoader
+						words={[
+							"Generating the image",
+							"Composing the scene",
+							"Adding the details",
+						]}
+					/>
+				) : null}
 				{run.state === "stopped" ? (
 					<div className="text-xs text-fg-muted">
 						<Status tone="muted">Stopped</Status>

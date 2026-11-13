@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useSession } from "#/features/auth/session.tsx";
-import { PinIcon, PinOffIcon } from "lucide-react";
+import {
+	PushPinIcon as PinIcon,
+	PushPinSlashIcon as PinOffIcon,
+} from "@phosphor-icons/react/dist/ssr";
 import { Button } from "#/components/ui/button";
 import { usePathname } from "next/navigation";
 import { cn } from "#/shared/lib/classes";

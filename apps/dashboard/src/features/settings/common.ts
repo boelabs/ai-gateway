@@ -47,6 +47,30 @@ export const ROUTING_STRATEGIES = [
  */
 export const PARAMETER_STRATEGIES = ["drop", "error", "allow"] as const;
 
+/** What each strategy means, in the words an operator would choose it by. */
+export const ROUTING_STRATEGY_LABELS: Record<
+	(typeof ROUTING_STRATEGIES)[number],
+	string
+> = {
+	"simple-shuffle": "Shuffle evenly",
+	"least-busy": "Least busy",
+	"usage-based-tpm": "Most token headroom",
+	"usage-based-rpm": "Most request headroom",
+	"latency-based": "Lowest latency",
+	"throughput-based": "Highest throughput",
+	"price-based": "Cheapest",
+	"health-aware": "Healthiest",
+};
+
+export const PARAMETER_STRATEGY_LABELS: Record<
+	(typeof PARAMETER_STRATEGIES)[number],
+	string
+> = {
+	drop: "Drop them silently",
+	error: "Reject the request",
+	allow: "Send them anyway",
+};
+
 export const FALLBACK_REASONS = [
 	"general",
 	"context_window",
@@ -135,7 +159,7 @@ export const ROUTER_NUMERIC_FIELDS: readonly {
 		key: "allowedFails",
 		group: "opening",
 		label: "Allowed fails",
-		hint: "Absolute ceiling: this many failures open the circuit no matter how much traffic succeeded. It is the backstop for a deployment failing outright, not the main rule.",
+		hint: "Failures that take it out regardless of the rate.",
 		min: 0,
 		unit: null,
 	},
@@ -143,7 +167,7 @@ export const ROUTER_NUMERIC_FIELDS: readonly {
 		key: "minWindowRequests",
 		group: "opening",
 		label: "Minimum attempts",
-		hint: "Attempts the window needs before the failure rate is allowed to decide anything. Below this, three failures after a quiet hour read as 100%.",
+		hint: "Attempts needed before the rate counts.",
 		min: 1,
 		unit: null,
 	},
@@ -151,7 +175,7 @@ export const ROUTER_NUMERIC_FIELDS: readonly {
 		key: "failureWindowSeconds",
 		group: "opening",
 		label: "Failure window",
-		hint: "How long failures and attempts are counted for.",
+		hint: "How far back failures are counted.",
 		min: 1,
 		unit: "s",
 	},
@@ -159,7 +183,7 @@ export const ROUTER_NUMERIC_FIELDS: readonly {
 		key: "cooldownSeconds",
 		group: "cooldown",
 		label: "Cooldown",
-		hint: "How long a deployment stays out after its circuit opens. Zero disables automatic cooldown entirely.",
+		hint: "Time out after it is taken out. 0 disables it.",
 		min: 0,
 		unit: "s",
 	},
@@ -167,7 +191,7 @@ export const ROUTER_NUMERIC_FIELDS: readonly {
 		key: "maxCooldownSeconds",
 		group: "cooldown",
 		label: "Max cooldown",
-		hint: "Ceiling for the escalating cooldown.",
+		hint: "Longest a cooldown can grow to.",
 		min: 1,
 		unit: "s",
 	},
@@ -175,7 +199,7 @@ export const ROUTER_NUMERIC_FIELDS: readonly {
 		key: "halfOpenProbeSeconds",
 		group: "cooldown",
 		label: "Half-open probe",
-		hint: "How long one probe request may hold the recovery slot before another may try.",
+		hint: "How long one recovery probe may run.",
 		min: 1,
 		unit: "s",
 	},
@@ -183,7 +207,7 @@ export const ROUTER_NUMERIC_FIELDS: readonly {
 		key: "configurationCooldownSeconds",
 		group: "cooldown",
 		label: "Configuration cooldown",
-		hint: "Applied when the failure looks like misconfiguration (401, 403, 404) rather than load.",
+		hint: "After a 401, 403 or 404.",
 		min: 1,
 		unit: "s",
 	},
@@ -191,7 +215,7 @@ export const ROUTER_NUMERIC_FIELDS: readonly {
 		key: "throttleCooldownSeconds",
 		group: "cooldown",
 		label: "Throttle cooldown",
-		hint: "Applied when the provider answers 429. Shared by every deployment in the same failure domain.",
+		hint: "After a 429, shared across a shared quota.",
 		min: 1,
 		unit: "s",
 	},
@@ -199,7 +223,7 @@ export const ROUTER_NUMERIC_FIELDS: readonly {
 		key: "retryAfterSeconds",
 		group: "cooldown",
 		label: "Retry after",
-		hint: "Minimum wait before retrying the same upstream. A deployment not yet tried is used at once; the same one waits 0.5 s, doubling to 8 s.",
+		hint: "Least wait before retrying the same upstream.",
 		min: 0,
 		unit: "s",
 	},

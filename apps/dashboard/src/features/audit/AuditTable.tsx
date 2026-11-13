@@ -12,9 +12,9 @@ import type { AuditEntry } from "./api.ts";
 import { splitAction } from "./common.ts";
 
 import {
-	ShieldCheck as IconShieldCheck,
-	SearchX as IconSearchX,
-} from "lucide-react";
+	ShieldCheckIcon as IconShieldCheck,
+	MagnifyingGlassMinusIcon as IconSearchX,
+} from "@phosphor-icons/react/dist/ssr";
 
 function statusTone(status: number | null) {
 	if (status === null) {
