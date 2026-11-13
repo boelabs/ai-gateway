@@ -51,12 +51,20 @@ export function Calendar({
 				weekday:
 					"flex size-9 items-center justify-center font-normal text-muted-foreground text-xs",
 				week: "mt-0.5 flex w-full",
-				day: "group/day relative size-9 p-0 text-center text-sm data-[selected]:bg-accent [&.rdp-range_start]:rounded-s-lg [&.rdp-range_end]:rounded-e-lg [&.rdp-range_middle]:rounded-none data-[selected]:not-[.rdp-range_middle]:rounded-lg first:data-[selected]:rounded-s-lg last:data-[selected]:rounded-e-lg",
+				/*
+				 * A range is an accent band across its cells, rounded where it starts, ends or wraps to a
+				 * new week; its two ends are primary buttons on top. The radius rules only ever add
+				 * rounding, so no two of them compete on specificity or source order.
+				 */
+				day: "group/day relative size-9 p-0 text-center text-sm [&.range-start,&.range-middle,&.range-end]:bg-accent [&.range-start]:rounded-s-lg [&.range-end]:rounded-e-lg [&[data-selected]]:first:rounded-s-lg [&[data-selected]]:last:rounded-e-lg",
 				day_button:
-					"inline-flex size-9 cursor-pointer items-center justify-center rounded-lg tabular-nums outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring group-[.rdp-range_middle]/day:hover:bg-transparent group-[.rdp-range_start]/day:bg-primary group-[.rdp-range_start]/day:text-primary-foreground group-[.rdp-range_end]/day:bg-primary group-[.rdp-range_end]/day:text-primary-foreground group-data-[selected]/day:not-group-[.rdp-range_middle]/day:bg-primary group-data-[selected]/day:not-group-[.rdp-range_middle]/day:text-primary-foreground",
-				range_start: "rdp-range_start",
-				range_middle: "rdp-range_middle",
-				range_end: "rdp-range_end",
+					"inline-flex size-9 cursor-pointer items-center justify-center rounded-lg tabular-nums outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring group-[.range-middle]/day:hover:bg-transparent group-data-[selected]/day:not-group-[.range-middle]/day:bg-primary group-data-[selected]/day:not-group-[.range-middle]/day:text-primary-foreground",
+				// No underscores: in a Tailwind arbitrary value `_` stands for a space, so a selector
+				// on react-day-picker's own `rdp-range_start` compiles to `.rdp-range start` and never
+				// matches.
+				range_start: "range-start",
+				range_middle: "range-middle",
+				range_end: "range-end",
 				today: "font-semibold [&:not([data-selected])>button]:text-primary",
 				outside: "text-muted-foreground/60",
 				disabled: "pointer-events-none text-muted-foreground/40",
