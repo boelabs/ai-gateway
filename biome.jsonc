@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.6.7/schema.json",
 	"root": true,
 
 	// Ultracite is a pinned rule set on top of Biome, not a second tool: it only supplies
@@ -72,7 +72,17 @@
 			 */
 			"includes": ["**/*.test.ts", "**/*.test.tsx", "**/tests/**"],
 			"linter": {
-				"rules": { "style": { "noNonNullAssertion": "off" } }
+				"rules": {
+					"style": { "noNonNullAssertion": "off" },
+					/*
+					 * Ultracite 8.2 extends this to tests: 32 findings in 9 files (Ultracite 8.1 left
+					 * tests out). Every one is a `Record<string, any>` over parsed WebSocket or JSON
+					 * output that the test then reads several levels deep inside an assertion; with
+					 * `noUncheckedIndexedAccess` an `unknown` there means a guard per level of a fixture
+					 * the assertion is already checking. Production code is still held to it.
+					 */
+					"suspicious": { "noExplicitAny": "off" }
+				}
 			}
 		}
 	],

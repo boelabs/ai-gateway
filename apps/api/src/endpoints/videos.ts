@@ -65,7 +65,7 @@ import {
 import {
 	type VideoInputResolutionMetadata,
 	createVideoInputResolver,
-} from "#files/requestContentInputs.ts";
+} from "#files/videoInputResolver.ts";
 
 function scopeOf(c: Context<AppEnv>): StateScope {
 	return stateScopeOf(getAuth(c));

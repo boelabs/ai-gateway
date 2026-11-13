@@ -1,12 +1,13 @@
 /** Candidate-aware normalization and secure materialization for canonical media inputs. */
 
-import type { CanonicalVideoRequest, VideoUrlReference } from "#core/videos.ts";
 import { fetchPinnedHttps, type ResolvedAddress } from "./pinnedHttpsFetch.ts";
 import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
 import type { ContentPartInputSupport } from "#adapters/types.ts";
 import type { UpstreamTransport } from "#core/transport.ts";
+import { AsyncSemaphore } from "./asyncSemaphore.ts";
 import { pdfWorkerPool } from "./pdfWorkerPool.ts";
 import { GatewayError } from "#core/errors.ts";
+import { ByteBudget } from "./byteBudget.ts";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
@@ -25,7 +26,7 @@ const MAX_TEXT_CHARACTERS = 2_000_000;
 const MAX_PDF_PAGES = 200;
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
-const MAX_CONCURRENT_FETCHES = 4;
+export const MAX_CONCURRENT_FETCHES = 4;
 /**
  * Upper bound on file and image parts in one request, across every message. It matches the largest
  * per-request image count a supported provider documents (OpenAI: 1,500 images per request), so no
@@ -131,12 +132,12 @@ type ResolvedFetch = (
 	addresses: readonly ResolvedAddress[],
 ) => Promise<Response>;
 
-interface ResolverDependencies {
+export interface ResolverDependencies {
 	fetch: ResolvedFetch;
 	resolveHostname: ResolveHostname;
 }
 
-interface MaterializedInput {
+export interface MaterializedInput {
 	bytes: Uint8Array;
 	dataUrl: string;
 	filename?: string;
@@ -145,7 +146,7 @@ interface MaterializedInput {
 
 type MaterializablePart = CanonicalFilePart | CanonicalImagePart;
 
-interface ContentSource {
+export interface ContentSource {
 	kind: "provider_file_id" | "url" | "data_url";
 	value: string;
 }
@@ -164,19 +165,7 @@ export interface ResolvedContentInputRequest {
 	metadata?: ContentInputResolutionMetadata;
 }
 
-export interface VideoInputResolutionMetadata {
-	materializedAudio: number;
-	materializedImages: number;
-	materializedVideo: number;
-	totalBytes: number;
-}
-
-export interface ResolvedVideoInputRequest {
-	request: CanonicalVideoRequest;
-	metadata?: VideoInputResolutionMetadata;
-}
-
-const DEFAULT_DEPENDENCIES: ResolverDependencies = {
+export const DEFAULT_DEPENDENCIES: ResolverDependencies = {
 	fetch: (url, options, addresses) =>
 		fetchPinnedHttps(url, addresses, {
 			method: options.method,
@@ -187,7 +176,7 @@ const DEFAULT_DEPENDENCIES: ResolverDependencies = {
 		lookup(hostname, { all: true, verbatim: true }),
 };
 
-function requestError(
+export function requestError(
 	message: string,
 	code: string,
 	publicMessage: string,
@@ -205,7 +194,7 @@ function requestError(
 	});
 }
 
-function candidateInputError(
+export function candidateInputError(
 	message: string,
 	code: string,
 	publicMessage: string,
@@ -352,7 +341,7 @@ function inputParam(kind: RemoteInputKind): string {
 	return kind === "file" ? "file_url" : `${kind}_url`;
 }
 
-function parseSafeHttpsUrl(
+export function parseSafeHttpsUrl(
 	value: string,
 	kind: RemoteInputKind,
 	errorParam = "messages",
@@ -688,7 +677,7 @@ async function readLimitedBody(
 	return bytes;
 }
 
-async function fetchInput(
+export async function fetchInput(
 	value: string,
 	signal: AbortSignal,
 	dependencies: ResolverDependencies,
@@ -785,7 +774,7 @@ async function fetchInput(
 	throw new Error("unreachable");
 }
 
-function decodeDataUrl(
+export function decodeDataUrl(
 	value: string,
 	filename: string | undefined,
 	kind: RemoteInputKind,
@@ -859,7 +848,7 @@ function decodeDataUrl(
 	};
 }
 
-function mimeMatches(
+export function mimeMatches(
 	mimeType: string | undefined,
 	patterns: readonly string[] | undefined,
 ): boolean {
@@ -962,7 +951,7 @@ function assertPdfSignature(file: MaterializedInput): void {
 	}
 }
 
-function assertImageContent(
+export function assertImageContent(
 	image: MaterializedInput,
 	param = "messages",
 ): void {
@@ -1085,81 +1074,16 @@ function portableTextPart(
 	};
 }
 
-/**
- * The bytes one request may download, shared by its remote inputs. Each fetch reserves what it may
- * read before it starts and is capped to that, so concurrent downloads cannot together pass the
- * limit before any of them is counted. A fetch that does not fit waits for another to settle and
- * return what it did not use; only when nothing is in flight does it get the true remainder, and a
- * request with none left is refused.
- */
-class ByteBudget {
-	#remaining: number;
-	#inFlight = 0;
-	readonly #waiters: Array<() => void> = [];
-
-	constructor(limit: number) {
-		this.#remaining = limit;
-	}
-
-	async run<T extends { bytes: Uint8Array }>(
-		maxBytes: number,
-		param: string,
-		fetch: (grant: number) => Promise<T>,
-	): Promise<T> {
-		while (this.#remaining < maxBytes && this.#inFlight > 0) {
-			await new Promise<void>((resolve) => this.#waiters.push(resolve));
-		}
-		const grant = Math.min(maxBytes, this.#remaining);
-		if (grant <= 0) {
-			throw requestError(
-				`Remote content inputs exceed the ${MAX_PORTABLE_CONTENT_INPUT_BYTES} byte request limit`,
-				"content_inputs_too_large",
-				"The combined content inputs are too large for portable processing.",
-				param,
-			);
-		}
-		this.#remaining -= grant;
-		this.#inFlight += 1;
-		let used = 0;
-		try {
-			const result = await fetch(grant);
-			used = result.bytes.byteLength;
-			return result;
-		} finally {
-			this.#remaining += grant - used;
-			this.#inFlight -= 1;
-			for (const wake of this.#waiters.splice(0)) {
-				wake();
-			}
-		}
-	}
-}
-
-class AsyncSemaphore {
-	#available: number;
-	readonly #waiters: Array<() => void> = [];
-
-	constructor(limit: number) {
-		this.#available = limit;
-	}
-
-	async run<T>(operation: () => Promise<T>): Promise<T> {
-		if (this.#available === 0) {
-			await new Promise<void>((resolve) => this.#waiters.push(resolve));
-		} else {
-			this.#available -= 1;
-		}
-		try {
-			return await operation();
-		} finally {
-			const next = this.#waiters.shift();
-			if (next) {
-				next();
-			} else {
-				this.#available += 1;
-			}
-		}
-	}
+/** The download budget one request's remote inputs share. */
+export function contentInputBudget(): ByteBudget {
+	return new ByteBudget(MAX_PORTABLE_CONTENT_INPUT_BYTES, (param) =>
+		requestError(
+			`Remote content inputs exceed the ${MAX_PORTABLE_CONTENT_INPUT_BYTES} byte request limit`,
+			"content_inputs_too_large",
+			"The combined content inputs are too large for portable processing.",
+			param,
+		),
+	);
 }
 
 export class ContentInputResolver {
@@ -1179,7 +1103,7 @@ export class ContentInputResolver {
 	readonly #parsedText = new WeakMap<MaterializedInput, Promise<string>>();
 	readonly #accounted = new WeakSet<MaterializablePart>();
 	readonly #fetches = new AsyncSemaphore(MAX_CONCURRENT_FETCHES);
-	readonly #budget = new ByteBudget(MAX_PORTABLE_CONTENT_INPUT_BYTES);
+	readonly #budget = contentInputBudget();
 	/** Aborted on the first failed fetch, so its siblings stop downloading for a request that failed. */
 	readonly #fetchAbort = new AbortController();
 	#totalBytes = 0;
@@ -1555,257 +1479,6 @@ export function createContentInputResolver(
 	dependencies?: Partial<ResolverDependencies>,
 ): ContentInputResolver {
 	return new ContentInputResolver(request, signal, {
-		...DEFAULT_DEPENDENCIES,
-		...dependencies,
-	});
-}
-
-type VideoMediaKind = "audio" | "image" | "video";
-
-interface VideoMediaPart {
-	kind: VideoMediaKind;
-	param: "frame_images" | "input_references";
-	url: string;
-}
-
-const VIDEO_MEDIA_KINDS: Record<VideoUrlReference["type"], VideoMediaKind> = {
-	image_url: "image",
-	audio_url: "audio",
-	video_url: "video",
-};
-
-function videoMediaKind(ref: VideoUrlReference): VideoMediaKind {
-	return VIDEO_MEDIA_KINDS[ref.type];
-}
-
-function videoMediaParts(request: CanonicalVideoRequest): VideoMediaPart[] {
-	return [
-		...(request.inputReferences ?? [])
-			.filter((ref): ref is VideoUrlReference => ref.type !== "file_id")
-			.map((ref) => ({
-				kind: videoMediaKind(ref),
-				param: "input_references" as const,
-				url: ref.url,
-			})),
-		...(request.frameImages ?? []).map((frame) => ({
-			kind: "image" as const,
-			param: "frame_images" as const,
-			url: frame.url,
-		})),
-	];
-}
-
-function videoSource(
-	url: string,
-	kind: VideoMediaKind,
-	param: string,
-): ContentSource {
-	if (url.length === 0) {
-		throw requestError(
-			`${kind} input source is empty`,
-			`invalid_${kind}_url`,
-			`${kind}_url cannot be empty.`,
-			param,
-		);
-	}
-	if (/^data:/iu.test(url)) {
-		return { kind: "data_url", value: url };
-	}
-	parseSafeHttpsUrl(url, kind, param);
-	return { kind: "url", value: url };
-}
-
-function assertVideoMediaSupported(
-	part: VideoMediaPart,
-	support: ContentPartInputSupport | undefined,
-): void {
-	if (!support?.sources.includes("data_url")) {
-		throw candidateInputError(
-			`The selected transport cannot consume materialized ${part.kind} inputs`,
-			`unsupported_${part.kind}_input`,
-			`The selected deployment cannot consume this ${part.kind} input.`,
-			part.param,
-		);
-	}
-}
-
-/**
- * Materializes every video-generation media URL before adapter execution. Remote URLs are never
- * forwarded to providers: each candidate must explicitly accept a data URL for the media kind.
- */
-export class VideoInputResolver {
-	readonly #request: CanonicalVideoRequest;
-	readonly #signal: AbortSignal;
-	readonly #dependencies: ResolverDependencies;
-	readonly #parts: VideoMediaPart[];
-	readonly #materialized = new Map<string, Promise<MaterializedInput>>();
-	readonly #fetches = new AsyncSemaphore(MAX_CONCURRENT_FETCHES);
-	readonly #budget = new ByteBudget(MAX_PORTABLE_CONTENT_INPUT_BYTES);
-	readonly #fetchAbort = new AbortController();
-
-	constructor(
-		request: CanonicalVideoRequest,
-		signal: AbortSignal,
-		dependencies: ResolverDependencies = DEFAULT_DEPENDENCIES,
-	) {
-		this.#request = request;
-		this.#signal = signal;
-		this.#dependencies = dependencies;
-		this.#parts = videoMediaParts(request);
-		for (const part of this.#parts) {
-			videoSource(part.url, part.kind, part.param);
-		}
-	}
-
-	get hasInputs(): boolean {
-		return this.#parts.length > 0;
-	}
-
-	assertCandidate(
-		candidate: DeploymentCandidate,
-		transport: UpstreamTransport,
-	): void {
-		const support = candidate.adapter.contentInputs?.[transport];
-		for (const part of this.#parts) {
-			assertVideoMediaSupported(part, support?.[part.kind]);
-		}
-	}
-
-	async #materialize(part: VideoMediaPart): Promise<MaterializedInput> {
-		const source = videoSource(part.url, part.kind, part.param);
-		const key = `${part.kind}:${source.kind}:${source.value}`;
-		let pending = this.#materialized.get(key);
-		if (pending === undefined) {
-			pending =
-				source.kind === "url"
-					? this.#fetches
-							.run(() =>
-								this.#budget.run(
-									MAX_PORTABLE_CONTENT_INPUT_BYTES,
-									part.param,
-									(grant) =>
-										fetchInput(
-											source.value,
-											AbortSignal.any([this.#signal, this.#fetchAbort.signal]),
-											this.#dependencies,
-											part.kind,
-											grant,
-											part.param,
-										),
-								),
-							)
-							.catch((error: unknown) => {
-								this.#fetchAbort.abort(error);
-								throw error;
-							})
-					: Promise.resolve(
-							decodeDataUrl(
-								source.value,
-								undefined,
-								part.kind,
-								MAX_PORTABLE_CONTENT_INPUT_BYTES,
-								part.param,
-							),
-						);
-			this.#materialized.set(key, pending);
-		}
-		return pending;
-	}
-
-	async resolveForCandidate(
-		candidate: DeploymentCandidate,
-		transport: UpstreamTransport,
-	): Promise<ResolvedVideoInputRequest> {
-		if (!this.hasInputs) {
-			return { request: this.#request };
-		}
-		this.assertCandidate(candidate, transport);
-		const support = candidate.adapter.contentInputs?.[transport];
-		const resolved = await Promise.all(
-			this.#parts.map(async (part) => {
-				const media = await this.#materialize(part);
-				if (part.kind === "image") {
-					assertImageContent(media, part.param);
-				}
-				const kindSupport = support?.[part.kind];
-				if (
-					!(
-						media.mimeType.startsWith(`${part.kind}/`) &&
-						mimeMatches(media.mimeType, kindSupport?.mimeTypes)
-					) ||
-					(kindSupport?.maxBytes !== undefined &&
-						media.bytes.byteLength > kindSupport.maxBytes)
-				) {
-					throw candidateInputError(
-						`The ${part.kind} input uses unsupported MIME type ${media.mimeType} or exceeds the transport limit`,
-						`unsupported_${part.kind}_input`,
-						`The selected deployment does not support this ${part.kind} input.`,
-						part.param,
-					);
-				}
-				return { media, part };
-			}),
-		);
-		const totalBytes = resolved.reduce(
-			(total, item) => total + item.media.bytes.byteLength,
-			0,
-		);
-		if (totalBytes > MAX_PORTABLE_CONTENT_INPUT_BYTES) {
-			throw requestError(
-				`Video media inputs contain ${totalBytes} bytes, above the ${MAX_PORTABLE_CONTENT_INPUT_BYTES} byte request limit`,
-				"content_inputs_too_large",
-				"The combined video media inputs exceed the 50 MB limit.",
-				"input_references",
-			);
-		}
-
-		let index = 0;
-		// The resolved media are in the order the references were collected, so they are consumed
-		// in that order too; running out means the two walks disagree, which is a bug here.
-		const nextResolved = () => {
-			const entry = resolved[index++];
-			if (entry === undefined) {
-				throw new Error("Resolved media ran out before its references did");
-			}
-			return entry;
-		};
-		const inputReferences = this.#request.inputReferences?.map((ref) => {
-			if (ref.type === "file_id") {
-				return ref;
-			}
-			const { media } = nextResolved();
-			return { ...ref, url: media.dataUrl };
-		});
-		const frameImages = this.#request.frameImages?.map((frame) => {
-			const { media } = nextResolved();
-			return { ...frame, url: media.dataUrl };
-		});
-		return {
-			request: {
-				...this.#request,
-				...(inputReferences === undefined ? {} : { inputReferences }),
-				...(frameImages === undefined ? {} : { frameImages }),
-			},
-			metadata: {
-				materializedAudio: resolved.filter((item) => item.part.kind === "audio")
-					.length,
-				materializedImages: resolved.filter(
-					(item) => item.part.kind === "image",
-				).length,
-				materializedVideo: resolved.filter((item) => item.part.kind === "video")
-					.length,
-				totalBytes,
-			},
-		};
-	}
-}
-
-export function createVideoInputResolver(
-	request: CanonicalVideoRequest,
-	signal: AbortSignal,
-	dependencies?: Partial<ResolverDependencies>,
-): VideoInputResolver {
-	return new VideoInputResolver(request, signal, {
 		...DEFAULT_DEPENDENCIES,
 		...dependencies,
 	});
