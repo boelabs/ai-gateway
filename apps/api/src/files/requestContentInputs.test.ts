@@ -1,5 +1,6 @@
 import { openaicompatibleAdapter } from "#adapters/openaicompatible/index.ts";
 import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
+import { createVideoInputResolver } from "./videoInputResolver.ts";
 import { deepseekAdapter } from "#adapters/deepseek/index.ts";
 import { jsonBody, must } from "#test-support/adapters.ts";
 import { googleAdapter } from "#adapters/google/index.ts";
@@ -10,7 +11,6 @@ import { test } from "node:test";
 
 import {
 	createContentInputResolver,
-	createVideoInputResolver,
 	MAX_CONTENT_INPUT_PARTS,
 } from "./requestContentInputs.ts";
 

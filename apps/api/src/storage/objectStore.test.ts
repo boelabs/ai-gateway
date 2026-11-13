@@ -1,5 +1,5 @@
+import { LocalObjectStore } from "./localObjectStore.ts";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
-import { LocalObjectStore } from "./objectStore.ts";
 import assert from "node:assert/strict";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

@@ -49,7 +49,6 @@ export function bodyOf(request: UpstreamHttpRequest): string {
  * provider payload is the point of these tests, and a fixture that has to be typed first is a
  * fixture nobody writes. Pass a type argument where it helps.
  */
-// biome-ignore lint/suspicious/noExplicitAny: mirrors JSON.parse, which is what this replaced.
 export function jsonBody<T = any>(request: UpstreamHttpRequest): T {
 	return JSON.parse(bodyOf(request)) as T;
 }
