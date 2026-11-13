@@ -28,7 +28,7 @@ const ACCEPTED_ADVISORIES: readonly {
 		url: "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
 		vulnerableVersions: "<=3.0.3",
 		reason:
-			"No fixed release exists; only reached through micromatch <- fast-glob <- shadcn and ultracite (build and lint tooling).",
+			"No fixed release exists; only reached through micromatch <- fast-glob <- ultracite (lint tooling).",
 	},
 ];
 
