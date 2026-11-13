@@ -1,14 +1,14 @@
-import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { makeOpenAIResponsesWebSocketHandler } from "./openaiResponsesWebSocket.ts";
 import { makeOpenAIRealtimeConversationHandler } from "./openaiRealtime.ts";
+import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { upstreamFetch } from "#gateway/instrumentedTransport.ts";
+import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import { looksLikeContextWindowError } from "#core/httpError.ts";
 import { GatewayError, type ErrorClass } from "#core/errors.ts";
 import { type BaseCreds, requireApiKeyCreds } from "./creds.ts";
 import type { CanonicalChatRequest } from "#core/canonical.ts";
 import type { ReasoningControlKind } from "#core/reasoning.ts";
 import type { UpstreamTransport } from "#core/transport.ts";
-import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import { mapUpstreamHttpError } from "./upstreamError.ts";
 import type { ImageOperation } from "#core/images.ts";
 import { mergeExtraBody } from "#core/extraBody.ts";
@@ -33,12 +33,6 @@ import {
 	resolveVideoSize,
 } from "#core/videos.ts";
 
-import {
-	responsesEventsToCanonicalChunks,
-	buildResponsesRequestBody,
-	parseResponsesResponse,
-} from "#contracts/openai/responsesTransport.ts";
-
 import type {
 	TranscriptionHandler,
 	ChatSupportContext,
@@ -52,6 +46,19 @@ import type {
 } from "./types.ts";
 
 import {
+	type BuildChatBodyOptions,
+	parseOpenAIChatResponse,
+	parseOpenAIChatChunk,
+	buildOpenAIChatBody,
+} from "#contracts/openai/chatTransport.ts";
+
+import {
+	responsesEventsToCanonicalChunks,
+	buildResponsesRequestBody,
+	parseResponsesResponse,
+} from "#contracts/openai/responsesTransport.ts";
+
+import {
 	recordUnknownAdapterEvent,
 	adapterContextDiagnostics,
 	attachAdapterDiagnostics,
@@ -63,13 +70,6 @@ import {
 	parseTranscriptionStream,
 	buildTranscriptionForm,
 } from "#contracts/openai/audioTransport.ts";
-
-import {
-	type BuildChatBodyOptions,
-	parseOpenAIChatResponse,
-	parseOpenAIChatChunk,
-	buildOpenAIChatBody,
-} from "#contracts/openai/chatTransport.ts";
 
 import {
 	parseEmbeddingsResponse,

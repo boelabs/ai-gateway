@@ -1,6 +1,6 @@
-import type { CanonicalChatStreamChunk } from "#core/canonical.ts";
 import { messagesRequestSchema } from "#contracts/anthropic/messages.ts";
 import { jsonBody, must, streamOf } from "#test-support/adapters.ts";
+import type { CanonicalChatStreamChunk } from "#core/canonical.ts";
 import type { AdapterContext } from "#adapters/types.ts";
 import { anthropicAdapter } from "./index.ts";
 import assert from "node:assert/strict";
