@@ -1806,6 +1806,41 @@
 			},
 			"notes": "Introductory pricing through 2026-11-30. From 2026-12-01 Google publishes $4.00 input / $20.00 output / $0.20 cached input per 1M tokens: update before then. Implicit caching only (no explicit cache or storage price). temperature/top_p/top_k are ignored by Gemini 4."
 		},
+		"gemini-4-hydrogen": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"parameters": {
+						"max_tokens": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["low", "medium", "high"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 150,
+				"outputCentsPerMTokens": 750,
+				"cacheReadCentsPerMTokens": 7.5
+			},
+			"notes": "Implicit caching only (no explicit cache or storage price). Output above 65,536 tokens needs long decode continuation hops the adapter does not run."
+		},
 		"gemini-3.1-pro-preview": {
 			"operations": {
 				"text.generate": {
