@@ -864,7 +864,7 @@
 						"structuredOutputs": true
 					},
 					"maxInputTokens": 262144,
-					"maxOutputTokens": 128000,
+					"maxOutputTokens": 131072,
 					"modalities": {
 						"input": ["image", "text"],
 						"output": ["text"]
@@ -984,7 +984,7 @@
 						"reasoning": true,
 						"structuredOutputs": true
 					},
-					"maxInputTokens": 262144,
+					"maxInputTokens": 1000000,
 					"maxOutputTokens": 128000,
 					"modalities": {
 						"input": ["image", "text"],
@@ -1012,7 +1012,8 @@
 			"pricing": {
 				"inputCentsPerMTokens": 200,
 				"outputCentsPerMTokens": 600,
-				"cacheReadCentsPerMTokens": 25
+				"cacheReadCentsPerMTokens": 25,
+				"cacheWriteCentsPerMTokens": 250
 			}
 		},
 		"alibaba/qwen3.8-max-0902": {
@@ -3493,7 +3494,7 @@
 						"structuredOutputs": true
 					},
 					"maxInputTokens": 1048576,
-					"maxOutputTokens": 32768,
+					"maxOutputTokens": 1048576,
 					"modalities": {
 						"input": ["image", "pdf", "text"],
 						"output": ["text"]
@@ -3520,7 +3521,7 @@
 			"pricing": {
 				"inputCentsPerMTokens": 30,
 				"outputCentsPerMTokens": 120,
-				"cacheReadCentsPerMTokens": 0.7
+				"cacheReadCentsPerMTokens": 0.6
 			}
 		},
 		"deepseek/deepseek-v4.1-flash-1017": {
@@ -6603,7 +6604,7 @@
 						"tools": true,
 						"vision": false,
 						"reasoning": true,
-						"structuredOutputs": true
+						"structuredOutputs": false
 					},
 					"maxInputTokens": 256000,
 					"maxOutputTokens": 32000,
@@ -6617,9 +6618,7 @@
 						"max_tokens": true,
 						"reasoning": true,
 						"reasoning_effort": true,
-						"response_format": true,
 						"stop": true,
-						"structured_outputs": true,
 						"temperature": true,
 						"tool_choice": true,
 						"tools": true
@@ -7853,8 +7852,8 @@
 						"reasoning": true,
 						"structuredOutputs": true
 					},
-					"maxInputTokens": 512000,
-					"maxOutputTokens": 512000,
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 1000000,
 					"modalities": {
 						"input": ["image", "pdf", "text"],
 						"output": ["text"]
@@ -7881,7 +7880,15 @@
 			"pricing": {
 				"inputCentsPerMTokens": 30,
 				"outputCentsPerMTokens": 120,
-				"cacheReadCentsPerMTokens": 6
+				"cacheReadCentsPerMTokens": 6,
+				"tiers": [
+					{
+						"aboveInputTokens": 512000,
+						"inputCentsPerMTokens": 120,
+						"outputCentsPerMTokens": 480,
+						"cacheReadCentsPerMTokens": 24
+					}
+				]
 			}
 		},
 		"minimax/minimax-m3.1-flash": {
@@ -7893,8 +7900,8 @@
 						"reasoning": true,
 						"structuredOutputs": true
 					},
-					"maxInputTokens": 1048576,
-					"maxOutputTokens": 1048576,
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 524288,
 					"modalities": {
 						"input": ["image", "text"],
 						"output": ["text"]
@@ -8526,7 +8533,7 @@
 						"structuredOutputs": true
 					},
 					"maxInputTokens": 1000000,
-					"maxOutputTokens": 131072,
+					"maxOutputTokens": 1000000,
 					"modalities": {
 						"input": ["image", "pdf", "text"],
 						"output": ["text"]
@@ -8550,9 +8557,9 @@
 				}
 			},
 			"pricing": {
-				"inputCentsPerMTokens": 450,
+				"inputCentsPerMTokens": 600,
 				"outputCentsPerMTokens": 2250,
-				"cacheReadCentsPerMTokens": 45
+				"cacheReadCentsPerMTokens": 60
 			}
 		},
 		"moonshotai/kimi-k3.1-pro": {
@@ -8692,44 +8699,6 @@
 			"pricing": {
 				"inputCentsPerMTokens": 90,
 				"outputCentsPerMTokens": 190
-			}
-		},
-		"nvidia/nemotron-3-nano-30b-a3b": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": true,
-						"structuredOutputs": false
-					},
-					"maxInputTokens": 262144,
-					"maxOutputTokens": 262144,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"reasoning_effort": true,
-						"stop": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					},
-					"reasoning": {
-						"kind": "openai_effort",
-						"levels": ["none", "low", "medium", "high"]
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 5,
-				"outputCentsPerMTokens": 20,
-				"cacheReadCentsPerMTokens": 2.5
 			}
 		},
 		"nvidia/nemotron-3-super-120b-a12b": {
@@ -14291,10 +14260,10 @@
 						"reasoning": true,
 						"structuredOutputs": true
 					},
-					"maxInputTokens": 1048576,
-					"maxOutputTokens": 1048576,
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 1000000,
 					"modalities": {
-						"input": ["image", "text", "video"],
+						"input": ["image", "text"],
 						"output": ["text"]
 					},
 					"contracts": ["chat.completions", "responses"],
