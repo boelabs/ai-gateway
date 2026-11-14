@@ -8633,7 +8633,7 @@
 				"inputCentsPerMTokens": 400,
 				"outputCentsPerMTokens": 2000,
 				"cacheReadCentsPerMTokens": 20,
-				"cacheWriteCentsPerMTokens": 400
+				"cacheWriteCentsPerMTokens": 500
 			}
 		},
 		"morph/morph-v3-fast": {
