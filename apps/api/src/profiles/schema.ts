@@ -474,6 +474,31 @@ const videoOperationProfileSchema = z
 			.min(1)
 			.optional(),
 		pollIntervalSeconds: z.int().positive().optional(),
+		durationLimits: z
+			.object({
+				maxSecondsWithLastFrame: z.int().positive().optional(),
+				maxSecondsByTask: z
+					.partialRecord(
+						z.enum([
+							"text_to_video",
+							"image_to_video",
+							"reference_to_video",
+							"edit",
+							"extend",
+						]),
+						z.int().positive(),
+					)
+					.optional(),
+				videoReferences: z
+					.object({
+						aboveSeconds: z.int().positive(),
+						max: z.int().nonnegative(),
+					})
+					.strict()
+					.optional(),
+			})
+			.strict()
+			.optional(),
 	})
 	.strict();
 

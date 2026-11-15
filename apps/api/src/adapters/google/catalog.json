@@ -31,7 +31,26 @@
 						"edit",
 						"extend"
 					],
-					"durations": ["3", "4", "5", "6", "7", "8", "9", "10"],
+					"durations": [
+						"3",
+						"4",
+						"5",
+						"6",
+						"7",
+						"8",
+						"9",
+						"10",
+						"11",
+						"12",
+						"13",
+						"14",
+						"15"
+					],
+					"durationLimits": {
+						"maxSecondsWithLastFrame": 10,
+						"maxSecondsByTask": { "extend": 10 },
+						"videoReferences": { "aboveSeconds": 10, "max": 1 }
+					},
 					"supportsImageUrl": true,
 					"supportsVideoUrl": true,
 					"supportsFrameImages": true,
@@ -3356,7 +3375,18 @@
 				"inputCentsPerMTokens": 75,
 				"outputCentsPerMTokens": 375,
 				"cacheReadCentsPerMTokens": 7.5,
-				"cacheWriteCentsPerMTokens": 2.083333
+				"cacheWriteCentsPerMTokens": 2.083333,
+				"scheduled": [
+					{
+						"effectiveFrom": "2027-01-01",
+						"pricing": {
+							"inputCentsPerMTokens": 150,
+							"outputCentsPerMTokens": 750,
+							"cacheReadCentsPerMTokens": 15,
+							"cacheWriteCentsPerMTokens": 4.166667
+						}
+					}
+				]
 			}
 		},
 		"gemini-3.8-live": {

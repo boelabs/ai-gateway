@@ -1,4 +1,5 @@
 import type { ResolvedModelMetadata } from "#catalog/types.ts";
+import { pricingAt } from "#catalog/pricing.ts";
 import type { Usage } from "#core/usage.ts";
 
 export interface CostBreakdown {
@@ -152,9 +153,11 @@ function servedPricing(
  * based on promptTokens. No pricing -> 0.
  */
 export function computeCost(
-	meta: Pick<ResolvedModelMetadata, "pricing">,
+	declared: Pick<ResolvedModelMetadata, "pricing">,
 	usage: Usage,
+	at: Date = new Date(),
 ): CostBreakdown {
+	const meta = { pricing: pricingAt(declared.pricing, at) };
 	const r = effectiveRates(
 		servedPricing(meta.pricing ?? {}, usage.serviceTier),
 		usage.promptTokens,
@@ -287,8 +290,9 @@ export function estimateMaximumCostCents(
 	totalTokens: number,
 	searchUnits = 0,
 	outputImages = 0,
+	at: Date = new Date(),
 ): number | null {
-	const { pricing } = meta;
+	const pricing = pricingAt(meta.pricing, at);
 	if (pricing === undefined) {
 		return null;
 	}

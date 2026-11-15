@@ -113,6 +113,22 @@ export interface VideoModelProfile {
 	contentVariants?: VideoAssetVariant[];
 	/** How often the gateway should poll an unfinished job for this model. */
 	pollIntervalSeconds?: number;
+	/** Narrower duration ceilings for some workflows, below the longest of `durations`. */
+	durationLimits?: VideoDurationLimits;
+}
+
+/**
+ * Some providers generate longer clips than they can interpolate or extend (Gemini Omni: 15 s from a
+ * prompt, 10 s between a first and last frame or per extension turn), and allow fewer reference
+ * videos as the clip gets longer. Each field is a ceiling the request must stay within.
+ */
+export interface VideoDurationLimits {
+	/** Longest duration, in seconds, when a last frame is given (first-to-last interpolation). */
+	maxSecondsWithLastFrame?: number;
+	/** Longest duration, in seconds, per task (e.g. `extend`). */
+	maxSecondsByTask?: Partial<Record<VideoTask, number>>;
+	/** Above `aboveSeconds`, at most `max` reference videos. */
+	videoReferences?: { aboveSeconds: number; max: number };
 }
 
 /** The provider-facing dimensions resolved from `size` or `aspectRatio`/`resolution` via the profile. */

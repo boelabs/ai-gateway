@@ -203,6 +203,16 @@ for (const catalog of catalogs) {
 	checkDeclaredTransports(catalog.adapterKey, doc.models);
 	checkAudioRates(catalog.adapterKey, doc.models);
 	checkReplacements(catalog.adapterKey, doc.models);
+	for (const [model, entry] of Object.entries(doc.models)) {
+		for (const change of entry.pricing?.scheduled ?? []) {
+			if (Date.parse(`${change.effectiveFrom}T00:00:00Z`) <= Date.now()) {
+				// Billing already uses it; folding it into the base keeps the catalog honest for the sync.
+				console.warn(
+					`warning: ${catalog.adapterKey}/${model} scheduled pricing from ${change.effectiveFrom} is in effect; fold it into the base pricing`,
+				);
+			}
+		}
+	}
 }
 
 for (const item of uncatalogedReplacements) {

@@ -25,6 +25,7 @@ type PricingField = Exclude<
 	| "tiers"
 	| "cacheWriteCentsPerMTokensByTtl"
 	| "serviceTiers"
+	| "scheduled"
 	| "imageOutputCentsPerImageByVariant"
 >;
 type TierPricingField = Exclude<

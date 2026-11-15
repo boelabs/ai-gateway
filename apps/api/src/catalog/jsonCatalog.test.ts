@@ -113,3 +113,43 @@ test("a Gemini thinkingLevel ladder only declares levels Gemini accepts", () => 
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("scheduled pricing must be dated, ascending and complete", () => {
+	const source = new URL("../adapters/google/catalog.json", import.meta.url);
+	const doc = JSON.parse(readFileSync(source, "utf8"));
+	const dir = mkdtempSync(join(tmpdir(), "catalog-"));
+	const url = pathToFileURL(join(dir, "catalog.json"));
+	const withSchedule = (scheduled: unknown) => {
+		doc.models["gemini-3.8-flash"].pricing = {
+			inputCentsPerMTokens: 75,
+			scheduled,
+		};
+		writeFileSync(url, JSON.stringify(doc));
+	};
+	try {
+		withSchedule([
+			{ effectiveFrom: "2027-01-01", pricing: { inputCentsPerMTokens: 150 } },
+		]);
+		assert.doesNotThrow(() => loadCatalogDocument(url));
+		for (const [scheduled, message] of [
+			[
+				[{ effectiveFrom: "Jan 1", pricing: { inputCentsPerMTokens: 1 } }],
+				/YYYY-MM-DD/u,
+			],
+			[
+				[
+					{ effectiveFrom: "2027-06-01", pricing: { inputCentsPerMTokens: 1 } },
+					{ effectiveFrom: "2027-01-01", pricing: { inputCentsPerMTokens: 2 } },
+				],
+				/later than the previous/u,
+			],
+			[[{ effectiveFrom: "2027-01-01", pricing: {} }], /full pricing/u],
+			[[], /non-empty array/u],
+		] as const) {
+			withSchedule(scheduled);
+			assert.throws(() => loadCatalogDocument(url), message);
+		}
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
