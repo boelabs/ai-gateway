@@ -33,6 +33,7 @@ import {
 import {
 	type PlaygroundSettings,
 	type PublicEndpoint,
+	type ServiceMode,
 	isPublicEndpoint,
 	PUBLIC_ENDPOINTS,
 	emptySettings,
@@ -45,6 +46,14 @@ import {
 	useState,
 	useRef,
 } from "react";
+
+/** How each service mode reads in the picker; the gateway docs hold the per-provider detail. */
+const SERVICE_MODE_LABELS: Record<ServiceMode | "standard", string> = {
+	standard: "Standard",
+	fast: "Fast — faster output, premium price",
+	priority: "Priority — reserved capacity, premium price",
+	flex: "Flex — cheaper and slower, may be unavailable",
+};
 
 /**
  * Text generation: a conversation, under one of the three public chat contracts.
@@ -242,6 +251,31 @@ function SettingsDialog({
 							</SelectItem>
 						))}
 					</Select>
+					{/**
+					 * Sent as a `model:mode` suffix. Only the modes the gateway will route for this model are
+					 * offered, so a choice here is never refused; switching model resets it to Standard.
+					 */}
+					{model.serviceModes.length > 0 ? (
+						<Select
+							label="Service tier"
+							onValueChange={(value) => {
+								const mode = model.serviceModes.find(
+									(entry) => entry === value,
+								);
+								setSettings((current) => {
+									const { serviceMode: _previous, ...rest } = current;
+									return mode ? { ...rest, serviceMode: mode } : rest;
+								});
+							}}
+							value={settings.serviceMode ?? "standard"}
+						>
+							{(["standard", ...model.serviceModes] as const).map((mode) => (
+								<SelectItem key={mode} value={mode}>
+									{SERVICE_MODE_LABELS[mode]}
+								</SelectItem>
+							))}
+						</Select>
+					) : null}
 					<Tabs.Root defaultValue="generation">
 						<Tabs.List className="w-full">
 							<Tabs.Tab className="flex-1" value="generation">

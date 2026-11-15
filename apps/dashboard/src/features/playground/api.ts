@@ -22,11 +22,25 @@ export function isPublicEndpoint(value: unknown): value is PublicEndpoint {
 	return typeof value === "string" && Object.hasOwn(PUBLIC_ENDPOINTS, value);
 }
 
+/** Service modes a model may offer, sent as a `model:mode` suffix (see /docs/service-modes). */
+export const SERVICE_MODES = ["fast", "priority", "flex"] as const;
+export type ServiceMode = (typeof SERVICE_MODES)[number];
+
 export interface PlaygroundSettings {
 	systemPrompt: string;
+	/** Absent = standard processing. */
+	serviceMode?: ServiceMode;
 	parameters: Record<string, number>;
 	reasoningEffort?: string;
 	stopSequences: string[];
+}
+
+/** The model the request names: the public model, plus the chosen service mode as a suffix. */
+export function requestModelId(
+	modelId: string,
+	settings: Pick<PlaygroundSettings, "serviceMode">,
+): string {
+	return settings.serviceMode ? `${modelId}:${settings.serviceMode}` : modelId;
 }
 
 export const emptySettings = (): PlaygroundSettings => ({

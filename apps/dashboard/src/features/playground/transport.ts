@@ -1,6 +1,6 @@
 import type { ChatTransport, LanguageModelUsage, UIMessage } from "ai";
 import type { PlaygroundSettings, PublicEndpoint } from "./api";
-import { modelFor, providerOptionsFor } from "./api";
+import { modelFor, providerOptionsFor, requestModelId } from "./api";
 import type { ProviderMetadata } from "ai";
 
 import {
@@ -24,11 +24,35 @@ export interface ResponseMetrics {
 	cachedInputTokens?: number;
 	totalTokens?: number;
 	finishReason?: string;
+	/** The service mode the request asked for (`model:mode`), if any. */
+	requestedServiceTier?: string;
+	/** The tier the gateway reports it served, when the contract carries it. */
+	servedServiceTier?: string;
 	warnings?: string[];
 	state?: "streaming" | "completed" | "stopped" | "failed";
 }
 
 export type PlaygroundMessage = UIMessage<ResponseMetrics>;
+
+/**
+ * The tier asked for and the one served. They can differ: OpenAI downgrades a ramp-limited Fast
+ * request to `default`, and reports Fast as `priority` on older models. Responses carries the served
+ * tier in the SDK's OpenAI metadata; Chat Completions in the gateway's own (see `chatReasoning.ts`);
+ * Messages does not report it.
+ */
+function servedTier(
+	settings: PlaygroundSettings,
+	metadata: ProviderMetadata | undefined,
+): Pick<ResponseMetrics, "requestedServiceTier" | "servedServiceTier"> {
+	const served =
+		metadata?.openai?.serviceTier ?? metadata?.aiGateway?.serviceTier;
+	return {
+		...(settings.serviceMode
+			? { requestedServiceTier: settings.serviceMode }
+			: {}),
+		...(typeof served === "string" ? { servedServiceTier: served } : {}),
+	};
+}
 
 /** One numeric field of an untyped usage-details object, if it is really there and numeric. */
 function numberField(source: unknown, field: string): number | undefined {
@@ -165,7 +189,7 @@ export function createPlaygroundTransport(
 				// Resolved here, not when the transport was built: the address comes from the
 				// dashboard's own `/api/config` and the answer may still be in flight while the
 				// operator is typing. By the time a message is sent it is there.
-				model: modelFor(endpoint, modelId, settings, {
+				model: modelFor(endpoint, requestModelId(modelId, settings), settings, {
 					...options,
 					// This app's own origin: the route behind it relays to the gateway and keeps
 					// the stream a stream. Tests pass a literal and never reach the network.
@@ -248,6 +272,7 @@ export function createPlaygroundTransport(
 							),
 							durationMs: elapsed,
 							finishReason: part.finishReason,
+							...servedTier(settings, metrics.providerMetadata),
 							state: "completed",
 						};
 					}

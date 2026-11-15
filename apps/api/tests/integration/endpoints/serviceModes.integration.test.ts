@@ -1,7 +1,12 @@
 import { jsonResponse, withStubbedFetch } from "#test-support/fetch.ts";
 import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
-import { makeOpenAIContractTestApp } from "#test-support/app.ts";
+import {
+	makeOpenAIContractTestApp,
+	makeGatewayTestApp,
+} from "#test-support/app.ts";
 import { createDeployment, deleteDeployment } from "#db/repos/deployments.ts";
+import { modelsWildcardHandler, listModelsHandler } from "#endpoints/models.ts";
+import { invalidatePublicModelGroups } from "#catalog/publicModels.ts";
 import { chatCompletionsHandler } from "#endpoints/chat.ts";
 import { eventually } from "#test-support/wait.ts";
 import { randomUUID } from "node:crypto";
@@ -22,6 +27,12 @@ const skip =
 		: "Postgres/Redis unavailable";
 const app = makeOpenAIContractTestApp((instance) => {
 	instance.post("/v1/chat/completions", chatCompletionsHandler);
+});
+
+// /v1/models is public, outside the authenticated /v1/* of the contract app.
+const modelsApp = makeGatewayTestApp((instance) => {
+	instance.get("/v1/models", listModelsHandler);
+	instance.get("/v1/models/*", modelsWildcardHandler);
 });
 
 function chat(model: string, requestId: string) {
@@ -139,5 +150,45 @@ test("a mode the deployment cannot serve is refused before any upstream call", {
 		assert.equal(calls, 0);
 	} finally {
 		await deleteDeployment(row.id);
+	}
+});
+
+test("/v1/models lists only the modes the router would serve", {
+	skip,
+}, async () => {
+	const openai = await createDeployment({
+		publicModel: `service-mode-${randomUUID()}`,
+		adapterKey: "openai",
+		upstreamModel: "gpt-6.1-sol",
+		credentials: { apiKey: "test-key" },
+	});
+	const azure = await createDeployment({
+		publicModel: `service-mode-${randomUUID()}`,
+		adapterKey: "azureopenai",
+		upstreamModel: "gpt-6.1-sol",
+		credentials: {
+			apiKey: "test-key",
+			baseUrl: "https://resource.openai.azure.com/openai/v1",
+		},
+	});
+	try {
+		invalidatePublicModelGroups();
+		const modes = async (model: string) => {
+			const response = await modelsApp.request(`/v1/models/${model}`);
+			assert.equal(response.status, 200);
+			return ((await response.json()) as { service_modes: string[] })
+				.service_modes;
+		};
+		assert.deepEqual(await modes(openai.publicModel), [
+			"fast",
+			"flex",
+			"priority",
+		]);
+		// Same model and prices, but the Azure adapter cannot request a tier.
+		assert.deepEqual(await modes(azure.publicModel), []);
+	} finally {
+		await deleteDeployment(openai.id);
+		await deleteDeployment(azure.id);
+		invalidatePublicModelGroups();
 	}
 });

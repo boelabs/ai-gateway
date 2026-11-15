@@ -743,3 +743,54 @@ test("the system prompt reaches each contract where it expects instructions", as
 		}
 	}
 });
+
+test("a service mode is sent as a model:mode suffix and the served tier is reported", async () => {
+	let model: unknown;
+	const transport = createPlaygroundTransport(
+		"chat.completions",
+		"gpt-6.1-sol",
+		{ ...settings, serviceMode: "fast" },
+		{
+			baseURL: "https://gateway.test/v1",
+			fetch: async (_input, init) => {
+				({ model } = JSON.parse(String(init?.body)) as { model: unknown });
+				return sse([
+					{
+						id: "chat-1",
+						created: 1,
+						model: "gpt-6.1-sol:fast",
+						choices: [
+							{
+								index: 0,
+								delta: { role: "assistant", content: "Hi" },
+								finish_reason: null,
+							},
+						],
+					},
+					{
+						id: "chat-1",
+						created: 1,
+						model: "gpt-6.1-sol:fast",
+						service_tier: "default",
+						choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+						usage: { prompt_tokens: 3, completion_tokens: 1, total_tokens: 4 },
+					},
+				]);
+			},
+		},
+	);
+	const messages = await streamParts(
+		await transport.sendMessages({
+			trigger: "submit-message",
+			chatId: "chat-1",
+			messageId: undefined,
+			messages: [userMessage()],
+			abortSignal: undefined,
+		}),
+	);
+	assert.equal(model, "gpt-6.1-sol:fast");
+	const metadata = messages.at(-1)?.metadata;
+	// A ramp-limited Fast request comes back as `default`: the details must say so.
+	assert.equal(metadata?.requestedServiceTier, "fast");
+	assert.equal(metadata?.servedServiceTier, "default");
+});

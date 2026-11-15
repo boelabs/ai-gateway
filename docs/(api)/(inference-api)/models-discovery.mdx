@@ -68,6 +68,8 @@ Aggregation rules:
 - **`operations`** — the union of operation ids the pool supports, each with its public endpoint path(s).
 - **`supported_parameters`** — the union of parameter names any deployment in the pool declares as
   supported (see [Parameter policy](/docs/parameter-policy) for what "supported" means).
+- **`service_modes`** — the `model:mode` suffixes (`fast`, `flex`, `priority`) at least one deployment
+  in the pool can serve; a mode not listed is refused. See [Service modes](/docs/service-modes).
 - **`endpoint_count`** — how many deployments back this Public Model, without exposing which ones.
 - **`text_capabilities`** — for text generation, the conservative intersection of effective pool
   profiles: `contracts`, `supported_parameters`, `input_modalities`, canonical `reasoning_efforts`,
