@@ -56,7 +56,21 @@ export type FetchLike = (
 	init?: RequestInit,
 ) => Promise<Response>;
 
-/** SDK providers encode the protocol; deployment metadata, not vendor model-name heuristics, owns settings. */
+/**
+ * SDK providers encode the protocol; deployment metadata, not vendor model-name heuristics, owns
+ * settings.
+ *
+ * That is why parameters are written into the body here instead of passed as AI SDK settings or
+ * `providerOptions`. The providers decide what to send from the model's NAME, and here that name is
+ * the gateway's public model, which an operator chooses (an alias, a custom name):
+ *  - `@ai-sdk/openai` treats `gpt-5`+ and `o*` names as reasoning models and drops `temperature`,
+ *    `top_p` and friends for them; for any other name it drops the `reasoning` block instead, so
+ *    `reasoningEffort` would vanish for an alias. `forceReasoning` trades one loss for the other.
+ *  - `@ai-sdk/anthropic` looks the name up in its own table to decide whether sampling parameters,
+ *    adaptive thinking or `effort` are allowed, and caps `maxOutputTokens` for names it does not know.
+ * Only the gateway knows what a deployment accepts, so the operator's choices go on the wire as set.
+ * Revisit if the SDK grows a way to turn this filtering off; `api.test.ts` pins the bodies.
+ */
 export function createSessionFetch(
 	endpoint: PublicEndpoint,
 	settings: PlaygroundSettings,
