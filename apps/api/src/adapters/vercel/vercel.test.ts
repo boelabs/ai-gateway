@@ -102,9 +102,16 @@ test("vercel owns creator/model metadata from its public catalog", () => {
 		resolveModelMetadata("anthropic", "claude-opus-5").reasoning,
 	);
 
+	// Like the ladders above, MiniMax's reasoning spec is Vercel's to publish and changes with each
+	// sync; pin only that it comes through from the snapshot, not which levels it lists today.
 	const minimax = resolveModelMetadata("vercel", "minimax/minimax-m3");
 	assert.ok((minimax.maxOutputTokens ?? 0) > 0);
-	assert.deepEqual(minimax.reasoning, { kind: "fixed", levels: ["high"] });
+	assert.ok(minimax.reasoning?.levels.length);
+	assert.deepEqual(
+		minimax.reasoning,
+		vercelCatalog.models["minimax/minimax-m3"]?.operations["text.generate"]
+			?.reasoning,
+	);
 
 	/**
 	 * Input-token tiers survive the sync as tiers, rather than being flattened to the first rate —
