@@ -1,12 +1,12 @@
 import { createVideoJob, purgeFinishedVideoRows } from "#db/repos/videos.ts";
 import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
 import { reserveVirtualKeyUsage } from "#ratelimit/index.ts";
-import { videoJobs } from "#db/schema.ts";
+import { spendLedger, videoJobs } from "#db/schema.ts";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { redis } from "#cache/redis.ts";
 import { db } from "#db/client.ts";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { test } from "node:test";
 
 import {
@@ -18,6 +18,7 @@ import {
 
 import {
 	recordVirtualKeySpend,
+	pruneSpendLedger,
 	getVirtualKeyById,
 	createVirtualKey,
 	deleteVirtualKey,
@@ -210,5 +211,57 @@ test("finished video rows are purged once nothing is left to settle or delete", 
 		await db.delete(videoJobs).where(eq(videoJobs.virtualKeyId, row.id));
 	} finally {
 		await cleanup(row.id);
+	}
+});
+
+test("the ledger GC deletes entries older than the cutoff and keeps newer ones", {
+	skip,
+}, async () => {
+	const keyId = randomUUID();
+	const day = 24 * 60 * 60_000;
+	const now = Date.now();
+	const ids = [0, 1, 2, 3].map(() => `gc-${randomUUID()}`);
+	await db.insert(spendLedger).values([
+		{
+			id: ids[0]!,
+			virtualKeyId: keyId,
+			cents: "1",
+			createdAt: new Date(now - 10 * day),
+		},
+		{
+			id: ids[1]!,
+			virtualKeyId: keyId,
+			cents: "1",
+			createdAt: new Date(now - 9 * day),
+		},
+		{
+			id: ids[2]!,
+			virtualKeyId: keyId,
+			cents: "1",
+			createdAt: new Date(now - 8 * day),
+		},
+		{
+			id: ids[3]!,
+			virtualKeyId: keyId,
+			cents: "1",
+			createdAt: new Date(now - 1 * day),
+		},
+	]);
+	try {
+		const cutoff = new Date(now - 7 * day);
+		const remaining = async () =>
+			(
+				await db
+					.select({ id: spendLedger.id })
+					.from(spendLedger)
+					.where(inArray(spendLedger.id, ids))
+			)
+				.map((row) => row.id)
+				.sort();
+		// Other tests may leave old rows too, so assert on this test's own rows only.
+		await pruneSpendLedger(cutoff, 1_000_000);
+		assert.deepEqual(await remaining(), [ids[3]]);
+	} finally {
+		await db.delete(spendLedger).where(inArray(spendLedger.id, ids));
 	}
 });
