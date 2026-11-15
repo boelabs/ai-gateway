@@ -361,11 +361,13 @@ export async function pruneSpendLedger(
 	before: Date,
 	limit = 1000,
 ): Promise<number> {
+	// Raw SQL skips the column's mapping, and the driver cannot serialize a Date parameter: pass the
+	// instant as ISO text and cast it, as the other GC queries do.
 	const deleted = await db.execute(drizzleSql`
 		DELETE FROM ${spendLedger}
 		WHERE ${spendLedger.id} IN (
 			SELECT ${spendLedger.id} FROM ${spendLedger}
-			WHERE ${spendLedger.createdAt} < ${before}
+			WHERE ${spendLedger.createdAt} < ${before.toISOString()}::timestamptz
 			ORDER BY ${spendLedger.createdAt}
 			LIMIT ${limit}
 		)
