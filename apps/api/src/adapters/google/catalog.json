@@ -48,8 +48,13 @@
 					],
 					"durationLimits": {
 						"maxSecondsWithLastFrame": 10,
-						"maxSecondsByTask": { "extend": 10 },
-						"videoReferences": { "aboveSeconds": 10, "max": 1 }
+						"maxSecondsByTask": {
+							"extend": 10
+						},
+						"videoReferences": {
+							"aboveSeconds": 10,
+							"max": 1
+						}
 					},
 					"supportsImageUrl": true,
 					"supportsVideoUrl": true,
@@ -1786,7 +1791,17 @@
 			"pricing": {
 				"inputCentsPerMTokens": 200,
 				"outputCentsPerMTokens": 1000,
-				"cacheReadCentsPerMTokens": 10
+				"cacheReadCentsPerMTokens": 10,
+				"scheduled": [
+					{
+						"effectiveFrom": "2026-12-01",
+						"pricing": {
+							"inputCentsPerMTokens": 400,
+							"outputCentsPerMTokens": 2000,
+							"cacheReadCentsPerMTokens": 20
+						}
+					}
+				]
 			},
 			"notes": "Introductory pricing through 2026-11-30. From 2026-12-01 Google publishes $4.00 input / $20.00 output / $0.20 cached input per 1M tokens: update before then. Implicit caching only (no explicit cache or storage price). Non-streaming generateContent caps output at 32,768 tokens (a higher max_output_tokens without a continuation token returns 400); streaming caps at 65,536. Long decode up to 1,048,576 needs continuation hops the adapter does not run. temperature/top_p/top_k are ignored by Gemini 4."
 		},
@@ -1821,7 +1836,17 @@
 			"pricing": {
 				"inputCentsPerMTokens": 200,
 				"outputCentsPerMTokens": 1000,
-				"cacheReadCentsPerMTokens": 10
+				"cacheReadCentsPerMTokens": 10,
+				"scheduled": [
+					{
+						"effectiveFrom": "2026-12-01",
+						"pricing": {
+							"inputCentsPerMTokens": 400,
+							"outputCentsPerMTokens": 2000,
+							"cacheReadCentsPerMTokens": 20
+						}
+					}
+				]
 			},
 			"notes": "Introductory pricing through 2026-11-30. From 2026-12-01 Google publishes $4.00 input / $20.00 output / $0.20 cached input per 1M tokens: update before then. Implicit caching only (no explicit cache or storage price). temperature/top_p/top_k are ignored by Gemini 4."
 		},
@@ -1985,7 +2010,18 @@
 				"inputCentsPerMTokens": 75,
 				"outputCentsPerMTokens": 375,
 				"cacheReadCentsPerMTokens": 7.5,
-				"cacheWriteCentsPerMTokens": 2.083333
+				"cacheWriteCentsPerMTokens": 2.083333,
+				"scheduled": [
+					{
+						"effectiveFrom": "2027-01-01",
+						"pricing": {
+							"inputCentsPerMTokens": 150,
+							"outputCentsPerMTokens": 750,
+							"cacheReadCentsPerMTokens": 15,
+							"cacheWriteCentsPerMTokens": 4.166667
+						}
+					}
+				]
 			}
 		},
 		"gemini-3.7-flash": {
