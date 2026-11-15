@@ -14,7 +14,7 @@ import {
 
 /** Bun reports S3 failures as errors whose `code` is the S3 error code (`NoSuchKey`, ...). */
 function isMissing(err: unknown): boolean {
-	const { code } = err as { code?: string };
+	const code = err instanceof Error && "code" in err ? err.code : undefined;
 	return (
 		code === "NoSuchKey" ||
 		code === "NotFound" ||

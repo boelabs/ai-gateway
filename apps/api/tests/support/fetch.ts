@@ -10,7 +10,10 @@ export async function withStubbedFetch<T>(
 	run: () => T | Promise<T>,
 ): Promise<T> {
 	const original = globalThis.fetch;
-	globalThis.fetch = (async (...args) => stub(...args)) as typeof fetch;
+	const stubbed = async (...args: Parameters<typeof fetch>) => stub(...args);
+	globalThis.fetch = Object.assign(stubbed, {
+		preconnect: original.preconnect,
+	});
 	try {
 		return await run();
 	} finally {

@@ -119,18 +119,20 @@ test("compareAzureListing: reports missing ids and retired ids still served, ski
 });
 
 test("checkAzureListing: asks Learn for Markdown and compares it", async () => {
-	let requested: Request | undefined;
+	let url: string | undefined;
+	let accept: string | null = null;
 	const findings = await withStubbedFetch(
 		(input, init) => {
-			requested = new Request(input, init);
+			url = String(input);
+			accept = new Headers(init?.headers).get("accept");
 			return new Response(page, {
 				headers: { "content-type": "text/markdown" },
 			});
 		},
 		() => checkAzureListing(new Map()),
 	);
-	assert.equal(requested?.url, AZURE_LISTING_URL);
-	assert.equal(requested?.headers.get("accept"), "text/markdown");
+	assert.equal(url, AZURE_LISTING_URL);
+	assert.equal(accept, "text/markdown");
 	assert.equal(findings.complete, true);
 	assert.ok(findings.missing.some((m) => m.id === "grok-4.7"));
 });

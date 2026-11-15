@@ -139,7 +139,7 @@ test("content resolver materializes Responses image URLs for Gemini and memoizes
 		new AbortController().signal,
 		{
 			resolveHostname: async () => [{ address: "93.184.216.34", family: 4 }],
-			fetch: (async () => {
+			fetch: async () => {
 				fetches += 1;
 				activeFetches += 1;
 				peakFetches = Math.max(peakFetches, activeFetches);
@@ -148,7 +148,7 @@ test("content resolver materializes Responses image URLs for Gemini and memoizes
 				return new Response(new Uint8Array(Buffer.from(PNG_BASE64, "base64")), {
 					headers: { "content-type": "image/png" },
 				});
-			}) as typeof fetch,
+			},
 		},
 	);
 	const google = candidate(googleAdapter);
@@ -194,10 +194,10 @@ test("content resolver preserves native image URLs without downloading them", as
 		}),
 		new AbortController().signal,
 		{
-			fetch: (async () => {
+			fetch: async () => {
 				fetches += 1;
 				throw new Error("unexpected fetch");
-			}) as typeof fetch,
+			},
 		},
 	);
 	const resolved = await resolver.resolveForCandidate(
@@ -261,10 +261,10 @@ test("materialized image inputs reject content with a non-image signature", asyn
 		new AbortController().signal,
 		{
 			resolveHostname: async () => [{ address: "93.184.216.34", family: 4 }],
-			fetch: (async () =>
+			fetch: async () =>
 				new Response("<html>not an image</html>", {
 					headers: { "content-type": "text/html" },
-				})) as typeof fetch,
+				}),
 		},
 	);
 	await assert.rejects(
@@ -612,7 +612,7 @@ test("content resolver stops sibling downloads once one fetch fails", async () =
 		new AbortController().signal,
 		{
 			resolveHostname: async () => [{ address: "93.184.216.34", family: 4 }],
-			fetch: ((url: URL | string, init?: RequestInit) => {
+			fetch: (url: URL | string, init?: RequestInit) => {
 				if (String(url).includes("broken")) {
 					return Promise.resolve(new Response("nope", { status: 404 }));
 				}
@@ -623,7 +623,7 @@ test("content resolver stops sibling downloads once one fetch fails", async () =
 						reject(new Error("aborted"));
 					});
 				});
-			}) as typeof fetch,
+			},
 		},
 	);
 	const google = candidate(googleAdapter);

@@ -1,7 +1,7 @@
 {
 	"extends": "@boelabs/tsconfig/base.json",
 	"compilerOptions": {
-		"types": ["node"]
+		"types": ["node", "bun-types"]
 	},
 	"include": ["src", "scripts", "tests", "drizzle.config.ts"]
 }

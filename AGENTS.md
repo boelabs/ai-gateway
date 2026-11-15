@@ -97,7 +97,8 @@ bun test --preload ./tests/support/unitSetup.ts src/router/strategies.test.ts
 ## 4. Conventions
 
 - **Runtime is Bun**, not Node. `node:*` imports and `process`/`Buffer` are fine (Bun implements
-  them), but the app is never executed with the `node` binary.
+  them), but the app is never executed with the `node` binary. The api uses Bun's own APIs where
+  they replace a dependency (see §10); types come from `bun-types`.
 - **Biome is the single source of truth** for formatting and lint (tabs, double quotes). Don't
   hand-format; run `bun run format`. `organizeImports` is intentionally **off** — import order is
   owned by `scripts/sort-imports.ts` (folded into `bun run format`), sorting by length, descending.
@@ -416,10 +417,13 @@ files stay out of git except the committed `.env.example` templates.
 
 ## 10. Things that will bite you
 
-- **Bun is the runner, not a dependency.** Application code in both apps uses web and Node APIs
-  only; `Bun.*` and `bun:*` imports belong in tests and in dev scripts. The gateway and the
-  dashboard both happen to run under Bun today, and nothing in either app should make that the only
-  option.
+- **The api runs on Bun by design; the dashboard does not depend on it.** The api serves with
+  `Bun.serve` (http/bunServer.ts), stores objects with `Bun.S3Client` and hashes with
+  `Bun.password`, each chosen over an npm dependency after measuring (Bun.serve: about 2x HTTP
+  throughput, +40% SSE and ~25 MB less RSS than `@hono/node-server` + `ws`). Reach for a `Bun.*`
+  API in the api when it replaces a dependency or a measurable cost; keep everything else on web and
+  Node APIs so the code stays portable. The dashboard is a Next.js app: application code there uses
+  web and Node APIs only, and `Bun.*` belongs in its tests and dev scripts.
 - **Neither app may carry configuration into its image.** No build arguments for hostnames, no
   `NEXT_PUBLIC_*`, and nothing read from `process.env` at module scope — a value captured when a
   module is first evaluated can be captured during a Next prerender and baked into the build. Read
