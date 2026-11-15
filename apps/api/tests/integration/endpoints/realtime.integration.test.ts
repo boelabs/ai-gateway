@@ -1,6 +1,6 @@
 import { realtimeClientSecretsHandler } from "#endpoints/realtimeClientSecrets.ts";
 import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
-import { type WebSocketServerLike, serve } from "@hono/node-server";
+import { startServer } from "#http/bunServer.ts";
 import { realtimeWebSocketHandler } from "#endpoints/realtime.ts";
 import { makeOpenAIContractTestApp } from "#test-support/app.ts";
 import { deleteDeployment } from "#db/repos/deployments.ts";
@@ -85,28 +85,16 @@ async function gateway() {
 		testApp.get("/v1/realtime", realtimeWebSocketHandler);
 		testApp.post("/v1/realtime/client_secrets", realtimeClientSecretsHandler);
 	});
-	const webSocketServer = new WebSocketServer({ noServer: true });
-	const server = serve({
-		fetch: app.fetch,
+	const server = startServer({
+		fetch: (request, bindings) => app.fetch(request, bindings),
 		port: 0,
 		hostname: "127.0.0.1",
-		websocket: { server: webSocketServer as WebSocketServerLike },
+		maxRequestBodySize: 1024 * 1024,
 	});
-	await new Promise<void>((resolve) => server.once("listening", resolve));
-	const { port } = server.address() as AddressInfo;
 	return {
-		url: `ws://127.0.0.1:${port}/v1/realtime`,
+		url: `ws://127.0.0.1:${server.port}/v1/realtime`,
 		app,
-		close: () =>
-			new Promise<void>((resolve) => {
-				for (const socket of webSocketServer.clients) {
-					socket.terminate();
-				}
-				server.close(() => resolve());
-				(
-					server as { closeAllConnections?: () => void }
-				).closeAllConnections?.();
-			}),
+		close: () => server.stop(true),
 	};
 }
 

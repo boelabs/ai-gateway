@@ -1,4 +1,4 @@
-import { getConnInfo } from "@hono/node-server/conninfo";
+import { remoteAddress as connectionAddress } from "#http/bunServer.ts";
 import type { AppEnv } from "#auth/types.ts";
 import { env } from "#config/env.ts";
 import type { Context } from "hono";
@@ -39,15 +39,8 @@ export function resolveClientIp(
 
 /** Resolves the client through an explicitly configured trusted proxy chain. */
 export function clientIp(c: Context<AppEnv>): string | null {
-	let remote: string | null = null;
-	try {
-		const info = getConnInfo(c);
-		remote = info.remote.address ?? null;
-	} catch {
-		/* ignore */
-	}
 	return resolveClientIp(
-		remote,
+		connectionAddress(c),
 		c.req.header("x-forwarded-for"),
 		env.TRUSTED_PROXY_HOPS,
 	);

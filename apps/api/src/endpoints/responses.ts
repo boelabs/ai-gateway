@@ -17,7 +17,7 @@ import { RouteLifecycle } from "./runtime/routeLifecycle.ts";
 import { getEffectiveSettings } from "#router/settings.ts";
 import type { ChatExecResult } from "#gateway/executor.ts";
 import { reasoningLogInfo } from "#core/reasoning.ts";
-import { upgradeWebSocket } from "@hono/node-server";
+import { upgradeWebSocket } from "#http/bunServer.ts";
 import { tapFirstToken } from "#gateway/ttft.ts";
 import { GatewayError } from "#core/errors.ts";
 import { stateScopeOf } from "#auth/scope.ts";
@@ -1504,12 +1504,7 @@ export const responsesWebSocketHandler = upgradeWebSocket(
 			},
 		};
 	},
-	{
-		onError(error) {
-			// Upgrade errors are handled by Hono's normal error path before a socket exists.
-			throw error;
-		},
-	},
+	// Upgrade errors are handled by Hono's normal error path before a socket exists.
 );
 
 /**
