@@ -47,3 +47,24 @@ test("an explicit service_tier must agree with the slug's mode", () => {
 		/conflicts with the `:flex` model suffix/u,
 	);
 });
+
+test("support follows the pricing in effect, scheduled changes included", () => {
+	const meta = {
+		pricing: {
+			inputCentsPerMTokens: 1,
+			serviceTiers: { flex: { inputCentsPerMTokens: 1 } },
+			scheduled: [
+				{ effectiveFrom: "2027-01-01", pricing: { inputCentsPerMTokens: 2 } },
+			],
+		},
+	};
+	const modes = new Set(["flex"] as const);
+	assert.equal(
+		supportsServiceMode(meta, modes, "flex", new Date("2026-12-31T00:00:00Z")),
+		true,
+	);
+	assert.equal(
+		supportsServiceMode(meta, modes, "flex", new Date("2027-01-02T00:00:00Z")),
+		false,
+	);
+});

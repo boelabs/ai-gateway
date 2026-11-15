@@ -1,4 +1,5 @@
 import type { ResolvedModelMetadata } from "#catalog/types.ts";
+import { pricingAt } from "#catalog/pricing.ts";
 import { GatewayError } from "#core/errors.ts";
 
 /**
@@ -37,15 +38,19 @@ export function parseServiceMode(model: string): {
 		: { publicModel: model };
 }
 
-/** Whether a deployment can serve a mode: priced in its catalog and sendable by its adapter. */
+/**
+ * Whether a deployment can serve a mode: sendable by its adapter and priced in the pricing in effect
+ * now (a scheduled price change replaces the tiers too).
+ */
 export function supportsServiceMode(
 	meta: Pick<ResolvedModelMetadata, "pricing">,
 	adapterModes: ReadonlySet<ServiceMode> | undefined,
 	mode: ServiceMode,
+	at: Date = new Date(),
 ): boolean {
 	return (
 		adapterModes?.has(mode) === true &&
-		meta.pricing?.serviceTiers?.[mode] !== undefined
+		pricingAt(meta.pricing, at)?.serviceTiers?.[mode] !== undefined
 	);
 }
 

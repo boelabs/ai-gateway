@@ -137,7 +137,11 @@ function validatePricing(value: unknown, path: string): void {
 		fail(path, "must be an object");
 	}
 	validateTokenPricing(value, path);
-	validateScheduledPricing(value.scheduled, `${path}.scheduled`);
+	validateScheduledPricing(
+		value.scheduled,
+		`${path}.scheduled`,
+		isRecord(value.serviceTiers) ? Object.keys(value.serviceTiers).sort() : [],
+	);
 	if (value.serviceTiers !== undefined) {
 		if (!isRecord(value.serviceTiers)) {
 			fail(`${path}.serviceTiers`, "must be an object");
@@ -161,7 +165,11 @@ function validatePricing(value: unknown, path: string): void {
  * Announced price changes: dated, in ascending order, each a complete pricing of its own (it replaces
  * the base rates from that day, so a partial one would silently price the missing fields at zero).
  */
-function validateScheduledPricing(value: unknown, path: string): void {
+function validateScheduledPricing(
+	value: unknown,
+	path: string,
+	baseServiceTiers: readonly string[],
+): void {
 	if (value === undefined) {
 		return;
 	}
@@ -194,6 +202,17 @@ function validateScheduledPricing(value: unknown, path: string): void {
 		}
 		if (pricing.scheduled !== undefined) {
 			fail(`${at}.pricing.scheduled`, "cannot be nested");
+		}
+		// The entry replaces the whole pricing, tiers included: one that dropped a tier would make the
+		// model stop serving that mode (`model:flex`) on the day it takes effect.
+		const tiers = isRecord(pricing.serviceTiers)
+			? Object.keys(pricing.serviceTiers).sort()
+			: [];
+		if (tiers.join(",") !== baseServiceTiers.join(",")) {
+			fail(
+				`${at}.pricing.serviceTiers`,
+				`must price the same service tiers as the current pricing (${baseServiceTiers.join(", ") || "none"})`,
+			);
 		}
 		validatePricing(pricing, `${at}.pricing`);
 	}

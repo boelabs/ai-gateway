@@ -153,3 +153,37 @@ test("scheduled pricing must be dated, ascending and complete", () => {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("a scheduled price change must keep pricing every service tier", () => {
+	const source = new URL("../adapters/google/catalog.json", import.meta.url);
+	const doc = JSON.parse(readFileSync(source, "utf8"));
+	const dir = mkdtempSync(join(tmpdir(), "catalog-"));
+	const url = pathToFileURL(join(dir, "catalog.json"));
+	const tier = { inputCentsPerMTokens: 1 };
+	const withTiers = (scheduledTiers: Record<string, unknown> | undefined) => {
+		doc.models["gemini-3.8-flash"].pricing = {
+			inputCentsPerMTokens: 75,
+			serviceTiers: { flex: tier, priority: tier },
+			scheduled: [
+				{
+					effectiveFrom: "2027-01-01",
+					pricing: {
+						inputCentsPerMTokens: 150,
+						...(scheduledTiers ? { serviceTiers: scheduledTiers } : {}),
+					},
+				},
+			],
+		};
+		writeFileSync(url, JSON.stringify(doc));
+	};
+	try {
+		withTiers({ flex: tier, priority: tier });
+		assert.doesNotThrow(() => loadCatalogDocument(url));
+		for (const tiers of [undefined, { flex: tier }]) {
+			withTiers(tiers);
+			assert.throws(() => loadCatalogDocument(url), /same service tiers/u);
+		}
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
