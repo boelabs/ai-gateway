@@ -62,6 +62,50 @@ let total = 0;
 const pendingReview: string[] = [];
 const unrunnable: string[] = [];
 const missingAudioRates: string[] = [];
+const staleReplacements: string[] = [];
+const uncatalogedReplacements: string[] = [];
+
+/** The model ids a deprecation note names after "replacement:" ("a or b", "a with reasoning.mode pro"). */
+function replacementIds(notes: string | undefined): string[] {
+	const match = notes?.match(/replacement: ([^)]*)\)/u);
+	if (!match?.[1]) {
+		return [];
+	}
+	return match[1]
+		.split(/ or /u)
+		.map((part) => part.trim().split(/\s/u)[0] ?? "")
+		.filter((id) => id.length > 0);
+}
+
+/**
+ * A deprecation note's replacement is advice operators act on during a migration, and it goes stale
+ * silently: the provider ships a newer family and the note keeps pointing at the old one, or at a
+ * model that is itself on its way out. A replacement that is deprecated in turn fails; one this
+ * catalog does not list yet is reported as a warning, since it is usually a model still to be added.
+ */
+function checkReplacements(
+	adapterKey: string,
+	models: Record<string, CatalogEntry>,
+): void {
+	for (const [model, entry] of Object.entries(models)) {
+		for (const id of replacementIds(entry.notes)) {
+			const replacement = models[id];
+			if (replacement === undefined) {
+				// Not an error: the provider's newer model may simply not be catalogued yet.
+				uncatalogedReplacements.push(
+					`${adapterKey}/${model} names replacement "${id}", which this catalog does not list yet`,
+				);
+			} else if (
+				replacement.deprecated === true ||
+				/shuts down on/u.test(replacement.notes ?? "")
+			) {
+				staleReplacements.push(
+					`${adapterKey}/${model} names replacement "${id}", which is deprecated too`,
+				);
+			}
+		}
+	}
+}
 
 /**
  * Providers bill audio tokens far above text, so an audio model priced only by its text rates is
@@ -158,6 +202,19 @@ for (const catalog of catalogs) {
 	pendingReview.push(...pendingReviewEntries(catalog.adapterKey, doc.models));
 	checkDeclaredTransports(catalog.adapterKey, doc.models);
 	checkAudioRates(catalog.adapterKey, doc.models);
+	checkReplacements(catalog.adapterKey, doc.models);
+}
+
+for (const item of uncatalogedReplacements) {
+	console.warn(`warning: ${item}`);
+}
+
+if (staleReplacements.length > 0) {
+	console.error("catalog validation failed: stale deprecation replacements:");
+	for (const item of staleReplacements) {
+		console.error(`  - ${item}`);
+	}
+	process.exit(1);
 }
 
 if (missingAudioRates.length > 0) {

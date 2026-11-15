@@ -254,6 +254,7 @@ const GEMINI_THINKING_LEVELS: ReadonlySet<string> = new Set([
 	"low",
 	"medium",
 	"high",
+	"xhigh",
 ]);
 
 function validateReasoning(value: unknown, path: string): void {
