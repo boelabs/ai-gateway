@@ -6407,86 +6407,6 @@
 				"outputCentsPerMTokens": 0
 			}
 		},
-		"inception/mercury-2": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": true,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 128000,
-					"maxOutputTokens": 128000,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"reasoning_effort": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					},
-					"reasoning": {
-						"kind": "openai_effort",
-						"levels": ["low", "medium", "high"]
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 25,
-				"outputCentsPerMTokens": 75,
-				"cacheReadCentsPerMTokens": 2.5
-			}
-		},
-		"inception/mercury-2.5": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": true,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 260000,
-					"maxOutputTokens": 65536,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"reasoning_effort": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					},
-					"reasoning": {
-						"kind": "openai_effort",
-						"levels": ["low", "medium", "high"]
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 4,
-				"outputCentsPerMTokens": 15,
-				"cacheReadCentsPerMTokens": 0.4
-			}
-		},
 		"inception/mercury-3": {
 			"operations": {
 				"text.generate": {
@@ -6525,38 +6445,6 @@
 				"inputCentsPerMTokens": 10,
 				"outputCentsPerMTokens": 35,
 				"cacheReadCentsPerMTokens": 1
-			}
-		},
-		"inception/mercury-coder-small": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": false,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 32000,
-					"maxOutputTokens": 16384,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"max_tokens": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 25,
-				"outputCentsPerMTokens": 100
 			}
 		},
 		"inclusionai/ling-3.0-flash": {
@@ -14575,7 +14463,15 @@
 					},
 					"reasoning": {
 						"kind": "openai_effort",
-						"levels": ["none", "low", "medium", "high"]
+						"levels": [
+							"none",
+							"minimal",
+							"low",
+							"medium",
+							"high",
+							"xhigh",
+							"max"
+						]
 					}
 				}
 			},

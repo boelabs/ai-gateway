@@ -175,7 +175,7 @@
 				"rerank": {
 					"documentModalities": ["text"],
 					"maxDocuments": 1000,
-					"maxTokensPerDocument": 40960
+					"maxTokensPerDocument": 32768
 				}
 			}
 		},
