@@ -67,7 +67,10 @@ async function waitForOperation(requestId: string) {
 			const page = await listOperationsPage({ limit: 1, offset: 0, requestId });
 			const [operation] = page.rows;
 			const detail = operation ? await getOperationDetail(operation.id) : null;
-			return detail && detail.attempts.length > 0 ? detail : null;
+			// Usage is written when the operation finishes, after its first attempt is recorded.
+			return detail?.lifecycleState === "finished" && detail.attempts.length > 0
+				? detail
+				: null;
 		},
 		{ description: `gateway_operation ${requestId}` },
 	);
