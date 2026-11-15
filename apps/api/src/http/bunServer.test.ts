@@ -60,12 +60,9 @@ test("an upgraded request keeps its address and its signal outlives the socket",
 			onMessage(event, ws) {
 				// Binary arrives as exactly the bytes sent, and the context reports live state.
 				assert.equal(ws.readyState, 1);
-				assert.equal(
-					typeof (ws.raw as unknown as { bufferedAmount: number })
-						.bufferedAmount,
-					"number",
-				);
-				ws.send(event.data as ArrayBuffer);
+				assert.equal(typeof ws.raw?.bufferedAmount, "number");
+				assert.ok(event.data instanceof ArrayBuffer);
+				ws.send(event.data);
 			},
 			onClose() {
 				closed();

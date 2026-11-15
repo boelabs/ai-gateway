@@ -43,7 +43,7 @@
 			"quoteStyle": "double",
 			"trailingCommas": "all"
 		},
-		// Bun globals the source touches; `@types/bun` is deliberately not installed (AGENTS.md §10).
+		// Bun globals the source touches (AGENTS.md §10); their types come from `bun-types`.
 		"globals": ["Bun", "HTMLRewriter"]
 	},
 

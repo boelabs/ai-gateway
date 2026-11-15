@@ -10,6 +10,7 @@ import { route, type RouteResult } from "#router/index.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { AppEnv } from "#auth/types.ts";
 import { randomUUID } from "node:crypto";
+import type { RawSocket } from "#http/bunServer.ts";
 import type { WSEvents } from "hono/ws";
 import type { Context } from "hono";
 
@@ -570,7 +571,7 @@ export function realtimeConversationSocket(
 	scopeKey: string,
 	model: string,
 	preset: RealtimeConversationSessionUpdate | null,
-): WSEvents {
+): WSEvents<RawSocket> {
 	const state = preset
 		? applyConversationSessionUpdate(
 				newRealtimeConversationState(model),

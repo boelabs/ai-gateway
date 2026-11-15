@@ -18,7 +18,7 @@ import {
  */
 
 export interface GracefulShutdownOptions {
-	server: Bun.Server;
+	server: Bun.Server<unknown>;
 	/** Timers and pollers. Stopped as soon as draining starts: they are not traffic. */
 	stopJobs?: Array<() => void | Promise<void>>;
 	/** WebSockets and anything else that would otherwise hold the process open indefinitely. */
@@ -29,7 +29,7 @@ export interface GracefulShutdownOptions {
  * Stops listening and resolves once in-flight requests have finished. Bun closes idle keep-alive
  * connections itself when it stops, so there is no separate step for those.
  */
-function closeServer(server: Bun.Server): Promise<void> {
+function closeServer(server: Bun.Server<unknown>): Promise<void> {
 	return server.stop(false);
 }
 

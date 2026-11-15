@@ -23,12 +23,15 @@ function describeFetchTarget(input: Parameters<typeof fetch>[0]): string {
 }
 
 if (!["1", "true", "yes"].includes(process.env.ALLOW_TEST_NETWORK ?? "")) {
-	globalThis.fetch = (async (input) => {
-		throw new Error(
-			`[test] Real fetch blocked: ${describeFetchTarget(input)}. ` +
-				"Use withStubbedFetch() from #test-support/fetch.ts to simulate the upstream.",
+	const blocked = (input: Parameters<typeof fetch>[0]): Promise<never> =>
+		Promise.reject(
+			new Error(
+				`[test] Real fetch blocked: ${describeFetchTarget(input)}. ` +
+					"Use withStubbedFetch() from #test-support/fetch.ts to simulate the upstream.",
+			),
 		);
-	}) as typeof fetch;
+	// Keep Bun's `fetch.preconnect` so the replacement is a whole `fetch`, not a cast to one.
+	globalThis.fetch = Object.assign(blocked, { preconnect: fetch.preconnect });
 }
 
 export {};

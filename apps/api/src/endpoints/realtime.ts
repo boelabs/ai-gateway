@@ -13,6 +13,7 @@ import { GatewayError } from "#core/errors.ts";
 import { getAuth } from "#auth/middleware.ts";
 import type { AppEnv } from "#auth/types.ts";
 import { randomUUID } from "node:crypto";
+import type { RawSocket } from "#http/bunServer.ts";
 import type { WSEvents } from "hono/ws";
 import type { Context } from "hono";
 import { z } from "zod/v4";
@@ -524,7 +525,7 @@ function realtimeTranscriptionSocket(
 	c: Context<AppEnv>,
 	scopeKey: string,
 	preset: RealtimeSessionUpdate | null,
-): WSEvents {
+): WSEvents<RawSocket> {
 	let connection: RealtimeConnection;
 	const entry: RealtimeSocketEntry = {
 		scopeKey,

@@ -20,22 +20,32 @@ import {
  * would be refused), it snapshots `readyState` when the context is created, and it is deprecated.
  */
 
+/**
+ * What a handler finds in `ws.raw`: Bun's socket, and the bytes still waiting to be written, which
+ * the handlers watch for slow clients (the name the `ws` package used, so they did not change).
+ */
+export interface RawSocket {
+	socket: Socket;
+	readonly bufferedAmount: number;
+}
+
 interface SocketData {
-	events: WSEvents<Bun.ServerWebSocket<SocketData>>;
+	events: WSEvents<RawSocket>;
 	url: URL;
 	protocol: string;
-	context?: WSContext<Bun.ServerWebSocket<SocketData>>;
+	context?: WSContext<RawSocket>;
 }
 
 type Socket = Bun.ServerWebSocket<SocketData>;
 
 /** Bindings handed to every request, so handlers reach the server that accepted it. */
 export interface ServerBindings {
-	server: Bun.Server;
+	server: Bun.Server<SocketData>;
 }
 
-function serverOf(c: Context): Bun.Server | undefined {
-	return (c.env as Partial<ServerBindings> | undefined)?.server;
+function serverOf(c: Context): Bun.Server<SocketData> | undefined {
+	const bindings: Partial<ServerBindings> | undefined = c.env;
+	return bindings?.server;
 }
 
 /** Addresses of upgraded requests, whose `c.req.raw` is a detached copy Bun cannot look up. */
@@ -72,22 +82,21 @@ function detachUpgradeRequest(c: Context, address: string | null): void {
  * the socket from `onOpen` holds the same object later. `readyState` is read live, and `raw` exposes
  * the bytes still waiting to be written, which the handlers watch for slow clients.
  */
-function contextOf(ws: Socket): WSContext<Socket> {
+function contextOf(ws: Socket): WSContext<RawSocket> {
 	let { context } = ws.data;
 	if (!context) {
-		const raw = Object.assign(Object.create(null) as object, {
-			socket: ws,
-			get bufferedAmount() {
-				return ws.getBufferedAmount();
-			},
-		});
-		context = new WSContext<Socket>({
+		context = new WSContext<RawSocket>({
 			send: (source) => {
-				ws.send(source as string | ArrayBufferLike | Uint8Array);
+				ws.send(source);
 			},
-			raw: raw as unknown as Socket,
+			raw: {
+				socket: ws,
+				get bufferedAmount() {
+					return ws.getBufferedAmount();
+				},
+			},
 			get readyState() {
-				return ws.readyState as 0 | 1 | 2 | 3;
+				return ws.readyState;
 			},
 			url: ws.data.url,
 			protocol: ws.data.protocol,
@@ -105,14 +114,12 @@ function messageData(message: string | Uint8Array): string | ArrayBuffer {
 	if (typeof message === "string") {
 		return message;
 	}
-	return message.buffer.slice(
-		message.byteOffset,
-		message.byteOffset + message.byteLength,
-	) as ArrayBuffer;
+	// A copy: Bun may hand over a view into a larger, reused buffer.
+	return new Uint8Array(message).buffer;
 }
 
-export const upgradeWebSocket: UpgradeWebSocket<Socket> =
-	defineWebSocketHelper<Socket>((c, events) => {
+export const upgradeWebSocket: UpgradeWebSocket<RawSocket> =
+	defineWebSocketHelper<RawSocket>((c, events) => {
 		const server = serverOf(c);
 		if (!server) {
 			throw new TypeError("The request was not served by Bun.serve.");
@@ -124,7 +131,7 @@ export const upgradeWebSocket: UpgradeWebSocket<Socket> =
 		// Bun may run `open` inside `upgrade()`, so the handlers must already see the detached
 		// request; and it can no longer look the connection up once the request is upgraded.
 		detachUpgradeRequest(c, server.requestIP(original)?.address ?? null);
-		const upgraded = server.upgrade<SocketData>(original, {
+		const upgraded = server.upgrade(original, {
 			...(protocol ? { headers: { "Sec-WebSocket-Protocol": protocol } } : {}),
 			data: { events, url: new URL(c.req.url), protocol: protocol || "" },
 		});
@@ -177,7 +184,9 @@ export interface StartServerOptions {
 	maxRequestBodySize: number;
 }
 
-export function startServer(options: StartServerOptions): Bun.Server {
+export function startServer(
+	options: StartServerOptions,
+): Bun.Server<SocketData> {
 	return Bun.serve<SocketData>({
 		port: options.port,
 		...(options.hostname ? { hostname: options.hostname } : {}),

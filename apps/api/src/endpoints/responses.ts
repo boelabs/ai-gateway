@@ -26,6 +26,7 @@ import type { Usage } from "#core/usage.ts";
 import { streamSSE } from "hono/streaming";
 import type { Auth } from "#auth/types.ts";
 import { randomUUID } from "node:crypto";
+import type { RawSocket } from "#http/bunServer.ts";
 import type { WSContext } from "hono/ws";
 import { env } from "#config/env.ts";
 import type { Context } from "hono";
@@ -983,7 +984,7 @@ interface ActiveResponsesWebSocket {
 	queue: Promise<void>;
 	activeAbort: AbortController | null;
 	timer: ReturnType<typeof setTimeout> | undefined;
-	socket: WSContext | null;
+	socket: WSContext<RawSocket> | null;
 	preferredDeploymentId: string | null;
 	scopeKey: string;
 	queuedTurns: number;
@@ -1001,7 +1002,7 @@ function websocketError(error: GatewayErrorType): Record<string, unknown> {
 }
 
 async function sendWebSocketJson(
-	ws: WSContext,
+	ws: WSContext<RawSocket>,
 	value: unknown,
 	observation?: DownstreamWriteObservation,
 ): Promise<void> {
@@ -1011,8 +1012,7 @@ async function sendWebSocketJson(
 	const startedAt = Date.now();
 	const serialized = JSON.stringify(value);
 	ws.send(serialized);
-	const raw = ws.raw as { bufferedAmount?: number } | undefined;
-	while ((raw?.bufferedAmount ?? 0) > 1_048_576) {
+	while ((ws.raw?.bufferedAmount ?? 0) > 1_048_576) {
 		if (Date.now() - startedAt >= 30_000) {
 			throw new GatewayError({
 				class: "server",
