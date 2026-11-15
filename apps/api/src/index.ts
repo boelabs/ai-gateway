@@ -4,9 +4,10 @@ import {
 	openAIDecisionsHandler,
 } from "./endpoints/decisions.ts";
 import { realtimeClientSecretsHandler } from "./endpoints/realtimeClientSecrets.ts";
-import { type WebSocketServerLike, serve } from "@hono/node-server";
+import { PUBLIC_JSON_BODY_MAX_BYTES } from "./http/body.ts";
+import { startServer } from "./http/bunServer.ts";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { createSocketServer } from "#endpoints/socketServer.ts";
+import { startHeartbeat } from "#endpoints/socketServer.ts";
 import { GatewayError } from "./core/errors.ts";
 import { pingRedis } from "./cache/redis.ts";
 import { Hono, type Context } from "hono";
@@ -366,18 +367,20 @@ app.use("/v1beta/*", authMiddleware());
 app.use("/v1beta/*", requireInferenceAccess());
 app.post("/v1beta/decisions", geminiDecisionsHandler);
 
-const { server: webSocketServer, stop: stopSocketHeartbeat } =
-	createSocketServer();
-const server = serve(
-	{
-		fetch: app.fetch,
-		port: env.PORT,
-		websocket: { server: webSocketServer as WebSocketServerLike },
-	},
-	(info) => {
-		log.info("server", "listening", { port: info.port, env: env.NODE_ENV });
-	},
-);
+const stopSocketHeartbeat = startHeartbeat();
+const server = startServer({
+	fetch: (request, bindings) => app.fetch(request, bindings),
+	port: env.PORT,
+	// Bun refuses larger bodies before any route runs; the routes enforce their own limits below it.
+	maxRequestBodySize:
+		Math.max(
+			PUBLIC_JSON_BODY_MAX_BYTES,
+			env.IMAGES_MAX_MULTIPART_BYTES,
+			env.AUDIO_MAX_MULTIPART_BYTES,
+		) +
+		1024 * 1024,
+});
+log.info("server", "listening", { port: server.port, env: env.NODE_ENV });
 
 installGracefulShutdown({
 	server,

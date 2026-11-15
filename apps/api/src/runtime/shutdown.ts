@@ -1,7 +1,6 @@
 import { beginDraining, isDraining } from "#runtime/lifecycle.ts";
 import { flushOperationLogs } from "#logging/operations.ts";
 import { shutdownTelemetry } from "#telemetry/index.ts";
-import type { ServerType } from "@hono/node-server";
 import { closeRedis } from "#cache/redis.ts";
 import { closeDb } from "#db/client.ts";
 import { log } from "#logging/log.ts";
@@ -18,30 +17,20 @@ import {
  * lives in `drain.ts`.
  */
 
-type ClosableServer = ServerType & {
-	close: (callback?: (err?: Error) => void) => void;
-	closeIdleConnections?: () => void;
-	closeAllConnections?: () => void;
-};
-
 export interface GracefulShutdownOptions {
-	server: ServerType;
+	server: Bun.Server;
 	/** Timers and pollers. Stopped as soon as draining starts: they are not traffic. */
 	stopJobs?: Array<() => void | Promise<void>>;
 	/** WebSockets and anything else that would otherwise hold the process open indefinitely. */
 	releaseConnections?: (options: { idleOnly: boolean }) => void | Promise<void>;
 }
 
-function closeServer(server: ClosableServer): Promise<void> {
-	return new Promise((resolve, reject) => {
-		server.close((err?: Error) => {
-			if (err) {
-				reject(err);
-			} else {
-				resolve();
-			}
-		});
-	});
+/**
+ * Stops listening and resolves once in-flight requests have finished. Bun closes idle keep-alive
+ * connections itself when it stops, so there is no separate step for those.
+ */
+function closeServer(server: Bun.Server): Promise<void> {
+	return server.stop(false);
 }
 
 /** Events the sequence reports, mapped to the level they deserve in the log. */
@@ -76,7 +65,7 @@ const EVENT_MESSAGE: Record<DrainEvent, string> = {
 export function installGracefulShutdown(
 	options: GracefulShutdownOptions,
 ): void {
-	const server = options.server as ClosableServer;
+	const { server } = options;
 	const timings = {
 		drainDelayMs: env.DRAIN_DELAY_MS,
 		drainTimeoutMs: env.SHUTDOWN_TIMEOUT_MS,
@@ -113,8 +102,10 @@ export function installGracefulShutdown(
 					await Promise.resolve(options.releaseConnections?.(releaseOptions));
 				},
 				closeServer: () => closeServer(server),
-				closeIdleConnections: () => server.closeIdleConnections?.(),
-				closeAllConnections: () => server.closeAllConnections?.(),
+				closeIdleConnections: () => undefined,
+				closeAllConnections: () => {
+					void server.stop(true);
+				},
 				flushLogs: () => flushOperationLogs(),
 				closeDependencies: async () => {
 					await Promise.allSettled([

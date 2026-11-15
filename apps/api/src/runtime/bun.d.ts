@@ -1,6 +1,7 @@
 /**
  * Narrow ambient declaration for the Bun globals the source uses: `Bun.password` (Argon2id hashing
- * in auth/password.ts) and `Bun.S3Client` (object storage in storage/s3ObjectStore.ts).
+ * in auth/password.ts), `Bun.S3Client` (object storage in storage/s3ObjectStore.ts) and `Bun.serve`
+ * (the HTTP and WebSocket server in http/bunServer.ts).
  *
  * Pulling in `@types/bun` would be the obvious alternative, but it redeclares globals that overlap
  * with `@types/node` and would change typechecking for the whole repository. The runtime is Bun
@@ -59,4 +60,73 @@ declare namespace Bun {
 		constructor(options?: S3Options);
 		file(path: string): S3File;
 	}
+
+	interface SocketAddress {
+		address: string;
+		port: number;
+		family: "IPv4" | "IPv6";
+	}
+
+	interface ServerWebSocket<T = undefined> {
+		data: T;
+		readonly readyState: number;
+		readonly remoteAddress: string;
+		send: (
+			data: string | ArrayBufferLike | Uint8Array,
+			compress?: boolean,
+		) => number;
+		close: (code?: number, reason?: string) => void;
+		/** Closes without the closing handshake. */
+		terminate: () => void;
+		ping: (data?: string | Uint8Array) => number;
+		getBufferedAmount: () => number;
+	}
+
+	interface WebSocketHandler<T = undefined> {
+		open?: (ws: ServerWebSocket<T>) => void | Promise<void>;
+		message: (
+			ws: ServerWebSocket<T>,
+			message: string | Uint8Array,
+		) => void | Promise<void>;
+		close?: (
+			ws: ServerWebSocket<T>,
+			code: number,
+			reason: string,
+		) => void | Promise<void>;
+		pong?: (ws: ServerWebSocket<T>, data: Uint8Array) => void | Promise<void>;
+		maxPayloadLength?: number;
+		perMessageDeflate?: boolean;
+		/** Seconds; 0 disables. */
+		idleTimeout?: number;
+		sendPings?: boolean;
+	}
+
+	interface Server {
+		readonly port: number;
+		readonly hostname: string;
+		readonly pendingRequests: number;
+		readonly pendingWebSockets: number;
+		requestIP: (request: Request) => SocketAddress | null;
+		upgrade: <T>(
+			request: Request,
+			options?: { headers?: HeadersInit; data?: T },
+		) => boolean;
+		/**
+		 * Stops accepting connections. Without `closeActiveConnections` it resolves once in-flight
+		 * requests finish; with it, every connection is closed at once.
+		 */
+		stop: (closeActiveConnections?: boolean) => Promise<void>;
+	}
+
+	interface ServeOptions<T> {
+		port?: number;
+		hostname?: string;
+		/** Seconds a connection may sit without traffic; 0 disables. */
+		idleTimeout?: number;
+		maxRequestBodySize?: number;
+		fetch: (request: Request, server: Server) => Response | Promise<Response>;
+		websocket?: WebSocketHandler<T>;
+	}
+
+	function serve<T = undefined>(options: ServeOptions<T>): Server;
 }

@@ -8,7 +8,7 @@ import { candidateMetadata } from "#gateway/candidateMetadata.ts";
 import { completedTerminal } from "#gateway/streamLifecycle.ts";
 import { OperationLogDraft } from "./runtime/operationLog.ts";
 import { route, type RouteResult } from "#router/index.ts";
-import { upgradeWebSocket } from "@hono/node-server";
+import { upgradeWebSocket } from "#http/bunServer.ts";
 import { GatewayError } from "#core/errors.ts";
 import { getAuth } from "#auth/middleware.ts";
 import type { AppEnv } from "#auth/types.ts";
@@ -670,9 +670,5 @@ export const realtimeWebSocketHandler = upgradeWebSocket(
 			secret?.type === "realtime" ? { ...secret, model: undefined } : null,
 		);
 	},
-	{
-		onError(error) {
-			throw error;
-		},
-	},
+	// An error building the handlers (before any socket exists) takes Hono's normal error path.
 );
