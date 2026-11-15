@@ -65,6 +65,18 @@
 				"cacheWriteCentsPerMTokensByTtl": {
 					"300": 500,
 					"3600": 800
+				},
+				"serviceTiers": {
+					"fast": {
+						"inputCentsPerMTokens": 800,
+						"outputCentsPerMTokens": 4000,
+						"cacheReadCentsPerMTokens": 40,
+						"cacheWriteCentsPerMTokens": 1000,
+						"cacheWriteCentsPerMTokensByTtl": {
+							"300": 1000,
+							"3600": 1600
+						}
+					}
 				}
 			}
 		},
@@ -118,6 +130,18 @@
 				"cacheWriteCentsPerMTokensByTtl": {
 					"300": 625,
 					"3600": 1000
+				},
+				"serviceTiers": {
+					"fast": {
+						"inputCentsPerMTokens": 1000,
+						"outputCentsPerMTokens": 5000,
+						"cacheReadCentsPerMTokens": 100,
+						"cacheWriteCentsPerMTokens": 1250,
+						"cacheWriteCentsPerMTokensByTtl": {
+							"300": 1250,
+							"3600": 2000
+						}
+					}
 				}
 			}
 		},
@@ -171,6 +195,18 @@
 				"cacheWriteCentsPerMTokensByTtl": {
 					"300": 625,
 					"3600": 1000
+				},
+				"serviceTiers": {
+					"fast": {
+						"inputCentsPerMTokens": 1000,
+						"outputCentsPerMTokens": 5000,
+						"cacheReadCentsPerMTokens": 100,
+						"cacheWriteCentsPerMTokens": 1250,
+						"cacheWriteCentsPerMTokensByTtl": {
+							"300": 1250,
+							"3600": 2000
+						}
+					}
 				}
 			}
 		},
@@ -224,6 +260,18 @@
 				"cacheWriteCentsPerMTokensByTtl": {
 					"300": 625,
 					"3600": 1000
+				},
+				"serviceTiers": {
+					"fast": {
+						"inputCentsPerMTokens": 3000,
+						"outputCentsPerMTokens": 15000,
+						"cacheReadCentsPerMTokens": 300,
+						"cacheWriteCentsPerMTokens": 3750,
+						"cacheWriteCentsPerMTokensByTtl": {
+							"300": 3750,
+							"3600": 6000
+						}
+					}
 				}
 			}
 		},
@@ -698,6 +746,18 @@
 				"cacheWriteCentsPerMTokensByTtl": {
 					"300": 1000,
 					"3600": 1600
+				},
+				"serviceTiers": {
+					"fast": {
+						"inputCentsPerMTokens": 1600,
+						"outputCentsPerMTokens": 8000,
+						"cacheReadCentsPerMTokens": 40,
+						"cacheWriteCentsPerMTokens": 2000,
+						"cacheWriteCentsPerMTokensByTtl": {
+							"300": 2000,
+							"3600": 3200
+						}
+					}
 				}
 			}
 		},
@@ -750,227 +810,6 @@
 			},
 			"deprecated": true,
 			"notes": "Anthropic deprecated claude-sonnet-4-5-20250929 on September 30, 2026; it retires on the Claude API on November 30, 2026 (replacement: claude-sonnet-5-5)."
-		},
-		"claude-opus-4-8-fast": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": true,
-						"reasoning": true,
-						"structuredOutputs": true,
-						"strictTools": true
-					},
-					"reasoning": {
-						"kind": "anthropic_adaptive",
-						"levels": ["none", "low", "medium", "high", "xhigh", "max"]
-					},
-					"maxInputTokens": 1000000,
-					"maxOutputTokens": 128000,
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"tool_choice": true,
-						"tools": true,
-						"verbosity": true,
-						"temperature": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						},
-						"reasoning_effort": true,
-						"top_p": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						},
-						"top_k": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						}
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 1000,
-				"outputCentsPerMTokens": 5000,
-				"cacheReadCentsPerMTokens": 100,
-				"cacheWriteCentsPerMTokens": 1250,
-				"cacheWriteCentsPerMTokensByTtl": {
-					"300": 1250,
-					"3600": 2000
-				}
-			},
-			"deprecated": true,
-			"notes": "Anthropic deprecated fast mode for Claude Opus 4.8; it is removed on 2026-11-30 (replacement: claude-opus-5-5-fast)."
-		},
-		"claude-opus-5-5-fast": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": true,
-						"reasoning": true,
-						"structuredOutputs": true,
-						"strictTools": true
-					},
-					"reasoning": {
-						"kind": "anthropic_adaptive",
-						"levels": ["low", "medium", "high", "xhigh", "max"]
-					},
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"tool_choice": {
-							"mode": "range",
-							"values": ["auto", "none"],
-							"notes": "Forced tool use (any or a named tool) is rejected with a 400 on this model."
-						},
-						"tools": true,
-						"verbosity": true,
-						"reasoning_effort": true,
-						"temperature": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						},
-						"top_p": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						},
-						"top_k": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						}
-					},
-					"maxInputTokens": 1000000,
-					"maxOutputTokens": 128000
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 800,
-				"outputCentsPerMTokens": 4000,
-				"cacheReadCentsPerMTokens": 40,
-				"cacheWriteCentsPerMTokens": 1000,
-				"cacheWriteCentsPerMTokensByTtl": {
-					"300": 1000,
-					"3600": 1600
-				}
-			},
-			"notes": "Gateway fast-mode alias for claude-opus-5-5. The adapter sends speed=\"fast\" with the required beta header; Anthropic access is required."
-		},
-		"claude-opus-5-fast": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": true,
-						"reasoning": true,
-						"structuredOutputs": true,
-						"strictTools": true
-					},
-					"reasoning": {
-						"kind": "anthropic_adaptive",
-						"levels": ["none", "low", "medium", "high", "xhigh", "max"]
-					},
-					"maxInputTokens": 1000000,
-					"maxOutputTokens": 128000,
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"tool_choice": true,
-						"tools": true,
-						"verbosity": true,
-						"reasoning_effort": true,
-						"temperature": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						},
-						"top_p": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						},
-						"top_k": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						}
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 1000,
-				"outputCentsPerMTokens": 5000,
-				"cacheReadCentsPerMTokens": 100,
-				"cacheWriteCentsPerMTokens": 1250,
-				"cacheWriteCentsPerMTokensByTtl": {
-					"300": 1250,
-					"3600": 2000
-				}
-			},
-			"notes": "Gateway fast-mode alias for claude-opus-5. The adapter sends speed=\"fast\" with the required beta header; Anthropic access is required."
-		},
-		"claude-opus-4-7-fast": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": true,
-						"reasoning": true,
-						"structuredOutputs": true,
-						"strictTools": true
-					},
-					"reasoning": {
-						"kind": "anthropic_adaptive",
-						"levels": ["none", "low", "medium", "high", "xhigh", "max"]
-					},
-					"maxInputTokens": 1000000,
-					"maxOutputTokens": 128000,
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"tool_choice": true,
-						"tools": true,
-						"verbosity": true,
-						"temperature": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						},
-						"top_p": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						},
-						"top_k": {
-							"mode": "unsupported",
-							"notes": "Rejected with a 400 at any non-default value on this model."
-						}
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 3000,
-				"outputCentsPerMTokens": 15000,
-				"cacheReadCentsPerMTokens": 300,
-				"cacheWriteCentsPerMTokens": 3750,
-				"cacheWriteCentsPerMTokensByTtl": {
-					"300": 3750,
-					"3600": 6000
-				}
-			},
-			"deprecated": true,
-			"notes": "Anthropic removed fast mode for Claude Opus 4.7 on July 24, 2026. Use claude-opus-5-fast or claude-opus-4-8-fast."
 		},
 		"claude-opus-4-5": {
 			"operations": {
@@ -1354,6 +1193,18 @@
 				"cacheWriteCentsPerMTokensByTtl": {
 					"300": 1000,
 					"3600": 1600
+				},
+				"serviceTiers": {
+					"fast": {
+						"inputCentsPerMTokens": 1600,
+						"outputCentsPerMTokens": 8000,
+						"cacheReadCentsPerMTokens": 40,
+						"cacheWriteCentsPerMTokens": 2000,
+						"cacheWriteCentsPerMTokensByTtl": {
+							"300": 2000,
+							"3600": 3200
+						}
+					}
 				}
 			}
 		}

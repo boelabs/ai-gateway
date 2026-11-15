@@ -52,6 +52,15 @@ Rules learned the hard way:
 - **Ids, not aliases of features.** `-fast`, `-pro`, `:batch`, `:free`, `-decisions` and similar
   suffixes on aggregators are usually a service tier, a mode or a different endpoint on an existing
   model. Add an entry only when the provider's API reference or models page lists that exact id.
+- **Service tiers are prices on the base model, never entries.** Clients pick a tier with a
+  `model:fast`, `model:flex` or `model:priority` suffix, and the gateway routes a mode only to models
+  whose catalog prices it in `pricing.serviceTiers` (keys `fast`, `priority`, `flex`; OpenAI also
+  `ultrafast`, billed when reported). So a missing tier is a mode clients cannot use, and a wrong one
+  is a billing error: copy every tier the provider's pricing page lists for the model (Flex/Batch,
+  Fast/Priority, Ultrafast tabs or columns), with its long-context `tiers` and cached-input rates.
+  OpenAI's Fast is the former Priority, so `fast` and `priority` carry the same rates there. A
+  scheduled price change (`pricing.scheduled`) must price the same tiers as the current pricing; the
+  validator rejects one that drops a tier.
   Match the provider's spelling and case (`MiniMax-M3.1-Flash`, not `minimax-m3.1-flash`).
 - **No number, no field.** When the provider publishes no price or limit, leave it absent. Do not
   infer one from an aggregator or from a sibling model.
@@ -114,9 +123,9 @@ provider in parallel when you can:
 | Provider | Start from |
 |---|---|
 | anthropic | `https://platform.claude.com/docs/en/release-notes/api`, `.../about-claude/models/overview`, `.../about-claude/model-deprecations` |
-| openai | `https://developers.openai.com/api/docs/changelog`, `.../docs/models`, `.../docs/deprecations` |
+| openai | `https://developers.openai.com/api/docs/changelog`, `.../docs/models`, `.../docs/deprecations`, and `.../docs/pricing` for every price and service tier (append `.md` for Markdown). If the site refuses automated requests, say so in the report and leave prices untouched: never fill them from an aggregator |
 | azureopenai, azurefoundry | The report's Azure sections (below), `https://learn.microsoft.com/azure/foundry/openai/concepts/model-retirement-schedule`, and for each model the page's own section or how-to |
-| googleaistudio | `https://ai.google.dev/gemini-api/docs/changelog`, `.../docs/models` (its "Live API" section), `.../docs/deprecations`, `.../docs/transcribe`, `.../docs/live-api/live-transcribe`, `.../docs/live-api/capabilities`, `.../docs/live-api/tools`, `.../docs/live-api/live-translate` |
+| googleaistudio | `https://aistudio.google.com/llms.txt` (index of every page as Markdown) and `https://aistudio.google.com/docs/pricing.md` for every price and the Flex and Priority tiers, then `https://ai.google.dev/gemini-api/docs/changelog`, `.../docs/models` (its "Live API" section), `.../docs/deprecations`, `.../docs/transcribe`, `.../docs/live-api/live-transcribe`, `.../docs/live-api/capabilities`, `.../docs/live-api/tools`, `.../docs/live-api/live-translate` |
 | deepseek | `https://api-docs.deepseek.com/updates`, `.../news/`, `.../quick_start/pricing` |
 | moonshot | `https://platform.kimi.ai/docs/platform-changelog.md`, `.../docs/models.md` |
 | zai | `https://docs.z.ai/release-notes/new-released`, `.../guides/overview/pricing` |

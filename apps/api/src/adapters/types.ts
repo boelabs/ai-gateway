@@ -3,6 +3,7 @@ import type { AttemptWatchdog } from "#gateway/attemptWatchdog.ts";
 import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import type { ReasoningControlKind } from "#core/reasoning.ts";
 import type { ResolvedModelMetadata } from "#catalog/types.ts";
+import type { ServiceMode } from "#core/serviceMode.ts";
 import type { GatewayError } from "#core/errors.ts";
 import type { CallType } from "#core/callType.ts";
 
@@ -115,6 +116,8 @@ export interface AdapterContext {
 	watchdog?: AttemptWatchdog;
 	/** Mutable private evidence for transport-level observations that do not produce a public frame. */
 	diagnostics?: AdapterDiagnostics;
+	/** Service mode the client chose with a `model:mode` suffix; only set when the adapter supports it. */
+	serviceMode?: ServiceMode;
 	/** Private transport timestamps populated by the instrumented executor. */
 	timings?: { headersAt?: number };
 	/** Byte counters populated only by the instrumented HTTP/WebSocket transport. */
@@ -131,6 +134,8 @@ export interface ChatSupportContext {
 export interface AdapterDiagnostics {
 	providerRequestId?: string;
 	modelVersion?: string;
+	/** The service tier a provider reports it served in a response header (`x-gemini-service-tier`). */
+	servedServiceTier?: string;
 	originalTerminalReason?: string;
 	transportTerminator?:
 		| "eof"
@@ -404,6 +409,11 @@ export interface Adapter {
 		required: readonly string[];
 	};
 	supportedCallTypes: ReadonlySet<CallType>;
+	/**
+	 * Service modes this adapter can request upstream (`model:fast`, `:flex`, `:priority`). A model
+	 * also needs the tier priced in its catalog; anything else is refused before routing.
+	 */
+	serviceModes?: ReadonlySet<ServiceMode>;
 	chat?: ChatHandler;
 	/** Rejects requests whose guarantee cannot be honored by the resolved transport. */
 	assertChatRequestSupported?: (

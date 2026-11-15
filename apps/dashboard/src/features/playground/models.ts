@@ -1,3 +1,4 @@
+import { SERVICE_MODES, type ServiceMode } from "./api";
 import { type Capability, CAPABILITIES } from "./capabilities.ts";
 import type { PublicEndpoint } from "./api.ts";
 import { z } from "zod";
@@ -29,6 +30,8 @@ export interface PlaygroundCapabilities {
 
 export interface PlaygroundModel extends PlaygroundCapabilities {
 	id: string;
+	/** The `model:mode` service modes the gateway will route for this model; empty for none. */
+	serviceModes: ServiceMode[];
 	/**
 	 * What this model can be asked to do here — the same model may offer several, and it is listed
 	 * under each. Only capabilities the playground implements appear; see `capabilities.ts`.
@@ -60,6 +63,8 @@ const publicModelsSchema = z.object({
 				z.object({ id: z.string(), endpoints: z.array(z.string()) }),
 			),
 			supported_parameters: z.array(z.string()).optional(),
+			// Unknown future modes are dropped, not fatal: an older dashboard keeps working.
+			service_modes: z.array(z.string()).optional(),
 			architecture: z
 				.object({ input_modalities: z.array(z.string()).optional() })
 				.optional(),
@@ -122,6 +127,9 @@ export function parsePublicModels(body: unknown): PlaygroundModel[] {
 			return [
 				{
 					id: model.id,
+					serviceModes: SERVICE_MODES.filter((mode) =>
+						model.service_modes?.includes(mode),
+					),
 					capabilities: availableCapabilities,
 					operations,
 					endpoints: available,

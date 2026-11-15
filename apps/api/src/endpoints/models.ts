@@ -1,3 +1,8 @@
+import {
+	type ServiceMode,
+	SERVICE_MODES,
+	supportsServiceMode,
+} from "#core/serviceMode.ts";
 import type { OperationProfiles, TransportOverrides } from "#profiles/types.ts";
 import { publicTextCapabilities } from "#catalog/publicTextCapabilities.ts";
 import { enforcePublicModelRateLimit } from "./modelsRateLimit.ts";
@@ -309,6 +314,29 @@ function topProvider(metas: ResolvedModelMetadata[]): Record<string, unknown> {
 	};
 }
 
+/**
+ * The `model:mode` suffixes this pool can serve, by the router's own rule: a mode some deployment's
+ * adapter can request and its catalog prices now. Clients see only modes that will not be refused.
+ */
+function serviceModes(
+	rows: DeploymentRow[],
+	metas: ResolvedModelMetadata[],
+): ServiceMode[] {
+	return SERVICE_MODES.filter((mode) =>
+		rows.some((row, index) => {
+			const meta = metas[index];
+			return (
+				meta !== undefined &&
+				supportsServiceMode(
+					meta,
+					getAdapter(row.adapterKey)?.serviceModes,
+					mode,
+				)
+			);
+		}),
+	);
+}
+
 function toModelObject(group: PublicModelGroup): Record<string, unknown> {
 	const architecture = aggregateModalities(group.metas);
 	return {
@@ -325,6 +353,7 @@ function toModelObject(group: PublicModelGroup): Record<string, unknown> {
 		pricing: publicPricing(group.metas),
 		operations: publicOperations(group.metas),
 		supported_parameters: aggregateSupportedParameters(group),
+		service_modes: serviceModes(group.rows, group.metas),
 		text_capabilities: publicTextCapabilities(group.metas),
 		endpoint_count: group.rows.length,
 	};
@@ -400,6 +429,7 @@ async function deploymentObjects(group: PublicModelGroup): Promise<object[]> {
 			pricing: deploymentPricing(meta.pricing),
 			operations: publicOperations([meta]),
 			supported_parameters: deploymentParameterNames(row, meta),
+			service_modes: serviceModes([row], [meta]),
 			transports: Object.fromEntries(
 				Object.entries(transportOverrides(row)).filter(([, value]) => value),
 			),

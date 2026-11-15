@@ -125,6 +125,14 @@ export function Metrics({ metrics }: { metrics: ResponseMetrics }) {
 					Finish reason: {metrics.finishReason}
 				</p>
 			) : null}
+			{metrics.requestedServiceTier || metrics.servedServiceTier ? (
+				<p className="text-xs text-fg-muted">
+					Service tier: {metrics.requestedServiceTier ?? "standard"} requested
+					{metrics.servedServiceTier
+						? `, ${metrics.servedServiceTier} served`
+						: ", served tier not reported"}
+				</p>
+			) : null}
 			{metrics.warnings?.map((warning) => (
 				<p className="text-xs wrap-break-word text-warning" key={warning}>
 					{warning}

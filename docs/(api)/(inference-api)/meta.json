@@ -18,6 +18,7 @@
 		"decisions",
 		"---Shared behavior---",
 		"models-discovery",
+		"service-modes",
 		"file-inputs",
 		"streaming",
 		"provider-specific-fields",

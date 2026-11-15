@@ -710,3 +710,37 @@ test("openai.parseStream: reasoning output_item.done -> delta.providerFields (de
 		["rs_1", "rs_2"],
 	);
 });
+
+test("openai: a service mode becomes service_tier on both transports", () => {
+	const handler = must(openaiAdapter, "chat");
+	for (const transport of ["responses", "chat_completions"] as const) {
+		const body = jsonBody(
+			handler.buildRequest(baseReq, { ...ctx, transport, serviceMode: "flex" }),
+		);
+		assert.equal(body.service_tier, "flex");
+	}
+	const fast = jsonBody(
+		handler.buildRequest(baseReq, { ...ctx, serviceMode: "fast" }),
+	);
+	assert.equal(fast.service_tier, "fast");
+	// Priority was renamed Fast, so an explicit `priority` agrees with `:fast`.
+	assert.doesNotThrow(() =>
+		handler.buildRequest(
+			{ ...baseReq, chatTransport: { serviceTier: "priority" } },
+			{ ...ctx, serviceMode: "fast" },
+		),
+	);
+	assert.throws(
+		() =>
+			handler.buildRequest(
+				{ ...baseReq, chatTransport: { serviceTier: "flex" } },
+				{ ...ctx, serviceMode: "fast" },
+			),
+		(error) =>
+			GatewayError.is(error) && error.code === "conflicting_service_tier",
+	);
+	assert.equal(
+		jsonBody(handler.buildRequest(baseReq, ctx)).service_tier,
+		undefined,
+	);
+});

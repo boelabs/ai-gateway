@@ -1,0 +1,57 @@
+---
+title: "Modos de servicio"
+description: "Elige procesamiento fast, flex o priority con un sufijo modelo:modo, en los proveedores que lo ofrecen."
+---
+
+Un modo de servicio es el mismo modelo servido de otra forma: más rápido, más barato y lento, o con
+capacidad reservada. Se elige añadiendo un sufijo al modelo, como en OpenRouter:
+
+```json
+{ "model": "gpt-6.1-sol:flex", "input": "Summarize this report." }
+```
+
+El sufijo funciona en todos los contratos de texto (`/v1/chat/completions`, `/v1/responses`, el
+WebSocket de Responses y `/v1/messages`), y una key limitada a `model` también puede usar `model:mode`.
+
+| Sufijo | Qué es | OpenAI | Anthropic | Gemini |
+|---|---|---|---|---|
+| `:fast` | Salida más rápida con sobreprecio | `service_tier: "fast"` | `speed: "fast"` | — |
+| `:priority` | Capacidad reservada con sobreprecio | `service_tier: "priority"` (el mismo nivel que Fast desde que OpenAI lo renombró) | — | `service_tier: "priority"` |
+| `:flex` | Más barato y lento, puede no estar disponible | `service_tier: "flex"` | — | `service_tier: "flex"` |
+
+## Qué modelos admiten cada modo [#which-models-support-a-mode]
+
+Un deployment puede servir un modo si su proveedor lo ofrece **y** el catálogo tiene precio para ese
+nivel (`pricing.serviceTiers`). El gateway enruta `model:mode` solo a los deployments que cumplen. Si
+ninguno cumple (el modelo o el proveedor no tiene ese modo, o el deployment pasa por un agregador que
+no lo expone), la solicitud se rechaza **antes de llamar al proveedor**:
+
+```json
+{
+  "error": {
+    "type": "invalid_request_error",
+    "code": "unsupported_service_mode",
+    "param": "model",
+    "message": "The model `my-model` does not support the `fast` service mode."
+  }
+}
+```
+
+No hay fallback silencioso al procesamiento estándar. Un sufijo que no es un modo (`:free`, `:online`)
+forma parte del nombre del modelo.
+
+Si la solicitud también envía `service_tier`, tiene que coincidir con el sufijo (`auto` y `default`
+dejan decidir al sufijo); si no, falla con `conflicting_service_tier`.
+
+## Facturación [#billing]
+
+El gateway cobra el nivel que el proveedor dice haber **servido**, no el solicitado:
+
+- **OpenAI** lo informa en `service_tier`. Fast mode frenado por su límite de rampa vuelve como
+  `default` y se cobra a tarifa estándar; GPT-5.6 y anteriores informan Fast como `priority`.
+- **Anthropic** informa `usage.speed`; solo `fast` se cobra a la tarifa fast.
+- **Gemini** Flex nunca degrada (falla con 429 o 503), así que una respuesta Flex se cobra a Flex. El
+  excedente de Priority se sirve en Standard, y Gemini solo lo indica en la cabecera de respuesta
+  `x-gemini-service-tier`; el gateway cobra Standard cuando esa cabecera dice `standard`.
+
+Consulta [Contabilidad de costos](/docs/cost-accounting) para ver cómo se aplican las tarifas por nivel.

@@ -304,3 +304,12 @@ test("a text model with no contract the gateway exposes is not offered at all", 
 		[],
 	);
 });
+
+test("service modes come from the catalog and unknown ones are ignored", () => {
+	const [parsed] = parsePublicModels({
+		data: [{ ...model(), service_modes: ["flex", "ultrafast", "fast"] }],
+	});
+	assert.deepEqual(parsed?.serviceModes, ["fast", "flex"]);
+	const [plain] = parsePublicModels({ data: [model()] });
+	assert.deepEqual(plain?.serviceModes, []);
+});

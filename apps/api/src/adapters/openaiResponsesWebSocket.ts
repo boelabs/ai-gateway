@@ -1,3 +1,4 @@
+import { withOpenAIServiceMode } from "./openaiServiceMode.ts";
 import { upstreamWebSocket } from "#gateway/instrumentedTransport.ts";
 import { abortGatewayError } from "#gateway/abortReason.ts";
 import { GatewayError } from "#core/errors.ts";
@@ -115,7 +116,7 @@ export function buildResponsesWebSocketMessage(
 	options: { previousResponseId?: string; generate: boolean },
 ): Record<string, unknown> {
 	const body = buildResponsesRequestBody(
-		req,
+		withOpenAIServiceMode(req, ctx.serviceMode),
 		ctx.upstreamModel,
 		ctx.meta.reasoning,
 	);

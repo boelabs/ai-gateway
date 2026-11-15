@@ -248,6 +248,10 @@ async function dispatch(
 			break;
 		}
 	}
+	const servedServiceTier = res.headers.get("x-gemini-service-tier");
+	if (servedServiceTier) {
+		adapterContextDiagnostics(ctx).servedServiceTier = servedServiceTier;
+	}
 	if (!res.ok) {
 		const retryAfter = res.headers.get("retry-after");
 		const body = await readBody(res, ctx);

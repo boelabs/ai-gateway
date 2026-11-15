@@ -620,10 +620,10 @@ test("anthropic.buildRequest: adaptive reasoning keeps xhigh and max distinct", 
 	assert.deepEqual(jsonBody(maximum).output_config, { effort: "max" });
 });
 
-test("anthropic.buildRequest: fast aliases select the native model and required beta", () => {
+test("anthropic.buildRequest: the fast service mode sends speed=fast with its beta", () => {
 	const built = must(anthropicAdapter, "chat").buildRequest(
 		{ ...req, reasoning: { effort: "max" } },
-		{ ...adaptiveCtx, upstreamModel: "claude-opus-5-fast" },
+		{ ...adaptiveCtx, upstreamModel: "claude-opus-5", serviceMode: "fast" },
 	);
 	const body = jsonBody(built);
 	assert.equal(body.model, "claude-opus-5");
@@ -634,10 +634,18 @@ test("anthropic.buildRequest: fast aliases select the native model and required 
 
 	const opus55 = must(anthropicAdapter, "chat").buildRequest(req, {
 		...adaptiveCtx,
-		upstreamModel: "claude-opus-5-5-fast",
+		upstreamModel: "claude-opus-5-5",
+		serviceMode: "fast",
 	});
 	assert.equal(jsonBody(opus55).model, "claude-opus-5-5");
 	assert.equal(jsonBody(opus55).speed, "fast");
+
+	const standard = must(anthropicAdapter, "chat").buildRequest(req, {
+		...adaptiveCtx,
+		upstreamModel: "claude-opus-5-5",
+	});
+	assert.equal(jsonBody(standard).speed, undefined);
+	assert.equal(standard.headers["anthropic-beta"], undefined);
 });
 
 test("anthropic.buildRequest: structured output merges with output_config.effort", () => {

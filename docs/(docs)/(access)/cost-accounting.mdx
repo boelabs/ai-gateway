@@ -42,7 +42,8 @@ charges the tier in the **response**, not the one requested, because a provider 
 another tier (OpenAI downgrades Fast mode to `default` under its ramp-rate limit). A declared tier
 replaces the standard token rates and context tiers, with its own `tiers` for long context; a tier with
 no declared rates is charged at the standard rates. The served tier is recorded as
-`metadata.serviceTier` on the operation.
+`metadata.serviceTier` on the operation. Clients choose a tier with a `model:mode` suffix; see
+[Service modes](/docs/service-modes).
 
 A deployment's own `pricing` field, if set, **overrides** the catalog rate entirely for that deployment
 — useful for a negotiated rate or a custom model with no catalog entry at all. An override must

@@ -8,29 +8,36 @@ const reasoningPart = z.object({
 });
 const reasoningState = z.array(z.record(z.string(), z.json()));
 const chunkSchema = z.object({
-	choices: z.array(
-		z.object({
-			delta: z
-				.object({
-					provider_specific_fields: z
-						.object({
-							openai: z
-								.object({
-									reasoning: reasoningState.optional(),
-									responses: z
-										.object({ reasoning_part: reasoningPart.optional() })
-										.optional(),
-								})
-								.optional(),
-						})
-						.optional(),
-				})
-				.optional(),
-		}),
-	),
+	/** The tier the gateway served the request at; sent on the final chunk. */
+	service_tier: z.string().optional(),
+	choices: z
+		.array(
+			z.object({
+				delta: z
+					.object({
+						provider_specific_fields: z
+							.object({
+								openai: z
+									.object({
+										reasoning: reasoningState.optional(),
+										responses: z
+											.object({ reasoning_part: reasoningPart.optional() })
+											.optional(),
+									})
+									.optional(),
+							})
+							.optional(),
+					})
+					.optional(),
+			}),
+		)
+		.default([]),
 });
 
-/** The compatible SDK flattens reasoning; restore the gateway's item and summary boundaries. */
+/**
+ * The compatible SDK flattens reasoning; restore the gateway's item and summary boundaries. It also
+ * drops the chunk's `service_tier`, which is kept here as `aiGateway.serviceTier`.
+ */
 export const chatReasoningMiddleware: LanguageModelMiddleware = {
 	transformParams: async ({ params }) => ({
 		...params,
@@ -68,6 +75,7 @@ export const chatReasoningMiddleware: LanguageModelMiddleware = {
 		let active: string | undefined;
 		let sequence = 0;
 		const states = new Map<string, z.infer<typeof reasoningState>[number]>();
+		let serviceTier: string | undefined;
 		const close = (controller: TransformStreamDefaultController<Part>) => {
 			if (active !== undefined) {
 				controller.enqueue({ type: "reasoning-end", id: active });
@@ -82,6 +90,7 @@ export const chatReasoningMiddleware: LanguageModelMiddleware = {
 						if (part.type === "raw") {
 							const parsed = chunkSchema.safeParse(part.rawValue);
 							if (parsed.success) {
+								serviceTier = parsed.data.service_tier ?? serviceTier;
 								for (const state of parsed.data.choices[0]?.delta
 									?.provider_specific_fields?.openai?.reasoning ?? []) {
 									states.set(
@@ -127,14 +136,18 @@ export const chatReasoningMiddleware: LanguageModelMiddleware = {
 						if (part.type === "finish" || part.type === "error") {
 							close(controller);
 						}
-						if (part.type === "finish" && states.size) {
+						if (
+							part.type === "finish" &&
+							(states.size || serviceTier !== undefined)
+						) {
 							controller.enqueue({
 								...part,
 								providerMetadata: {
 									...part.providerMetadata,
 									aiGateway: {
 										...part.providerMetadata?.aiGateway,
-										reasoning: [...states.values()],
+										...(states.size ? { reasoning: [...states.values()] } : {}),
+										...(serviceTier === undefined ? {} : { serviceTier }),
 									},
 								},
 							});

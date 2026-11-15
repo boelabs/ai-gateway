@@ -66,7 +66,8 @@ test("client betas reach Anthropic beside the adapter's own", () => {
 	]);
 	const built = must(anthropicAdapter, "chat").buildRequest(req, {
 		...ctx,
-		upstreamModel: "claude-opus-5-fast",
+		upstreamModel: "claude-opus-5",
+		serviceMode: "fast",
 	});
 	const betas = String(built.headers["anthropic-beta"]).split(",");
 	assert.ok(betas.includes("context-management-2025-06-27"));
@@ -88,7 +89,8 @@ test("a native field that contradicts the model's own setting is rejected", () =
 		() =>
 			must(anthropicAdapter, "chat").buildRequest(req, {
 				...ctx,
-				upstreamModel: "claude-opus-5-fast",
+				upstreamModel: "claude-opus-5",
+				serviceMode: "fast",
 			}),
 		(error) => GatewayError.is(error) && error.param === "speed",
 	);

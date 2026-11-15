@@ -1574,3 +1574,43 @@ test("google: an allowed subset under auto is expressed by the declarations, not
 		allowedFunctionNames: ["a"],
 	});
 });
+
+test("google: Flex and Priority go on the body and bill the tier actually served", () => {
+	const handler = must(googleAdapter, "chat");
+	const flexCtx: AdapterContext = { ...ctx, serviceMode: "flex" };
+	assert.equal(
+		jsonBody(handler.buildRequest(req, flexCtx)).service_tier,
+		"flex",
+	);
+	assert.equal(
+		jsonBody(handler.buildRequest(req, ctx)).service_tier,
+		undefined,
+	);
+
+	const raw = {
+		candidates: [
+			{ content: { parts: [{ text: "hi" }] }, finishReason: "STOP" },
+		],
+		usageMetadata: {
+			promptTokenCount: 5,
+			candidatesTokenCount: 2,
+			totalTokenCount: 7,
+		},
+	};
+	assert.equal(handler.parseResponse(raw, flexCtx).usage.serviceTier, "flex");
+	assert.equal(
+		handler.parseResponse(raw, { ...ctx, serviceMode: "priority" }).usage
+			.serviceTier,
+		"priority",
+	);
+	// Priority overflow is served (and billed) at Standard; the header is the only signal.
+	assert.equal(
+		handler.parseResponse(raw, {
+			...ctx,
+			serviceMode: "priority",
+			diagnostics: { servedServiceTier: "standard" },
+		}).usage.serviceTier,
+		undefined,
+	);
+	assert.equal(handler.parseResponse(raw, ctx).usage.serviceTier, undefined);
+});

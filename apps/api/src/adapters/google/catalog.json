@@ -1798,10 +1798,34 @@
 						"pricing": {
 							"inputCentsPerMTokens": 400,
 							"outputCentsPerMTokens": 2000,
-							"cacheReadCentsPerMTokens": 20
+							"cacheReadCentsPerMTokens": 20,
+							"serviceTiers": {
+								"flex": {
+									"inputCentsPerMTokens": 200,
+									"outputCentsPerMTokens": 1000,
+									"cacheReadCentsPerMTokens": 10
+								},
+								"priority": {
+									"inputCentsPerMTokens": 720,
+									"outputCentsPerMTokens": 3600,
+									"cacheReadCentsPerMTokens": 36
+								}
+							}
 						}
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 100,
+						"outputCentsPerMTokens": 500,
+						"cacheReadCentsPerMTokens": 5
+					},
+					"priority": {
+						"inputCentsPerMTokens": 360,
+						"outputCentsPerMTokens": 1800,
+						"cacheReadCentsPerMTokens": 18
+					}
+				}
 			},
 			"notes": "Introductory pricing through 2026-11-30. From 2026-12-01 Google publishes $4.00 input / $20.00 output / $0.20 cached input per 1M tokens: update before then. Implicit caching only (no explicit cache or storage price). Non-streaming generateContent caps output at 32,768 tokens (a higher max_output_tokens without a continuation token returns 400); streaming caps at 65,536. Long decode up to 1,048,576 needs continuation hops the adapter does not run. temperature/top_p/top_k are ignored by Gemini 4."
 		},
@@ -1843,10 +1867,34 @@
 						"pricing": {
 							"inputCentsPerMTokens": 400,
 							"outputCentsPerMTokens": 2000,
-							"cacheReadCentsPerMTokens": 20
+							"cacheReadCentsPerMTokens": 20,
+							"serviceTiers": {
+								"flex": {
+									"inputCentsPerMTokens": 200,
+									"outputCentsPerMTokens": 1000,
+									"cacheReadCentsPerMTokens": 10
+								},
+								"priority": {
+									"inputCentsPerMTokens": 720,
+									"outputCentsPerMTokens": 3600,
+									"cacheReadCentsPerMTokens": 36
+								}
+							}
 						}
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 100,
+						"outputCentsPerMTokens": 500,
+						"cacheReadCentsPerMTokens": 5
+					},
+					"priority": {
+						"inputCentsPerMTokens": 360,
+						"outputCentsPerMTokens": 1800,
+						"cacheReadCentsPerMTokens": 18
+					}
+				}
 			},
 			"notes": "Introductory pricing through 2026-11-30. From 2026-12-01 Google publishes $4.00 input / $20.00 output / $0.20 cached input per 1M tokens: update before then. Implicit caching only (no explicit cache or storage price). temperature/top_p/top_k are ignored by Gemini 4."
 		},
@@ -1881,7 +1929,19 @@
 			"pricing": {
 				"inputCentsPerMTokens": 150,
 				"outputCentsPerMTokens": 750,
-				"cacheReadCentsPerMTokens": 7.5
+				"cacheReadCentsPerMTokens": 7.5,
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 75,
+						"outputCentsPerMTokens": 375,
+						"cacheReadCentsPerMTokens": 3.75
+					},
+					"priority": {
+						"inputCentsPerMTokens": 270,
+						"outputCentsPerMTokens": 1350,
+						"cacheReadCentsPerMTokens": 13.5
+					}
+				}
 			},
 			"notes": "Implicit caching only (no explicit cache or storage price). Output above 65,536 tokens needs long decode continuation hops the adapter does not run."
 		},
@@ -1929,7 +1989,37 @@
 						"cacheReadCentsPerMTokens": 40
 					}
 				],
-				"cacheWriteCentsPerMTokens": 18.75
+				"cacheWriteCentsPerMTokens": 18.75,
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 100,
+						"outputCentsPerMTokens": 600,
+						"cacheReadCentsPerMTokens": 20,
+						"cacheWriteCentsPerMTokens": 18.75,
+						"tiers": [
+							{
+								"aboveInputTokens": 200000,
+								"inputCentsPerMTokens": 200,
+								"outputCentsPerMTokens": 900,
+								"cacheReadCentsPerMTokens": 40
+							}
+						]
+					},
+					"priority": {
+						"inputCentsPerMTokens": 360,
+						"outputCentsPerMTokens": 2160,
+						"cacheReadCentsPerMTokens": 36,
+						"cacheWriteCentsPerMTokens": 33.75,
+						"tiers": [
+							{
+								"aboveInputTokens": 200000,
+								"inputCentsPerMTokens": 720,
+								"outputCentsPerMTokens": 3240,
+								"cacheReadCentsPerMTokens": 72
+							}
+						]
+					}
+				}
 			}
 		},
 		"gemini-3.1-pro-preview-customtools": {
@@ -2018,10 +2108,38 @@
 							"inputCentsPerMTokens": 150,
 							"outputCentsPerMTokens": 750,
 							"cacheReadCentsPerMTokens": 15,
-							"cacheWriteCentsPerMTokens": 4.166667
+							"cacheWriteCentsPerMTokens": 4.166667,
+							"serviceTiers": {
+								"flex": {
+									"inputCentsPerMTokens": 75,
+									"outputCentsPerMTokens": 375,
+									"cacheReadCentsPerMTokens": 7.5,
+									"cacheWriteCentsPerMTokens": 4.166667
+								},
+								"priority": {
+									"inputCentsPerMTokens": 270,
+									"outputCentsPerMTokens": 1350,
+									"cacheReadCentsPerMTokens": 27,
+									"cacheWriteCentsPerMTokens": 4.166667
+								}
+							}
 						}
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 37.5,
+						"outputCentsPerMTokens": 187.5,
+						"cacheReadCentsPerMTokens": 3.75,
+						"cacheWriteCentsPerMTokens": 2.083333
+					},
+					"priority": {
+						"inputCentsPerMTokens": 135,
+						"outputCentsPerMTokens": 675,
+						"cacheReadCentsPerMTokens": 13.5,
+						"cacheWriteCentsPerMTokens": 2.083333
+					}
+				}
 			}
 		},
 		"gemini-3.7-flash": {
@@ -2134,7 +2252,21 @@
 				"inputCentsPerMTokens": 30,
 				"outputCentsPerMTokens": 250,
 				"cacheReadCentsPerMTokens": 3,
-				"cacheWriteCentsPerMTokens": 4.166667
+				"cacheWriteCentsPerMTokens": 4.166667,
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 15,
+						"outputCentsPerMTokens": 125,
+						"cacheReadCentsPerMTokens": 2,
+						"cacheWriteCentsPerMTokens": 4.166667
+					},
+					"priority": {
+						"inputCentsPerMTokens": 54,
+						"outputCentsPerMTokens": 450,
+						"cacheReadCentsPerMTokens": 5,
+						"cacheWriteCentsPerMTokens": 4.166667
+					}
+				}
 			}
 		},
 		"gemini-3-flash-preview": {
@@ -2360,7 +2492,21 @@
 				"inputCentsPerMTokens": 10,
 				"outputCentsPerMTokens": 40,
 				"cacheReadCentsPerMTokens": 1,
-				"cacheWriteCentsPerMTokens": 8.333333
+				"cacheWriteCentsPerMTokens": 8.333333,
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 5,
+						"outputCentsPerMTokens": 20,
+						"cacheReadCentsPerMTokens": 1,
+						"cacheWriteCentsPerMTokens": 8.333333
+					},
+					"priority": {
+						"inputCentsPerMTokens": 18,
+						"outputCentsPerMTokens": 72,
+						"cacheReadCentsPerMTokens": 1.8,
+						"cacheWriteCentsPerMTokens": 14.999999
+					}
+				}
 			}
 		},
 		"gemma-4-26b-a4b-it": {
@@ -3419,10 +3565,38 @@
 							"inputCentsPerMTokens": 150,
 							"outputCentsPerMTokens": 750,
 							"cacheReadCentsPerMTokens": 15,
-							"cacheWriteCentsPerMTokens": 4.166667
+							"cacheWriteCentsPerMTokens": 4.166667,
+							"serviceTiers": {
+								"flex": {
+									"inputCentsPerMTokens": 75,
+									"outputCentsPerMTokens": 375,
+									"cacheReadCentsPerMTokens": 7.5,
+									"cacheWriteCentsPerMTokens": 4.166667
+								},
+								"priority": {
+									"inputCentsPerMTokens": 270,
+									"outputCentsPerMTokens": 1350,
+									"cacheReadCentsPerMTokens": 27,
+									"cacheWriteCentsPerMTokens": 4.166667
+								}
+							}
 						}
 					}
-				]
+				],
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 37.5,
+						"outputCentsPerMTokens": 187.5,
+						"cacheReadCentsPerMTokens": 3.75,
+						"cacheWriteCentsPerMTokens": 2.083333
+					},
+					"priority": {
+						"inputCentsPerMTokens": 135,
+						"outputCentsPerMTokens": 675,
+						"cacheReadCentsPerMTokens": 13.5,
+						"cacheWriteCentsPerMTokens": 2.083333
+					}
+				}
 			}
 		},
 		"gemini-3.8-live": {

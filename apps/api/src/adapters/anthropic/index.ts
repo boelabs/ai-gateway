@@ -1,3 +1,4 @@
+import type { ServiceMode } from "#core/serviceMode.ts";
 import {
 	toUpstreamReasoningEffort,
 	summaryVisible,
@@ -73,6 +74,8 @@ interface AnthropicUsage {
 	};
 	/** Requests to tools Anthropic runs itself: `web_search_requests`, `web_fetch_requests`, ... */
 	server_tool_use?: Record<string, unknown> | null;
+	/** `fast` or `standard`: the speed the request was actually served at. */
+	speed?: string | null;
 }
 
 interface AnthropicContentBlock {
@@ -118,12 +121,12 @@ const DEFAULT_BASE = "https://api.anthropic.com/v1";
 const DEFAULT_VERSION = "2023-06-01";
 const DEFAULT_MAX_TOKENS = 4096;
 const FAST_MODE_BETA = "fast-mode-2026-02-01";
-const FAST_MODE_ALIASES: ReadonlyMap<string, string> = new Map([
-	["claude-opus-5-5-fast", "claude-opus-5-5"],
-	["claude-opus-5-fast", "claude-opus-5"],
-	["claude-opus-4-8-fast", "claude-opus-4-8"],
-	["claude-opus-4-7-fast", "claude-opus-4-7"],
-]);
+/**
+ * Fast mode is `speed: "fast"` on the standard model id, chosen with a `model:fast` slug. Which models
+ * have it is the catalog's `pricing.serviceTiers.fast`; the response's `usage.speed` says whether it
+ * was served fast, and only then is the fast rate billed.
+ */
+const SERVICE_MODES: ReadonlySet<ServiceMode> = new Set(["fast"]);
 const ANTHROPIC_BODY_MANAGED_KEYS = [
 	"model",
 	"max_tokens",
@@ -691,14 +694,13 @@ function buildBody(
 		});
 	}
 	assertNoPrefixCachePolicy(req);
-	const nativeModel = FAST_MODE_ALIASES.get(ctx.upstreamModel);
 	const body: Record<string, unknown> = {
-		model: nativeModel ?? ctx.upstreamModel,
+		model: ctx.upstreamModel,
 		max_tokens: req.maxTokens ?? ctx.meta.maxOutputTokens ?? DEFAULT_MAX_TOKENS,
 		stream: req.stream,
 		...buildMessages(req),
 	};
-	if (nativeModel !== undefined) {
+	if (ctx.serviceMode === "fast") {
 		body.speed = "fast";
 	}
 	if (req.temperature !== undefined) {
@@ -858,6 +860,9 @@ function mapUsage(usage: AnthropicUsage | undefined): Usage {
 	const serverToolCalls = serverToolCallsOf(usage?.server_tool_use);
 	if (serverToolCalls !== undefined) {
 		out.serverToolCalls = serverToolCalls;
+	}
+	if (usage?.speed === "fast") {
+		out.serviceTier = "fast";
 	}
 	return out;
 }
@@ -1028,6 +1033,14 @@ function mergeStreamUsage(
 		return previous;
 	}
 	const merged = { ...previous, ...update };
+	// The speed is reported once; a later event without it must not erase it.
+	if (update.speed == null) {
+		if (previous.speed == null) {
+			delete merged.speed;
+		} else {
+			merged.speed = previous.speed;
+		}
+	}
 	for (const field of [
 		"input_tokens",
 		"output_tokens",
@@ -1676,7 +1689,7 @@ function buildTokenCountBody(
 	]) {
 		delete body[key];
 	}
-	body.model = FAST_MODE_ALIASES.get(ctx.upstreamModel) ?? ctx.upstreamModel;
+	body.model = ctx.upstreamModel;
 	return mergeExtraBody(body, extraBody, [
 		"model",
 		"messages",
@@ -1692,7 +1705,7 @@ function buildTokenCountBody(
 const chat: ChatHandler = {
 	buildRequest(req, ctx) {
 		const { base, headers } = requestHeaders(ctx, {
-			fastMode: FAST_MODE_ALIASES.has(ctx.upstreamModel),
+			fastMode: ctx.serviceMode === "fast",
 			providerFileId: requestUsesProviderFileId(req),
 			...(req.messagesTransport?.betas
 				? { betas: req.messagesTransport.betas }
@@ -1734,6 +1747,7 @@ export const anthropicAdapter: Adapter = {
 	key: "anthropic",
 	credentials: { required: ["apiKey"] },
 	supportedCallTypes: new Set(["chat"]),
+	serviceModes: SERVICE_MODES,
 	chat,
 	messageTokenCount,
 	reasoningKinds: new Set<ReasoningControlKind>([
