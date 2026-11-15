@@ -72,7 +72,7 @@ export function parseObjectStorage(
 		backend: "s3",
 		bucket,
 		region: url.searchParams.get("region") ?? "auto",
-		// A bare `s3://` host means AWS itself, which the SDK addresses from the region alone.
+		// A bare `s3://` host means AWS itself, which the client addresses from the region alone.
 		...(url.host && url.host !== "s3.amazonaws.com"
 			? {
 					endpoint: `${url.searchParams.get("tls") === "false" ? "http" : "https"}://${url.host}`,
