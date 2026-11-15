@@ -1,0 +1,57 @@
+---
+title: "Service modes"
+description: "Pick fast, flex or priority processing with a model:mode suffix, on the providers that offer it."
+---
+
+A service mode is the same model served differently: faster, cheaper and slower, or with reserved
+capacity. Pick one by adding a suffix to the model, the way OpenRouter does:
+
+```json
+{ "model": "gpt-6.1-sol:flex", "input": "Summarize this report." }
+```
+
+The suffix works on every text contract (`/v1/chat/completions`, `/v1/responses`, the Responses
+WebSocket and `/v1/messages`), and a key scoped to `model` may also use `model:mode`.
+
+| Suffix | What it is | OpenAI | Anthropic | Gemini |
+|---|---|---|---|---|
+| `:fast` | Faster output at a premium | `service_tier: "fast"` | `speed: "fast"` | — |
+| `:priority` | Reserved capacity at a premium | `service_tier: "priority"` (the same tier as Fast since OpenAI renamed it) | — | `service_tier: "priority"` |
+| `:flex` | Cheaper, slower, may be unavailable | `service_tier: "flex"` | — | `service_tier: "flex"` |
+
+## Which models support a mode
+
+A deployment can serve a mode when its provider offers it **and** the catalog prices that tier
+(`pricing.serviceTiers`). The gateway routes `model:mode` only to deployments that qualify. When none
+does (the model or provider has no such mode, or the deployment goes through an aggregator that does
+not expose it), the request is refused **before any upstream call**:
+
+```json
+{
+  "error": {
+    "type": "invalid_request_error",
+    "code": "unsupported_service_mode",
+    "param": "model",
+    "message": "The model `my-model` does not support the `fast` service mode."
+  }
+}
+```
+
+There is no silent fallback to standard processing. A suffix that is not a mode (`:free`, `:online`) is
+part of the model's own name.
+
+If the request also sets `service_tier`, it must agree with the suffix (`auto` and `default` defer to
+it); otherwise the request fails with `conflicting_service_tier`.
+
+## Billing
+
+The gateway charges the tier the provider says it **served**, not the one requested:
+
+- **OpenAI** reports it in `service_tier`. Fast mode held back by its ramp-rate limit comes back as
+  `default` and is charged at standard rates; GPT-5.6 and earlier report Fast as `priority`.
+- **Anthropic** reports `usage.speed`; only `fast` is charged at the fast rate.
+- **Gemini** Flex never falls back (it fails with 429 or 503 instead), so a Flex answer is charged at
+  Flex. Priority overflow is served at Standard, and Gemini says so only in the `x-gemini-service-tier`
+  response header; the gateway charges Standard when that header says `standard`.
+
+See [Cost accounting](/docs/cost-accounting) for how tier rates apply.

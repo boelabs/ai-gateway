@@ -32,9 +32,10 @@ credentials and choose a model available to your provider account. See
 - Claude Opus 5 enables adaptive thinking upstream when `thinking` is omitted. The adapter sends
   `thinking: { "type": "disabled" }` when canonical reasoning resolves to `none`, preserving the
   gateway's provider-independent off semantics.
-- `claude-opus-5-fast` and `claude-opus-4-8-fast` are gateway aliases for Anthropic's research-preview
-  fast mode. The adapter selects the base model, sends `speed: "fast"`, and adds the required beta
-  header. Anthropic account access is still required.
+- Fast mode is `model:fast` (for example `claude-opus-5-5:fast`) on the models that price it: the
+  adapter sends `speed: "fast"` with the fast-mode beta header, and `usage.speed` decides whether the
+  fast rate is charged. The former `-fast` alias models are gone. See
+  [Service modes](/docs/service-modes).
 - Native `/v1/messages` requests pass through with minimal translation; `/v1/chat/completions` and
   `/v1/responses` requests are rendered onto the same canonical reasoning/tool/format machinery as
   every other provider.
