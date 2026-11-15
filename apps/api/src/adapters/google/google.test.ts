@@ -1,3 +1,4 @@
+import { resolveModelMetadata } from "#catalog/index.ts";
 import type { CanonicalEmbeddingsRequest } from "#core/embeddings.ts";
 import { jsonBody, must, streamOf } from "#test-support/adapters.ts";
 import { observeChatStream } from "#gateway/streamLifecycle.ts";
@@ -823,6 +824,21 @@ test("google.buildRequest: Gemini 3 uses thinkingLevel and merges extraBody", ()
 	assert.equal(body.generationConfig.thinkingConfig.includeThoughts, true);
 	// extra_body.safetySettings overrides the gateway default (shallow extra_body merge wins).
 	assert.deepEqual(body.safetySettings, []);
+});
+
+test("google.buildRequest: gemini-4-hydrogen sends its xhigh thinkingLevel as-is", () => {
+	const hydrogenCtx: AdapterContext = {
+		...ctx,
+		upstreamModel: "gemini-4-hydrogen",
+		meta: resolveModelMetadata("googleaistudio", "gemini-4-hydrogen"),
+	};
+	const body = jsonBody(
+		must(googleAdapter, "chat").buildRequest(
+			{ ...req, reasoning: { effort: "xhigh" } },
+			hydrogenCtx,
+		),
+	);
+	assert.equal(body.generationConfig.thinkingConfig.thinkingLevel, "xhigh");
 });
 
 test("google.buildRequest: safety filters default to OFF for every category", () => {

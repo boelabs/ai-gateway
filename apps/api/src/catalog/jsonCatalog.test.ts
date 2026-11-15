@@ -94,16 +94,19 @@ test("a Gemini thinkingLevel ladder only declares levels Gemini accepts", () => 
 		writeFileSync(url, JSON.stringify(doc));
 	};
 	try {
-		for (const level of ["none", "xhigh", "max"]) {
+		for (const level of ["none", "max"]) {
 			withLevels({ levels: ["low", "high", level] });
 			assert.throws(
 				() => loadCatalogDocument(url),
 				/not a Gemini thinkingLevel/u,
 			);
 		}
+		// Gemini 4 Hydrogen introduced xhigh as a native thinkingLevel (Gemini changelog, 2026-11-12).
+		withLevels({ levels: ["low", "high", "xhigh"] });
+		assert.doesNotThrow(() => loadCatalogDocument(url));
 		withLevels({
-			levels: ["low", "high", "xhigh"],
-			upstreamEffortMap: { xhigh: "high" },
+			levels: ["low", "high", "max"],
+			upstreamEffortMap: { max: "high" },
 		});
 		assert.doesNotThrow(() => loadCatalogDocument(url));
 	} finally {

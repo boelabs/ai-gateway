@@ -1830,7 +1830,7 @@
 					},
 					"reasoning": {
 						"kind": "gemini_level",
-						"levels": ["low", "medium", "high"]
+						"levels": ["low", "medium", "high", "xhigh"]
 					}
 				}
 			},
