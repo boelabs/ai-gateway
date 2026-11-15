@@ -1,3 +1,4 @@
+import { resolveModelMetadata } from "#catalog/index.ts";
 import { assertVideoRequestSupported } from "#gateway/videoRequestValidation.ts";
 import { sanitizeVideoRequestBody, resolveVideoSize } from "#core/videos.ts";
 import { jsonResponse, withStubbedFetch } from "#test-support/fetch.ts";
@@ -929,4 +930,64 @@ test("sanitizeVideoRequestBody redacts large data URLs anywhere in the body", ()
 	const nested = (sanitized.extra_body as { nested: [{ image: string }] })
 		.nested[0].image;
 	assert.match(nested, /redacted/u);
+});
+
+test("Gemini Omni generates up to 15 s, but interpolates and extends at most 10 s", () => {
+	const omni = resolveModelMetadata("googleaistudio", "gemini-omni-1.2-flash");
+	const base = { model: "m", prompt: "p" };
+	const frame = (position: "first" | "last") => ({
+		frame: position,
+		url: "https://example.com/frame.png",
+	});
+	const videoRef = {
+		type: "video_url" as const,
+		url: "https://example.com/ref.mp4",
+	};
+	assert.doesNotThrow(() =>
+		assertVideoRequestSupported({ ...base, seconds: "15" }, omni),
+	);
+	assert.doesNotThrow(() =>
+		assertVideoRequestSupported(
+			{ ...base, seconds: "15", frameImages: [frame("first")] },
+			omni,
+		),
+	);
+	assert.throws(
+		() =>
+			assertVideoRequestSupported(
+				{
+					...base,
+					seconds: "11",
+					frameImages: [frame("first"), frame("last")],
+				},
+				omni,
+			),
+		/last frame/u,
+	);
+	assert.throws(
+		() =>
+			assertVideoRequestSupported(
+				{ ...base, task: "extend", seconds: "12" },
+				omni,
+			),
+		/task=extend/u,
+	);
+	assert.doesNotThrow(() =>
+		assertVideoRequestSupported(
+			{ ...base, seconds: "15", inputReferences: [videoRef] },
+			omni,
+		),
+	);
+	assert.throws(
+		() =>
+			assertVideoRequestSupported(
+				{ ...base, seconds: "15", inputReferences: [videoRef, videoRef] },
+				omni,
+			),
+		/reference video/u,
+	);
+	assert.throws(
+		() => assertVideoRequestSupported({ ...base, seconds: "16" }, omni),
+		/duration/u,
+	);
 });

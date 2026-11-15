@@ -167,6 +167,46 @@ function assertReferencesSupported(
 	}
 }
 
+/** The narrower ceilings a profile sets for interpolation, some tasks and long clips with references. */
+function assertDurationLimits(
+	req: CanonicalVideoRequest,
+	profile: VideoModelProfile,
+): void {
+	const limits = profile.durationLimits;
+	if (!(limits && req.seconds)) {
+		return;
+	}
+	const seconds = Number(req.seconds);
+	const lastFrame = req.frameImages?.some((frame) => frame.frame === "last");
+	if (
+		lastFrame &&
+		limits.maxSecondsWithLastFrame !== undefined &&
+		seconds > limits.maxSecondsWithLastFrame
+	) {
+		unsupported(
+			"duration",
+			`With a last frame, the selected model generates at most ${limits.maxSecondsWithLastFrame} seconds.`,
+		);
+	}
+	const taskLimit = req.task ? limits.maxSecondsByTask?.[req.task] : undefined;
+	if (taskLimit !== undefined && seconds > taskLimit) {
+		unsupported(
+			"duration",
+			`For task=${req.task}, the selected model generates at most ${taskLimit} seconds.`,
+		);
+	}
+	const refs = limits.videoReferences;
+	const videoRefs = (req.inputReferences ?? []).filter(
+		(ref) => ref.type === "video_url",
+	).length;
+	if (refs && seconds > refs.aboveSeconds && videoRefs > refs.max) {
+		unsupported(
+			"input_references",
+			`Above ${refs.aboveSeconds} seconds, the selected model accepts at most ${refs.max} reference video(s).`,
+		);
+	}
+}
+
 /** See assertImageRequestSupported: `quality` is judged here only under the `error` strategy. */
 export function assertVideoRequestSupported(
 	req: CanonicalVideoRequest,
@@ -202,6 +242,7 @@ export function assertVideoRequestSupported(
 			`The selected model does not support a duration of ${req.seconds} seconds.`,
 		);
 	}
+	assertDurationLimits(req, profile);
 	assertDimensionsSupported(req, profile);
 	if (
 		strategy === "error" &&

@@ -199,6 +199,51 @@ function validateScheduledPricing(value: unknown, path: string): void {
 	}
 }
 
+function validateDurationLimits(value: unknown, path: string): void {
+	if (value === undefined) {
+		return;
+	}
+	if (!isRecord(value)) {
+		fail(path, "must be an object");
+	}
+	for (const key of Object.keys(value)) {
+		if (
+			![
+				"maxSecondsWithLastFrame",
+				"maxSecondsByTask",
+				"videoReferences",
+			].includes(key)
+		) {
+			fail(`${path}.${key}`, "is not a duration limit");
+		}
+	}
+	if (value.maxSecondsWithLastFrame !== undefined) {
+		assertNumber(
+			value.maxSecondsWithLastFrame,
+			`${path}.maxSecondsWithLastFrame`,
+		);
+	}
+	if (value.maxSecondsByTask !== undefined) {
+		if (!isRecord(value.maxSecondsByTask)) {
+			fail(`${path}.maxSecondsByTask`, "must be an object");
+		}
+		for (const [task, seconds] of Object.entries(value.maxSecondsByTask)) {
+			if (!VIDEO_TASK_SET.has(task)) {
+				fail(`${path}.maxSecondsByTask`, `unknown video task "${task}"`);
+			}
+			assertNumber(seconds, `${path}.maxSecondsByTask.${task}`);
+		}
+	}
+	if (value.videoReferences !== undefined) {
+		const refs = value.videoReferences;
+		if (!isRecord(refs)) {
+			fail(`${path}.videoReferences`, "must be an object");
+		}
+		assertNumber(refs.aboveSeconds, `${path}.videoReferences.aboveSeconds`);
+		assertNumber(refs.max, `${path}.videoReferences.max`);
+	}
+}
+
 function validateTokenPricing(
 	value: Record<string, unknown>,
 	path: string,
@@ -628,6 +673,10 @@ function validateOperations(value: unknown, path: string): void {
 					assertStringArray(profile[key], `${path}.${operation}.${key}`);
 				}
 			}
+			validateDurationLimits(
+				profile.durationLimits,
+				`${path}.${operation}.durationLimits`,
+			);
 			if (Array.isArray(profile.tasks)) {
 				for (const task of profile.tasks) {
 					if (!VIDEO_TASK_SET.has(task)) {
