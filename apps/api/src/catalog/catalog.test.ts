@@ -215,13 +215,13 @@ test("Anthropic catalog exposes Opus 5.5 always-on reasoning and fast mode", () 
 	assert.equal(opus55?.pricing?.inputCentsPerMTokens, 400);
 	assert.equal(opus55?.pricing?.cacheReadCentsPerMTokens, 20);
 
-	const opus55Fast = getCatalogEntry("anthropic", "claude-opus-5-5-fast");
-	assert.deepEqual(
-		opus55Fast?.operations["text.generate"]?.reasoning,
-		opus55?.operations["text.generate"]?.reasoning,
+	// Fast mode is a service tier of the same model (`claude-opus-5-5:fast`), not a separate entry.
+	assert.equal(getCatalogEntry("anthropic", "claude-opus-5-5-fast"), undefined);
+	assert.equal(opus55?.pricing?.serviceTiers?.fast?.inputCentsPerMTokens, 800);
+	assert.equal(
+		opus55?.pricing?.serviceTiers?.fast?.outputCentsPerMTokens,
+		4000,
 	);
-	assert.equal(opus55Fast?.pricing?.inputCentsPerMTokens, 800);
-	assert.equal(opus55Fast?.pricing?.outputCentsPerMTokens, 4000);
 });
 
 test("Anthropic catalog exposes Opus 5 reasoning, fast mode, and model-specific tiers", () => {
@@ -239,16 +239,12 @@ test("Anthropic catalog exposes Opus 5 reasoning, fast mode, and model-specific 
 		assert.equal(typeof entry === "object" && entry.mode, "unsupported");
 	}
 
-	const opus5Fast = getCatalogEntry("anthropic", "claude-opus-5-fast");
-	assert.deepEqual(
-		opus5Fast?.operations["text.generate"]?.reasoning,
-		opus5?.reasoning,
-	);
-	assert.equal(opus5Fast?.pricing?.inputCentsPerMTokens, 1000);
-	assert.equal(opus5Fast?.pricing?.outputCentsPerMTokens, 5000);
-	assert.equal(
-		getCatalogEntry("anthropic", "claude-opus-4-7-fast")?.deprecated,
-		true,
+	const opus5Fast = opus5Entry?.pricing?.serviceTiers?.fast;
+	assert.equal(opus5Fast?.inputCentsPerMTokens, 1000);
+	assert.equal(opus5Fast?.outputCentsPerMTokens, 5000);
+	assert.ok(
+		getCatalogEntry("anthropic", "claude-opus-4-7")?.pricing?.serviceTiers
+			?.fast,
 	);
 
 	const opus48 = getCatalogEntry("anthropic", "claude-opus-4-8")?.operations[

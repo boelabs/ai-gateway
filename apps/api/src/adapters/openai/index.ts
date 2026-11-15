@@ -1,3 +1,4 @@
+import { OPENAI_SERVICE_MODES } from "../openaiServiceMode.ts";
 import { makeOpenAIDecisionsHandler } from "#adapters/decisions.ts";
 import { makeOpenAIStyleAdapter } from "#adapters/openaiStyle.ts";
 import type { Adapter, ProviderModule } from "#adapters/types.ts";
@@ -27,6 +28,7 @@ function refineBadRequest(message: string, body: unknown): ErrorClass | null {
 const openAIStyle = makeOpenAIStyleAdapter({
 	key: "openai",
 	label: "OpenAI",
+	serviceModes: OPENAI_SERVICE_MODES,
 	defaultBaseUrl: "https://api.openai.com/v1",
 	defaultTransport: "responses",
 	supportedChatTransports: ["responses", "chat_completions"],

@@ -1,3 +1,4 @@
+import type { ServiceMode } from "#core/serviceMode.ts";
 import { makeGeminiRealtimeConversationHandler } from "./liveConversation.ts";
 import { mergeExtraBody, mergeExtraBodyDeep } from "#core/extraBody.ts";
 import { type BaseCreds, requireApiKeyCreds } from "#adapters/creds.ts";
@@ -463,7 +464,10 @@ function buildGeminiBody(
 	ctx: AdapterContext,
 ): GeminiBody {
 	assertNoPrefixCachePolicy(req);
-	const body: GeminiBody = { contents: [] };
+	const body: GeminiBody = {
+		contents: [],
+		...(ctx.serviceMode ? { service_tier: ctx.serviceMode } : {}),
+	};
 	const strictToolsRequested =
 		req.tools?.some((tool) => tool.strict === true) === true;
 	if (strictToolsRequested && !supportsStrictToolCalling(ctx)) {
@@ -1187,6 +1191,28 @@ function mapGoogleError(err: unknown, ctx: AdapterContext): GatewayError {
 	);
 }
 
+/**
+ * Flex and Priority are `service_tier` on the request (`model:flex`, `model:priority`). Flex never
+ * falls back server-side (it fails instead), so a Flex answer was served at Flex. Priority overflow is
+ * quietly served at Standard and billed at Standard; the only signal is the `x-gemini-service-tier`
+ * response header, so Priority is billed unless that header says `standard`.
+ */
+const SERVICE_MODES: ReadonlySet<ServiceMode> = new Set(["flex", "priority"]);
+
+function chatUsage(u: GeminiUsage | undefined, ctx: AdapterContext): Usage {
+	const usage = mapGeminiUsage(u);
+	if (ctx.serviceMode === "flex") {
+		return { ...usage, serviceTier: "flex" };
+	}
+	if (
+		ctx.serviceMode === "priority" &&
+		ctx.diagnostics?.servedServiceTier !== "standard"
+	) {
+		return { ...usage, serviceTier: "priority" };
+	}
+	return usage;
+}
+
 function mapGeminiUsage(u: GeminiUsage | undefined): Usage {
 	const thoughts = u?.thoughtsTokenCount ?? 0;
 	// OpenAI semantics: completion_tokens includes the reasoning tokens. Gemini reports
@@ -1314,7 +1340,7 @@ function parseGeminiResponse(
 							message: { role: "assistant", content: null },
 						},
 					],
-					usage: mapGeminiUsage(r.usageMetadata),
+					usage: chatUsage(r.usageMetadata, ctx),
 				},
 				{
 					...(r.responseId ? { providerRequestId: r.responseId } : {}),
@@ -1339,7 +1365,7 @@ function parseGeminiResponse(
 		created: Math.floor(Date.now() / 1000),
 		model: r.modelVersion ?? ctx.upstreamModel,
 		choices: (r.candidates ?? []).map(candidateToChoice),
-		usage: mapGeminiUsage(r.usageMetadata),
+		usage: chatUsage(r.usageMetadata, ctx),
 	};
 	const originalTerminalReason = r.candidates?.find(
 		(candidate) => candidate.finishReason != null,
@@ -1413,7 +1439,7 @@ const chat: ChatHandler = {
 							},
 						],
 						...(json.usageMetadata
-							? { usage: mapGeminiUsage(json.usageMetadata) }
+							? { usage: chatUsage(json.usageMetadata, ctx) }
 							: {}),
 					},
 					{
@@ -1434,7 +1460,7 @@ const chat: ChatHandler = {
 					model: json.modelVersion ?? ctx.upstreamModel,
 					choices: [],
 					...(json.usageMetadata
-						? { usage: mapGeminiUsage(json.usageMetadata) }
+						? { usage: chatUsage(json.usageMetadata, ctx) }
 						: {}),
 				};
 				yield attachAdapterDiagnostics(metadataChunk, {
@@ -1527,7 +1553,7 @@ const chat: ChatHandler = {
 				choices,
 			};
 			if (json.usageMetadata) {
-				chunk.usage = mapGeminiUsage(json.usageMetadata);
+				chunk.usage = chatUsage(json.usageMetadata, ctx);
 			}
 			const originalTerminalReason = json.candidates?.find(
 				(candidate) => candidate.finishReason != null,
@@ -2463,6 +2489,7 @@ const audioTranscription: TranscriptionHandler = {
 export const googleAdapter: Adapter = {
 	key: "googleaistudio",
 	credentials: { required: ["apiKey"] },
+	serviceModes: SERVICE_MODES,
 	supportedCallTypes: new Set([
 		"chat",
 		"images.generations",

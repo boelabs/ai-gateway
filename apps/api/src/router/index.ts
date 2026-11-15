@@ -9,9 +9,16 @@ import { resolveExecutionPolicy } from "#core/executionPolicy.ts";
 import { type FailurePhase, GatewayError } from "#core/errors.ts";
 import { beginUpstreamAttempt } from "#logging/operations.ts";
 import type { CallType } from "#core/callType.ts";
+import {
+	type ServiceMode,
+	parseServiceMode,
+	supportsServiceMode,
+	unsupportedServiceMode,
+} from "#core/serviceMode.ts";
 import { resolveTransport } from "./transport.ts";
 import { pickDeployment } from "./strategies.ts";
 import { computeCost } from "#logging/cost.ts";
+import { getAdapter } from "#adapters/registry.ts";
 import type { Usage } from "#core/usage.ts";
 import { log } from "#logging/log.ts";
 
@@ -405,6 +412,7 @@ function buildContext(
 	settings: EffectiveSettings,
 	opts: RouteOptions,
 	totalDeadlineAt: number,
+	serviceMode: ServiceMode | undefined,
 ): { ctx: AdapterContext; cleanup: () => void } {
 	// Resolved before anything is armed: a credential that fails to decrypt must not leave a
 	// watchdog, a deadline timer and a client-abort listener behind with no cleanup to release them.
@@ -448,6 +456,7 @@ function buildContext(
 			),
 			requestId: opts.requestId,
 			...(opts.operationId ? { operationId: opts.operationId } : {}),
+			...(serviceMode ? { serviceMode } : {}),
 			watchdog,
 			diagnostics: {},
 			signal: controller.signal,
@@ -466,11 +475,23 @@ function buildContext(
  * CallType. The concrete execution is injected via `execute`.
  */
 export async function route<T>(
-	publicModel: string,
+	requestedModel: string,
 	callType: CallType,
 	opts: RouteOptions,
 	execute: ExecuteFn<T>,
 ): Promise<RouteResult<T>> {
+	// `model:fast` routes to the deployments of `model` that can serve that mode, and only those.
+	const { publicModel, serviceMode } = parseServiceMode(requestedModel);
+	const servingMode = (candidates: DeploymentCandidate[]) =>
+		serviceMode === undefined
+			? candidates
+			: candidates.filter((candidate) =>
+					supportsServiceMode(
+						candidate.meta,
+						getAdapter(candidate.row.adapterKey)?.serviceModes,
+						serviceMode,
+					),
+				);
 	const routingTelemetry = opts.operationId
 		? startOperationChildTelemetry(opts.operationId, "routing")
 		: null;
@@ -533,7 +554,9 @@ export async function route<T>(
 		): Promise<PublicModelAttempt> {
 			const listed =
 				preloaded ??
-				(await listDeploymentCandidates(candidatePublicModel, callType));
+				servingMode(
+					await listDeploymentCandidates(candidatePublicModel, callType),
+				);
 			const eligibleCandidates =
 				opts.candidateEligibility || opts.usageQuota
 					? listed.filter((candidate) => {
@@ -870,6 +893,7 @@ export async function route<T>(
 						settings,
 						opts,
 						totalDeadlineAt,
+						serviceMode,
 					);
 					activeContext = instrumentedContext.ctx;
 					cleanupContext = instrumentedContext.cleanup;
@@ -1435,10 +1459,15 @@ export async function route<T>(
 			};
 		}
 
-		const primaryCandidates = await listDeploymentCandidates(
-			publicModel,
-			callType,
-		);
+		const listedPrimary = await listDeploymentCandidates(publicModel, callType);
+		const primaryCandidates = servingMode(listedPrimary);
+		if (
+			serviceMode &&
+			listedPrimary.length > 0 &&
+			primaryCandidates.length === 0
+		) {
+			throw unsupportedServiceMode(publicModel, serviceMode);
+		}
 		if (primaryCandidates.length === 0) {
 			throw new GatewayError({
 				class: "not_found",

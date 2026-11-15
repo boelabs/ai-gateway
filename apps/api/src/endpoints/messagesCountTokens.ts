@@ -1,4 +1,5 @@
 import { estimateMessagesInputTokens } from "#contracts/anthropic/messagesTokenCount.ts";
+import { parseServiceMode } from "#core/serviceMode.ts";
 import { messagesRequestToCanonical } from "#contracts/anthropic/messagesRender.ts";
 import { listDeploymentCandidates } from "#gateway/deploymentCandidates.ts";
 import type { MessageTokenCountResponse } from "#adapters/types.ts";
@@ -61,7 +62,10 @@ export async function messagesCountTokensHandler(
 			}),
 			{ messageState: messageStateCodec },
 		);
-		const candidates = await listDeploymentCandidates(canonical.model, "chat");
+		const candidates = await listDeploymentCandidates(
+			parseServiceMode(canonical.model).publicModel,
+			"chat",
+		);
 		if (candidates.length === 0) {
 			throw new GatewayError({
 				class: "not_found",

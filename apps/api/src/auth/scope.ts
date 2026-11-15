@@ -1,4 +1,5 @@
 import { type Auth, actorOf } from "./types.ts";
+import { parseServiceMode } from "#core/serviceMode.ts";
 import { GatewayError } from "#core/errors.ts";
 
 /**
@@ -8,6 +9,7 @@ import { GatewayError } from "#core/errors.ts";
  *    operators, and an operator can read the whole catalog from /admin anyway.
  *  - virtual with allowedModels=[]: everything.
  *  - virtual with allowedModels=[...]: only the listed ones.
+ * A `model:mode` slug is the same model served differently, so access to `model` covers it.
  * Throws GatewayError(permission) otherwise.
  */
 export function assertModelAllowed(auth: Auth, publicModel: string): void {
@@ -18,7 +20,7 @@ export function assertModelAllowed(auth: Auth, publicModel: string): void {
 	if (allowed.length === 0) {
 		return;
 	}
-	if (!allowed.includes(publicModel)) {
+	if (!allowed.includes(parseServiceMode(publicModel).publicModel)) {
 		throw new GatewayError({
 			class: "permission",
 			message: `The API key does not have access to public model "${publicModel}"`,

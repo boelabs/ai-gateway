@@ -1,3 +1,5 @@
+import { withOpenAIServiceMode } from "./openaiServiceMode.ts";
+import type { ServiceMode } from "#core/serviceMode.ts";
 import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { makeOpenAIResponsesWebSocketHandler } from "./openaiResponsesWebSocket.ts";
 import { makeOpenAIRealtimeConversationHandler } from "./openaiRealtime.ts";
@@ -90,6 +92,8 @@ import {
 export interface OpenAIStyleConfig {
 	key: string;
 	label: string;
+	/** `service_tier` modes the upstream accepts for a `model:mode` slug (the real OpenAI API only). */
+	serviceModes?: ReadonlySet<ServiceMode>;
 	/** Default base URL. If undefined, `baseUrl` in credentials is REQUIRED. */
 	defaultBaseUrl?: string;
 	/**
@@ -553,8 +557,10 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 				transport: ctx.transport,
 			};
 			config.assertChatRequestSupported?.(req, supportContext);
-			const preparedRequest =
-				config.prepareChatRequest?.(req, supportContext) ?? req;
+			const preparedRequest = withOpenAIServiceMode(
+				config.prepareChatRequest?.(req, supportContext) ?? req,
+				ctx.serviceMode,
+			);
 			const base =
 				config.resolveChatBaseUrl?.(c.base, preparedRequest, supportContext) ??
 				c.base;
@@ -1176,6 +1182,7 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 			required: config.defaultBaseUrl ? ["apiKey"] : ["apiKey", "baseUrl"],
 		},
 		supportedCallTypes,
+		...(config.serviceModes ? { serviceModes: config.serviceModes } : {}),
 		chat,
 		// n, stop and seed on Responses go through the parameter policy (chatParameters), so a drop
 		// strategy can drop them; the body builder still refuses them if they arrive regardless.
