@@ -137,6 +137,7 @@ function validatePricing(value: unknown, path: string): void {
 		fail(path, "must be an object");
 	}
 	validateTokenPricing(value, path);
+	validateScheduledPricing(value.scheduled, `${path}.scheduled`);
 	if (value.serviceTiers !== undefined) {
 		if (!isRecord(value.serviceTiers)) {
 			fail(`${path}.serviceTiers`, "must be an object");
@@ -153,6 +154,48 @@ function validatePricing(value: unknown, path: string): void {
 			}
 			validateTokenPricing(rates, `${path}.serviceTiers.${tier}`);
 		}
+	}
+}
+
+/**
+ * Announced price changes: dated, in ascending order, each a complete pricing of its own (it replaces
+ * the base rates from that day, so a partial one would silently price the missing fields at zero).
+ */
+function validateScheduledPricing(value: unknown, path: string): void {
+	if (value === undefined) {
+		return;
+	}
+	if (!Array.isArray(value) || value.length === 0) {
+		fail(path, "must be a non-empty array");
+	}
+	let previous = "";
+	for (const [index, entry] of value.entries()) {
+		const at = `${path}[${index}]`;
+		if (!isRecord(entry)) {
+			fail(at, "must be an object");
+		}
+		const { effectiveFrom, pricing } = entry;
+		if (
+			typeof effectiveFrom !== "string" ||
+			!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u.test(effectiveFrom) ||
+			Number.isNaN(Date.parse(`${effectiveFrom}T00:00:00Z`))
+		) {
+			fail(`${at}.effectiveFrom`, "must be a YYYY-MM-DD date");
+		}
+		if (effectiveFrom <= previous) {
+			fail(`${at}.effectiveFrom`, "must be later than the previous entry");
+		}
+		previous = effectiveFrom;
+		if (!isRecord(pricing) || Object.keys(pricing).length === 0) {
+			fail(
+				`${at}.pricing`,
+				"must declare the full pricing in effect from that date",
+			);
+		}
+		if (pricing.scheduled !== undefined) {
+			fail(`${at}.pricing.scheduled`, "cannot be nested");
+		}
+		validatePricing(pricing, `${at}.pricing`);
 	}
 }
 

@@ -170,6 +170,12 @@ export interface TokenPricing {
 	}>;
 }
 
+/** A price change announced for a date: the full pricing in effect from that day on. */
+export interface ScheduledPricing {
+	effectiveFrom: string;
+	pricing: TokenPricing & { serviceTiers?: Record<string, TokenPricing> };
+}
+
 /** Model metadata: pricing, limits, supported modalities. Used by the cost calc. */
 export interface RuntimeModelMetadata {
 	pricing?: TokenPricing & {
@@ -180,6 +186,12 @@ export interface RuntimeModelMetadata {
 		 * context tiers; fields it leaves out fall back to the standard ones.
 		 */
 		serviceTiers?: Record<string, TokenPricing>;
+		/**
+		 * Announced price changes, oldest first. From its `effectiveFrom` (a UTC date, `YYYY-MM-DD`)
+		 * an entry's pricing replaces the rates above entirely, so a published increase is billed from
+		 * the day it applies instead of the day someone edits the catalog.
+		 */
+		scheduled?: ScheduledPricing[];
 	};
 	maxInputTokens?: number;
 	maxOutputTokens?: number;

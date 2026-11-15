@@ -72,3 +72,24 @@ export function pricing(p: PricingInput): Pricing {
 	});
 	return out;
 }
+
+/**
+ * The pricing in effect at `at`: the latest scheduled entry whose `effectiveFrom` (UTC midnight) has
+ * passed, else the base rates. The result never carries `scheduled`, so callers price exactly one set.
+ */
+export function pricingAt(
+	declared: Pricing | undefined,
+	at: Date = new Date(),
+): Omit<Pricing, "scheduled"> | undefined {
+	if (declared === undefined) {
+		return undefined;
+	}
+	const { scheduled, ...base } = declared;
+	let current: Omit<Pricing, "scheduled"> = base;
+	for (const entry of scheduled ?? []) {
+		if (Date.parse(`${entry.effectiveFrom}T00:00:00Z`) <= at.getTime()) {
+			current = entry.pricing;
+		}
+	}
+	return current;
+}

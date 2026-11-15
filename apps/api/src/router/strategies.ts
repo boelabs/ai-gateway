@@ -1,5 +1,6 @@
 import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
 import type { RoutingStrategy } from "./settings.ts";
+import { pricingAt } from "#catalog/pricing.ts";
 import type { DeploymentMetrics } from "./state.ts";
 
 // healthScore: 0.5 (neutral), matching fetchMetrics' default for a deployment with no recorded
@@ -135,7 +136,7 @@ function pickMaxScore(
 function priceScore(
 	candidate: DeploymentCandidate,
 ): { basis: "tokens" | "search_units"; value: number } | null {
-	const { pricing } = candidate.meta;
+	const pricing = pricingAt(candidate.meta.pricing);
 	if (!pricing) {
 		return null;
 	}

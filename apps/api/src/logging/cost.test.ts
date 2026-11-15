@@ -525,3 +525,41 @@ test("per-unit pricing: images by variant and audio by the second", () => {
 	);
 	assert.equal(estimateMaximumCostCents({ pricing }, 0, 0, 3), 18);
 });
+
+test("a scheduled price change is billed from its date, in cost and in the budget estimate", () => {
+	const meta = {
+		pricing: {
+			inputCentsPerMTokens: 75,
+			outputCentsPerMTokens: 375,
+			scheduled: [
+				{
+					effectiveFrom: "2027-01-01",
+					pricing: { inputCentsPerMTokens: 150, outputCentsPerMTokens: 750 },
+				},
+			],
+		},
+	};
+	const usage = {
+		promptTokens: 1_000_000,
+		completionTokens: 0,
+		totalTokens: 1_000_000,
+	};
+	assert.equal(
+		computeCost(meta, usage, new Date("2026-12-31T12:00:00Z")).totalCents,
+		75,
+	);
+	assert.equal(
+		computeCost(meta, usage, new Date("2027-01-01T12:00:00Z")).totalCents,
+		150,
+	);
+	assert.equal(
+		estimateMaximumCostCents(
+			meta,
+			1_000_000,
+			0,
+			0,
+			new Date("2027-01-01T12:00:00Z"),
+		),
+		750,
+	);
+});

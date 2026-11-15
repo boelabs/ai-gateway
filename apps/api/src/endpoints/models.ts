@@ -13,6 +13,7 @@ import { getAdapter } from "#adapters/registry.ts";
 import { fetchMetrics } from "#router/state.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { AppEnv } from "#auth/types.ts";
+import { pricingAt } from "#catalog/pricing.ts";
 import { createHash } from "node:crypto";
 import type { Context } from "hono";
 
@@ -197,7 +198,7 @@ function minDefined(values: Array<number | undefined>): number | undefined {
 }
 
 function publicPricing(metas: ResolvedModelMetadata[]): Record<string, string> {
-	const pricing = metas.map((meta) => meta.pricing).filter(Boolean);
+	const pricing = metas.map((meta) => pricingAt(meta.pricing)).filter(Boolean);
 	const result: Record<string, string> = {};
 	const prompt = centsPerMillionToUsdPerToken(
 		minDefined(pricing.map((p) => p?.inputCentsPerMTokens)),

@@ -3356,7 +3356,18 @@
 				"inputCentsPerMTokens": 75,
 				"outputCentsPerMTokens": 375,
 				"cacheReadCentsPerMTokens": 7.5,
-				"cacheWriteCentsPerMTokens": 2.083333
+				"cacheWriteCentsPerMTokens": 2.083333,
+				"scheduled": [
+					{
+						"effectiveFrom": "2027-01-01",
+						"pricing": {
+							"inputCentsPerMTokens": 150,
+							"outputCentsPerMTokens": 750,
+							"cacheReadCentsPerMTokens": 15,
+							"cacheWriteCentsPerMTokens": 4.166667
+						}
+					}
+				]
 			}
 		},
 		"gemini-3.8-live": {
