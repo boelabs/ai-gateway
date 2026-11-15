@@ -5,6 +5,7 @@ import { getAuth, revalidateAuth } from "#auth/middleware.ts";
 import { toGatewayError } from "./runtime/pipeline.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { AppEnv } from "#auth/types.ts";
+import type { RawSocket } from "#http/bunServer.ts";
 import type { WSContext } from "hono/ws";
 import { env } from "#config/env.ts";
 import type { Context } from "hono";
@@ -115,7 +116,7 @@ export function watchCredential(
 
 export interface RealtimeSocketEntry {
 	scopeKey: string;
-	socket: WSContext | null;
+	socket: WSContext<RawSocket> | null;
 	/** A provider session is open: shutdown waits for its usage to be logged. */
 	busy: () => boolean;
 	/** Ends the provider session and logs it; idempotent. */
@@ -189,7 +190,7 @@ export function unregisterRealtimeSocket(entry: RealtimeSocketEntry): void {
 }
 
 export function sendRealtimeEvent(
-	socket: WSContext | null,
+	socket: WSContext<RawSocket> | null,
 	value: Record<string, unknown>,
 	downstream?: DownstreamWriteObservation,
 ): void {
@@ -198,8 +199,7 @@ export function sendRealtimeEvent(
 	}
 	// Realtime events cannot wait (audio keeps arriving), so a client that stops reading is not
 	// waited for: past the ceiling of unsent bytes it is disconnected rather than buffered forever.
-	const raw = socket.raw as { bufferedAmount?: number } | undefined;
-	if ((raw?.bufferedAmount ?? 0) > MAX_BUFFERED_SEND_BYTES) {
+	if ((socket.raw?.bufferedAmount ?? 0) > MAX_BUFFERED_SEND_BYTES) {
 		socket.close(1008, "client is not reading");
 		return;
 	}
