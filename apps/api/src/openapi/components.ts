@@ -1212,6 +1212,7 @@ export const RouterSettings = z
 				"audio.speech": OperationExecutionPolicy,
 				"realtime.transcription": OperationExecutionPolicy,
 				"realtime.conversation": OperationExecutionPolicy,
+				"live.session": OperationExecutionPolicy,
 				embeddings: OperationExecutionPolicy,
 				rerank: OperationExecutionPolicy,
 				decisions: OperationExecutionPolicy,

@@ -153,6 +153,8 @@ export function makeAzurev1Adapter(
 		| "supportsDeveloperRole"
 		| "imageTransports"
 		| "defaultImageTransport"
+		| "realtime"
+		| "live"
 	>,
 ) {
 	return makeOpenAIStyleAdapter({

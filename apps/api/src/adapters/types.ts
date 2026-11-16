@@ -331,6 +331,49 @@ export interface RealtimeConversationHandler {
 	) => Promise<RealtimeConversationSession>;
 }
 
+/** One server event of a live session: the frame as received, and its parsed form. */
+export interface LiveServerFrame {
+	text: string;
+	event: Record<string, unknown>;
+}
+
+/**
+ * An open GPT-Live socket at the provider: a primary or fork session (`started` is its
+ * `session.started`), or a sideband attach (`started` is null). Frames pass through unchanged.
+ */
+export interface LiveUpstream {
+	started: Record<string, unknown> | null;
+	/** Sends a client event as the client wrote it. */
+	send: (text: string) => void;
+	/** Ends when the provider closes the socket; throws a GatewayError when it fails. */
+	frames: AsyncIterable<LiveServerFrame>;
+	close: () => void;
+}
+
+/**
+ * An adapter's GPT-Live handler (`/v1/live/sessions`). The protocol is relayed, not translated:
+ * `start` and `create` receive the client's body with `session.model` already set to the upstream
+ * model.
+ */
+export interface LiveSessionHandler {
+	/** Opens a session (or a fork of `forkOf`) with `session.start`; resolves on `session.started`. */
+	start: (
+		start: Record<string, unknown>,
+		ctx: AdapterContext,
+		forkOf?: string,
+	) => Promise<LiveUpstream>;
+	/** Opens the sideband socket of a running session. */
+	attach: (sessionId: string, ctx: AdapterContext) => Promise<LiveUpstream>;
+	/** Creates a WebRTC or SIP session (or forks one): `POST /live/sessions`. Resolves to its JSON. */
+	create: (
+		body: Record<string, unknown>,
+		ctx: AdapterContext,
+		forkOf?: string,
+	) => Promise<{ status: number; body: Record<string, unknown> }>;
+	/** A stored session's recording: `GET /live/sessions/{id}/content`, streamed as is. */
+	content: (sessionId: string, ctx: AdapterContext) => Promise<Response>;
+}
+
 /** An adapter's canonical embeddings handler. No streaming. */
 export interface EmbeddingsHandler {
 	buildRequest: (
@@ -451,6 +494,7 @@ export interface Adapter {
 	speech?: SpeechHandler;
 	realtimeTranscription?: RealtimeTranscriptionHandler;
 	realtimeConversation?: RealtimeConversationHandler;
+	liveSession?: LiveSessionHandler;
 	embeddings?: EmbeddingsHandler;
 	rerank?: RerankHandler;
 	decisions?: DecisionsHandler;

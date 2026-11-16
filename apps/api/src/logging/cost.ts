@@ -19,6 +19,8 @@ export interface CostBreakdown {
 	searchUnitCents: number;
 	/** Cost of per-unit prices (per generated image, per second of audio), in USD cents. */
 	unitCents: number;
+	/** Cost of work handed to other models, priced against them (`usage.delegatedCostCents`). */
+	delegatedCents: number;
 	/** Cost reported by the upstream, retained separately for reconciliation. */
 	providerReportedCents: number | null;
 	/** Total in USD cents. */
@@ -238,6 +240,7 @@ export function computeCost(
 		(usage.searchUnits ?? 0) * (meta.pricing?.searchUnitCents ?? 0);
 	const unitCents = perUnitCents(meta.pricing ?? {}, usage);
 	const providerReportedCents = usage.providerCostCents ?? null;
+	const delegatedCents = Math.max(0, usage.delegatedCostCents ?? 0);
 	const configuredPricing = meta.pricing;
 	const hasConfiguredPricing =
 		configuredPricing !== undefined &&
@@ -273,10 +276,12 @@ export function computeCost(
 		audioCents,
 		searchUnitCents,
 		unitCents,
+		delegatedCents,
 		providerReportedCents,
-		totalCents: hasConfiguredPricing
-			? calculatedCents
-			: (providerReportedCents ?? calculatedCents),
+		totalCents:
+			(hasConfiguredPricing
+				? calculatedCents
+				: (providerReportedCents ?? calculatedCents)) + delegatedCents,
 	};
 }
 

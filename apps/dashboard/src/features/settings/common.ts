@@ -25,6 +25,7 @@ export const EXECUTION_CALL_TYPES = [
 	{ key: "audio.speech", label: "Speech" },
 	{ key: "realtime.transcription", label: "Realtime transcription" },
 	{ key: "realtime.conversation", label: "Realtime conversation" },
+	{ key: "live.session", label: "Live voice sessions" },
 	{ key: "embeddings", label: "Embeddings" },
 	{ key: "rerank", label: "Rerank" },
 	{ key: "decisions", label: "Decisions" },

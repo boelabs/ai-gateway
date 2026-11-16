@@ -35,6 +35,10 @@ const base = makeAzurev1Adapter({
 	// POST {endpoint}/openai/v1/images/{generations,edits}
 	imageTransports: ["images"],
 	defaultImageTransport: "images",
+	// Azure's v1 surface serves the Realtime API (conversations and transcription) at OpenAI's paths,
+	// under /openai/v1, with the deployment name as the model. GPT-Live is not enabled: Microsoft lists
+	// gpt-live-1 by region but documents no endpoint for it and publishes no price meter.
+	realtime: true,
 });
 
 /** Azure OpenAI with classic audio transcriptions and an explicit v1 audio opt-in. */

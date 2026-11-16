@@ -6,7 +6,7 @@ description: "GET /v1/realtime?intent=transcription — OpenAI's Realtime API in
 Transcribe live audio over a WebSocket. The endpoint speaks OpenAI's Realtime API in transcription
 mode, so OpenAI's SDKs and clients work unchanged; the public model must support
 `audio.transcribe.realtime` (today `gemini-3.5-transcribe-live`, through Gemini's Live API, and
-OpenAI's `gpt-live-transcribe`).
+`gpt-live-transcribe` and `gpt-realtime-whisper`, on OpenAI or Azure OpenAI).
 
 ## Connecting
 
@@ -80,6 +80,9 @@ utterance; `server_vad` or `semantic_vad` is refused before a provider session o
 are sent as `languages`, even a single one, and vocabulary as `keywords`. It streams deltas and
 returns no word timestamps, speakers or confidence. OpenAI prices it at $0.017 per minute of audio;
 the gateway bills the seconds of audio it forwarded, with no token estimate.
+
+`gpt-realtime-whisper` works the same way, at the same price. OpenAI documents no language hints or
+vocabulary for it, so the gateway does not send them. Both models are also served by Azure OpenAI.
 
 ## Limits
 

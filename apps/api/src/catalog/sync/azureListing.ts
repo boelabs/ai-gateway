@@ -42,22 +42,17 @@ export const AZURE_LISTING_UNSERVED: Readonly<
 		"gpt-audio-mini": "Audio output; AI Gateway has no audio chat operation.",
 		"gpt-audio-1.5": "Audio output; AI Gateway has no audio chat operation.",
 		"gpt-4o-realtime-preview":
-			"Realtime API; AI Gateway has no realtime operation.",
+			"Preview Realtime API, retired by Microsoft on 2026-04-30; AI Gateway speaks the GA API.",
 		"gpt-4o-mini-realtime-preview":
-			"Realtime API; AI Gateway has no realtime operation.",
-		"gpt-realtime": "Realtime API; AI Gateway has no realtime operation.",
-		"gpt-realtime-mini": "Realtime API; AI Gateway has no realtime operation.",
-		"gpt-realtime-1.5": "Realtime API; AI Gateway has no realtime operation.",
-		"gpt-realtime-2": "Realtime API; AI Gateway has no realtime operation.",
-		"gpt-realtime-2.1": "Realtime API; AI Gateway has no realtime operation.",
-		"gpt-realtime-2.1-mini":
-			"Realtime API; AI Gateway has no realtime operation.",
+			"Preview Realtime API, retired by Microsoft on 2026-04-30; AI Gateway speaks the GA API.",
+		"gpt-realtime":
+			"Deprecated by OpenAI, and Azure publishes no Global price meter for it.",
+		"gpt-realtime-mini":
+			"Deprecated by OpenAI, and Azure publishes no Global price meter for it.",
+		"gpt-realtime-1.5":
+			"Azure publishes no Global price meter for it, so it could not be billed.",
 		"gpt-realtime-translate":
-			"Realtime API; AI Gateway has no realtime operation.",
-		"gpt-realtime-whisper":
-			"Realtime API; AI Gateway has no realtime operation.",
-		"gpt-live-transcribe":
-			"Realtime API; AI Gateway has no realtime operation.",
+			"Realtime translation (/realtime/translations); AI Gateway has no translation operation.",
 		tts: "Text to speech; AI Gateway has no speech operation.",
 		"tts-hd": "Text to speech; AI Gateway has no speech operation.",
 		"gpt-4o-mini-tts": "Text to speech; AI Gateway has no speech operation.",

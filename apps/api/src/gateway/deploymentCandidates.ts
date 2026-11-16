@@ -11,6 +11,7 @@ import {
 	decisionProfileFor,
 	rerankProfileFor,
 	speechProfileFor,
+	liveProfileFor,
 	imageProfileFor,
 	videoProfileFor,
 } from "#catalog/types.ts";
@@ -100,6 +101,9 @@ function resolveCandidates(
 				continue;
 			}
 			if (callType === "audio.speech" && !speechProfileFor(meta)) {
+				continue;
+			}
+			if (callType === "live.session" && !liveProfileFor(meta)) {
 				continue;
 			}
 			if (

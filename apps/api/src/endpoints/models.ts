@@ -133,6 +133,12 @@ function addModalitiesForOperation(
 			output.add("audio");
 			output.add("text");
 			break;
+		case "audio.live":
+			input.add("audio");
+			input.add("text");
+			output.add("audio");
+			output.add("text");
+			break;
 		case "embedding.create":
 			input.add("text");
 			output.add("embedding");

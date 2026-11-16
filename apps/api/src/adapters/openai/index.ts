@@ -57,6 +57,7 @@ const openAIStyle = makeOpenAIStyleAdapter({
 	defaultVideoTransport: "videos",
 	audioTranscriptions: true,
 	realtime: true,
+	live: true,
 	embeddings: true,
 });
 

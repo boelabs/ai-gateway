@@ -1,0 +1,90 @@
+---
+title: "Sesiones Live"
+description: "/v1/live/sessions: la API GPT-Live de OpenAI para voz full-duplex, retransmitida sin cambios."
+---
+
+GPT-Live (`gpt-live-1`) es el modelo de voz full-duplex de OpenAI: escucha y habla a la vez, y delega el
+razonamiento y las herramientas en un modelo de backend. El gateway sirve la API GPT-Live de OpenAI en
+las mismas rutas y con los mismos eventos, así que los clientes GPT-Live de OpenAI funcionan cambiando
+solo la URL base y la key. El modelo público debe admitir `audio.live`.
+
+El protocolo se retransmite, no se traduce. El gateway autentica la key, enruta `session.model` (un
+modelo público) a un deployment y mide la sesión. Todos los eventos del cliente y del servidor pasan
+tal cual, salvo que los eventos `session.*` muestran el nombre del modelo público en vez del upstream.
+
+## Sesiones por WebSocket [#websocket-sessions]
+
+Abre un WebSocket a `$GATEWAY/v1/live/sessions` con tu virtual key en `Authorization: Bearer`. El
+primer evento debe ser `session.start`:
+
+```json
+{
+  "type": "session.start",
+  "session": {
+    "model": "live",
+    "instructions": "You are a friendly support agent.",
+    "audio": { "format": { "type": "audio/pcm", "rate": 24000 }, "output": { "voice": "marin" } },
+    "delegation": {
+      "type": "responses",
+      "responses": { "model": "gpt-6-luna", "tools": [{ "type": "web_search" }] }
+    }
+  }
+}
+```
+
+Espera `session.started` y luego envía audio con `session.input_audio.append`. Todos los demás eventos
+(`session.update`, `session.instructions.append`, `response.create`, `response.item.create`,
+`session.close`, y los del servidor: `session.output_audio.delta`, los deltas de transcripción,
+`response.event`, `session.usage.updated`, `session.closed`, `error`) son los de OpenAI, sin cambios.
+Cierra con `session.close` y lee hasta `session.closed`.
+
+## WebRTC y SIP [#webrtc-and-sip]
+
+`POST /v1/live/sessions` recibe el cuerpo de OpenAI: `session` más `transport`, ya sea
+`{ "type": "webrtc", "sdp": "<offer>" }` o un `destination` y `trunk` SIP. Devuelve el cuerpo `201`
+de OpenAI: el id de la sesión y, en WebRTC, la respuesta SDP. Luego el audio va directo entre el
+cliente y el proveedor. El gateway se conecta al sideband de la sesión para leer sus eventos de uso.
+
+## Sideband, forks y grabaciones [#sideband-forks-and-recordings]
+
+| Ruta | Qué hace |
+|---|---|
+| `GET /v1/live/sessions/{id}/attach` (WebSocket) | Control desde el servidor de una sesión en curso: el sideband de OpenAI, retransmitido |
+| `GET /v1/live/sessions/{id}/fork` (WebSocket) | Una sesión nueva que continúa una guardada (`store: true`); envía `session.start`, `{}` conserva su configuración |
+| `POST /v1/live/sessions/{id}/fork` | Lo mismo por WebRTC |
+| `GET /v1/live/sessions/{id}/content` | La grabación de una sesión guardada: WAV estéreo, entrada a la izquierda y salida a la derecha |
+
+Solo la key que abrió una sesión puede conectarse a su sideband, hacer un fork o descargar su
+grabación. Los forks corren en el deployment de la sesión de origen.
+
+## Delegación [#delegation]
+
+La delegación `client`, `responses` y `decisions` funciona como la documenta OpenAI. Un modelo de
+backend indicado en `delegation.responses.model` o `delegation.decisions.model` tiene que estar
+permitido para la key y tener precio en el catálogo del proveedor de la sesión. Una sesión que indique
+otro se rechaza, para que su uso de backend no quede sin facturar.
+
+## Facturación [#billing]
+
+Cada sesión es una operación `live.session`. Se cobra:
+
+- los segundos de sesión que informa el proveedor (`session.usage.updated` y luego `session.closed`),
+  al precio por segundo del modelo ($0.05 por minuto en `gpt-live-1`);
+- cada respuesta del backend (`response.completed` dentro de `response.event`) y cada decisión, a las
+  tarifas por token del propio modelo de backend.
+
+La virtual key se cobra mientras la sesión transcurre. Cuando se agota su presupuesto, el gateway
+envía un `error` con código `budget_exceeded` y termina la sesión. Si una sesión termina sin el uso
+final del proveedor, se factura por reloj y se marca con `usageEstimated`.
+
+## Proveedores y límites [#providers-and-limits]
+
+- **OpenAI** sirve `gpt-live-1`.
+- **Azure OpenAI** lista `gpt-live-1` en sus regiones, pero no documenta un endpoint ni publica precio,
+  así que todavía no se ofrece.
+- Las llamadas SIP entrantes (el webhook `live.transport.incoming` de OpenAI y
+  `accept`/`reject`/`refer`/`hangup`) llegan al webhook del propio proyecto del proveedor, no a una key
+  del gateway, así que no se retransmiten.
+- Una sesión dura como máximo 60 minutos en el gateway, como una sesión realtime (OpenAI permite hasta
+  dos horas en una llamada conectada). Los límites de conexión son los de
+  [Conversaciones en tiempo real](/docs/realtime-conversations).

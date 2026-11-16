@@ -145,10 +145,17 @@ embeddings, rerankers, image and video models. Known transcription models today:
 `gemini-3.8-live`, `gemini-3.8-live-extended-thinking`, `gemini-3.1-flash-live-preview`,
 `gemini-2.5-flash-native-audio-preview-12-2025` and `gemini-3.5-live-translate-preview`; OpenAI
 `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, `gpt-realtime-1.5`. OpenAI's
-`gpt-live-transcribe` runs on the OpenAI adapter's transcription sessions and is priced per minute
-as `audioInputCentsPerSecond` (the minute price / 60). `gpt-realtime-whisper` (same price, live
-transcription) can follow the same entry once its model page confirms the transcription intent and
-turn detection; `gpt-realtime-translate` is out of scope (no realtime translation operation).
+`gpt-live-transcribe` and `gpt-realtime-whisper` run on the OpenAI and Azure OpenAI adapters'
+transcription sessions and are priced per minute as `audioInputCentsPerSecond` (the minute price /
+60); declare only the hints and turn detection the model page documents. `gpt-realtime-translate` is
+out of scope (no realtime translation operation).
+
+GPT-Live models (`gpt-live-*`, OpenAI's `/v1/live/sessions`) take the `audio.live` operation. Known
+today: OpenAI `gpt-live-1`. The session is priced per minute as `audioInputCentsPerSecond`; the backend
+model it delegates to is billed from its own catalog entry, so it needs no extra pricing. Azure lists
+`gpt-live-1` by region but documents no endpoint and publishes no price meter; keep it out of the
+Azure catalog until both exist. Azure's realtime models are priced from their Global meters (the
+Retail Prices API row above); one without a Global meter stays in `AZURE_LISTING_UNSERVED`.
 
 Text-to-speech models (`*-tts`, "text-to-speech") take the `audio.speech` operation. Known today:
 Google `gemini-3.8-flash-tts` and `gemini-3.8-flash-lite-tts`. Their profile lists the audio

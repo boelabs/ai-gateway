@@ -428,6 +428,141 @@
 			"deprecated": true,
 			"notes": "Microsoft retires Azure OpenAI gpt-image-1 (version 2025-04-15, preview) on 2026-10-23 and names no replacement."
 		},
+		"gpt-realtime-2.1": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio", "text"],
+					"voices": [
+						"alloy",
+						"ash",
+						"ballad",
+						"coral",
+						"echo",
+						"sage",
+						"shimmer",
+						"verse",
+						"marin",
+						"cedar"
+					],
+					"supportsInstructions": true,
+					"supportsTools": true,
+					"reasoningEfforts": ["minimal", "low", "medium", "high", "xhigh"],
+					"supportsDeferredResponse": true,
+					"supportsSpeed": true,
+					"supportsTextInput": true,
+					"supportsImageInput": true,
+					"supportsInputTranscription": true,
+					"turnDetection": ["server_vad", "semantic_vad", "manual"]
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 400,
+				"outputCentsPerMTokens": 2400,
+				"cacheReadCentsPerMTokens": 40,
+				"audioInputCentsPerMTokens": 3200,
+				"audioOutputCentsPerMTokens": 6400,
+				"imageInputCentsPerMTokens": 500
+			},
+			"notes": "Realtime API (wss /openai/v1/realtime, deployment name as the model). Reasoning model: 128k context, 32k max output. Input transcription runs on a separate transcription model, billed by OpenAI on its own. Prices are Azure's Global meters."
+		},
+		"gpt-realtime-2.1-mini": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio", "text"],
+					"voices": [
+						"alloy",
+						"ash",
+						"ballad",
+						"coral",
+						"echo",
+						"sage",
+						"shimmer",
+						"verse",
+						"marin",
+						"cedar"
+					],
+					"supportsInstructions": true,
+					"supportsTools": true,
+					"reasoningEfforts": ["minimal", "low", "medium", "high", "xhigh"],
+					"supportsDeferredResponse": true,
+					"supportsSpeed": true,
+					"supportsTextInput": true,
+					"supportsImageInput": true,
+					"supportsInputTranscription": true,
+					"turnDetection": ["server_vad", "semantic_vad", "manual"]
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 60,
+				"outputCentsPerMTokens": 240,
+				"cacheReadCentsPerMTokens": 30,
+				"audioInputCentsPerMTokens": 1000,
+				"audioOutputCentsPerMTokens": 2000,
+				"imageInputCentsPerMTokens": 80
+			},
+			"notes": "Realtime API (wss /openai/v1/realtime, deployment name as the model). Reasoning model: 128k context, 32k max output. OpenAI prices cached audio at $0.30 and cached text at $0.06 per 1M; the catalog has one cache rate, so the audio one applies. Prices are Azure's Global meters."
+		},
+		"gpt-realtime-2": {
+			"operations": {
+				"audio.converse.realtime": {
+					"outputModalities": ["audio", "text"],
+					"voices": [
+						"alloy",
+						"ash",
+						"ballad",
+						"coral",
+						"echo",
+						"sage",
+						"shimmer",
+						"verse",
+						"marin",
+						"cedar"
+					],
+					"supportsInstructions": true,
+					"supportsTools": true,
+					"reasoningEfforts": ["minimal", "low", "medium", "high", "xhigh"],
+					"supportsDeferredResponse": true,
+					"supportsSpeed": true,
+					"supportsTextInput": true,
+					"supportsImageInput": true,
+					"supportsInputTranscription": true,
+					"turnDetection": ["server_vad", "semantic_vad", "manual"]
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 400,
+				"outputCentsPerMTokens": 2400,
+				"cacheReadCentsPerMTokens": 40,
+				"audioInputCentsPerMTokens": 3200,
+				"audioOutputCentsPerMTokens": 6400,
+				"imageInputCentsPerMTokens": 500
+			},
+			"notes": "Realtime API (wss /openai/v1/realtime, deployment name as the model). Reasoning model: 128k context, 32k max output. gpt-realtime-2.1 improves on it. Prices are Azure's Global meters."
+		},
+		"gpt-live-transcribe": {
+			"operations": {
+				"audio.transcribe.realtime": {
+					"supportsKeywords": true,
+					"supportsLanguageHints": true,
+					"turnDetection": ["manual"]
+				}
+			},
+			"pricing": {
+				"audioInputCentsPerSecond": 0.028333
+			},
+			"notes": "Realtime transcription (wss /openai/v1/realtime?intent=transcription, deployment name as the model). No server VAD: the client commits each utterance. Azure Global meter: $1.02 per hour of audio ($0.017 per minute), billed here by the second."
+		},
+		"gpt-realtime-whisper": {
+			"operations": {
+				"audio.transcribe.realtime": {
+					"turnDetection": ["manual"]
+				}
+			},
+			"pricing": {
+				"audioInputCentsPerSecond": 0.028333
+			},
+			"notes": "Realtime transcription (wss /openai/v1/realtime?intent=transcription, deployment name as the model). Manual turns only, as on OpenAI. Azure Global meter: $1.02 per hour of audio ($0.017 per minute)."
+		},
 		"gpt-transcribe": {
 			"operations": {
 				"audio.transcribe": {

@@ -502,6 +502,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/live/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GPT-Live session WebSocket (OpenAI-compatible)
+         * @description Requires Upgrade: websocket. The first client event is session.start with session.model (a public model with audio.live); every later event and every server event is OpenAI's GPT-Live protocol, relayed unchanged except that session.* events name the public model. Billed per session second plus the delegated backend model's usage.
+         */
+        get: operations["openLiveSession"];
+        put?: never;
+        /**
+         * Create a WebRTC or SIP GPT-Live session (OpenAI-compatible)
+         * @description OpenAI's body: { session, transport: { type: webrtc, sdp } | { type: sip, destination, trunk } }. Returns OpenAI's 201 body (session id, and the SDP answer for WebRTC). Media flows between the client and the provider; the gateway meters the session from its sideband.
+         */
+        post: operations["createLiveSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/live/sessions/{id}/attach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GPT-Live sideband WebSocket (OpenAI-compatible)
+         * @description Requires Upgrade: websocket. Server-side control of a running session opened by the same key; relayed to the provider's sideband.
+         */
+        get: operations["attachLiveSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/live/sessions/{id}/fork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fork a stored GPT-Live session over WebSocket
+         * @description Requires Upgrade: websocket. Send session.start ({} keeps the source's settings); the fork runs on the source session's deployment and is metered as its own session.
+         */
+        get: operations["forkLiveSessionWebSocket"];
+        put?: never;
+        /** Fork a stored GPT-Live session over WebRTC */
+        post: operations["forkLiveSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/live/sessions/{id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a stored GPT-Live session's recording */
+        get: operations["downloadLiveSessionContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/realtime/client_secrets": {
         parameters: {
             query?: never;
@@ -2311,7 +2393,7 @@ export interface paths {
                     bucket?: "hour" | "day";
                     publicModel?: string;
                     deploymentId?: string;
-                    operation?: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.speech" | "audio.transcribe.realtime" | "audio.converse.realtime" | "embedding.create" | "rerank" | "decision.create";
+                    operation?: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.speech" | "audio.transcribe.realtime" | "audio.converse.realtime" | "audio.live" | "embedding.create" | "rerank" | "decision.create";
                 };
                 header?: never;
                 path?: never;
@@ -3809,6 +3891,10 @@ export interface components {
                     json: components["schemas"]["ExecutionPolicy"];
                     stream: components["schemas"]["ExecutionPolicy"];
                 };
+                "live.session": {
+                    json: components["schemas"]["ExecutionPolicy"];
+                    stream: components["schemas"]["ExecutionPolicy"];
+                };
                 embeddings: {
                     json: components["schemas"]["ExecutionPolicy"];
                     stream: components["schemas"]["ExecutionPolicy"];
@@ -4926,6 +5012,8 @@ export interface components {
         IdPath: string;
         /** @description OpenResponses response id (resp_...) */
         ResponseIdPath: string;
+        /** @description GPT-Live session id (live_...) */
+        LiveSessionIdPath: string;
         /** @description Gateway video id (video_...) */
         VideoIdPath: string;
         Limit: number;
@@ -5071,6 +5159,166 @@ export interface operations {
             403: components["responses"]["Error"];
             413: components["responses"]["Error"];
             429: components["responses"]["Error"];
+        };
+    };
+    openLiveSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Switching Protocols */
+            101: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            426: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    createLiveSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description The created session */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    attachLiveSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description GPT-Live session id (live_...) */
+                id: components["parameters"]["LiveSessionIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Switching Protocols */
+            101: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            426: components["responses"]["Error"];
+        };
+    };
+    forkLiveSessionWebSocket: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description GPT-Live session id (live_...) */
+                id: components["parameters"]["LiveSessionIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Switching Protocols */
+            101: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            426: components["responses"]["Error"];
+        };
+    };
+    forkLiveSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description GPT-Live session id (live_...) */
+                id: components["parameters"]["LiveSessionIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description The forked session */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    downloadLiveSessionContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description GPT-Live session id (live_...) */
+                id: components["parameters"]["LiveSessionIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stereo WAV: input on the left channel, output on the right */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/wav": string;
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
     createRealtimeClientSecret: {

@@ -10,6 +10,7 @@ export const OPERATION_IDS = [
 	"audio.speech",
 	"audio.transcribe.realtime",
 	"audio.converse.realtime",
+	"audio.live",
 	"embedding.create",
 	"rerank",
 	"decision.create",
@@ -92,6 +93,13 @@ export const OPERATIONS: readonly OperationDefinition[] = [
 		label: "Realtime conversation",
 		callType: "realtime.conversation",
 		publicEndpoints: ["/v1/realtime"],
+	},
+	{
+		id: "audio.live",
+		family: "audio",
+		label: "Live voice sessions",
+		callType: "live.session",
+		publicEndpoints: ["/v1/live/sessions"],
 	},
 	{
 		id: "embedding.create",

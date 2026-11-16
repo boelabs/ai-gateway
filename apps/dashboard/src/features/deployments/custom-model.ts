@@ -77,6 +77,8 @@ export function operationTemplate(id: string): Record<string, unknown> {
 			return { responseFormats: ["json"] };
 		case "audio.speech":
 			return { responseFormats: ["mp3"] };
+		case "audio.live":
+			return {};
 		case "embedding.create":
 			return {};
 		case "rerank":

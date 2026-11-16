@@ -3901,6 +3901,67 @@
 				}
 			}
 		},
+		"gpt-live-1": {
+			"operations": {
+				"audio.live": {
+					"voices": [
+						"alloy",
+						"ash",
+						"ballad",
+						"beacon",
+						"bossa",
+						"brise",
+						"calandria",
+						"cedar",
+						"cinder",
+						"compas",
+						"coral",
+						"delta",
+						"destello",
+						"echo",
+						"flitz",
+						"gleam",
+						"halo",
+						"harema",
+						"hornero",
+						"juni",
+						"luciernaga",
+						"marin",
+						"meridian",
+						"nira",
+						"noeul",
+						"nuri",
+						"pearl",
+						"quartz",
+						"ripple",
+						"sage",
+						"shida",
+						"shimmer",
+						"sillage",
+						"stone",
+						"tempo",
+						"verse",
+						"vesper",
+						"willow"
+					]
+				}
+			},
+			"pricing": {
+				"audioInputCentsPerSecond": 0.083333
+			},
+			"notes": "GPT-Live (/v1/live/sessions): full-duplex voice over WebSocket, WebRTC or SIP, delegating reasoning and tools to a backend model (responses or decisions delegation) or to the client. $0.05 per minute of session, billed per second; the backend model's tokens are billed at its own rates."
+		},
+		"gpt-realtime-whisper": {
+			"operations": {
+				"audio.transcribe.realtime": {
+					"turnDetection": ["manual"]
+				}
+			},
+			"pricing": {
+				"audioInputCentsPerSecond": 0.028333
+			},
+			"notes": "Realtime transcription (wss /v1/realtime?intent=transcription). 16k context, 2,000 max output tokens. OpenAI documents no server VAD, language hints or vocabulary for it, so the catalog offers manual turns only. $0.017 per minute of audio."
+		},
 		"gpt-realtime-2.1": {
 			"operations": {
 				"audio.converse.realtime": {

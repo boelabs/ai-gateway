@@ -1,0 +1,89 @@
+---
+title: "Live sessions"
+description: "/v1/live/sessions — OpenAI's GPT-Live API for full-duplex voice, relayed unchanged."
+---
+
+GPT-Live (`gpt-live-1`) is OpenAI's full-duplex voice model: it listens and speaks at the same time,
+and hands reasoning and tools to a backend model. The gateway serves OpenAI's GPT-Live API at the same
+paths, with the same events, so OpenAI's GPT-Live clients work by changing only the base URL and the
+key. The public model must support `audio.live`.
+
+The protocol is relayed, not translated. The gateway authenticates the key, routes `session.model` (a
+public model) to a deployment, and meters the session. Every client and server event passes through
+as sent, except that `session.*` events show the public model name instead of the upstream one.
+
+## WebSocket sessions
+
+Open a WebSocket to `$GATEWAY/v1/live/sessions` with your virtual key in `Authorization: Bearer`. The
+first event must be `session.start`:
+
+```json
+{
+  "type": "session.start",
+  "session": {
+    "model": "live",
+    "instructions": "You are a friendly support agent.",
+    "audio": { "format": { "type": "audio/pcm", "rate": 24000 }, "output": { "voice": "marin" } },
+    "delegation": {
+      "type": "responses",
+      "responses": { "model": "gpt-6-luna", "tools": [{ "type": "web_search" }] }
+    }
+  }
+}
+```
+
+Wait for `session.started`, then stream audio with `session.input_audio.append`. Every other event
+(`session.update`, `session.instructions.append`, `response.create`, `response.item.create`,
+`session.close`, and the server's `session.output_audio.delta`, transcript deltas, `response.event`,
+`session.usage.updated`, `session.closed`, `error`) is OpenAI's, unchanged. Close with `session.close`
+and read until `session.closed`.
+
+## WebRTC and SIP
+
+`POST /v1/live/sessions` takes OpenAI's body: `session` plus `transport`, either
+`{ "type": "webrtc", "sdp": "<offer>" }` or a SIP `destination` and `trunk`. It returns OpenAI's
+`201` body: the session id and, for WebRTC, the SDP answer. Media then flows between the client and
+the provider. The gateway attaches to the session's sideband to read its usage events.
+
+## Sideband, forks and recordings
+
+| Route | What it does |
+|---|---|
+| `GET /v1/live/sessions/{id}/attach` (WebSocket) | Server-side control of a running session: OpenAI's sideband, relayed |
+| `GET /v1/live/sessions/{id}/fork` (WebSocket) | A new session continuing a stored one (`store: true`); send `session.start`, `{}` keeps its settings |
+| `POST /v1/live/sessions/{id}/fork` | The same over WebRTC |
+| `GET /v1/live/sessions/{id}/content` | A stored session's recording: stereo WAV, input left and output right |
+
+Only the key that opened a session can attach to it, fork it or download its recording. Forks run on
+the source session's deployment.
+
+## Delegation
+
+`client`, `responses` and `decisions` delegation work as OpenAI documents them. A backend model named
+in `delegation.responses.model` or `delegation.decisions.model` must be one the key may use and one
+the catalog prices for the session's provider. A session that names another one is refused, so its
+backend usage cannot go unbilled.
+
+## Billing
+
+Each session is one `live.session` operation. It is charged:
+
+- the session seconds the provider reports (`session.usage.updated`, then `session.closed`), at the
+  model's per-second price ($0.05 per minute for `gpt-live-1`);
+- every backend response (`response.completed` inside `response.event`) and decision, at the backend
+  model's own token rates.
+
+A virtual key is charged as the session runs. Once its budget is spent, the gateway sends an `error`
+with code `budget_exceeded` and ends the session. If a session ends without the provider's final
+usage, it is billed by the clock and marked `usageEstimated`.
+
+## Providers and limits
+
+- **OpenAI** serves `gpt-live-1`.
+- **Azure OpenAI** lists `gpt-live-1` in its regions, but documents no endpoint and publishes no price
+  for it, so it is not offered yet.
+- Inbound SIP calls (OpenAI's `live.transport.incoming` webhook and `accept`/`reject`/`refer`/`hangup`)
+  reach the provider project's own webhook, not a gateway key, so they are not relayed.
+- A session lasts at most 60 minutes on the gateway, like a realtime session (OpenAI allows a
+  connected call up to two hours). Connection limits are those of
+  [Realtime conversations](/docs/realtime-conversations).

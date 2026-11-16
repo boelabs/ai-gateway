@@ -19,6 +19,7 @@ test("registry separates public operations from internal CallTypes", () => {
 			"audio.speech",
 			"audio.transcribe.realtime",
 			"audio.converse.realtime",
+			"audio.live",
 			"embedding.create",
 			"rerank",
 			"decision.create",
