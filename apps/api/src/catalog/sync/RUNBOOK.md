@@ -144,9 +144,11 @@ embeddings, rerankers, image and video models. Known transcription models today:
 `gemini-3.5-transcribe` and `gemini-3.5-transcribe-live`. Known live voice models: Google
 `gemini-3.8-live`, `gemini-3.8-live-extended-thinking`, `gemini-3.1-flash-live-preview`,
 `gemini-2.5-flash-native-audio-preview-12-2025` and `gemini-3.5-live-translate-preview`; OpenAI
-`gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, `gpt-realtime-1.5`. OpenAI's per-minute
-`gpt-realtime-translate` and `gpt-realtime-whisper` are out of scope (no per-minute pricing, and no
-realtime transcription or translation on the OpenAI adapter yet).
+`gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, `gpt-realtime-1.5`. OpenAI's
+`gpt-live-transcribe` runs on the OpenAI adapter's transcription sessions and is priced per minute
+as `audioInputCentsPerSecond` (the minute price / 60). `gpt-realtime-whisper` (same price, live
+transcription) can follow the same entry once its model page confirms the transcription intent and
+turn detection; `gpt-realtime-translate` is out of scope (no realtime translation operation).
 
 Text-to-speech models (`*-tts`, "text-to-speech") take the `audio.speech` operation. Known today:
 Google `gemini-3.8-flash-tts` and `gemini-3.8-flash-lite-tts`. Their profile lists the audio

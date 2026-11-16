@@ -10,6 +10,8 @@ import { OperationLogDraft } from "./runtime/operationLog.ts";
 import { route, type RouteResult } from "#router/index.ts";
 import { upgradeWebSocket } from "#http/bunServer.ts";
 import { GatewayError } from "#core/errors.ts";
+import { pricingAt } from "#catalog/pricing.ts";
+import type { Usage } from "#core/usage.ts";
 import { getAuth } from "#auth/middleware.ts";
 import type { AppEnv } from "#auth/types.ts";
 import { randomUUID } from "node:crypto";
@@ -196,27 +198,43 @@ async function pump(connection: RealtimeConnection, run: UpstreamRun) {
 	}
 }
 
-/** The run's usage so far: the provider's reports, or an estimate from the audio received. */
+/**
+ * The run's usage so far, with the seconds of audio received. A model priced by the second is billed
+ * on those alone; a token-priced one on the provider's reports, or an estimate from the audio when
+ * the provider sends none.
+ */
 function runUsage(run: UpstreamRun): {
-	usage: RealtimeUsage | null;
+	usage: Usage | null;
 	estimated: boolean;
 } {
 	const seconds = runSeconds(run);
-	if (run.usage || seconds <= 0) {
-		return { usage: run.usage, estimated: false };
-	}
-	const audioTokens = Math.ceil(seconds * ESTIMATED_AUDIO_TOKENS_PER_SECOND);
-	const outputTokens = Math.ceil(
-		run.tracker.transcriptCharacters / ESTIMATED_CHARACTERS_PER_OUTPUT_TOKEN,
-	);
-	return {
-		usage: {
+	const perSecond =
+		pricingAt(run.routing.candidate.meta.pricing)?.audioInputCentsPerSecond !==
+		undefined;
+	let usage = realtimeUsageToCore(run.usage);
+	let estimated = false;
+	if (!usage && seconds > 0 && !perSecond) {
+		const audioTokens = Math.ceil(seconds * ESTIMATED_AUDIO_TOKENS_PER_SECOND);
+		const outputTokens = Math.ceil(
+			run.tracker.transcriptCharacters / ESTIMATED_CHARACTERS_PER_OUTPUT_TOKEN,
+		);
+		usage = realtimeUsageToCore({
 			inputTokens: audioTokens,
 			outputTokens,
 			totalTokens: audioTokens + outputTokens,
 			audioTokens,
+		});
+		estimated = true;
+	}
+	if (seconds <= 0) {
+		return { usage, estimated };
+	}
+	return {
+		usage: {
+			...(usage ?? { promptTokens: 0, completionTokens: 0, totalTokens: 0 }),
+			inputAudioSeconds: Math.round(seconds * 1000) / 1000,
 		},
-		estimated: true,
+		estimated,
 	};
 }
 
@@ -233,7 +251,7 @@ async function budgetExhaustedAfterCharge(run: UpstreamRun): Promise<boolean> {
 	}
 	run.chargedUsage = run.usage;
 	run.chargedItems = run.tracker.completedItems;
-	const core = realtimeUsageToCore(runUsage(run).usage);
+	const core = runUsage(run).usage;
 	if (!core) {
 		return false;
 	}
@@ -258,8 +276,7 @@ async function endRun(
 	run.session.close();
 	run.abort.abort();
 	const seconds = runSeconds(run);
-	const { usage, estimated } = runUsage(run);
-	const core = realtimeUsageToCore(usage);
+	const { usage: core, estimated } = runUsage(run);
 	const terminal = error ? null : completedTerminal(core);
 	await run.routing.finish(core, undefined, error, terminal, run.downstream);
 	finishDownstreamWriteObservation(run.downstream, error?.code);

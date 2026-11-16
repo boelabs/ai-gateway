@@ -770,6 +770,19 @@
 			"deprecated": true,
 			"notes": "OpenAI shut down dall-e-3 on 2026-05-12; replacement gpt-image-2."
 		},
+		"gpt-live-transcribe": {
+			"operations": {
+				"audio.transcribe.realtime": {
+					"supportsKeywords": true,
+					"supportsLanguageHints": true,
+					"turnDetection": ["manual"]
+				}
+			},
+			"pricing": {
+				"audioInputCentsPerSecond": 0.028333
+			},
+			"notes": "Realtime transcription (wss /v1/realtime?intent=transcription, a transcription session). Streams transcript deltas; no server VAD, so the client commits each utterance. No word timestamps, speakers or confidence. $0.017 per minute of audio, billed here by the second."
+		},
 		"gpt-transcribe": {
 			"operations": {
 				"audio.transcribe": {

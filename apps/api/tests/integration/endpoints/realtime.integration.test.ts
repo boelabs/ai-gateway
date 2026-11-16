@@ -254,6 +254,161 @@ test("GET /v1/realtime transcribes a manual turn through Gemini Live and logs it
 	}
 });
 
+/** An OpenAI transcription-intent stand-in: transcribes each committed utterance. */
+async function openAITranscriptionStub() {
+	const server = new WebSocketServer({ port: 0, host: "127.0.0.1" });
+	await new Promise<void>((resolve) => server.once("listening", resolve));
+	const sessions: Record<string, any>[] = [];
+	const paths: string[] = [];
+	server.on("connection", (socket, request) => {
+		paths.push(request.url ?? "");
+		socket.send(JSON.stringify({ type: "session.created", session: {} }));
+		let item = 0;
+		socket.on("message", (data) => {
+			const event = JSON.parse(data.toString()) as Record<string, any>;
+			if (event.type === "session.update") {
+				sessions.push(event.session);
+				socket.send(
+					JSON.stringify({ type: "session.updated", session: event.session }),
+				);
+			}
+			if (event.type === "input_audio_buffer.commit") {
+				const itemId = `item_${++item}`;
+				for (const reply of [
+					{ type: "input_audio_buffer.committed", item_id: itemId },
+					{
+						type: "conversation.item.input_audio_transcription.delta",
+						item_id: itemId,
+						delta: "Hola",
+					},
+					{
+						type: "conversation.item.input_audio_transcription.completed",
+						item_id: itemId,
+						transcript: "Hola AI Gateway.",
+					},
+				]) {
+					socket.send(JSON.stringify(reply));
+				}
+			}
+		});
+	});
+	const { port } = server.address() as AddressInfo;
+	return {
+		baseUrl: `http://127.0.0.1:${port}/v1`,
+		sessions,
+		paths,
+		close: () =>
+			new Promise<void>((resolve) => {
+				for (const connection of server.clients) {
+					connection.terminate();
+				}
+				server.close(() => resolve());
+			}),
+	};
+}
+
+test("GET /v1/realtime transcribes through gpt-live-transcribe and bills the audio by the second", {
+	skip,
+	timeout: 30_000,
+}, async () => {
+	const stub = await openAITranscriptionStub();
+	const server = await gateway();
+	const publicModel = `realtime-openai-${randomUUID()}`;
+	let deploymentId: string | undefined;
+	let virtualKey: CreatedVirtualKey | undefined;
+	try {
+		const created = await createDeployment({
+			publicModel,
+			adapterKey: "openai",
+			upstreamModel: "gpt-live-transcribe",
+			credentials: { apiKey: "sk-test", baseUrl: stub.baseUrl },
+		});
+		deploymentId = created.row.id;
+		virtualKey = await createVirtualKey({
+			name: `realtime-openai-${randomUUID()}`,
+			allowedModels: [publicModel],
+		});
+
+		const { socket, next } = await client(
+			`${server.url}?intent=transcription`,
+			virtualKey.rawKey,
+		);
+		await next("session.created");
+		socket.send(
+			JSON.stringify({
+				type: "session.update",
+				session: {
+					type: "transcription",
+					audio: {
+						input: {
+							format: { type: "audio/pcm", rate: 24_000 },
+							transcription: {
+								model: publicModel,
+								keywords: ["AI Gateway"],
+								languages: ["es"],
+							},
+							turn_detection: null,
+						},
+					},
+				},
+			}),
+		);
+		await next("session.updated");
+		assert.deepEqual(stub.paths, ["/v1/realtime?intent=transcription"]);
+		assert.deepEqual(stub.sessions[0]?.audio.input.transcription, {
+			model: "gpt-live-transcribe",
+			languages: ["es"],
+			keywords: ["AI Gateway"],
+		});
+		assert.equal(stub.sessions[0]?.audio.input.turn_detection, null);
+
+		// One second of audio at 24 kHz.
+		socket.send(
+			JSON.stringify({
+				type: "input_audio_buffer.append",
+				audio: Buffer.alloc(48_000).toString("base64"),
+			}),
+		);
+		socket.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
+		const completed = await next(
+			"conversation.item.input_audio_transcription.completed",
+		);
+		assert.equal(completed.transcript, "Hola AI Gateway.");
+
+		socket.close();
+		const operation = await eventually(
+			async () => {
+				const page = await listOperationsPage({
+					limit: 1,
+					offset: 0,
+					publicModel,
+					callType: "realtime.transcription",
+				});
+				const [row] = page.rows;
+				const detail = row ? await getOperationDetail(row.id) : null;
+				return detail?.outcome ? detail : null;
+			},
+			{ description: "realtime gateway_operation", timeoutMs: 8000 },
+		);
+		assert.equal(operation.outcome, "success");
+		// $0.017 per minute: one second is 0.028333 cents, and no token estimate is added.
+		assert.ok(
+			Math.abs(Number(operation.consumerCostCents) - 0.028_333) < 0.0005,
+			String(operation.consumerCostCents),
+		);
+		assert.equal(operation.promptTokens, 0);
+	} finally {
+		if (virtualKey) {
+			await deleteVirtualKey(virtualKey.row.id);
+		}
+		if (deploymentId) {
+			await deleteDeployment(deploymentId);
+		}
+		await server.close();
+		await stub.close();
+	}
+});
+
 test("GET /v1/realtime refuses unknown intents and conversations without a model before upgrading", {
 	skip,
 }, async () => {
