@@ -79,9 +79,10 @@ usage, it is billed by the clock and marked `usageEstimated`.
 
 ## Providers and limits
 
-- **OpenAI** serves `gpt-live-1`.
-- **Azure OpenAI** lists `gpt-live-1` in its regions, but documents no endpoint and publishes no price
-  for it, so it is not offered yet.
+- **OpenAI** serves `gpt-live-1` over WebSocket, WebRTC and SIP.
+- **Azure OpenAI** serves `gpt-live-1` over WebSocket and WebRTC, at
+  `{resource}.openai.azure.com/openai/v1/live/sessions` with the deployment name as the model. Azure
+  documents no SIP transport. Its Global meter is the same $0.05 per minute.
 - Inbound SIP calls (OpenAI's `live.transport.incoming` webhook and `accept`/`reject`/`refer`/`hangup`)
   reach the provider project's own webhook, not a gateway key, so they are not relayed.
 - A session lasts at most 60 minutes on the gateway, like a realtime session (OpenAI allows a

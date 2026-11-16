@@ -44,9 +44,11 @@ async function liveStub() {
 	await new Promise<void>((resolve) => server.once("listening", resolve));
 	const starts: Record<string, any>[] = [];
 	const paths: string[] = [];
+	const authorizations: string[] = [];
 	server.on("connection", (socket, request) => {
 		const path = request.url ?? "";
 		paths.push(path);
+		authorizations.push(request.headers.authorization ?? "");
 		if (path.endsWith("/attach")) {
 			socket.send(
 				JSON.stringify({
@@ -110,6 +112,7 @@ async function liveStub() {
 		baseUrl: `http://127.0.0.1:${port}/v1`,
 		starts,
 		paths,
+		authorizations,
 		close: () =>
 			new Promise<void>((resolve) => {
 				for (const connection of server.clients) {
@@ -236,6 +239,7 @@ test("GET /v1/live/sessions relays a session under its public name and bills sec
 		assert.equal(stub.starts[0]?.model, "gpt-live-1");
 		assert.equal(stub.starts[0]?.instructions, "Be brief.");
 		assert.deepEqual(stub.paths, ["/v1/live/sessions"]);
+		assert.deepEqual(stub.authorizations, ["Bearer sk-test"]);
 
 		socket.send(JSON.stringify({ type: "session.close" }));
 		const sessionClosed = await next("session.closed");

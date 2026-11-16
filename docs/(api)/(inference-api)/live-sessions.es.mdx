@@ -79,9 +79,10 @@ final del proveedor, se factura por reloj y se marca con `usageEstimated`.
 
 ## Proveedores y límites [#providers-and-limits]
 
-- **OpenAI** sirve `gpt-live-1`.
-- **Azure OpenAI** lista `gpt-live-1` en sus regiones, pero no documenta un endpoint ni publica precio,
-  así que todavía no se ofrece.
+- **OpenAI** sirve `gpt-live-1` por WebSocket, WebRTC y SIP.
+- **Azure OpenAI** sirve `gpt-live-1` por WebSocket y WebRTC, en
+  `{resource}.openai.azure.com/openai/v1/live/sessions` con el nombre del deployment como modelo.
+  Azure no documenta transporte SIP. Su medidor Global cuesta lo mismo, $0.05 por minuto.
 - Las llamadas SIP entrantes (el webhook `live.transport.incoming` de OpenAI y
   `accept`/`reject`/`refer`/`hangup`) llegan al webhook del propio proyecto del proveedor, no a una key
   del gateway, así que no se retransmiten.

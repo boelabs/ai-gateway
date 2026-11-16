@@ -37,9 +37,9 @@ Envía este cuerpo a `POST /admin/deployments` con credencial de operador. Reemp
   WebSocket GA de Azure (`wss://{resource}.openai.azure.com/openai/v1/realtime`, con el nombre del
   deployment como modelo y la cabecera `api-key`). Los precios son los medidores Global de Azure.
   `gpt-realtime-1.5` no tiene medidor de precio en Azure y la API Realtime preview
-  (`gpt-4o-realtime-preview`) está retirada, así que no se ofrecen. [GPT-Live](/docs/live-sessions)
-  todavía no se ofrece en Azure: Microsoft lista `gpt-live-1` por región, pero no documenta un endpoint
-  ni publica precio.
+  (`gpt-4o-realtime-preview`) está retirada, así que no se ofrecen. `gpt-live-1` sirve
+  [sesiones Live](/docs/live-sessions) por WebSocket y WebRTC (`/openai/v1/live/sessions`, con la key
+  como token Bearer); Azure no documenta transporte SIP para él.
 - Catálogo: `src/adapters/azureopenai/catalog.json`.
 
 ## Próximos pasos [#next-steps]

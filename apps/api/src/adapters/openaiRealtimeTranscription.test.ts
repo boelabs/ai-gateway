@@ -3,6 +3,7 @@ import { resolveModelMetadata } from "#catalog/index.ts";
 import { type WebSocket, WebSocketServer } from "ws";
 import { azureopenaiAdapter } from "./azureopenai/index.ts";
 import { normalizeAzurev1BaseUrl } from "./azurev1.ts";
+import { openAILiveUrl } from "./openaiLive.ts";
 import { openaiAdapter } from "./openai/index.ts";
 import type { AdapterContext } from "./types.ts";
 import type { AddressInfo } from "node:net";
@@ -186,10 +187,10 @@ test("openai transcription: a session configures itself, streams 24 kHz audio an
 	}
 });
 
-test("azure openai: realtime runs on the GA /openai/v1 surface, with priced voice models", () => {
+test("azure openai: realtime and GPT-Live run on the GA /openai/v1 surface, with priced voice models", () => {
 	assert.ok(azureopenaiAdapter.realtimeConversation);
 	assert.ok(azureopenaiAdapter.realtimeTranscription);
-	assert.equal(azureopenaiAdapter.liveSession, undefined);
+	assert.ok(azureopenaiAdapter.liveSession);
 	const base = normalizeAzurev1BaseUrl("https://res.openai.azure.com");
 	assert.equal(
 		openAIRealtimeTranscriptionUrl(base),
@@ -199,6 +200,20 @@ test("azure openai: realtime runs on the GA /openai/v1 surface, with priced voic
 		openAIRealtimeUrl(base, "my-realtime"),
 		"wss://res.openai.azure.com/openai/v1/realtime?model=my-realtime",
 	);
+	assert.equal(
+		openAILiveUrl(base, "", "ws"),
+		"wss://res.openai.azure.com/openai/v1/live/sessions",
+	);
+	assert.equal(
+		openAILiveUrl(base, "/live_1/attach", "ws"),
+		"wss://res.openai.azure.com/openai/v1/live/sessions/live_1/attach",
+	);
+	const live = resolveModelMetadata("azureopenai", "gpt-live-1");
+	assert.deepEqual(live.operations?.["audio.live"]?.transports, [
+		"websocket",
+		"webrtc",
+	]);
+	assert.ok(live.pricing?.audioInputCentsPerSecond);
 	for (const [model, operation] of [
 		["gpt-realtime-2.1", "audio.converse.realtime"],
 		["gpt-realtime-2.1-mini", "audio.converse.realtime"],

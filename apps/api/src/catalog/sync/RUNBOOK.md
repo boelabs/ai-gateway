@@ -152,9 +152,9 @@ out of scope (no realtime translation operation).
 
 GPT-Live models (`gpt-live-*`, OpenAI's `/v1/live/sessions`) take the `audio.live` operation. Known
 today: OpenAI `gpt-live-1`. The session is priced per minute as `audioInputCentsPerSecond`; the backend
-model it delegates to is billed from its own catalog entry, so it needs no extra pricing. Azure lists
-`gpt-live-1` by region but documents no endpoint and publishes no price meter; keep it out of the
-Azure catalog until both exist. Azure's realtime models are priced from their Global meters (the
+model it delegates to is billed from its own catalog entry, so it needs no extra pricing. Azure serves
+`gpt-live-1` too (WebSocket and WebRTC, no SIP); its meter is named `Live 1 Gl` ($3.00 per hour), not
+after the model id, and Microsoft's model list does not show it. Azure's realtime models are priced from their Global meters (the
 Retail Prices API row above); one without a Global meter stays in `AZURE_LISTING_UNSERVED`.
 
 Text-to-speech models (`*-tts`, "text-to-speech") take the `audio.speech` operation. Known today:
