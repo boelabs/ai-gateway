@@ -6,7 +6,7 @@ description: "GET /v1/realtime?intent=transcription: la Realtime API de OpenAI e
 Transcribe audio en vivo por WebSocket. El endpoint habla la Realtime API de OpenAI en modo
 transcripción, así que los SDKs y clientes de OpenAI funcionan sin cambios; el public model debe
 admitir `audio.transcribe.realtime` (hoy `gemini-3.5-transcribe-live`, a través de la Live API de
-Gemini).
+Gemini, y `gpt-live-transcribe` de OpenAI).
 
 ## Conexión [#connecting]
 
@@ -48,7 +48,7 @@ Envía `session.update` con `session.type: "transcription"`. El modelo va en
 | `transcription.language` / `languages` | Pistas de idioma (BCP-47 en Gemini). Envía uno u otro. |
 | `transcription.keywords` | Vocabulario; hasta 1.000 en Gemini. |
 | `transcription.transcription_mode` | Extensión de AI Gateway: `verbatim` (predeterminado) o `smart`, que quita muletillas y da formato a los números. |
-| `transcription.prompt`, `delay`, `noise_reduction` | Se aceptan; Gemini no tiene equivalente, así que no se envían. |
+| `transcription.prompt`, `delay`, `noise_reduction` | Se aceptan, pero no se envían al proveedor. |
 | `turn_detection` | `null`: cada `input_audio_buffer.commit` cierra un enunciado. `server_vad` o `semantic_vad`: el proveedor detecta las pausas. |
 | `include` | `item.input_audio_transcription.interim` añade el evento interim descrito abajo. |
 
@@ -72,6 +72,16 @@ Gemini corrige su hipótesis sobre la marcha; los deltas de OpenAI solo agregan 
 delta solo lleva texto que extiende lo ya enviado, y `completed` siempre trae la transcripción
 definitiva. Para ver cada corrección, incluye `item.input_audio_transcription.interim`: cada evento
 `conversation.item.input_audio_transcription.interim` trae el `transcript` completo actual.
+
+## gpt-live-transcribe [#gpt-live-transcribe]
+
+`gpt-live-transcribe` de OpenAI responde a través de las sesiones de transcripción de OpenAI. No
+detecta los turnos por sí mismo, así que sus sesiones usan `turn_detection: null` y el cliente
+confirma cada enunciado; `server_vad` o `semantic_vad` se rechazan antes de abrir la sesión con el
+proveedor. Las pistas de idioma se envían como `languages`, aunque sea una sola, y el vocabulario
+como `keywords`. Transmite deltas y no devuelve timestamps por palabra, hablantes ni confianza.
+OpenAI lo cobra a $0.017 por minuto de audio; el gateway factura los segundos de audio que reenvió,
+sin estimar tokens.
 
 ## Límites [#limits]
 

@@ -2,7 +2,11 @@ import { withOpenAIServiceMode } from "./openaiServiceMode.ts";
 import type { ServiceMode } from "#core/serviceMode.ts";
 import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { makeOpenAIResponsesWebSocketHandler } from "./openaiResponsesWebSocket.ts";
-import { makeOpenAIRealtimeConversationHandler } from "./openaiRealtime.ts";
+import {
+	makeOpenAIRealtimeTranscriptionHandler,
+	makeOpenAIRealtimeConversationHandler,
+	type OpenAIRealtimeDeps,
+} from "./openaiRealtime.ts";
 import { upstreamFetch } from "#gateway/instrumentedTransport.ts";
 import { looksLikeContextWindowError } from "#core/httpError.ts";
 import { GatewayError, type ErrorClass } from "#core/errors.ts";
@@ -1155,10 +1159,26 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 	}
 	if (config.realtime) {
 		supportedCallTypes.add("realtime.conversation");
+		supportedCallTypes.add("realtime.transcription");
 	}
 	if (config.embeddings) {
 		supportedCallTypes.add("embeddings");
 	}
+	const realtimeDeps: OpenAIRealtimeDeps | undefined = config.realtime
+		? {
+				label: config.label,
+				resolveConnection(ctx) {
+					const credentials = resolveCreds(ctx);
+					return {
+						url: credentials.base,
+						headers: buildAuthHeaders(credentials),
+					};
+				},
+				mapError(err, ctx) {
+					return mapError(err, ctx);
+				},
+			}
+		: undefined;
 	const firstImageTransport = imageTransports?.[0];
 	const imageTransportConfig =
 		imageTransports && firstImageTransport
@@ -1236,21 +1256,12 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 			: {}),
 		...(videoTransportConfig ? { videoGeneration } : {}),
 		...(config.audioTranscriptions ? { audioTranscription } : {}),
-		...(config.realtime
+		...(realtimeDeps
 			? {
-					realtimeConversation: makeOpenAIRealtimeConversationHandler({
-						label: config.label,
-						resolveConnection(ctx) {
-							const credentials = resolveCreds(ctx);
-							return {
-								url: credentials.base,
-								headers: buildAuthHeaders(credentials),
-							};
-						},
-						mapError(err, ctx) {
-							return mapError(err, ctx);
-						},
-					}),
+					realtimeConversation:
+						makeOpenAIRealtimeConversationHandler(realtimeDeps),
+					realtimeTranscription:
+						makeOpenAIRealtimeTranscriptionHandler(realtimeDeps),
 				}
 			: {}),
 		...(config.embeddings ? { embeddings } : {}),
@@ -1286,6 +1297,10 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 			...(config.realtime
 				? {
 						"realtime.conversation": {
+							supported: ["realtime"],
+							default: "realtime",
+						},
+						"realtime.transcription": {
 							supported: ["realtime"],
 							default: "realtime",
 						},

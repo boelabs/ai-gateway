@@ -144,9 +144,11 @@ embeddings, rerankers, image and video models. Known transcription models today:
 `gemini-3.5-transcribe` and `gemini-3.5-transcribe-live`. Known live voice models: Google
 `gemini-3.8-live`, `gemini-3.8-live-extended-thinking`, `gemini-3.1-flash-live-preview`,
 `gemini-2.5-flash-native-audio-preview-12-2025` and `gemini-3.5-live-translate-preview`; OpenAI
-`gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, `gpt-realtime-1.5`. OpenAI's per-minute
-`gpt-realtime-translate` and `gpt-realtime-whisper` are out of scope (no per-minute pricing, and no
-realtime transcription or translation on the OpenAI adapter yet).
+`gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, `gpt-realtime-1.5`. OpenAI's
+`gpt-live-transcribe` runs on the OpenAI adapter's transcription sessions and is priced per minute
+as `audioInputCentsPerSecond` (the minute price / 60). `gpt-realtime-whisper` (same price, live
+transcription) can follow the same entry once its model page confirms the transcription intent and
+turn detection; `gpt-realtime-translate` is out of scope (no realtime translation operation).
 
 **Azure is read for you.** The aggregators never list Azure's deployment ids, so `catalog:sync` reads
 Microsoft's own list (`https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure`,
