@@ -211,6 +211,7 @@ platformAdminApp.get("/operations", (c) =>
 		operations: OPERATIONS.map(publicOperationView),
 		adapters: listAdapters().map((adapter) => ({
 			id: adapter.key,
+			label: adapter.label,
 			credentials: { required: [...adapter.credentials.required] },
 			supportedCallTypes: [...adapter.supportedCallTypes].sort(),
 			/**

@@ -11,7 +11,6 @@ import { readFileSync } from "node:fs";
 interface CatalogProviderInfo {
 	id: string;
 	adapterKey: string;
-	name?: string;
 	docs?: string[];
 	notes?: string;
 }
@@ -64,6 +63,9 @@ const MODEL_KEYS = new Set([
 	"notes",
 	"needsHumanReview",
 ]);
+
+/** The provider's display name is the adapter's `label`, so a catalog does not carry one. */
+const PROVIDER_KEYS = new Set(["id", "adapterKey", "docs", "notes"]);
 
 const PARAMETER_MODES = new Set<string>(PARAMETER_SUPPORT_MODES);
 const VIDEO_TASK_SET = new Set<string>(VIDEO_TASKS);
@@ -832,6 +834,11 @@ function validateDocument(
 	if (!isRecord(value.provider)) {
 		fail(`${path}.provider`, "must be an object");
 	}
+	for (const key of Object.keys(value.provider)) {
+		if (!PROVIDER_KEYS.has(key)) {
+			fail(`${path}.provider`, `unknown field "${key}"`);
+		}
+	}
 	assertString(value.provider.id, `${path}.provider.id`);
 	assertAdapterKey(value.provider.adapterKey, `${path}.provider.adapterKey`);
 	if (
@@ -842,9 +849,6 @@ function validateDocument(
 			`${path}.provider.adapterKey`,
 			`expected "${opts.adapterKey}", received "${value.provider.adapterKey}"`,
 		);
-	}
-	if (value.provider.name !== undefined) {
-		assertString(value.provider.name, `${path}.provider.name`);
 	}
 	if (value.provider.docs !== undefined) {
 		assertStringArray(value.provider.docs, `${path}.provider.docs`);

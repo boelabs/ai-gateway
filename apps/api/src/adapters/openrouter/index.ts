@@ -4,6 +4,7 @@ import { makeOpenRouterRerankHandler } from "./rerank.ts";
 
 export const openrouterAdapter = {
 	key: "openrouter",
+	label: "OpenRouter",
 	credentials: { required: ["apiKey"] },
 	supportedCallTypes: new Set(["rerank", "decisions"]),
 	rerank: makeOpenRouterRerankHandler(),

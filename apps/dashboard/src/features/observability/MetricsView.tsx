@@ -1,9 +1,10 @@
 "use client";
 
+import type { AdapterLabels } from "#/features/deployments/common.ts";
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
+import type { DetailedMetrics, UsageRow } from "./api.ts";
 import { useRefresh } from "#/shared/lib/useRefresh.ts";
 import type { MetricsSearch } from "./metrics-data.ts";
-import type { DetailedMetrics, UsageRow } from "./api.ts";
 import { Metrics } from "./Metrics.tsx";
 
 /**
@@ -21,10 +22,12 @@ export function MetricsView({
 	search,
 	actors,
 	keyNames,
+	adapterLabels,
 }: {
 	data: DetailedMetrics;
 	actors: readonly UsageRow[];
 	keyNames: Readonly<Record<string, string>>;
+	adapterLabels: AdapterLabels;
 	options: Pick<DetailedMetrics, "models" | "deployments">;
 	search: MetricsSearch;
 }) {
@@ -33,6 +36,7 @@ export function MetricsView({
 	return (
 		<Metrics
 			actors={actors}
+			adapterLabels={adapterLabels}
 			data={data}
 			keyNames={keyNames}
 			onChange={(patch) => set(patch)}

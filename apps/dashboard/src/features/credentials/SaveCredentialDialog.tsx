@@ -23,12 +23,13 @@ import {
  */
 export function SaveCredentialDialog({
 	deploymentId,
-	adapterKey,
+	provider,
 	isOpen,
 	onClose,
 }: {
 	deploymentId: string;
-	adapterKey: string;
+	/** The provider's name, for the copy only: the gateway copies the credentials itself. */
+	provider: string;
 	isOpen: boolean;
 	onClose: () => void;
 }) {
@@ -70,7 +71,7 @@ export function SaveCredentialDialog({
 				<DialogHeader>
 					<DialogTitle>Save credentials</DialogTitle>
 					<DialogDescription>
-						Reuse this deployment's {adapterKey} credentials when creating other
+						Reuse this deployment's {provider} credentials when creating other
 						models.
 					</DialogDescription>
 				</DialogHeader>
@@ -82,7 +83,7 @@ export function SaveCredentialDialog({
 							label="Name"
 							maxLength={120}
 							name="name"
-							placeholder={`${adapterKey} production`}
+							placeholder={`${provider} production`}
 							required
 						/>
 					</DialogBody>

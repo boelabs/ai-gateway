@@ -1745,6 +1745,7 @@ const messageTokenCount: MessageTokenCountHandler = {
 
 export const anthropicAdapter: Adapter = {
 	key: "anthropic",
+	label: "Anthropic",
 	credentials: { required: ["apiKey"] },
 	supportedCallTypes: new Set(["chat"]),
 	serviceModes: SERVICE_MODES,

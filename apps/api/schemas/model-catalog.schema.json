@@ -24,7 +24,6 @@
 			"properties": {
 				"id": { "type": "string", "minLength": 1 },
 				"adapterKey": { "type": "string", "minLength": 1 },
-				"name": { "type": "string" },
 				"docs": {
 					"type": "array",
 					"items": { "type": "string", "format": "uri" }

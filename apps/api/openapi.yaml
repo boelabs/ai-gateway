@@ -7825,17 +7825,242 @@ components:
     AdapterOperations:
       type: object
       properties:
-        adapters:
+        operations:
           type: array
           items:
             type: object
-            propertyNames:
-              type: string
-            additionalProperties: {}
+            properties:
+              id:
+                type: string
+                enum:
+                  - text.generate
+                  - image.generate
+                  - image.edit
+                  - video.generate
+                  - audio.transcribe
+                  - audio.speech
+                  - audio.transcribe.realtime
+                  - audio.converse.realtime
+                  - audio.translate.realtime
+                  - audio.live
+                  - embedding.create
+                  - rerank
+                  - decision.create
+              family:
+                type: string
+                enum:
+                  - text
+                  - image
+                  - video
+                  - audio
+                  - embedding
+                  - reranking
+                  - decision
+              label:
+                type: string
+              callType:
+                type: string
+                enum:
+                  - chat
+                  - images.generations
+                  - images.edits
+                  - videos.generations
+                  - audio.transcriptions
+                  - audio.speech
+                  - realtime.transcription
+                  - realtime.conversation
+                  - realtime.translation
+                  - live.session
+                  - embeddings
+                  - rerank
+                  - decisions
+              publicEndpoints:
+                type: array
+                items:
+                  type: string
+            required:
+              - id
+              - family
+              - label
+              - callType
+              - publicEndpoints
+            additionalProperties: false
+        adapters:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdapterSummary"
       required:
+        - operations
         - adapters
-      additionalProperties: true
+      additionalProperties: false
       description: Available operations, required credentials and transports, per registered adapter.
+    AdapterSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Adapter key, as adapterKey.
+        label:
+          type: string
+          description: Provider name for people (Google AI Studio).
+        credentials:
+          type: object
+          properties:
+            required:
+              type: array
+              items:
+                type: string
+          required:
+            - required
+          additionalProperties: false
+        supportedCallTypes:
+          type: array
+          items:
+            type: string
+            enum:
+              - chat
+              - images.generations
+              - images.edits
+              - videos.generations
+              - audio.transcriptions
+              - audio.speech
+              - realtime.transcription
+              - realtime.conversation
+              - realtime.translation
+              - live.session
+              - embeddings
+              - rerank
+              - decisions
+        models:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              operations:
+                type: array
+                items:
+                  type: string
+              deprecated:
+                type: boolean
+                const: true
+            required:
+              - id
+              - operations
+            additionalProperties: false
+          description: Models the adapter's catalog knows. Empty for openaicompatible, which ships no catalog.
+        operations:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                enum:
+                  - text.generate
+                  - image.generate
+                  - image.edit
+                  - video.generate
+                  - audio.transcribe
+                  - audio.speech
+                  - audio.transcribe.realtime
+                  - audio.converse.realtime
+                  - audio.translate.realtime
+                  - audio.live
+                  - embedding.create
+                  - rerank
+                  - decision.create
+              family:
+                type: string
+                enum:
+                  - text
+                  - image
+                  - video
+                  - audio
+                  - embedding
+                  - reranking
+                  - decision
+              label:
+                type: string
+              callType:
+                type: string
+                enum:
+                  - chat
+                  - images.generations
+                  - images.edits
+                  - videos.generations
+                  - audio.transcriptions
+                  - audio.speech
+                  - realtime.transcription
+                  - realtime.conversation
+                  - realtime.translation
+                  - live.session
+                  - embeddings
+                  - rerank
+                  - decisions
+              publicEndpoints:
+                type: array
+                items:
+                  type: string
+              transports:
+                type: array
+                items:
+                  type: string
+              defaultTransport:
+                type:
+                  - string
+                  - "null"
+              contentInputs:
+                type: object
+                propertyNames:
+                  type: string
+                additionalProperties:
+                  type: object
+                  propertyNames:
+                    type: string
+                  additionalProperties:
+                    $ref: "#/components/schemas/ContentInputSupport"
+            required:
+              - id
+              - family
+              - label
+              - callType
+              - publicEndpoints
+              - transports
+              - defaultTransport
+              - contentInputs
+            additionalProperties: false
+      required:
+        - id
+        - label
+        - credentials
+        - supportedCallTypes
+        - models
+        - operations
+      additionalProperties: false
+    ContentInputSupport:
+      type: object
+      properties:
+        sources:
+          type: array
+          items:
+            type: string
+            enum:
+              - provider_file_id
+              - url
+              - data_url
+        mimeTypes:
+          type: array
+          items:
+            type: string
+        maxBytes:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - sources
+      additionalProperties: false
     ResolvedDeployment:
       type: object
       properties: {}

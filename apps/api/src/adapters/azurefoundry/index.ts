@@ -4,7 +4,7 @@ import type { ProviderModule } from "#adapters/types.ts";
 /** Foundry models sold by Azure: Chat Completions upstream; Responses is rendered locally. */
 export const azurefoundryAdapter = makeAzurev1Adapter({
 	key: "azurefoundry",
-	label: "Azure Foundry v1",
+	label: "Azure Foundry",
 	defaultTransport: "chat_completions",
 	supportedChatTransports: ["chat_completions"],
 });

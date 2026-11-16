@@ -8,7 +8,7 @@ import { Frame, FrameFooter } from "#/components/ui/frame";
 import { useState, type ReactNode } from "react";
 import { Button } from "#/components/ui/button";
 import { Status } from "#/components/ui/status";
-import type { Deployment } from "./common";
+import { type AdapterLabels, type Deployment, adapterLabel } from "./common";
 import Link from "next/link";
 
 import {
@@ -58,6 +58,7 @@ import {
 
 interface ModelsTableProps {
 	deployments?: Deployment[];
+	adapterLabels?: AdapterLabels;
 	writable?: boolean;
 	loading?: boolean;
 	onEdit?: (deployment: Deployment) => void;
@@ -173,9 +174,11 @@ function PricingCell({ deployment }: { deployment: Deployment }) {
 function CellContent({
 	column,
 	deployment,
+	adapterLabels = {},
 }: {
 	column: ColumnKey;
 	deployment?: Deployment;
+	adapterLabels?: AdapterLabels;
 }) {
 	if (!deployment) {
 		if (["pricing", "limits"].includes(column)) {
@@ -233,15 +236,14 @@ function CellContent({
 			) : (
 				<span className="text-muted-foreground">—</span>
 			);
-		case "adapterKey":
+		case "adapterKey": {
+			const provider = adapterLabel(adapterLabels, deployment.adapterKey);
 			return (
-				<span
-					className="block truncate text-muted-foreground"
-					title={deployment.adapterKey}
-				>
-					{deployment.adapterKey}
+				<span className="block truncate text-muted-foreground" title={provider}>
+					{provider}
 				</span>
 			);
+		}
 		case "enabled":
 			return (
 				<Status tone={deployment.enabled ? "success" : "neutral"}>
@@ -310,6 +312,7 @@ function DeploymentActions({
 
 export function ModelsTable({
 	deployments = [],
+	adapterLabels = {},
 	loading = false,
 	...actions
 }: ModelsTableProps) {
@@ -325,11 +328,14 @@ export function ModelsTable({
 		COLUMNS.filter((column) => column.visible).map((column) => column.key),
 	);
 	const columns = COLUMNS.filter((column) => visibleKeys.includes(column.key));
-	const rows = sortModelRows(filterModelRows(deployments, filters), order);
+	const rows = sortModelRows(
+		filterModelRows(deployments, filters, adapterLabels),
+		order,
+	);
 	const pagination = modelRowPage(rows, requestedPage, pageSize);
-	const providers = [
-		...new Set(deployments.map((row) => row.adapterKey)),
-	].sort();
+	const providers = [...new Set(deployments.map((row) => row.adapterKey))]
+		.map((value) => ({ value, label: adapterLabel(adapterLabels, value) }))
+		.sort((a, b) => a.label.localeCompare(b.label));
 	const filtered = Object.values(filters).some(Boolean);
 	function updateFilter(key: keyof typeof filters, value: string) {
 		setFilters((previous) => ({ ...previous, [key]: value }));
@@ -416,7 +422,7 @@ export function ModelsTable({
 										aria-label="Filter by provider"
 										className="w-full"
 										clearLabel="All providers"
-										items={providers.map((value) => ({ value, label: value }))}
+										items={providers}
 										onValueChange={(value) =>
 											updateFilter("provider", value ?? "")
 										}
@@ -514,6 +520,7 @@ export function ModelsTable({
 											{columns.map((column) => (
 												<TableCell className="max-w-0" key={column.key}>
 													<CellContent
+														adapterLabels={adapterLabels}
 														column={column.key}
 														deployment={deployment}
 													/>

@@ -22,10 +22,17 @@ import {
 	credentialHint,
 } from "./common.ts";
 
+import {
+	type AdapterLabels,
+	adapterLabel,
+} from "#/features/deployments/common.ts";
+
 export function CredentialsTable({
 	credentials: loaded,
+	adapterLabels = {},
 }: {
 	credentials: SavedCredential[];
+	adapterLabels?: AdapterLabels;
 }) {
 	const { can } = useSession();
 	const router = useRouter();
@@ -64,7 +71,8 @@ export function CredentialsTable({
 		{
 			key: "adapter",
 			header: "Adapter",
-			render: (credential) => credential.adapterKey,
+			render: (credential) =>
+				adapterLabel(adapterLabels, credential.adapterKey),
 		},
 		{
 			key: "key",

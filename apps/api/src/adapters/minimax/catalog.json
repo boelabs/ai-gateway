@@ -4,7 +4,6 @@
 	"provider": {
 		"id": "minimax",
 		"adapterKey": "minimax",
-		"name": "MiniMax",
 		"docs": ["https://platform.minimax.io/docs/guides/pricing-paygo"]
 	},
 	"models": {

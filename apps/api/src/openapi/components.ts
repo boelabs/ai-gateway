@@ -26,7 +26,7 @@ import { openAIDecisionRequestSchema } from "#contracts/openai/decisions.ts";
 import { geminiDecisionRequestSchema } from "#contracts/google/decisions.ts";
 import { systemOneRequestSchema } from "#contracts/typesafe/systemone.ts";
 import { rerankRequestSchema } from "#contracts/openrouter/rerank.ts";
-import { OPERATION_IDS } from "#operations/registry.ts";
+import { OPERATION_FAMILIES, OPERATION_IDS } from "#operations/registry.ts";
 import { CALL_TYPE_VALUES } from "#core/callType.ts";
 import { pricingSchema } from "#profiles/schema.ts";
 import { EFFORT_ORDER } from "#core/reasoning.ts";
@@ -1946,16 +1946,66 @@ export const ExtensionInstance = loose(
 	{ id: "ExtensionInstance" },
 );
 
-export const AdapterOperations = loose(
-	{
-		adapters: z.array(z.record(z.string(), z.unknown())),
-	},
-	{
+const operationView = {
+	id: z.enum(OPERATION_IDS),
+	family: z.enum(OPERATION_FAMILIES),
+	label: z.string(),
+	callType: z.enum(CALL_TYPE_VALUES),
+	publicEndpoints: z.array(z.string()),
+};
+
+const ContentInputSupport = z
+	.object({
+		sources: z.array(z.enum(["provider_file_id", "url", "data_url"])),
+		mimeTypes: z.array(z.string()).optional(),
+		maxBytes: z.int().optional(),
+	})
+	.meta({ id: "ContentInputSupport" });
+
+export const AdapterSummary = z
+	.object({
+		id: z.string().meta({ description: "Adapter key, as adapterKey." }),
+		label: z.string().meta({
+			description: "Provider name for people (Google AI Studio).",
+		}),
+		credentials: z.object({ required: z.array(z.string()) }),
+		supportedCallTypes: z.array(z.enum(CALL_TYPE_VALUES)),
+		models: z
+			.array(
+				z.object({
+					id: z.string(),
+					operations: z.array(z.string()),
+					deprecated: z.literal(true).optional(),
+				}),
+			)
+			.meta({
+				description:
+					"Models the adapter's catalog knows. Empty for openaicompatible, which ships no catalog.",
+			}),
+		operations: z.array(
+			z.object({
+				...operationView,
+				transports: z.array(z.string()),
+				defaultTransport: nullableString,
+				contentInputs: z.record(
+					z.string(),
+					z.record(z.string(), ContentInputSupport),
+				),
+			}),
+		),
+	})
+	.meta({ id: "AdapterSummary" });
+
+export const AdapterOperations = z
+	.object({
+		operations: z.array(z.object(operationView)),
+		adapters: z.array(AdapterSummary),
+	})
+	.meta({
 		id: "AdapterOperations",
 		description:
 			"Available operations, required credentials and transports, per registered adapter.",
-	},
-);
+	});
 
 export const ResolvedDeployment = loose(
 	{},

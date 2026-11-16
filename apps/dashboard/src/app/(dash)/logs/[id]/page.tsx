@@ -3,6 +3,7 @@ import { RouteBoundary } from "#/shared/components/RouteBoundary.tsx";
 import { LogDetail } from "#/features/observability/LogDetail.tsx";
 import { isOperationId } from "#/features/observability/trace.ts";
 import { operationDetail } from "#/features/observability/api.ts";
+import { adapterLabels } from "#/features/deployments/api.ts";
 import { ApiError } from "#/shared/api/errors.ts";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -31,7 +32,8 @@ async function Operation({ params }: { params: Params }) {
 	if (!isOperationId(id)) {
 		notFound();
 	}
-	return <LogDetail detail={await load(id)} />;
+	const [detail, labels] = await Promise.all([load(id), adapterLabels()]);
+	return <LogDetail adapterLabels={labels} detail={detail} />;
 }
 
 async function load(id: string) {

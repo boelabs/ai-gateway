@@ -4,7 +4,6 @@
 	"provider": {
 		"id": "moonshot",
 		"adapterKey": "moonshot",
-		"name": "Moonshot AI / Kimi",
 		"docs": [
 			"https://platform.kimi.ai/docs/guide/kimi-k3-quickstart.md",
 			"https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart.md",

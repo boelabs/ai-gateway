@@ -12,7 +12,7 @@ import {
  */
 export const zaiAdapter = makeOpenAIStyleAdapter({
 	key: "zai",
-	label: "ZAI AI",
+	label: "Z.AI",
 	defaultBaseUrl: "https://api.z.ai/api/paas/v4",
 	defaultTransport: "chat_completions",
 	maxTokensField: "max_tokens",

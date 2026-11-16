@@ -22,24 +22,33 @@ import {
  */
 export function DeploymentHeaderActions({
 	deployment,
+	provider,
 	siblings,
 }: {
 	deployment: Deployment;
+	/** The adapter's provider name, as the page header shows it. */
+	provider: string;
 	/** Other enabled deployments of the same public model, to say what deleting this one does. */
 	siblings: number;
 }) {
 	return (
 		<Can permissions={["deployments:write"]}>
-			<Actions deployment={deployment} siblings={siblings} />
+			<Actions
+				deployment={deployment}
+				provider={provider}
+				siblings={siblings}
+			/>
 		</Can>
 	);
 }
 
 function Actions({
 	deployment,
+	provider,
 	siblings,
 }: {
 	deployment: Deployment;
+	provider: string;
 	siblings: number;
 }) {
 	const router = useRouter();
@@ -63,7 +72,7 @@ function Actions({
 	async function remove() {
 		const last = deployment.enabled && siblings === 0;
 		const confirmed = await confirm({
-			title: `Delete this ${deployment.adapterKey} deployment?`,
+			title: `Delete this ${provider} deployment?`,
 			description: last
 				? `${deployment.publicModel} has no other enabled deployment, so deleting this one stops the model from routing at all.`
 				: `Requests for ${deployment.publicModel} will be spread across its remaining deployments. Credentials stored here are removed with it.`,
@@ -107,10 +116,10 @@ function Actions({
 				Save credentials
 			</Button>
 			<SaveCredentialDialog
-				adapterKey={deployment.adapterKey}
 				deploymentId={deployment.id}
 				isOpen={saving}
 				onClose={() => setSaving(false)}
+				provider={provider}
 			/>
 		</>
 	);

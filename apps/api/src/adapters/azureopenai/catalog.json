@@ -4,7 +4,6 @@
 	"provider": {
 		"id": "azureopenai",
 		"adapterKey": "azureopenai",
-		"name": "Azure OpenAI",
 		"docs": [
 			"https://learn.microsoft.com/azure/ai-foundry/openai/concepts/models"
 		]

@@ -11,32 +11,19 @@ export type Deployment = components["schemas"]["Deployment"];
 export type CreateDeploymentInput = components["schemas"]["CreateDeployment"];
 export type UpdateDeploymentInput = components["schemas"]["UpdateDeployment"];
 
-/** A model the adapter's catalog already knows. */
-export interface CatalogModel {
-	id: string;
-	operations: string[];
-	deprecated?: boolean;
+/** Provider names by adapter key, as the gateway's adapter registry declares them. */
+export type AdapterLabels = Readonly<Record<string, string>>;
+
+/** The provider's name for an adapter key; the key itself for one the registry no longer has. */
+export function adapterLabel(labels: AdapterLabels, key: string): string {
+	return labels[key] ?? key;
 }
 
 /** One registered adapter: which credentials it needs, what it can execute, what it knows. */
-export interface AdapterSummary {
-	id: string;
-	credentials: { required: string[] };
-	supportedCallTypes: string[];
-	/**
-	 * Empty is meaningful rather than missing: `openaicompatible` ships no catalog because its
-	 * upstream is whatever the operator points it at, so every model there is custom by definition.
-	 */
-	models: CatalogModel[];
-	operations: AdapterOperation[];
-}
-
-export interface AdapterOperation {
-	id: string;
-	label: string;
-	transports: string[];
-	defaultTransport: string | null;
-}
+export type AdapterSummary = components["schemas"]["AdapterSummary"];
+/** A model the adapter's catalog already knows. */
+export type CatalogModel = AdapterSummary["models"][number];
+export type AdapterOperation = AdapterSummary["operations"][number];
 
 /**
  * Whether the catalog already describes this upstream id, which is exactly what decides if a
