@@ -23,6 +23,7 @@
  *   - interactions:     Google Interactions API (/interactions)
  *   - bidi_generate_content: Google Live API (BidiGenerateContent WebSocket)
  *   - realtime: OpenAI Realtime API (/v1/realtime WebSocket)
+ *   - live: OpenAI GPT-Live (/v1/live/sessions WebSocket, WebRTC and SIP)
  */
 export const UPSTREAM_TRANSPORTS = [
 	"chat_completions",
@@ -46,6 +47,7 @@ export const UPSTREAM_TRANSPORTS = [
 	"interactions",
 	"bidi_generate_content",
 	"realtime",
+	"live",
 ] as const;
 
 export type UpstreamTransport = (typeof UPSTREAM_TRANSPORTS)[number];

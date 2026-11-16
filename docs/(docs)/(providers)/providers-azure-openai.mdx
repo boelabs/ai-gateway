@@ -52,6 +52,14 @@ credentials and choose a model available to your provider account. See
   labeled user message, without prompt-cache or end-user fields. Up to 400 questions and 128 PNG, JPEG,
   WebP or GIF images (32 MB together) per request. Microsoft is rolling the API out to the regions
   that run `gpt-6-luna`, except East US 2.
+- **Realtime**: `gpt-realtime-2.1`, `gpt-realtime-2.1-mini` and `gpt-realtime-2` serve
+  [realtime conversations](/docs/realtime-conversations), and `gpt-live-transcribe` and
+  `gpt-realtime-whisper` serve [realtime transcription](/docs/realtime-transcription), on Azure's GA
+  WebSocket (`wss://{resource}.openai.azure.com/openai/v1/realtime`, the deployment name as the model,
+  the `api-key` header). Prices are Azure's Global meters. `gpt-realtime-1.5` has no Azure price
+  meter, and the preview Realtime API (`gpt-4o-realtime-preview`) is retired, so neither is offered.
+  [GPT-Live](/docs/live-sessions) is not offered on Azure yet: Microsoft lists `gpt-live-1` by region
+  but documents no endpoint or price for it.
 - Catalog: `src/adapters/azureopenai/catalog.json`.
 
 ## Next steps

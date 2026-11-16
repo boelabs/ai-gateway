@@ -1,4 +1,5 @@
 import { SPEECH_RESPONSE_FORMATS } from "#core/speech.ts";
+import { LIVE_DELEGATION_TYPES, LIVE_TRANSPORTS } from "#core/live.ts";
 import { UPSTREAM_TRANSPORTS } from "#core/transport.ts";
 import { OPERATION_IDS } from "#operations/registry.ts";
 import { CALL_TYPE_VALUES } from "#core/callType.ts";
@@ -396,6 +397,15 @@ const speechOperationProfileSchema = z
 	})
 	.strict();
 
+const liveOperationProfileSchema = z
+	.object({
+		...transportField,
+		voices: z.array(z.string().min(1)).min(1).optional(),
+		delegationTypes: z.array(z.enum(LIVE_DELEGATION_TYPES)).min(1).optional(),
+		transports: z.array(z.enum(LIVE_TRANSPORTS)).min(1).optional(),
+	})
+	.strict();
+
 const realtimeTranscriptionOperationProfileSchema = z
 	.object({
 		...transportField,
@@ -632,6 +642,7 @@ export const operationProfilesSchema = z
 			realtimeTranscriptionOperationProfileSchema.optional(),
 		"audio.converse.realtime":
 			realtimeConversationOperationProfileSchema.optional(),
+		"audio.live": liveOperationProfileSchema.optional(),
 		"embedding.create": embeddingOperationProfileSchema.optional(),
 		rerank: rerankOperationProfileSchema.optional(),
 		"decision.create": decisionOperationProfileSchema.optional(),

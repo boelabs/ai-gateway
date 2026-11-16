@@ -2,6 +2,7 @@ import { withOpenAIServiceMode } from "./openaiServiceMode.ts";
 import type { ServiceMode } from "#core/serviceMode.ts";
 import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { makeOpenAIResponsesWebSocketHandler } from "./openaiResponsesWebSocket.ts";
+import { makeOpenAILiveHandler } from "./openaiLive.ts";
 import {
 	makeOpenAIRealtimeTranscriptionHandler,
 	makeOpenAIRealtimeConversationHandler,
@@ -145,8 +146,10 @@ export interface OpenAIStyleConfig {
 	>;
 	/** The provider implements POST /audio/transcriptions (multipart). Absent = no audio. */
 	audioTranscriptions?: boolean;
-	/** Serves realtime conversations over the provider's /realtime WebSocket. */
+	/** Serves realtime conversations and transcription over the provider's /realtime WebSocket. */
 	realtime?: boolean;
+	/** Serves GPT-Live sessions over the provider's /live/sessions API. */
+	live?: boolean;
 	/** The provider implements POST /embeddings. Absent = no embeddings. */
 	embeddings?: boolean;
 	/** Async video generation protocols this adapter implements. Absent = no videos. */
@@ -1161,24 +1164,28 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 		supportedCallTypes.add("realtime.conversation");
 		supportedCallTypes.add("realtime.transcription");
 	}
+	if (config.live) {
+		supportedCallTypes.add("live.session");
+	}
 	if (config.embeddings) {
 		supportedCallTypes.add("embeddings");
 	}
-	const realtimeDeps: OpenAIRealtimeDeps | undefined = config.realtime
-		? {
-				label: config.label,
-				resolveConnection(ctx) {
-					const credentials = resolveCreds(ctx);
-					return {
-						url: credentials.base,
-						headers: buildAuthHeaders(credentials),
-					};
-				},
-				mapError(err, ctx) {
-					return mapError(err, ctx);
-				},
-			}
-		: undefined;
+	const realtimeDeps: OpenAIRealtimeDeps | undefined =
+		config.realtime || config.live
+			? {
+					label: config.label,
+					resolveConnection(ctx) {
+						const credentials = resolveCreds(ctx);
+						return {
+							url: credentials.base,
+							headers: buildAuthHeaders(credentials),
+						};
+					},
+					mapError(err, ctx) {
+						return mapError(err, ctx);
+					},
+				}
+			: undefined;
 	const firstImageTransport = imageTransports?.[0];
 	const imageTransportConfig =
 		imageTransports && firstImageTransport
@@ -1256,7 +1263,10 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 			: {}),
 		...(videoTransportConfig ? { videoGeneration } : {}),
 		...(config.audioTranscriptions ? { audioTranscription } : {}),
-		...(realtimeDeps
+		...(config.live && realtimeDeps
+			? { liveSession: makeOpenAILiveHandler(realtimeDeps) }
+			: {}),
+		...(config.realtime && realtimeDeps
 			? {
 					realtimeConversation:
 						makeOpenAIRealtimeConversationHandler(realtimeDeps),
@@ -1303,6 +1313,14 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 						"realtime.transcription": {
 							supported: ["realtime"],
 							default: "realtime",
+						},
+					}
+				: {}),
+			...(config.live
+				? {
+						"live.session": {
+							supported: ["live"],
+							default: "live",
 						},
 					}
 				: {}),

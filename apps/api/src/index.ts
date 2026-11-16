@@ -4,6 +4,14 @@ import {
 	openAIDecisionsHandler,
 } from "./endpoints/decisions.ts";
 import { realtimeClientSecretsHandler } from "./endpoints/realtimeClientSecrets.ts";
+import {
+	liveAttachSocketHandler,
+	liveSessionsSocketHandler,
+	liveForkSocketHandler,
+	liveContentHandler,
+	liveCreateHandler,
+	liveForkHandler,
+} from "./endpoints/live.ts";
 import { PUBLIC_JSON_BODY_MAX_BYTES } from "./http/body.ts";
 import { startServer } from "./http/bunServer.ts";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -344,6 +352,12 @@ app.post("/v1/responses", responsesHandler);
 app.get("/v1/responses", responsesWebSocketHandler);
 app.get("/v1/realtime", realtimeWebSocketHandler);
 app.post("/v1/realtime/client_secrets", realtimeClientSecretsHandler);
+app.get("/v1/live/sessions", liveSessionsSocketHandler);
+app.post("/v1/live/sessions", liveCreateHandler);
+app.get("/v1/live/sessions/:id/attach", liveAttachSocketHandler);
+app.get("/v1/live/sessions/:id/fork", liveForkSocketHandler);
+app.post("/v1/live/sessions/:id/fork", liveForkHandler);
+app.get("/v1/live/sessions/:id/content", liveContentHandler);
 app.post("/v1/responses/compact", compactResponseHandler);
 app.get("/v1/responses/:id", retrieveResponseHandler);
 app.delete("/v1/responses/:id", deleteResponseHandler);

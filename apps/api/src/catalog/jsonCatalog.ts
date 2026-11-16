@@ -1,3 +1,4 @@
+import { LIVE_DELEGATION_TYPES, LIVE_TRANSPORTS } from "#core/live.ts";
 import { SPEECH_RESPONSE_FORMATS } from "#core/speech.ts";
 import { EFFORT_ORDER, type ReasoningControlKind } from "#core/reasoning.ts";
 import { ADAPTER_KEY_PATTERN, ADAPTER_KEY_RULE } from "#adapters/key.ts";
@@ -35,6 +36,7 @@ const OPERATION_IDS = new Set<keyof OperationProfiles>([
 	"audio.speech",
 	"audio.transcribe.realtime",
 	"audio.converse.realtime",
+	"audio.live",
 	"embedding.create",
 	"rerank",
 	"decision.create",
@@ -621,6 +623,25 @@ function validateOperations(value: unknown, path: string): void {
 				if (profile[key] !== undefined) {
 					assertNumber(profile[key], `${path}.${operation}.${key}`);
 				}
+			}
+		} else if (operation === "audio.live") {
+			const allowed: Record<string, readonly string[]> = {
+				delegationTypes: LIVE_DELEGATION_TYPES,
+				transports: LIVE_TRANSPORTS,
+			};
+			for (const [key, values] of Object.entries(allowed)) {
+				if (profile[key] === undefined) {
+					continue;
+				}
+				assertStringArray(profile[key], `${path}.${operation}.${key}`);
+				for (const entry of profile[key]) {
+					if (!values.includes(entry)) {
+						fail(`${path}.${operation}.${key}`, `unknown value "${entry}"`);
+					}
+				}
+			}
+			if (profile.voices !== undefined) {
+				assertStringArray(profile.voices, `${path}.${operation}.voices`);
 			}
 		} else if (operation === "rerank") {
 			assertStringArray(

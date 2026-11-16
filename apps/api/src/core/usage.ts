@@ -62,8 +62,16 @@ export interface Usage {
 	/** Size and quality of those images, which select a per-image price variant. */
 	outputImageSize?: string;
 	outputImageQuality?: string;
-	/** Seconds of input audio, for models priced by duration. Independent from token counters. */
+	/**
+	 * Seconds of input audio, for models priced by duration (a GPT-Live session's billed seconds
+	 * too). Independent from token counters.
+	 */
 	inputAudioSeconds?: number;
+	/**
+	 * Cost of work this operation handed to other models (a GPT-Live session's backend responses and
+	 * decisions), already priced against those models' catalog entries, in USD cents.
+	 */
+	delegatedCostCents?: number;
 }
 
 /** Does the usage satisfy the invariant total = prompt + completion? (helper for tests/dev). */

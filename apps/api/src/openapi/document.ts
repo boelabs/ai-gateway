@@ -137,6 +137,13 @@ export function buildOpenApiDocument() {
 					schema: { type: "string" },
 					description: "OpenResponses response id (resp_...)",
 				},
+				LiveSessionIdPath: {
+					name: "id",
+					in: "path",
+					required: true,
+					schema: { type: "string" },
+					description: "GPT-Live session id (live_...)",
+				},
 				VideoIdPath: {
 					name: "id",
 					in: "path",
@@ -607,6 +614,129 @@ export function buildOpenApiDocument() {
 						"403": errorResponse,
 						"413": errorResponse,
 						"429": errorResponse,
+					},
+				},
+			},
+			"/v1/live/sessions": {
+				get: {
+					operationId: "openLiveSession",
+					tags: ["Inference"],
+					summary: "GPT-Live session WebSocket (OpenAI-compatible)",
+					description:
+						"Requires Upgrade: websocket. The first client event is session.start with session.model (a public model with audio.live); every later event and every server event is OpenAI's GPT-Live protocol, relayed unchanged except that session.* events name the public model. Billed per session second plus the delegated backend model's usage.",
+					responses: {
+						"101": { description: "Switching Protocols" },
+						"400": errorResponse,
+						"401": errorResponse,
+						"426": errorResponse,
+						"429": errorResponse,
+					},
+				},
+				post: {
+					operationId: "createLiveSession",
+					tags: ["Inference"],
+					summary:
+						"Create a WebRTC or SIP GPT-Live session (OpenAI-compatible)",
+					description:
+						"OpenAI's body: { session, transport: { type: webrtc, sdp } | { type: sip, destination, trunk } }. Returns OpenAI's 201 body (session id, and the SDP answer for WebRTC). Media flows between the client and the provider; the gateway meters the session from its sideband.",
+					requestBody: {
+						required: true,
+						content: {
+							"application/json": {
+								schema: { type: "object", additionalProperties: true },
+							},
+						},
+					},
+					responses: {
+						"201": {
+							description: "The created session",
+							content: {
+								"application/json": {
+									schema: { type: "object", additionalProperties: true },
+								},
+							},
+						},
+						"400": errorResponse,
+						"401": errorResponse,
+						"429": errorResponse,
+					},
+				},
+			},
+			"/v1/live/sessions/{id}/attach": {
+				get: {
+					operationId: "attachLiveSession",
+					tags: ["Inference"],
+					summary: "GPT-Live sideband WebSocket (OpenAI-compatible)",
+					description:
+						"Requires Upgrade: websocket. Server-side control of a running session opened by the same key; relayed to the provider's sideband.",
+					parameters: [{ $ref: "#/components/parameters/LiveSessionIdPath" }],
+					responses: {
+						"101": { description: "Switching Protocols" },
+						"401": errorResponse,
+						"404": errorResponse,
+						"426": errorResponse,
+					},
+				},
+			},
+			"/v1/live/sessions/{id}/fork": {
+				get: {
+					operationId: "forkLiveSessionWebSocket",
+					tags: ["Inference"],
+					summary: "Fork a stored GPT-Live session over WebSocket",
+					description:
+						"Requires Upgrade: websocket. Send session.start ({} keeps the source's settings); the fork runs on the source session's deployment and is metered as its own session.",
+					parameters: [{ $ref: "#/components/parameters/LiveSessionIdPath" }],
+					responses: {
+						"101": { description: "Switching Protocols" },
+						"401": errorResponse,
+						"404": errorResponse,
+						"426": errorResponse,
+					},
+				},
+				post: {
+					operationId: "forkLiveSession",
+					tags: ["Inference"],
+					summary: "Fork a stored GPT-Live session over WebRTC",
+					parameters: [{ $ref: "#/components/parameters/LiveSessionIdPath" }],
+					requestBody: {
+						required: true,
+						content: {
+							"application/json": {
+								schema: { type: "object", additionalProperties: true },
+							},
+						},
+					},
+					responses: {
+						"201": {
+							description: "The forked session",
+							content: {
+								"application/json": {
+									schema: { type: "object", additionalProperties: true },
+								},
+							},
+						},
+						"400": errorResponse,
+						"401": errorResponse,
+						"404": errorResponse,
+					},
+				},
+			},
+			"/v1/live/sessions/{id}/content": {
+				get: {
+					operationId: "downloadLiveSessionContent",
+					tags: ["Inference"],
+					summary: "Download a stored GPT-Live session's recording",
+					parameters: [{ $ref: "#/components/parameters/LiveSessionIdPath" }],
+					responses: {
+						"200": {
+							description:
+								"Stereo WAV: input on the left channel, output on the right",
+							content: {
+								"audio/wav": { schema: { type: "string", format: "binary" } },
+							},
+						},
+						"401": errorResponse,
+						"404": errorResponse,
 					},
 				},
 			},

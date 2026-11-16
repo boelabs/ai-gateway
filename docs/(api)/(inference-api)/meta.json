@@ -12,6 +12,7 @@
 		"speech",
 		"realtime-transcription",
 		"realtime-conversations",
+		"live-sessions",
 		"---Search and vectors---",
 		"embeddings",
 		"reranking",

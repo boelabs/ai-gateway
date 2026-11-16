@@ -94,6 +94,7 @@
 				"audio.converse.realtime": {
 					"$ref": "#/$defs/realtimeConversationProfile"
 				},
+				"audio.live": { "$ref": "#/$defs/liveProfile" },
 				"embedding.create": { "$ref": "#/$defs/embeddingProfile" },
 				"rerank": { "$ref": "#/$defs/rerankProfile" },
 				"decision.create": { "$ref": "#/$defs/decisionProfile" }
@@ -479,6 +480,30 @@
 				"supportsSpeed": { "type": "boolean" },
 				"maxInputCharacters": { "type": "integer", "minimum": 1 },
 				"maxOutputTokens": { "type": "integer", "minimum": 1 }
+			}
+		},
+		"liveProfile": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"transport": { "type": "string" },
+				"voices": {
+					"type": "array",
+					"items": { "type": "string", "minLength": 1 },
+					"minItems": 1
+				},
+				"delegationTypes": {
+					"type": "array",
+					"items": { "enum": ["client", "responses", "decisions"] },
+					"minItems": 1,
+					"uniqueItems": true
+				},
+				"transports": {
+					"type": "array",
+					"items": { "enum": ["websocket", "webrtc", "sip"] },
+					"minItems": 1,
+					"uniqueItems": true
+				}
 			}
 		},
 		"realtimeTranscriptionProfile": {
