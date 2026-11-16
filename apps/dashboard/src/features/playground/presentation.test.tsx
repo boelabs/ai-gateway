@@ -3,13 +3,14 @@ import { Conversation, groupMessages } from "./Conversation";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { PlaygroundMessage } from "./transport";
 import type { PlaygroundModel } from "./models";
+import { resolveSelection } from "./Playground";
 import { VideoRunView } from "./VideoRunView";
 import { ModelSelect } from "./ModelSelect";
 import { Metrics } from "./ResponseDetails";
 import type { VideoRun } from "./videos";
+import { ProcessTrace } from "./Process";
 import assert from "node:assert/strict";
 import { Markdown } from "./Markdown";
-import { ProcessTrace } from "./Process";
 import { stepsOf } from "./steps";
 import { test } from "node:test";
 
@@ -647,4 +648,32 @@ test("a failed job reports what the gateway said, and offers no player", () => {
 	assert.match(html, /role="alert"/u);
 	assert.match(html, /The provider rejected the prompt\./u);
 	assert.doesNotMatch(html, /<video/u);
+});
+
+test("a selection the catalog no longer offers falls back to the first model", () => {
+	const model: PlaygroundModel = {
+		id: "gpt-5",
+		capabilities: ["text"],
+		serviceModes: [],
+		operations: ["text.generate"],
+		endpoints: ["chat.completions"],
+		acceptsImages: false,
+		supportedParameters: [],
+		inputModalities: ["text"],
+		parameterConstraints: {},
+		reasoningEfforts: [],
+	};
+	const other = { ...model, id: "claude-opus-5" };
+	const chosen = { capability: "text", modelId: "claude-opus-5" } as const;
+
+	assert.deepEqual(resolveSelection([model, other], chosen), chosen);
+	assert.deepEqual(resolveSelection([model], chosen), {
+		capability: "text",
+		modelId: "gpt-5",
+	});
+	assert.deepEqual(
+		resolveSelection([model, other], { capability: "image", modelId: "gpt-5" }),
+		{ capability: "text", modelId: "gpt-5" },
+	);
+	assert.equal(resolveSelection([], chosen), undefined);
 });

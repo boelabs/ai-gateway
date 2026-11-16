@@ -1,9 +1,9 @@
 "use client";
 
 import { TranscriptionWorkspace } from "./TranscriptionWorkspace";
-import { EmptyState } from "#/components/ui/page";
 import { EmbeddingWorkspace } from "./EmbeddingWorkspace";
 import { RerankWorkspace } from "./RerankWorkspace";
+import { EmptyState } from "#/components/ui/page";
 import { ImageWorkspace } from "./ImageWorkspace";
 import { VideoWorkspace } from "./VideoWorkspace";
 import type { Capability } from "./capabilities";
@@ -49,18 +49,39 @@ const SPECIALISED_WORKSPACES: Partial<
 	embedding: EmbeddingWorkspace,
 };
 
-export function initialSelection(
+/**
+ * The selection to show: the operator's choice while the catalog still offers it, otherwise the
+ * first thing it does offer.
+ *
+ * The choice outlives the catalog it was made from. The router keeps this page's state while the
+ * operator is away editing deployments, so the model chosen before may have been renamed, disabled
+ * or stripped of that capability by the time they come back — and holding on to it would show an
+ * empty playground beside models that still work.
+ */
+export function resolveSelection(
 	models: PlaygroundModel[],
+	chosen?: PlaygroundSelection,
 ): PlaygroundSelection | undefined {
-	const [group] = capabilityGroups(models);
-	const [first] = group?.items ?? [];
+	const groups = capabilityGroups(models);
+	const offered = groups.some((group) =>
+		group.items.some(
+			(item) =>
+				item.capability === chosen?.capability &&
+				item.model.id === chosen.modelId,
+		),
+	);
+	if (chosen && offered) {
+		return chosen;
+	}
+	const [first] = groups[0]?.items ?? [];
 	return first
 		? { capability: first.capability, modelId: first.model.id }
 		: undefined;
 }
 
 export function Playground({ models }: { models: PlaygroundModel[] }) {
-	const [selection, setSelection] = useState(() => initialSelection(models));
+	const [chosen, setSelection] = useState(() => resolveSelection(models));
+	const selection = resolveSelection(models, chosen);
 	const selected = models.find((model) => model.id === selection?.modelId);
 	const [endpoint, setEndpoint] = useState<PublicEndpoint>(
 		selected?.endpoints[0] ?? "chat.completions",

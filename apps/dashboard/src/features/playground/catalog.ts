@@ -1,7 +1,8 @@
 import { parsePublicModels, type PlaygroundModel } from "./models.ts";
+import { CACHE_TAGS } from "#/shared/api/cacheTags.ts";
 import { publicApi } from "#/shared/api/client.ts";
+import { cacheLife, cacheTag } from "next/cache";
 import { unwrap } from "#/shared/api/errors.ts";
-import { cacheLife } from "next/cache";
 
 /**
  * The gateway's public model catalog, as the request that fetches it.
@@ -29,9 +30,14 @@ export async function fetchPublicModels(): Promise<PlaygroundModel[]> {
  * short-lived and is left out of prerendering, so `next build` never has to reach a running gateway
  * — while a couple of minutes is still long enough to spare every visit to the playground its own
  * round trip.
+ *
+ * The lifetime only bounds changes made outside this dashboard. Every deployment write made here
+ * expires the tag (`features/deployments/actions.ts`), so the playground never shows a model list
+ * older than the operator's last save.
  */
 export async function listPublicModels(): Promise<PlaygroundModel[]> {
 	"use cache";
 	cacheLife({ stale: 60, revalidate: 120, expire: 240 });
+	cacheTag(CACHE_TAGS.PUBLIC_MODELS);
 	return fetchPublicModels();
 }
