@@ -55,6 +55,10 @@ import type {
 	CanonicalRerankResponse,
 	CanonicalRerankRequest,
 } from "#core/rerank.ts";
+import type {
+	CanonicalSpeechResponse,
+	CanonicalSpeechRequest,
+} from "#core/speech.ts";
 
 /** Upstream error the executor passes to `mapError` when the response is not 2xx. */
 export interface UpstreamError {
@@ -340,6 +344,23 @@ export interface EmbeddingsHandler {
 	mapError: (err: unknown, ctx: AdapterContext) => GatewayError;
 }
 
+/**
+ * An adapter's text-to-speech handler. No streaming: the audio comes back whole, in the format the
+ * request resolved to (see `speechFormatFor`).
+ */
+export interface SpeechHandler {
+	buildRequest: (
+		req: CanonicalSpeechRequest,
+		ctx: AdapterContext,
+	) => UpstreamHttpRequest;
+	parseResponse: (
+		raw: unknown,
+		ctx: AdapterContext,
+		req: CanonicalSpeechRequest,
+	) => CanonicalSpeechResponse;
+	mapError: (err: unknown, ctx: AdapterContext) => GatewayError;
+}
+
 /** An adapter's canonical reranking handler. No streaming. */
 export interface RerankHandler {
 	/** Whether the OpenRouter-shaped `provider` routing object can be honored. */
@@ -427,6 +448,7 @@ export interface Adapter {
 	imageEdit?: ImageHandler;
 	videoGeneration?: VideoHandler;
 	audioTranscription?: TranscriptionHandler;
+	speech?: SpeechHandler;
 	realtimeTranscription?: RealtimeTranscriptionHandler;
 	realtimeConversation?: RealtimeConversationHandler;
 	embeddings?: EmbeddingsHandler;

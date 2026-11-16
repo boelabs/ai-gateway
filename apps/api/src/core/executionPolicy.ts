@@ -126,6 +126,11 @@ export const DEFAULT_EXECUTION_POLICIES: ExecutionPolicies = {
 		json: policy(15 * MINUTE, null, 30 * MINUTE, 2),
 		stream: policy(10 * MINUTE, 5 * MINUTE, 30 * MINUTE, 2),
 	},
+	// A long narration takes a while to synthesize, but nothing arrives until the audio is done.
+	"audio.speech": {
+		json: policy(5 * MINUTE, null, 10 * MINUTE, 2),
+		stream: policy(5 * MINUTE, 2 * MINUTE, 10 * MINUTE, 2),
+	},
 	// A live session: `response` covers connecting and the provider accepting the configuration;
 	// silence is normal, so nothing watches it; `total` is the session's whole life.
 	"realtime.transcription": {

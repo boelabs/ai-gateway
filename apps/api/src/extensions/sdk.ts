@@ -1,6 +1,7 @@
 import type { CanonicalTranscriptionStreamEvent } from "#core/audio.ts";
 import type { CanonicalChatStreamChunk } from "#core/canonical.ts";
 import type { CanonicalImageStreamEvent } from "#core/images.ts";
+import type { CanonicalSpeechRequest } from "#core/speech.ts";
 import type { CallType } from "#core/callType.ts";
 import type { Auth } from "#auth/types.ts";
 
@@ -48,6 +49,7 @@ export type ExtensionCanonicalRequest =
 	| CanonicalImageRequest
 	| CanonicalEmbeddingsRequest
 	| CanonicalTranscriptionRequest
+	| CanonicalSpeechRequest
 	| CanonicalRerankRequest
 	| CanonicalDecisionRequest;
 

@@ -68,7 +68,7 @@ Para fragmentos o cargas útiles personalizadas fuera del documento completo, ut
 
 - `models` es un objeto codificado por `upstreamModel`; no utiliza matrices para la ruta activa.
 - `operations` es la fuente declarativa: la presencia de una operación implica soporte.
-- Para modelos personalizados, se requiere `catalogEntry.operations` y el gateway valida los mínimos por operación: el texto requiere `capabilities.tools|vision|reasoning|structuredOutputs`; `strictTools` es opcional y solo debe configurarse cuando el nivel upstream garantiza argumentos de función compatibles con el esquema; la imagen requiere `outputFormats`, `responseFormats` y `sizes`, `arbitrarySize` o `autoSize`; la transcripción de audio requiere `responseFormats`.
+- Para modelos personalizados, se requiere `catalogEntry.operations` y el gateway valida los mínimos por operación: el texto requiere `capabilities.tools|vision|reasoning|structuredOutputs`; `strictTools` es opcional y solo debe configurarse cuando el nivel upstream garantiza argumentos de función compatibles con el esquema; la imagen requiere `outputFormats`, `responseFormats` y `sizes`, `arbitrarySize` o `autoSize`; la transcripción de audio y la voz requieren `responseFormats`.
 - Embeddings se declaran con `embedding.create`. El perfil puede indicar `dimensions`, `supportsDimensions`, `minDimensions`, `maxDimensions`, `encodingFormats`, límites de entrada y `supportsTokenInput`. La presencia de `embedding.create` habilita `/v1/embeddings`.
 - El token `pricing` utiliza centavos de dólar por cada millón de tokens; `searchUnitCents` utiliza centavos de USD por unidad de búsqueda de reranking.
 - `reasoning.kind` debe ser compatible con `adapter.reasoningKinds`; se valida al inicio.

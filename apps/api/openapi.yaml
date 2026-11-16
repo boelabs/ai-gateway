@@ -57,10 +57,8 @@ paths:
         - Inference
       summary: Chat Completions (OpenAI-compatible, stream + no-stream)
       parameters:
-        - &a2
-          $ref: "#/components/parameters/CacheHeader"
-        - &a3
-          $ref: "#/components/parameters/CacheTtlHeader"
+        - $ref: "#/components/parameters/CacheHeader"
+        - $ref: "#/components/parameters/CacheTtlHeader"
       requestBody:
         required: true
         content:
@@ -86,12 +84,16 @@ paths:
       responses:
         "200":
           description: chat.completion (or SSE stream of chat.completion.chunk)
-        "400": &a1
+        "400":
           $ref: "#/components/responses/Error"
-        "401": *a1
-        "403": *a1
-        "413": *a1
-        "429": *a1
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
   /v1/responses:
     get:
       tags:
@@ -101,16 +103,18 @@ paths:
       responses:
         "101":
           description: Switching Protocols
-        "401": *a1
-        "429": *a1
+        "401":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
     post:
       tags:
         - Inference
       summary: Responses (OpenResponses, provider-agnostic, stream + no-stream)
       description: This resource also supports OpenAI-compatible WebSocket upgrades with GET /v1/responses. Send response.create JSON events; the server returns the normal response.* streaming event objects. WebSocket turns are sequential and connections last at most 60 minutes.
       parameters:
-        - *a2
-        - *a3
+        - $ref: "#/components/parameters/CacheHeader"
+        - $ref: "#/components/parameters/CacheTtlHeader"
       requestBody:
         required: true
         content:
@@ -152,8 +156,10 @@ paths:
             text/event-stream:
               schema:
                 type: string
-        "400": *a1
-        "413": *a1
+        "400":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
   /v1/responses/compact:
     post:
       tags:
@@ -173,10 +179,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CompactResponseObject"
-        "400": *a1
-        "401": *a1
-        "413": *a1
-        "429": *a1
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
   /v1/responses/{id}:
     get:
       tags:
@@ -200,7 +210,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ResponseObject"
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
     delete:
       tags:
         - Inference
@@ -210,7 +221,8 @@ paths:
       responses:
         "200":
           description: "{ id, object: 'response.deleted', deleted: true }"
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/responses/{id}/input_items:
     get:
       tags:
@@ -252,7 +264,8 @@ paths:
       responses:
         "200":
           description: "{ object: 'list', data: [...], first_id, last_id, has_more }"
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/messages:
     post:
       tags:
@@ -326,8 +339,8 @@ paths:
       summary: Create embeddings (OpenAI contract, no-stream)
       description: "Accepts a string input, a string batch, tokens, or a tokenized batch. Routes the embeddings operation to OpenAI/OpenAI-compatible providers or Google AI Studio, with opt-in response caching through x-unified-cache. Each model validates its own profile: for example, Google AI Studio accepts text + float only, without tokenized input or base64."
       parameters:
-        - *a2
-        - *a3
+        - $ref: "#/components/parameters/CacheHeader"
+        - $ref: "#/components/parameters/CacheTtlHeader"
       requestBody:
         required: true
         content:
@@ -354,11 +367,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EmbeddingsResponse"
-        "400": *a1
-        "401": *a1
-        "403": *a1
-        "413": *a1
-        "429": *a1
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
   /v1/audio/transcriptions:
     post:
       operationId: createTranscription
@@ -385,11 +403,67 @@ paths:
             text/event-stream:
               schema:
                 type: string
-        "400": *a1
-        "401": *a1
-        "403": *a1
-        "413": *a1
-        "429": *a1
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /v1/audio/speech:
+    post:
+      operationId: createSpeech
+      tags:
+        - Inference
+      summary: Generate speech from text (OpenAI-compatible)
+      description: Returns the audio whole, in the requested `response_format` or the model's default. Formats, `instructions` and `speed` are checked against the model before any upstream call.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioSpeechRequest"
+      responses:
+        "200":
+          description: The generated audio
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/opus:
+              schema:
+                type: string
+                format: binary
+            audio/aac:
+              schema:
+                type: string
+                format: binary
+            audio/flac:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+            audio/pcm:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
   /v1/realtime/client_secrets:
     post:
       operationId: createRealtimeClientSecret
@@ -410,9 +484,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RealtimeClientSecret"
-        "400": *a1
-        "401": *a1
-        "403": *a1
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
   /v1/rerank:
     post:
       operationId: rerank
@@ -442,15 +519,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RerankResponse"
-        "400": &a4
+        "400":
           $ref: "#/components/responses/OpenRouterError"
-        "401": *a4
-        "403": *a4
-        "413": *a4
-        "429": *a4
-        "500": *a4
-        "502": *a4
-        "503": *a4
+        "401":
+          $ref: "#/components/responses/OpenRouterError"
+        "403":
+          $ref: "#/components/responses/OpenRouterError"
+        "413":
+          $ref: "#/components/responses/OpenRouterError"
+        "429":
+          $ref: "#/components/responses/OpenRouterError"
+        "500":
+          $ref: "#/components/responses/OpenRouterError"
+        "502":
+          $ref: "#/components/responses/OpenRouterError"
+        "503":
+          $ref: "#/components/responses/OpenRouterError"
   /v1/decisions:
     post:
       operationId: createDecision
@@ -638,11 +722,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ImagesResponse"
-        "400": *a1
-        "401": *a1
-        "403": *a1
-        "413": *a1
-        "429": *a1
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
   /v1/images/edits:
     post:
       operationId: createImageEdit
@@ -668,11 +757,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ImagesResponse"
-        "400": *a1
-        "401": *a1
-        "403": *a1
-        "413": *a1
-        "429": *a1
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
   /v1/videos:
     post:
       operationId: createVideo
@@ -707,12 +801,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VideoObject"
-        "400": *a1
-        "401": *a1
-        "403": *a1
-        "413": *a1
-        "429": *a1
-        "503": *a1
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
     get:
       operationId: listVideos
       tags:
@@ -746,7 +846,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VideoListResponse"
-        "401": *a1
+        "401":
+          $ref: "#/components/responses/Error"
   /v1/videos/{id}:
     get:
       operationId: retrieveVideo
@@ -762,8 +863,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VideoObject"
-        "401": *a1
-        "404": *a1
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
     delete:
       operationId: deleteVideo
       tags:
@@ -778,8 +881,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VideoDeleted"
-        "401": *a1
-        "404": *a1
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/videos/{id}/content:
     get:
       operationId: downloadVideoContent
@@ -808,10 +913,14 @@ paths:
                 format: binary
         "206":
           description: Partial content for byte-range requests
-        "400": *a1
-        "401": *a1
-        "404": *a1
-        "409": *a1
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /v1/models:
     get:
       tags:
@@ -822,7 +931,8 @@ paths:
       responses:
         "200":
           description: "{ object: 'list', data: [{ id, object, created, owned_by, architecture, top_provider, pricing, operations, supported_parameters, endpoint_count }] }"
-        "429": *a1
+        "429":
+          $ref: "#/components/responses/Error"
   /v1/models/{model}:
     get:
       tags:
@@ -839,8 +949,10 @@ paths:
       responses:
         "200":
           description: "{ id, object: 'model', created, owned_by }"
-        "404": *a1
-        "429": *a1
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
   /v1/models/{model}/deployments:
     get:
       tags:
@@ -857,7 +969,8 @@ paths:
       responses:
         "200":
           description: "{ object: 'list', data: [{ id, object: 'model.deployment', model, provider, status, retry_after_ms, top_provider, pricing, operations, supported_parameters, metrics }] }"
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
   /admin/operations:
     get:
       tags:
@@ -877,7 +990,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "401": *a1
+        "401":
+          $ref: "#/components/responses/Error"
   /admin/deployments/resolve:
     post:
       tags:
@@ -904,7 +1018,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "400": *a1
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/deployments:
     get:
       tags:
@@ -932,7 +1047,8 @@ paths:
                   - data
                   - pagination
                 additionalProperties: false
-        "401": *a1
+        "401":
+          $ref: "#/components/responses/Error"
     post:
       tags:
         - Admin
@@ -976,7 +1092,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "400": *a1
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/deployments/{id}:
     parameters:
       - $ref: "#/components/parameters/IdPath"
@@ -998,7 +1115,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
     patch:
       tags:
         - Admin
@@ -1023,7 +1141,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
     delete:
       tags:
         - Admin
@@ -1032,7 +1151,8 @@ paths:
       responses:
         "204":
           description: No Content
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
   /docs/export.json:
     get:
       tags:
@@ -1096,8 +1216,10 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "401": *a1
-        "429": *a1
+        "401":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
     get:
       tags:
         - Admin
@@ -1117,7 +1239,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "401": *a1
+        "401":
+          $ref: "#/components/responses/Error"
     delete:
       tags:
         - Admin
@@ -1159,8 +1282,10 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "401": *a1
-        "403": *a1
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
   /admin/users:
     get:
       tags:
@@ -1232,7 +1357,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "400": *a1
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/users/{id}:
     get:
       tags:
@@ -1253,7 +1379,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
     patch:
       tags:
         - Admin
@@ -1287,7 +1414,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
     delete:
       tags:
         - Admin
@@ -1318,7 +1446,8 @@ paths:
       responses:
         "204":
           description: No Content
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
   /admin/users/{id}/sessions:
     get:
       tags:
@@ -1342,7 +1471,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
   /admin/keys:
     get:
       tags:
@@ -1449,9 +1579,12 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "403": *a1
-        "404": *a1
-        "409": *a1
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /admin/keys/{id}/rotate:
     post:
       tags:
@@ -1486,7 +1619,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
   /admin/keys/{id}:
     get:
       tags:
@@ -1508,7 +1642,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
     patch:
       tags:
         - Admin
@@ -1547,7 +1682,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
     delete:
       tags:
         - Admin
@@ -1658,7 +1794,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "400": *a1
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/extensions/artifacts/{key}/versions:
     get:
       tags:
@@ -1724,7 +1861,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
   /admin/extensions/artifacts/{key}:
     delete:
       tags:
@@ -1810,7 +1948,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "400": *a1
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/extensions/instances/{id}:
     patch:
       tags:
@@ -1861,7 +2000,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
     delete:
       tags:
         - Admin
@@ -1899,8 +2039,10 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "400": *a1
-        "404": *a1
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /admin/audit:
     get:
       tags:
@@ -1960,7 +2102,8 @@ paths:
                   - data
                   - pagination
                 additionalProperties: false
-        "400": *a1
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/logs:
     get:
       tags:
@@ -2089,7 +2232,8 @@ paths:
                   - data
                   - pagination
                 additionalProperties: false
-        "400": *a1
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/logs/{id}:
     get:
       tags:
@@ -2115,7 +2259,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "404": *a1
+        "404":
+          $ref: "#/components/responses/Error"
   /admin/logs/{id}/payload:
     get:
       tags:
@@ -2145,9 +2290,12 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "403": *a1
-        "404": *a1
-        "409": *a1
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /admin/observability/summary:
     get:
       tags:
@@ -2190,7 +2338,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "400": *a1
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/observability/metrics:
     get:
       tags:
@@ -2242,6 +2391,7 @@ paths:
               - image.edit
               - video.generate
               - audio.transcribe
+              - audio.speech
               - audio.transcribe.realtime
               - audio.converse.realtime
               - embedding.create
@@ -2260,9 +2410,12 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "400": *a1
-        "401": *a1
-        "403": *a1
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
   /admin/usage:
     get:
       tags:
@@ -2333,7 +2486,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "400": *a1
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/router-settings:
     get:
       tags:
@@ -2419,7 +2573,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "400": *a1
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/fallbacks:
     get:
       tags:
@@ -2471,7 +2626,8 @@ paths:
                 required:
                   - data
                 additionalProperties: false
-        "400": *a1
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/fallbacks/{primaryModel}/{reason}:
     delete:
       tags:
@@ -3177,6 +3333,53 @@ components:
         - model
         - file
       additionalProperties: false
+    AudioSpeechRequest:
+      type: object
+      properties:
+        model:
+          type: string
+          minLength: 1
+        input:
+          type: string
+          minLength: 1
+        voice:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: object
+              properties:
+                id:
+                  type: string
+                  minLength: 1
+              required:
+                - id
+              additionalProperties: false
+        instructions:
+          type: string
+        response_format:
+          type: string
+          enum:
+            - mp3
+            - opus
+            - aac
+            - flac
+            - wav
+            - pcm
+        speed:
+          type: number
+          minimum: 0.25
+          maximum: 4
+        stream_format:
+          type: string
+          enum:
+            - audio
+            - sse
+      required:
+        - model
+        - input
+        - voice
+      additionalProperties: false
+      description: "Text to speak. `response_format` must be one the model returns; the gateway does not transcode. `stream_format: sse` is not served."
     RealtimeClientSecretRequest:
       type: object
       properties:
@@ -5186,6 +5389,7 @@ components:
           - image.edit
           - video.generate
           - audio.transcribe
+          - audio.speech
           - audio.transcribe.realtime
           - audio.converse.realtime
           - embedding.create
@@ -5202,6 +5406,7 @@ components:
         - image.edit
         - video.generate
         - audio.transcribe
+        - audio.speech
         - audio.transcribe.realtime
         - audio.converse.realtime
         - embedding.create
@@ -5425,6 +5630,7 @@ components:
           - image.edit
           - video.generate
           - audio.transcribe
+          - audio.speech
           - audio.transcribe.realtime
           - audio.converse.realtime
           - embedding.create
@@ -5438,6 +5644,7 @@ components:
         - image.edit
         - video.generate
         - audio.transcribe
+        - audio.speech
         - audio.transcribe.realtime
         - audio.converse.realtime
         - embedding.create
@@ -5454,6 +5661,7 @@ components:
           - images.edits
           - videos.generations
           - audio.transcriptions
+          - audio.speech
           - realtime.transcription
           - realtime.conversation
           - embeddings
@@ -5468,6 +5676,7 @@ components:
         - images.edits
         - videos.generations
         - audio.transcriptions
+        - audio.speech
         - realtime.transcription
         - realtime.conversation
         - embeddings
@@ -5849,6 +6058,16 @@ components:
               required:
                 - json
                 - stream
+            audio.speech:
+              type: object
+              properties:
+                json:
+                  $ref: "#/components/schemas/ExecutionPolicy"
+                stream:
+                  $ref: "#/components/schemas/ExecutionPolicy"
+              required:
+                - json
+                - stream
             realtime.transcription:
               type: object
               properties:
@@ -5905,6 +6124,7 @@ components:
             - images.edits
             - videos.generations
             - audio.transcriptions
+            - audio.speech
             - realtime.transcription
             - realtime.conversation
             - embeddings
@@ -9342,6 +9562,7 @@ components:
           - images.edits
           - videos.generations
           - audio.transcriptions
+          - audio.speech
           - realtime.transcription
           - realtime.conversation
           - embeddings
@@ -9356,6 +9577,7 @@ components:
         - images.edits
         - videos.generations
         - audio.transcriptions
+        - audio.speech
         - realtime.transcription
         - realtime.conversation
         - embeddings

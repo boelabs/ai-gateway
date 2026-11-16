@@ -3,6 +3,7 @@ import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import type { EmbeddingProfile } from "#core/embeddings.ts";
 import type { UpstreamTransport } from "#core/transport.ts";
 import type { TranscriptionProfile } from "#core/audio.ts";
+import type { SpeechProfile } from "#core/speech.ts";
 import type { OperationId } from "#operations/registry.ts";
 import type { DecisionProfile } from "#core/decisions.ts";
 import type { ImageModelProfile } from "#core/images.ts";
@@ -77,6 +78,7 @@ export interface OperationProfiles {
 	"image.edit"?: ImageModelProfile & OperationTransport;
 	"video.generate"?: VideoModelProfile & OperationTransport;
 	"audio.transcribe"?: TranscriptionProfile & OperationTransport;
+	"audio.speech"?: SpeechProfile & OperationTransport;
 	"audio.transcribe.realtime"?: RealtimeTranscriptionProfile &
 		OperationTransport;
 	"audio.converse.realtime"?: RealtimeConversationProfile & OperationTransport;

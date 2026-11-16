@@ -119,6 +119,10 @@ function addModalitiesForOperation(
 			input.add("file");
 			output.add("text");
 			break;
+		case "audio.speech":
+			input.add("text");
+			output.add("audio");
+			break;
 		case "audio.transcribe.realtime":
 			input.add("audio");
 			output.add("text");

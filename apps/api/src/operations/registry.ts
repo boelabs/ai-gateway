@@ -7,6 +7,7 @@ export const OPERATION_IDS = [
 	"image.edit",
 	"video.generate",
 	"audio.transcribe",
+	"audio.speech",
 	"audio.transcribe.realtime",
 	"audio.converse.realtime",
 	"embedding.create",
@@ -70,6 +71,13 @@ export const OPERATIONS: readonly OperationDefinition[] = [
 		label: "Audio transcription",
 		callType: "audio.transcriptions",
 		publicEndpoints: ["/v1/audio/transcriptions"],
+	},
+	{
+		id: "audio.speech",
+		family: "audio",
+		label: "Speech generation",
+		callType: "audio.speech",
+		publicEndpoints: ["/v1/audio/speech"],
 	},
 	{
 		id: "audio.transcribe.realtime",

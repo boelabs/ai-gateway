@@ -9,6 +9,7 @@ const CALL_TYPES = [
 	"images.edits",
 	"videos.generations",
 	"audio.transcriptions",
+	"audio.speech",
 	"realtime.transcription",
 	"realtime.conversation",
 	"embeddings",

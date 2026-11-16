@@ -1,0 +1,63 @@
+---
+title: "Speech"
+description: "POST /v1/audio/speech — text to speech on the OpenAI Audio contract."
+---
+
+Turn text into spoken audio. The public model must support `audio.speech`; the audio formats it
+returns and whether it takes `instructions` depend on its profile.
+
+## Example request
+
+Set `GATEWAY` to the gateway origin and `API_KEY` to your virtual key. Replace the example
+public model with one from [Model discovery](/docs/models-discovery).
+
+```bash
+curl -X POST "$GATEWAY/v1/audio/speech" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "speech",
+    "input": "Have a wonderful day!",
+    "voice": "Kore",
+    "instructions": "cheerful and friendly",
+    "response_format": "wav"
+  }' \
+  --output speech.wav
+```
+
+The response body is the audio itself, with its `Content-Type` (`audio/wav`, `audio/pcm`, …).
+
+## Fields
+
+| Field | Notes |
+|---|---|
+| `model` | A public model with an `audio.speech` profile. A [service mode](/docs/service-modes) suffix works here too. |
+| `input` | The text to speak. |
+| `voice` | A voice name, or `{ "id": "..." }` for a custom voice. Passed to the provider as given. |
+| `instructions` | Tone, pace or accent. Refused for a model whose profile lacks `supportsInstructions`. |
+| `response_format` | `mp3`, `opus`, `aac`, `flac`, `wav` or `pcm`. Omitted, the model's first format. |
+| `speed` | `0.25`–`4`. Anything other than `1` is refused unless the profile has `supportsSpeed`. |
+| `stream_format` | `audio` is accepted (the audio arrives whole); `sse` is refused. |
+
+The gateway does not transcode: a `response_format` the model does not return, or a `speed` it cannot
+apply, fails with `400 unsupported_parameter` before any upstream call, never with audio in another
+format.
+
+## Gemini TTS
+
+`gemini-3.8-flash-tts` and `gemini-3.8-flash-lite-tts` (Google AI Studio) answer on this endpoint
+through `generateContent`:
+
+| Request | Sent to Gemini |
+|---|---|
+| `input` | the turn's text, spoken verbatim (inline tags such as `<laugh>` included) |
+| `instructions` | `speech_metadata.style` |
+| `voice` | `speechConfig.voiceConfig.voice`: one of the 30 prebuilt voices (`Kore`, `Puck`, …), an Extended Voice Library id, or a designed or replicated `voice_...` id |
+| `response_format` | `wav` (default) or `pcm`: 24 kHz, mono, 16-bit little-endian |
+
+Other formats and `speed` are refused. Both models take `:flex` and `:priority`. Gemini bills the
+text in and the audio out by the token, and doubles both prices on 2027-01-01; the catalog already
+schedules the change.
+
+Multi-speaker dialogue, voice design and voice replication are Gemini features the OpenAI contract
+has no fields for. Create a voice in Google AI Studio and pass its `voice_...` id as `voice`.

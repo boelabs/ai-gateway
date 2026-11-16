@@ -45,6 +45,7 @@ import {
 import type {
 	TranscriptionHandler,
 	EmbeddingsHandler,
+	SpeechHandler,
 	AdapterContext,
 	ProviderModule,
 	VideoHandler,
@@ -78,9 +79,19 @@ import {
 
 import {
 	transcriptionProfileFor,
+	speechProfileFor,
 	imageProfileFor,
 	videoProfileFor,
 } from "#catalog/types.ts";
+
+import {
+	type CanonicalSpeechResponse,
+	type CanonicalSpeechRequest,
+	type SpeechResponseFormat,
+	speechFormatFor,
+	readWav,
+	pcmToWav,
+} from "#core/speech.ts";
 
 import {
 	parseGeminiTranscription,
@@ -2449,6 +2460,146 @@ const embeddings: EmbeddingsHandler = {
 	},
 };
 
+/** Sample rate Gemini TTS returns unless asked otherwise. */
+const GEMINI_SPEECH_SAMPLE_RATE = 24_000;
+
+/**
+ * The generateContent body for a TTS model. Gemini 3.8 TTS reads `instructions` as the turn's
+ * `speech_metadata.style`, the voice as a name or a `voice_...` id, and returns WAV unless asked for
+ * raw 16-bit PCM (`AUDIO_L16`), which is OpenAI's `pcm` at the same 24 kHz.
+ */
+function geminiSpeechBody(
+	req: CanonicalSpeechRequest,
+	format: SpeechResponseFormat,
+	ctx: AdapterContext,
+): Record<string, unknown> {
+	return {
+		contents: [
+			{
+				role: "user",
+				parts: [
+					{
+						text: req.input,
+						...(req.instructions
+							? { speech_metadata: { style: req.instructions } }
+							: {}),
+					},
+				],
+			},
+		],
+		generationConfig: {
+			responseModalities: ["AUDIO"],
+			responseFormat: {
+				audio: {
+					mimeType: format === "pcm" ? "AUDIO_L16" : "AUDIO_WAV",
+					sampleRate: GEMINI_SPEECH_SAMPLE_RATE,
+				},
+			},
+			speechConfig: { voiceConfig: { voice: req.voice } },
+		},
+		...(ctx.serviceMode ? { service_tier: ctx.serviceMode } : {}),
+	};
+}
+
+/** The rate in an `audio/L16;codec=pcm;rate=24000` MIME type, or Gemini's default. */
+function pcmRate(mimeType: string | undefined): number {
+	const rate = /(?:^|;)\s*rate=(\d+)/iu.exec(mimeType ?? "")?.[1];
+	return rate ? Number(rate) : GEMINI_SPEECH_SAMPLE_RATE;
+}
+
+/**
+ * The audio of a TTS answer in the format the request resolved to. Gemini may split it over several
+ * parts and may answer with WAV or raw PCM whatever was asked, so the samples are joined and wrapped
+ * (or unwrapped) here rather than trusted to arrive as requested.
+ */
+function parseGeminiSpeechResponse(
+	raw: unknown,
+	format: SpeechResponseFormat,
+	ctx: AdapterContext,
+): CanonicalSpeechResponse {
+	const response = (raw ?? {}) as GeminiResponse;
+	const parts = (response.candidates ?? [])
+		.flatMap((candidate) => candidate.content?.parts ?? [])
+		.filter((part) => typeof part.inlineData?.data === "string");
+	const blocked =
+		response.promptFeedback?.blockReason ??
+		response.candidates?.find(
+			(candidate) =>
+				candidate.finishReason !== undefined &&
+				candidate.finishReason !== "STOP" &&
+				candidate.finishReason !== "MAX_TOKENS",
+		)?.finishReason;
+	if (parts.length === 0 && blocked) {
+		throw new GatewayError({
+			class: "content_policy",
+			message: `Gemini returned no audio: ${blocked}`,
+			publicMessage: "The input was blocked by the provider's safety filters.",
+		});
+	}
+	let rate = GEMINI_SPEECH_SAMPLE_RATE;
+	const chunks = parts.map((part) => {
+		const bytes = Buffer.from(part.inlineData?.data ?? "", "base64");
+		const wav = readWav(bytes);
+		rate = wav?.sampleRate ?? pcmRate(part.inlineData?.mimeType);
+		return wav?.pcm ?? new Uint8Array(bytes);
+	});
+	const samples = Buffer.concat(chunks);
+	const audio =
+		format === "pcm" || samples.byteLength === 0
+			? new Uint8Array(samples)
+			: pcmToWav(samples, rate);
+	return {
+		audio,
+		format,
+		usage: chatUsage(response.usageMetadata, ctx),
+	};
+}
+
+const speech: SpeechHandler = {
+	buildRequest(req, ctx) {
+		if (ctx.transport !== "generate_content") {
+			throw new GatewayError({
+				class: "bad_request",
+				message: `Google: transport "${ctx.transport}" cannot generate speech`,
+			});
+		}
+		const profile = speechProfileFor(ctx.meta);
+		if (!profile) {
+			throw new GatewayError({
+				class: "bad_request",
+				message: `Google: ${ctx.upstreamModel} has no speech profile`,
+			});
+		}
+		const c = creds(ctx);
+		const base = (c.baseUrl ?? DEFAULT_BASE).replace(/\/+$/u, "");
+		return {
+			method: "POST",
+			url: `${base}/models/${encodeURIComponent(
+				googleModelPathId(ctx.upstreamModel),
+			)}:generateContent`,
+			headers: {
+				"content-type": "application/json",
+				"x-goog-api-key": c.apiKey,
+				...(c.headers ?? {}),
+			},
+			body: JSON.stringify(
+				geminiSpeechBody(req, speechFormatFor(req, profile), ctx),
+			),
+		};
+	},
+	parseResponse(raw, ctx, req) {
+		const profile = speechProfileFor(ctx.meta);
+		return parseGeminiSpeechResponse(
+			raw,
+			profile ? speechFormatFor(req, profile) : "wav",
+			ctx,
+		);
+	},
+	mapError(err, ctx) {
+		return mapGoogleError(err, ctx);
+	},
+};
+
 const audioTranscription: TranscriptionHandler = {
 	async buildRequest(req, ctx) {
 		if (ctx.transport !== "interactions") {
@@ -2496,6 +2647,7 @@ export const googleAdapter: Adapter = {
 		"images.edits",
 		"videos.generations",
 		"audio.transcriptions",
+		"audio.speech",
 		"realtime.transcription",
 		"realtime.conversation",
 		"embeddings",
@@ -2506,6 +2658,7 @@ export const googleAdapter: Adapter = {
 	imageEdit: imageHandler,
 	videoGeneration,
 	audioTranscription,
+	speech,
 	realtimeTranscription: makeGeminiRealtimeTranscriptionHandler({
 		creds,
 		mapError: mapGoogleError,
@@ -2623,6 +2776,10 @@ export const googleAdapter: Adapter = {
 		"audio.transcriptions": {
 			supported: ["interactions"],
 			default: "interactions",
+		},
+		"audio.speech": {
+			supported: ["generate_content"],
+			default: "generate_content",
 		},
 		"realtime.transcription": {
 			supported: ["bidi_generate_content"],

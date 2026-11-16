@@ -1,0 +1,64 @@
+---
+title: "Voz"
+description: "POST /v1/audio/speech — texto a voz con el contrato Audio de OpenAI."
+---
+
+Convierte texto en audio hablado. El modelo público tiene que admitir `audio.speech`; los formatos de
+audio que devuelve y si acepta `instructions` dependen de su perfil.
+
+## Solicitud de ejemplo [#example-request]
+
+Define `GATEWAY` con el origen del gateway y `API_KEY` con tu virtual key. Sustituye el modelo
+público del ejemplo por uno de [Descubrimiento de modelos](/docs/models-discovery).
+
+```bash
+curl -X POST "$GATEWAY/v1/audio/speech" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "speech",
+    "input": "Have a wonderful day!",
+    "voice": "Kore",
+    "instructions": "cheerful and friendly",
+    "response_format": "wav"
+  }' \
+  --output speech.wav
+```
+
+El cuerpo de la respuesta es el propio audio, con su `Content-Type` (`audio/wav`, `audio/pcm`, …).
+
+## Campos [#fields]
+
+| Campo | Notas |
+|---|---|
+| `model` | Un modelo público con perfil `audio.speech`. Aquí también funciona el sufijo de [modo de servicio](/docs/service-modes). |
+| `input` | El texto a decir. |
+| `voice` | Un nombre de voz, o `{ "id": "..." }` para una voz personalizada. Se pasa al proveedor tal cual. |
+| `instructions` | Tono, ritmo o acento. Se rechaza si el perfil del modelo no tiene `supportsInstructions`. |
+| `response_format` | `mp3`, `opus`, `aac`, `flac`, `wav` o `pcm`. Si se omite, el primer formato del modelo. |
+| `speed` | `0.25`–`4`. Cualquier valor distinto de `1` se rechaza salvo que el perfil tenga `supportsSpeed`. |
+| `stream_format` | Se acepta `audio` (el audio llega completo); `sse` se rechaza. |
+
+El gateway no transcodifica: un `response_format` que el modelo no devuelve, o un `speed` que no puede
+aplicar, falla con `400 unsupported_parameter` antes de llamar al proveedor, nunca con audio en otro
+formato.
+
+## Gemini TTS [#gemini-tts]
+
+`gemini-3.8-flash-tts` y `gemini-3.8-flash-lite-tts` (Google AI Studio) responden en este endpoint a
+través de `generateContent`:
+
+| Solicitud | Enviado a Gemini |
+|---|---|
+| `input` | el texto del turno, dicho literalmente (etiquetas como `<laugh>` incluidas) |
+| `instructions` | `speech_metadata.style` |
+| `voice` | `speechConfig.voiceConfig.voice`: una de las 30 voces predefinidas (`Kore`, `Puck`, …), un id de la Extended Voice Library o un id `voice_...` diseñado o replicado |
+| `response_format` | `wav` (por defecto) o `pcm`: 24 kHz, mono, 16 bits little-endian |
+
+Otros formatos y `speed` se rechazan. Ambos modelos admiten `:flex` y `:priority`. Gemini cobra por
+token el texto de entrada y el audio de salida, y duplica ambos precios el 2027-01-01; el catálogo ya
+tiene el cambio programado.
+
+El diálogo con varios hablantes, el diseño de voces y la replicación de voces son funciones de Gemini
+sin campos en el contrato de OpenAI. Crea la voz en Google AI Studio y pasa su id `voice_...` como
+`voice`.
