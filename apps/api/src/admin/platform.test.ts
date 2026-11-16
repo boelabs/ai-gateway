@@ -133,6 +133,35 @@ test("admin platform: rejects empty credential patches", () => {
 	assert.equal(parsed.success, false);
 });
 
+test("admin platform: credentials are typed or taken from a saved credential, never both", () => {
+	const base = {
+		publicModel: "x",
+		adapterKey: "openai",
+		upstreamModel: "gpt-5.4",
+	};
+	const credentialId = "00000000-0000-4000-8000-000000000000";
+	assert.equal(
+		createDeploymentSchema.safeParse({
+			...base,
+			credentials: { apiKey: "k" },
+			credentialId,
+		}).success,
+		false,
+	);
+	assert.equal(createDeploymentSchema.safeParse(base).success, false);
+	assert.equal(
+		createDeploymentSchema.safeParse({ ...base, credentialId }).success,
+		true,
+	);
+	assert.equal(
+		updateDeploymentSchema.safeParse({
+			credentials: { apiKey: "k" },
+			credentialId,
+		}).success,
+		false,
+	);
+});
+
 test("admin platform: an empty pricing override is rejected; null clears it", () => {
 	assert.equal(
 		updateDeploymentSchema.safeParse({ pricing: {} }).success,

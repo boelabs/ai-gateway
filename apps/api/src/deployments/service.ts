@@ -1,14 +1,15 @@
 import { resolveModelMetadata, getCatalogEntry } from "#catalog/index.ts";
 import type { ExecutionPolicyOverrides } from "#core/executionPolicy.ts";
 import { invalidatePublicModelGroups } from "#catalog/publicModels.ts";
+import { validateRequiredCredentials } from "#credentials/validate.ts";
 import { invalidatingResponseCache } from "#cache/responseCache.ts";
+import { savedCredentialFields } from "#credentials/service.ts";
 import type { TransportOverrides } from "#profiles/types.ts";
 import type { RuntimeModelMetadata } from "#db/schema.ts";
 import { declaredTransportFor } from "#catalog/types.ts";
 import { isUpstreamTransport } from "#core/transport.ts";
 import type { CatalogEntry } from "#catalog/types.ts";
 import { getAdapter } from "#adapters/registry.ts";
-import type { Adapter } from "#adapters/types.ts";
 import { GatewayError } from "#core/errors.ts";
 import { decryptRecord } from "#db/crypto.ts";
 
@@ -41,8 +42,10 @@ export interface PreviewDeploymentInput {
 }
 
 export interface CreateDeploymentInput extends PreviewDeploymentInput {
-	/** Plaintext credentials; the repo encrypts them. */
-	credentials: Record<string, unknown>;
+	/** Plaintext credentials; the repo encrypts them. Exclusive with `credentialId`. */
+	credentials?: Record<string, unknown>;
+	/** A saved credential whose fields are copied into this deployment. Exclusive with `credentials`. */
+	credentialId?: string;
 	executionPolicyOverrides?: ExecutionPolicyOverrides;
 	label?: string | null;
 	failureDomain?: string | null;
@@ -57,6 +60,8 @@ export interface UpdateDeploymentInput {
 	publicModel?: string;
 	upstreamModel?: string;
 	credentials?: Record<string, unknown>;
+	/** Replaces the stored credentials with a copy of a saved credential's. Exclusive with `credentials`. */
+	credentialId?: string;
 	label?: string | null;
 	failureDomain?: string | null;
 	metadata?: Record<string, unknown>;
@@ -112,56 +117,6 @@ function validateCustomCatalogEntry(
 			message: `Adapter "${adapter.key}" cannot emit reasoning.kind "${kind}"`,
 			param: "catalogEntry.operations.text.generate.reasoning.kind",
 		});
-	}
-}
-
-function validateRequiredCredentials(
-	adapter: Adapter,
-	credentials: Record<string, unknown>,
-): void {
-	for (const key of adapter.credentials.required) {
-		if (typeof credentials[key] !== "string" || credentials[key] === "") {
-			throw new GatewayError({
-				class: "bad_request",
-				message: `Credential "${key}" is required`,
-				param: `credentials.${key}`,
-			});
-		}
-	}
-	validateBaseUrl(credentials.baseUrl);
-	adapter.validateCredentials?.(credentials);
-}
-
-/**
- * A base URL the gateway will send credentials to: an absolute http(s) URL with no userinfo, query
- * or fragment, all of which would leak or be silently dropped when paths are appended.
- */
-function validateBaseUrl(value: unknown): void {
-	if (value === undefined) {
-		return;
-	}
-	const invalid = (message: string) =>
-		new GatewayError({
-			class: "bad_request",
-			message,
-			param: "credentials.baseUrl",
-		});
-	if (typeof value !== "string") {
-		throw invalid("credentials.baseUrl must be a string");
-	}
-	let url: URL;
-	try {
-		url = new URL(value);
-	} catch {
-		throw invalid("credentials.baseUrl must be an absolute URL");
-	}
-	if (url.protocol !== "https:" && url.protocol !== "http:") {
-		throw invalid("credentials.baseUrl must use http or https");
-	}
-	if (url.username || url.password || url.search || url.hash) {
-		throw invalid(
-			"credentials.baseUrl cannot contain credentials, query parameters, or fragments",
-		);
 	}
 }
 
@@ -322,6 +277,23 @@ export async function previewDeployment(
 }
 
 /**
+ * Credentials come from a saved credential or are typed, never both: a half-saved, half-typed set
+ * would match neither what was saved nor what was typed.
+ */
+function assertOneCredentialSource(input: {
+	credentials?: Record<string, unknown>;
+	credentialId?: string;
+}): void {
+	if (input.credentialId !== undefined && input.credentials !== undefined) {
+		throw new GatewayError({
+			class: "bad_request",
+			message: "Send either credentialId or credentials, not both",
+			param: "credentialId",
+		});
+	}
+}
+
+/**
  * Validation runs before the response cache is touched: a rejected change moves no cache epoch,
  * and does not depend on Redis to answer its 4xx.
  */
@@ -337,13 +309,19 @@ export async function createDeployment(
 			param: "adapterKey",
 		});
 	}
-	validateRequiredCredentials(adapter, input.credentials);
+	assertOneCredentialSource(input);
+	// A copy, not a reference: the deployment keeps working whatever later happens to the credential.
+	const credentials =
+		input.credentialId === undefined
+			? (input.credentials ?? {})
+			: await savedCredentialFields(input.credentialId, adapter.key);
+	validateRequiredCredentials(adapter, credentials);
 	const row = await invalidatingResponseCache(() =>
 		insertDeployment({
 			publicModel: input.publicModel,
 			adapterKey: input.adapterKey,
 			upstreamModel: input.upstreamModel,
-			credentials: input.credentials,
+			credentials,
 			label: input.label ?? null,
 			failureDomain: input.failureDomain ?? null,
 			metadata: input.metadata ?? {},
@@ -397,13 +375,18 @@ export async function updateDeployment(
 	// Credentials are never returned by the API, so an editor cannot round-trip them: a form that
 	// changes only `baseUrl` would otherwise have to resend `apiKey`, which it does not have. Patching
 	// therefore MERGES over the stored values; an explicit null removes one field.
+	assertOneCredentialSource(patch);
 	let mergedCredentials: Record<string, unknown> | undefined;
-	if (patch.credentials !== undefined) {
-		const current = decryptRecord(
-			existing.credentials,
-			"deployment-credentials",
+	if (patch.credentialId !== undefined) {
+		mergedCredentials = await savedCredentialFields(
+			patch.credentialId,
+			adapter.key,
 		);
-		mergedCredentials = { ...current };
+		validateRequiredCredentials(adapter, mergedCredentials);
+	} else if (patch.credentials !== undefined) {
+		mergedCredentials = {
+			...decryptRecord(existing.credentials, "deployment-credentials"),
+		};
 		for (const [field, value] of Object.entries(patch.credentials)) {
 			if (value === null) {
 				delete mergedCredentials[field];

@@ -1,11 +1,13 @@
 import { buildOpenApiDocument } from "./document.ts";
-import assert from "node:assert/strict";
 import { renderOpenApiYaml } from "./yaml.ts";
-import { parse } from "yaml";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { parse } from "yaml";
 
 import {
+	UpdateProviderCredential,
+	CreateProviderCredential,
 	CreateDeployment,
 	UpdateDeployment,
 	CreateKey,
@@ -18,6 +20,11 @@ import {
 	rotateKeySchema,
 	updateKeySchema,
 } from "#admin/keySchemas.ts";
+
+import {
+	createCredentialSchema,
+	updateCredentialSchema,
+} from "#admin/credentials.ts";
 
 import {
 	createDeploymentSchema,
@@ -44,7 +51,7 @@ test("openapi: committed openapi.yaml is up to date with the generator", () => {
 
 test("openapi: document is a structurally valid 3.1 spec with resolving refs", () => {
 	assert.equal(doc.openapi, "3.1.0");
-	assert.equal(Object.keys(doc.paths).length, 66);
+	assert.equal(Object.keys(doc.paths).length, 68);
 
 	// Every local $ref must resolve to a defined component.
 	const text = JSON.stringify(doc);
@@ -88,6 +95,16 @@ test("openapi: CreateKey/UpdateKey/RotateKey stay in sync with the runtime schem
 		[CreateKey, createKeySchema, "CreateKey"],
 		[UpdateKey, updateKeySchema, "UpdateKey"],
 		[RotateKey, rotateKeySchema, "RotateKey"],
+		[
+			CreateProviderCredential,
+			createCredentialSchema,
+			"CreateProviderCredential",
+		],
+		[
+			UpdateProviderCredential,
+			updateCredentialSchema,
+			"UpdateProviderCredential",
+		],
 	] as const) {
 		assert.deepEqual(
 			keys(published as never),

@@ -12,6 +12,7 @@ import { clearVirtualKeyBudget } from "#ratelimit/index.ts";
 import { configureFallback } from "#fallbacks/service.ts";
 import { aggregateMetrics } from "#db/repos/metrics.ts";
 import { getRequestId } from "#http/requestContext.ts";
+import { credentialsAdminApp } from "./credentials.ts";
 import { probeArtifact } from "#extensions/source.ts";
 import { type AppEnv, actorOf } from "#auth/types.ts";
 import { listAuditPage } from "#db/repos/audit.ts";
@@ -329,6 +330,9 @@ adminApp.use("*", authMiddleware(), requireOperator(), auditMiddleware());
  */
 adminApp.use("/deployments/*", methodPermission("deployments"));
 adminApp.use("/deployments", methodPermission("deployments"));
+// Saved provider credentials fill deployments, so they share the deployments permissions.
+adminApp.use("/credentials/*", methodPermission("deployments"));
+adminApp.use("/credentials", methodPermission("deployments"));
 adminApp.use("/keys/*", methodPermission("keys"));
 adminApp.use("/keys", methodPermission("keys"));
 // A copied key is as good as a written one, so reading it takes what writing takes. It is audited,
@@ -370,6 +374,7 @@ adminApp.use(
 	}),
 );
 adminApp.route("/users", dashboardUsersApp);
+adminApp.route("/credentials", credentialsAdminApp);
 // Model CRUD (with inline CatalogEntry for custom models) and adapter introspection.
 adminApp.route("/", platformAdminApp);
 

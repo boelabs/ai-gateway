@@ -1,6 +1,7 @@
 import { DeploymentHeaderActions } from "#/features/deployments/DeploymentHeaderActions.tsx";
 import { RouteBoundary } from "#/shared/components/RouteBoundary.tsx";
 import { ButtonSkeleton } from "#/shared/components/Skeleton.tsx";
+import { savedCredentials } from "#/features/credentials/api.ts";
 import { TextSkeleton } from "#/shared/components/TextSkeleton";
 import { Breadcrumbs } from "#/shared/components/Breadcrumbs";
 import { PageHeader } from "#/components/ui/page";
@@ -38,9 +39,10 @@ async function Deployment({
 	params: PageProps<"/models/[deployment]">["params"];
 }) {
 	const { deployment: id } = await params;
-	const [deployment, registry] = await Promise.all([
+	const [deployment, registry, credentials] = await Promise.all([
 		getDeployment(id),
 		adapterRegistry(),
+		savedCredentials(),
 	]);
 	if (!deployment) {
 		notFound();
@@ -81,6 +83,7 @@ async function Deployment({
 				adapters={registry.adapters}
 				existing={deployment}
 				key={`${deployment.id}:${deployment.updatedAt}`}
+				savedCredentials={credentials}
 			/>
 		</>
 	);

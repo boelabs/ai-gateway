@@ -6,8 +6,8 @@
 
 import { createDocument, type ZodOpenApiRequestBodyObject } from "zod-openapi";
 import { detailedMetrics, metricsQuery } from "#admin/metricsSchema.ts";
-import * as c from "./components.ts";
 import { SPEECH_CONTENT_TYPES } from "#core/speech.ts";
+import * as c from "./components.ts";
 import { z } from "zod/v4";
 
 const errorResponse = { $ref: "#/components/responses/Error" } as const;
@@ -1318,6 +1318,104 @@ export function buildOpenApiDocument() {
 					tags: ["Admin"],
 					operationId: "deleteDeployment",
 					summary: "Delete a deployment",
+					responses: {
+						"204": { description: "No Content" },
+						"404": errorResponse,
+					},
+				},
+			},
+			"/admin/credentials": {
+				get: {
+					tags: ["Admin"],
+					operationId: "listProviderCredentials",
+					summary: "List saved provider credentials (paginated)",
+					parameters: [
+						{ $ref: "#/components/parameters/Limit" },
+						{ $ref: "#/components/parameters/Offset" },
+						{
+							name: "adapterKey",
+							in: "query",
+							required: false,
+							schema: { type: "string" },
+							description: "Only the credentials of this adapter.",
+						},
+						{
+							name: "q",
+							in: "query",
+							required: false,
+							schema: { type: "string" },
+							description: "Case-insensitive substring of the name.",
+						},
+					],
+					responses: {
+						"200": paginatedResponse(
+							c.ProviderCredential,
+							"Paginated credentials (without secrets)",
+						),
+						"401": errorResponse,
+					},
+				},
+				post: {
+					tags: ["Admin"],
+					operationId: "createProviderCredential",
+					parameters: [
+						{ $ref: "#/components/parameters/IdempotencyKeyHeader" },
+					],
+					summary: "Save a provider credential for reuse",
+					description:
+						"Saves credentials under a unique name so deployments can be filled from them (`credentialId`). Saving the same secret twice for one adapter is refused (`credential_duplicate`).",
+					requestBody: jsonBody(c.CreateProviderCredential, {
+						anthropic: {
+							value: {
+								name: "Anthropic production",
+								adapterKey: "anthropic",
+								credentials: { apiKey: "sk-ant-..." },
+							},
+						},
+						fromDeployment: {
+							value: {
+								name: "OpenAI production",
+								fromDeploymentId: "00000000-0000-4000-8000-000000000000",
+							},
+						},
+					}),
+					responses: {
+						"201": dataResponse(
+							c.ProviderCredential,
+							"Credential saved; the secret is never returned",
+						),
+						"400": errorResponse,
+					},
+				},
+			},
+			"/admin/credentials/{id}": {
+				parameters: [{ $ref: "#/components/parameters/IdPath" }],
+				get: {
+					tags: ["Admin"],
+					operationId: "retrieveProviderCredential",
+					summary: "Retrieve a saved credential (without its secret)",
+					responses: {
+						"200": dataResponse(c.ProviderCredential, "Credential"),
+						"404": errorResponse,
+					},
+				},
+				patch: {
+					tags: ["Admin"],
+					operationId: "updateProviderCredential",
+					summary: "Rename a saved credential or replace its fields",
+					requestBody: jsonBody(c.UpdateProviderCredential),
+					responses: {
+						"200": dataResponse(c.ProviderCredential, "Credential updated"),
+						"400": errorResponse,
+						"404": errorResponse,
+					},
+				},
+				delete: {
+					tags: ["Admin"],
+					operationId: "deleteProviderCredential",
+					summary: "Delete a saved credential",
+					description:
+						"Deployments filled from it keep their own copy and keep working.",
 					responses: {
 						"204": { description: "No Content" },
 						"404": errorResponse,

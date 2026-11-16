@@ -26,7 +26,8 @@ Authorization: Bearer $MASTER_KEY
 | `publicModel` | yes | The model's public name; it is what the client puts in `"model"`. |
 | `adapterKey` | yes | The first-class adapter to execute (`openai`, `googleaistudio`, `openaicompatible`, etc.). |
 | `upstreamModel` | yes | The real id at the provider (catalog key, or the deployment name on Azure). |
-| `credentials` | yes | `{ apiKey, baseUrl?, ... }` depending on the adapter (see table). Encrypted at rest. On `PATCH`, the object is **merged** over the stored one — send only the fields you are changing, and `null` to remove one. |
+| `credentials` | yes, or `credentialId` | `{ apiKey, baseUrl?, ... }` depending on the adapter (see table). Encrypted at rest. On `PATCH`, the object is **merged** over the stored one — send only the fields you are changing, and `null` to remove one. |
+| `credentialId` | no | A [saved credential](/docs/creating-deployments#saved-credentials) of the same adapter to copy the credentials from, instead of `credentials` — never both. On `PATCH`, it replaces the stored credentials. |
 | `catalogEntry` | custom only | Inline catalog entry for a model **not** present in the catalog. Uses the same shape as `catalog.json`; for catalog models it **must be omitted**. If a later release adds the model to the catalog, an existing deployment keeps using its own entry. |
 | `pricing` | no | `{ inputCentsPerMTokens?, outputCentsPerMTokens?, cacheReadCentsPerMTokens?, cacheWriteCentsPerMTokens?, imageInputCentsPerMTokens?, imageOutputCentsPerMTokens?, audioInputCentsPerMTokens?, audioOutputCentsPerMTokens?, searchUnitCents? }`. |
 | `transportOverrides` | no | Per-operation transport override. The adapter default applies to every public endpoint. |
@@ -54,6 +55,30 @@ Authorization: Bearer $MASTER_KEY
 
 `GET /admin/operations` returns the live adapter list, required credentials, operations, and
 transports.
+
+## Saved credentials
+
+Save a provider's credentials once under a name, then fill any deployment of that adapter with them
+instead of pasting the key again:
+
+```text
+POST /admin/credentials
+{ "name": "Anthropic production", "adapterKey": "anthropic", "credentials": { "apiKey": "sk-ant-..." } }
+
+POST /admin/deployments
+{ "publicModel": "claude", "adapterKey": "anthropic", "upstreamModel": "claude-sonnet-4-5",
+  "credentialId": "<id returned above>" }
+```
+
+A saved credential is a **source, not a dependency**: the deployment stores its own encrypted copy.
+Replacing or deleting the saved credential later changes no deployment, and deleting a deployment
+leaves the credential where it is.
+
+- `POST /admin/credentials` with `{ "name", "fromDeploymentId" }` saves the credentials a deployment
+  already holds, so a key nobody can see any more can still be reused.
+- Names are unique regardless of case, and the same secret cannot be saved twice for one adapter.
+- The secret is never returned. Responses carry the stored field names and a hint to recognize it:
+  the API key's last four characters (only for keys of 16 characters or more) and the base URL's host.
 
 ## Catalog vs custom
 

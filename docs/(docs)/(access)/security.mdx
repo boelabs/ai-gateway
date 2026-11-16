@@ -165,6 +165,11 @@ tampering with the stored ciphertext makes it fail to decrypt rather than silent
 **No admin API response — `GET`, `POST`, or `PATCH` on `/admin/deployments`— ever includes credentials**,
 encrypted or not; they're stripped before the response is built.
 
+[Saved credentials](/docs/creating-deployments#saved-credentials) are sealed the same way under their
+own purpose, `provider-credential`, and the AAD also carries the row's id: an envelope copied onto
+another row does not decrypt. `/admin/credentials` never returns one either, only the field names and
+a hint (the API key's last four characters and the base URL's host).
+
 Losing every copy of a keyring entry while envelopes still reference it makes those values permanently
 unrecoverable. Keep the keyring outside the database it decrypts and never commit it. For the online
 rotation procedure for both `MASTER_KEY` and the encryption keyring, see

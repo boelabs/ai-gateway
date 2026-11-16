@@ -1,5 +1,7 @@
 "use client";
 
+import { ArrowCounterClockwiseIcon as IconReset } from "@phosphor-icons/react/dist/ssr";
+import { CredentialFields } from "#/features/credentials/CredentialFields.tsx";
 import { useIdempotencyKey } from "#/shared/lib/useIdempotencyKey.ts";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { ModelInput } from "#/shared/components/ModelPicker.tsx";
@@ -10,7 +12,6 @@ import { FormActions } from "#/shared/components/FormActions";
 import { SearchableSelect } from "#/components/ui/select";
 import { CustomModelEditor } from "./CustomModelEditor";
 import { parsePricing, type Pricing } from "./pricing";
-import { ArrowCounterClockwiseIcon as IconReset } from "@phosphor-icons/react/dist/ssr";
 import { Panel } from "#/shared/components/Panel.tsx";
 import { Textarea } from "#/components/ui/textarea";
 import { saveDeploymentAction } from "./actions.ts";
@@ -28,6 +29,12 @@ import {
 	type AdapterSummary,
 	type Deployment,
 } from "./common.ts";
+
+import {
+	readCredentialFields,
+	type SavedCredential,
+	credentialHint,
+} from "#/features/credentials/common.ts";
 
 import {
 	initialCustomEntry,
@@ -48,11 +55,6 @@ function limitOrNull(value: number): number | null {
 	return value > 0 ? Math.floor(value) : null;
 }
 
-const CREDENTIAL_LABELS: Record<string, string> = {
-	apiKey: "API key",
-	baseUrl: "Base URL",
-};
-
 /**
  * A deployment's editor, on its own page: what it serves, how to reach the provider, the model's
  * capabilities when it is not in the catalog, then the optional routing, pricing and metadata —
@@ -61,15 +63,20 @@ const CREDENTIAL_LABELS: Record<string, string> = {
 export function DeploymentForm({
 	adapters,
 	existing,
+	savedCredentials = [],
 }: {
 	adapters: AdapterSummary[];
 	/** Present when editing; the adapter of an existing deployment cannot change. */
 	existing?: Deployment;
+	/** Saved credentials that can fill this deployment's; those of other adapters are not offered. */
+	savedCredentials?: SavedCredential[];
 }) {
 	const router = useRouter();
 	const notify = useNotify();
 	const editing = existing !== undefined;
 	const [adapterKey, setAdapterKey] = useState(existing?.adapterKey ?? "");
+	/** A saved credential to copy from; typed fields still win over its values. */
+	const [credentialId, setCredentialId] = useState<string | null>(null);
 	const [upstreamModel, setUpstreamModel] = useState(
 		existing?.upstreamModel ?? "",
 	);
@@ -107,6 +114,12 @@ export function DeploymentForm({
 		[adapters, adapterKey],
 	);
 	const required = adapter?.credentials.required ?? [];
+	const offered = savedCredentials.filter(
+		(credential) => credential.adapterKey === adapterKey,
+	);
+	const filledFrom = offered.find(
+		(credential) => credential.id === credentialId,
+	);
 	const catalog = adapter?.models ?? [];
 	const known = isKnownUpstreamModel(catalog, upstreamModel);
 	const custom = !known;
@@ -135,20 +148,10 @@ export function DeploymentForm({
 		if (!adapter) {
 			throw new Error("Choose an adapter.");
 		}
-		const credentials: Record<string, unknown> = {};
-		for (const field of required) {
-			const value = optionalText(form.get(`cred_${field}`));
-			if (value !== undefined) {
-				credentials[field] = value;
-			}
-		}
-		const extra = parseObject(
-			String(form.get("credentialsExtra") ?? ""),
-			"Extra credentials",
-		);
-		if (extra) {
-			Object.assign(credentials, extra);
-		}
+		// A saved credential or typed fields, never both: picking one hides the inputs.
+		const credentials = filledFrom
+			? undefined
+			: readCredentialFields(form, required);
 		const entry = custom
 			? parseCustomEntry(technical ?? JSON.stringify(customEntry))
 			: undefined;
@@ -157,7 +160,9 @@ export function DeploymentForm({
 			publicModel: publicModel.trim(),
 			adapterKey,
 			upstreamModel: upstreamModel.trim(),
-			credentials,
+			...(filledFrom
+				? { credentialId: filledFrom.id }
+				: { credentials: credentials ?? {} }),
 			label: optionalText(form.get("label")) ?? null,
 			failureDomain: optionalText(form.get("failureDomain")) ?? null,
 			metadata:
@@ -239,6 +244,7 @@ export function DeploymentForm({
 								return;
 							}
 							setAdapterKey(key);
+							setCredentialId(null);
 							chooseUpstreamModel("");
 							setCustomEntry(
 								initialCustomEntry(
@@ -305,32 +311,35 @@ export function DeploymentForm({
 			</Panel>
 
 			<Panel
-				description={
-					editing
-						? "Leave a field blank to keep the stored value."
-						: "What the adapter needs to reach the provider."
-				}
+				description={credentialsDescription(editing, filledFrom)}
 				title="Credentials"
 			>
-				<div className="grid gap-4 sm:grid-cols-2">
-					{required.map((field) => (
-						<Input
-							autoComplete="off"
-							key={`${adapterKey}:${field}`}
-							label={CREDENTIAL_LABELS[field] ?? field}
-							name={`cred_${field}`}
-							required={!editing}
-							type={field === "baseUrl" ? "url" : "password"}
+				<div className="flex flex-col gap-4">
+					{offered.length > 0 ? (
+						<SearchableSelect
+							clearLabel="Enter manually"
+							items={offered.map((credential) => {
+								const hint = credentialHint(credential);
+								return {
+									value: credential.id,
+									label: hint
+										? `${credential.name} · ${hint}`
+										: credential.name,
+								};
+							})}
+							label="Saved credential (optional)"
+							onValueChange={setCredentialId}
+							searchPlaceholder="Search credentials"
+							value={credentialId}
 						/>
-					))}
-					<div className="sm:col-span-2">
-						<JsonField
-							label="Extra credentials (optional)"
-							name="credentialsExtra"
-							placeholder='{ "baseUrl": "https://…" }'
-							rows={2}
+					) : null}
+					{filledFrom ? null : (
+						<CredentialFields
+							adapterKey={adapterKey}
+							optional={editing}
+							required={required}
 						/>
-					</div>
+					)}
 				</div>
 			</Panel>
 
@@ -482,6 +491,21 @@ function JsonField({
 			spellCheck={false}
 		/>
 	);
+}
+
+/** Where this deployment's credentials come from. */
+function credentialsDescription(
+	editing: boolean,
+	filledFrom: SavedCredential | undefined,
+): string {
+	if (filledFrom) {
+		return editing
+			? `Replaces the stored credentials with a copy of ${filledFrom.name}.`
+			: `A copy of ${filledFrom.name} is stored with this model.`;
+	}
+	return editing
+		? "Leave a field blank to keep the stored value."
+		: "What the adapter needs to reach the provider.";
 }
 
 /** The form itself, inert and with its text masked: same panels, same heights, nothing moves. */

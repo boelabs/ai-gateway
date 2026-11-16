@@ -83,7 +83,9 @@ export async function saveDeployment(
 		catalogEntry: body.catalogEntry ?? null,
 		pricing: body.pricing ?? null,
 		transportOverrides: body.transportOverrides ?? {},
-		...(Object.keys(credentials).length > 0 ? { credentials } : {}),
+		...(credentials && Object.keys(credentials).length > 0
+			? { credentials }
+			: {}),
 	});
 }
 

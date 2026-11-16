@@ -12,6 +12,7 @@ export type EncryptionPurpose =
 	| "extension-source"
 	| "idempotency-response"
 	| "observability-payload"
+	| "provider-credential"
 	| "reasoning-state"
 	| "response-compaction"
 	| "virtual-key-secret";
@@ -62,6 +63,7 @@ export function parseEncryptedEnvelope(value: unknown): EncEnvelope {
 			"extension-source",
 			"idempotency-response",
 			"observability-payload",
+			"provider-credential",
 			"reasoning-state",
 			"response-compaction",
 			"virtual-key-secret",
@@ -79,11 +81,17 @@ export function parseEncryptedEnvelope(value: unknown): EncEnvelope {
 	return candidate as EncEnvelope;
 }
 
+/**
+ * The authenticated header. `context` binds a ciphertext to the row that holds it (its id), so an
+ * envelope copied into another row no longer opens; it is not stored, the caller supplies it again.
+ */
 function aad(
 	envelope: Pick<EncEnvelope, "v" | "alg" | "kid" | "purpose">,
+	context?: string,
 ): Buffer {
+	const header = `${envelope.v}:${envelope.alg}:${envelope.kid}:${envelope.purpose}`;
 	return Buffer.from(
-		`${envelope.v}:${envelope.alg}:${envelope.kid}:${envelope.purpose}`,
+		context === undefined ? header : `${header}:${context}`,
 		"utf8",
 	);
 }
@@ -101,11 +109,12 @@ function keyFor(id: string): Buffer {
 export function encryptJson(
 	value: unknown,
 	purpose: EncryptionPurpose,
+	context?: string,
 ): EncEnvelope {
 	const iv = randomBytes(12);
 	const header = { v: 2, alg: "A256GCM", kid: ACTIVE_KEY_ID, purpose } as const;
 	const cipher = createCipheriv("aes-256-gcm", keyFor(ACTIVE_KEY_ID), iv);
-	cipher.setAAD(aad(header));
+	cipher.setAAD(aad(header, context));
 	const plaintext = Buffer.from(JSON.stringify(value), "utf8");
 	const ct = Buffer.concat([cipher.update(plaintext), cipher.final()]);
 	const tag = cipher.getAuthTag();
@@ -120,6 +129,7 @@ export function encryptJson(
 export function decryptJson(
 	raw: EncEnvelope,
 	expectedPurpose: EncryptionPurpose,
+	context?: string,
 ): unknown {
 	const envelope = parseEncryptedEnvelope(raw);
 	if (
@@ -136,7 +146,7 @@ export function decryptJson(
 		keyFor(envelope.kid),
 		Buffer.from(envelope.iv, "base64"),
 	);
-	decipher.setAAD(aad(envelope));
+	decipher.setAAD(aad(envelope, context));
 	decipher.setAuthTag(Buffer.from(envelope.tag, "base64"));
 	const plaintext = Buffer.concat([
 		decipher.update(Buffer.from(envelope.ct, "base64")),
@@ -164,8 +174,9 @@ export function deriveActiveKey(purpose: string): Buffer {
 export function decryptRecord(
 	envelope: EncEnvelope,
 	purpose: EncryptionPurpose,
+	context?: string,
 ): Record<string, unknown> {
-	const value = decryptJson(envelope, purpose);
+	const value = decryptJson(envelope, purpose, context);
 	if (value === null || typeof value !== "object" || Array.isArray(value)) {
 		throw new Error(`Encrypted ${purpose} payload must be an object`);
 	}

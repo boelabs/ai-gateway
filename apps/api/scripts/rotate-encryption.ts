@@ -4,6 +4,15 @@ import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import { closeDb, db } from "#db/client.ts";
 
 import {
+	providerCredentials,
+	extensionArtifacts,
+	modelDeployments,
+	idempotencyKeys,
+	payloadSamples,
+	virtualKeys,
+} from "#db/schema.ts";
+
+import {
 	activeEncryptionKeyId,
 	type EncEnvelope,
 	decryptRecord,
@@ -11,14 +20,6 @@ import {
 	decryptJson,
 	encryptJson,
 } from "#db/crypto.ts";
-
-import {
-	extensionArtifacts,
-	modelDeployments,
-	idempotencyKeys,
-	payloadSamples,
-	virtualKeys,
-} from "#db/schema.ts";
 
 const BATCH_SIZE = 100;
 
@@ -39,7 +40,7 @@ interface Rotation {
 	/** Rows that still need resealing (besides the id cursor). */
 	pending: SQL;
 	/** Re-encrypts one envelope under the active key; throws when it cannot be opened. */
-	reseal: (envelope: EncEnvelope) => unknown;
+	reseal: (envelope: EncEnvelope, id: string) => unknown;
 }
 
 /**
@@ -74,7 +75,7 @@ async function rotate(rotation: Rotation): Promise<number> {
 				}
 				let resealed: unknown;
 				try {
-					resealed = rotation.reseal(row.envelope);
+					resealed = rotation.reseal(row.envelope, row.id);
 				} catch (error) {
 					orphans.push({
 						table: rotation.table,
@@ -112,6 +113,20 @@ const ROTATIONS: Record<string, Rotation> = {
 			encryptJson(
 				decryptRecord(envelope, "deployment-credentials"),
 				"deployment-credentials",
+			),
+	},
+	// Each envelope is bound to its row id, which therefore seals it again.
+	providerCredentials: {
+		table: "provider_credentials",
+		from: providerCredentials,
+		id: providerCredentials.id,
+		envelope: providerCredentials.secret,
+		pending: notActive(providerCredentials.secret),
+		reseal: (envelope, id) =>
+			encryptJson(
+				decryptRecord(envelope, "provider-credential", id),
+				"provider-credential",
+				id,
 			),
 	},
 	extensions: {
