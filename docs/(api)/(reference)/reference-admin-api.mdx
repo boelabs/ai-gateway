@@ -44,6 +44,19 @@ the API.
 | `PATCH /admin/deployments/:id` | Update a deployment. |
 | `DELETE /admin/deployments/:id` | Delete a deployment. |
 
+## Saved credentials
+
+Provider credentials saved for reuse; they fill a deployment's `credentialId` (see
+[Saved credentials](/docs/creating-deployments#saved-credentials)). Same permissions as deployments.
+
+| Route | Purpose |
+|---|---|
+| `GET /admin/credentials` | List them, never their secrets. Query: `limit`, `offset`, `adapterKey`, `q` (name). |
+| `POST /admin/credentials` | Save `{ name, adapterKey, credentials }`, or `{ name, fromDeploymentId }`. |
+| `GET /admin/credentials/:id` | Read one. |
+| `PATCH /admin/credentials/:id` | Rename it, or merge `credentials` over the stored fields (`null` removes one). |
+| `DELETE /admin/credentials/:id` | Delete it. Deployments filled from it keep their own copy. |
+
 ## Virtual keys
 
 | Route | Purpose |

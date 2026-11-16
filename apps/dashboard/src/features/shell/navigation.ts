@@ -1,16 +1,17 @@
-import type { Permission } from "#/features/auth/common.ts";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
+import type { Permission } from "#/features/auth/common.ts";
 
 import {
 	SlidersHorizontalIcon as SlidersHorizontal,
+	ShieldCheckIcon as ShieldCheck,
 	ChatsIcon as MessagesSquare,
 	ChartBarIcon as ChartColumn,
-	ShieldCheckIcon as ShieldCheck,
-	ScrollIcon as ScrollText,
 	ChartLineIcon as ChartLine,
+	ScrollIcon as ScrollText,
 	KeyIcon as KeyRound,
-	CubeIcon as Boxes,
 	UsersIcon as Users,
+	VaultIcon as Vault,
+	CubeIcon as Boxes,
 	PlugIcon as Plug,
 } from "@phosphor-icons/react/dist/ssr";
 
@@ -78,6 +79,13 @@ export const NAVIGATION: NavGroup[] = [
 				icon: KeyRound,
 				requires: ["keys:read"],
 				key: "k",
+			},
+			{
+				href: "/credentials",
+				label: "Credentials",
+				icon: Vault,
+				requires: ["deployments:read"],
+				key: "c",
 			},
 			{
 				href: "/playground",
@@ -151,6 +159,14 @@ export const CREATE_ACTIONS: CreateAction[] = [
 		icon: KeyRound,
 		requires: ["keys:write"],
 		key: "k",
+	},
+	{
+		href: "/credentials/new",
+		label: "Credential",
+		command: "Create credential",
+		icon: Vault,
+		requires: ["deployments:write"],
+		key: "c",
 	},
 ];
 

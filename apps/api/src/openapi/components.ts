@@ -1009,9 +1009,13 @@ export const CreateDeployment = z
 		upstreamModel: z
 			.string()
 			.meta({ description: "Exact ID; preserves slash namespaces." }),
-		credentials: z.record(z.string(), z.unknown()).meta({
+		credentials: z.record(z.string(), z.unknown()).optional().meta({
 			description:
-				"Inline provider credentials. Required keys are exposed by GET /admin/operations under adapter.credentials.required. Encrypted; never returned.",
+				"Inline provider credentials. Required keys are exposed by GET /admin/operations under adapter.credentials.required. Send this or credentialId, not both. Encrypted; never returned.",
+		}),
+		credentialId: z.uuid().optional().meta({
+			description:
+				"A saved credential of the same adapter whose fields are copied into the deployment, instead of credentials. A copy, not a reference: changing or deleting the credential later does not affect the deployment.",
 		}),
 		label: nullableString.optional().meta({
 			description:
@@ -1072,6 +1076,10 @@ export const ResolveDeployment = z
 			description:
 				"Accepted for body reuse with POST /admin/deployments, but ignored by resolve.",
 		}),
+		credentialId: z.uuid().optional().meta({
+			description:
+				"Accepted for body reuse with POST /admin/deployments, but ignored by resolve.",
+		}),
 		label: nullableString.optional().meta({
 			description:
 				"Accepted for body reuse with POST /admin/deployments, but ignored by resolve.",
@@ -1092,7 +1100,12 @@ export const UpdateDeployment = z
 		publicModel: z.string().optional(),
 		upstreamModel: z.string().optional(),
 		credentials: z.record(z.string(), z.unknown()).optional().meta({
-			description: "Credential patch; re-encrypted, never returned.",
+			description:
+				"Credential patch merged over the stored fields; null removes a field. Not with credentialId. Re-encrypted, never returned.",
+		}),
+		credentialId: z.uuid().optional().meta({
+			description:
+				"Replaces the stored credentials with a copy of this saved credential's fields. Not with credentials.",
 		}),
 		label: nullableString.optional().meta({
 			description: "Human identifier; null clears it.",
@@ -1113,6 +1126,35 @@ export const UpdateDeployment = z
 		rpmLimit: nullableInteger.optional(),
 	})
 	.meta({ id: "UpdateDeployment" });
+
+/* -------------------------------------------------------- provider credentials */
+
+export const CreateProviderCredential = z
+	.object({
+		name: z.string().meta({ description: "Unique name, regardless of case." }),
+		adapterKey: z.string().optional().meta({
+			description: "The adapter whose fields this holds. With credentials.",
+		}),
+		credentials: z.record(z.string(), z.unknown()).optional().meta({
+			description:
+				"The adapter's credential fields (adapter.credentials.required in GET /admin/operations). Encrypted; never returned.",
+		}),
+		fromDeploymentId: z.uuid().optional().meta({
+			description:
+				"Saves the credentials an existing deployment holds, instead of adapterKey and credentials.",
+		}),
+	})
+	.meta({ id: "CreateProviderCredential" });
+
+export const UpdateProviderCredential = z
+	.object({
+		name: z.string().optional(),
+		credentials: z.record(z.string(), z.unknown()).optional().meta({
+			description:
+				"Merged over the stored fields; null removes one. Deployments filled earlier keep their own copy.",
+		}),
+	})
+	.meta({ id: "UpdateProviderCredential" });
 
 /* ---------------------------------------------------------------- virtual keys */
 
@@ -1401,6 +1443,36 @@ export const Deployment = z
 		id: "Deployment",
 		description:
 			"A deployment as returned by the admin API. Credentials are never included, encrypted or otherwise.",
+	});
+
+export const ProviderCredential = z
+	.object({
+		id: z.uuid(),
+		name: z.string(),
+		adapterKey: z.string(),
+		/** Credential field names stored, so a client knows what it will fill. */
+		fields: z.array(z.string()),
+		hint: z
+			.object({
+				apiKey: z.string().optional().meta({
+					description:
+						"Last four characters of the API key, when it is long enough.",
+				}),
+				baseUrl: z
+					.string()
+					.optional()
+					.meta({ description: "Host of the base URL." }),
+			})
+			.meta({
+				description: "Enough to recognize the credential, never to use it.",
+			}),
+		createdAt: timestamp,
+		updatedAt: timestamp,
+	})
+	.meta({
+		id: "ProviderCredential",
+		description:
+			"A saved provider credential. It fills deployments when they are created or edited; the secret is never returned.",
 	});
 
 export const VirtualKey = z

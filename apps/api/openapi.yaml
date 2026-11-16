@@ -1306,6 +1306,149 @@ paths:
           description: No Content
         "404":
           $ref: "#/components/responses/Error"
+  /admin/credentials:
+    get:
+      tags:
+        - Admin
+      operationId: listProviderCredentials
+      summary: List saved provider credentials (paginated)
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: adapterKey
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Only the credentials of this adapter.
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Case-insensitive substring of the name.
+      responses:
+        "200":
+          description: Paginated credentials (without secrets)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProviderCredential"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+                required:
+                  - data
+                  - pagination
+                additionalProperties: false
+        "401":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - Admin
+      operationId: createProviderCredential
+      summary: Save a provider credential for reuse
+      description: Saves credentials under a unique name so deployments can be filled from them (`credentialId`). Saving the same secret twice for one adapter is refused (`credential_duplicate`).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderCredential"
+            examples:
+              anthropic:
+                value:
+                  name: Anthropic production
+                  adapterKey: anthropic
+                  credentials:
+                    apiKey: sk-ant-...
+              fromDeployment:
+                value:
+                  name: OpenAI production
+                  fromDeploymentId: 00000000-0000-4000-8000-000000000000
+      responses:
+        "201":
+          description: Credential saved; the secret is never returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ProviderCredential"
+                required:
+                  - data
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/Error"
+  /admin/credentials/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdPath"
+    get:
+      tags:
+        - Admin
+      operationId: retrieveProviderCredential
+      summary: Retrieve a saved credential (without its secret)
+      responses:
+        "200":
+          description: Credential
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ProviderCredential"
+                required:
+                  - data
+                additionalProperties: false
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      tags:
+        - Admin
+      operationId: updateProviderCredential
+      summary: Rename a saved credential or replace its fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProviderCredential"
+      responses:
+        "200":
+          description: Credential updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ProviderCredential"
+                required:
+                  - data
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags:
+        - Admin
+      operationId: deleteProviderCredential
+      summary: Delete a saved credential
+      description: Deployments filled from it keep their own copy and keep working.
+      responses:
+        "204":
+          description: No Content
+        "404":
+          $ref: "#/components/responses/Error"
   /docs/export.json:
     get:
       tags:
@@ -5506,6 +5649,11 @@ components:
           propertyNames:
             type: string
           additionalProperties: {}
+        credentialId:
+          description: Accepted for body reuse with POST /admin/deployments, but ignored by resolve.
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
         label:
           description: Accepted for body reuse with POST /admin/deployments, but ignored by resolve.
           type:
@@ -5879,11 +6027,16 @@ components:
           type: string
           description: Exact ID; preserves slash namespaces.
         credentials:
+          description: Inline provider credentials. Required keys are exposed by GET /admin/operations under adapter.credentials.required. Send this or credentialId, not both. Encrypted; never returned.
           type: object
           propertyNames:
             type: string
           additionalProperties: {}
-          description: Inline provider credentials. Required keys are exposed by GET /admin/operations under adapter.credentials.required. Encrypted; never returned.
+        credentialId:
+          description: "A saved credential of the same adapter whose fields are copied into the deployment, instead of credentials. A copy, not a reference: changing or deleting the credential later does not affect the deployment."
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
         label:
           description: Human identifier to tell deployments of the same publicModel apart (e.g. which API key). Snapshotted into operation metadata and attempt records.
           type:
@@ -5933,7 +6086,6 @@ components:
         - publicModel
         - adapterKey
         - upstreamModel
-        - credentials
     UpdateDeployment:
       type: object
       properties:
@@ -5942,11 +6094,16 @@ components:
         upstreamModel:
           type: string
         credentials:
-          description: Credential patch; re-encrypted, never returned.
+          description: Credential patch merged over the stored fields; null removes a field. Not with credentialId. Re-encrypted, never returned.
           type: object
           propertyNames:
             type: string
           additionalProperties: {}
+        credentialId:
+          description: Replaces the stored credentials with a copy of this saved credential's fields. Not with credentials.
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
         label:
           description: Human identifier; null clears it.
           type:
@@ -5993,6 +6150,39 @@ components:
               minimum: -9007199254740991
               maximum: 9007199254740991
             - type: "null"
+    CreateProviderCredential:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Unique name, regardless of case.
+        adapterKey:
+          description: The adapter whose fields this holds. With credentials.
+          type: string
+        credentials:
+          description: The adapter's credential fields (adapter.credentials.required in GET /admin/operations). Encrypted; never returned.
+          type: object
+          propertyNames:
+            type: string
+          additionalProperties: {}
+        fromDeploymentId:
+          description: Saves the credentials an existing deployment holds, instead of adapterKey and credentials.
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+      required:
+        - name
+    UpdateProviderCredential:
+      type: object
+      properties:
+        name:
+          type: string
+        credentials:
+          description: Merged over the stored fields; null removes one. Deployments filled earlier keep their own copy.
+          type: object
+          propertyNames:
+            type: string
+          additionalProperties: {}
     Login:
       type: object
       properties:
@@ -7771,6 +7961,50 @@ components:
         - total
         - nextOffset
       additionalProperties: false
+    ProviderCredential:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        name:
+          type: string
+        adapterKey:
+          type: string
+        fields:
+          type: array
+          items:
+            type: string
+        hint:
+          type: object
+          properties:
+            apiKey:
+              description: Last four characters of the API key, when it is long enough.
+              type: string
+            baseUrl:
+              description: Host of the base URL.
+              type: string
+          additionalProperties: false
+          description: Enough to recognize the credential, never to use it.
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        updatedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+      required:
+        - id
+        - name
+        - adapterKey
+        - fields
+        - hint
+        - createdAt
+        - updatedAt
+      additionalProperties: false
+      description: A saved provider credential. It fills deployments when they are created or edited; the secret is never returned.
     DashboardConfig:
       type: object
       properties:

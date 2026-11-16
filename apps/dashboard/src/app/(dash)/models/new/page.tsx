@@ -1,4 +1,5 @@
 import { RouteBoundary } from "#/shared/components/RouteBoundary.tsx";
+import { savedCredentials } from "#/features/credentials/api.ts";
 import { adapterRegistry } from "#/features/deployments/api.ts";
 import { Breadcrumbs } from "#/shared/components/Breadcrumbs";
 import { PageHeader } from "#/components/ui/page";
@@ -30,6 +31,9 @@ export default function NewDeploymentPage() {
 }
 
 async function Editor() {
-	const { adapters } = await adapterRegistry();
-	return <DeploymentForm adapters={adapters} />;
+	const [{ adapters }, credentials] = await Promise.all([
+		adapterRegistry(),
+		savedCredentials(),
+	]);
+	return <DeploymentForm adapters={adapters} savedCredentials={credentials} />;
 }

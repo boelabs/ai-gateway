@@ -28,3 +28,16 @@ test("encrypted envelope parsing rejects unavailable key ids and invalid IV leng
 	assert.throws(() => parseEncryptedEnvelope({ ...envelope, kid: "missing" }));
 	assert.throws(() => parseEncryptedEnvelope({ ...envelope, iv: "AA==" }));
 });
+
+test("a context-bound envelope opens only with the same context", () => {
+	const envelope = encryptJson(
+		{ apiKey: "secret" },
+		"provider-credential",
+		"a",
+	);
+	assert.deepEqual(decryptJson(envelope, "provider-credential", "a"), {
+		apiKey: "secret",
+	});
+	assert.throws(() => decryptJson(envelope, "provider-credential", "b"));
+	assert.throws(() => decryptJson(envelope, "provider-credential"));
+});

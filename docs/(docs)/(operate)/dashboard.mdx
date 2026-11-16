@@ -128,6 +128,7 @@ API calls would come back 403. See [Security → Roles](/docs/security#roles).
 | | viewer | admin | owner |
 |---|---|---|---|
 | Models and deployments | read | read/write | read/write |
+| Saved credentials (never their secrets) | read | read/write | read/write |
 | Usage, metrics, overview | read | read | read |
 | Virtual keys | — | read/write | read/write |
 | Logs and payload samples | — | read | read |
@@ -143,6 +144,8 @@ API calls would come back 403. See [Security → Roles](/docs/security#roles).
 - **Metrics** — the same numbers in more detail, filtered by model, deployment or operation.
 - **Models** — public models and the deployment pool behind each one. Creating or editing a
   deployment validates the whole configuration against the adapter before it is written.
+- **Credentials** — provider credentials saved once and picked when creating or editing a model,
+  which keeps its own copy. **Save credentials** on a deployment's page saves the ones it holds.
 - **API keys** — issuing, scoping, limiting and budgeting virtual keys. **Copy key** puts a key on
   the clipboard without showing it, and **Regenerate** replaces its secret. A key created
   **private** is shown once and never stored.
