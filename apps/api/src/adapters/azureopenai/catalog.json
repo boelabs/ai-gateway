@@ -428,6 +428,57 @@
 			"deprecated": true,
 			"notes": "Microsoft retires Azure OpenAI gpt-image-1 (version 2025-04-15, preview) on 2026-10-23 and names no replacement."
 		},
+		"gpt-live-1": {
+			"operations": {
+				"audio.live": {
+					"voices": [
+						"alloy",
+						"ash",
+						"ballad",
+						"beacon",
+						"bossa",
+						"brise",
+						"calandria",
+						"cedar",
+						"cinder",
+						"compas",
+						"coral",
+						"delta",
+						"destello",
+						"echo",
+						"flitz",
+						"gleam",
+						"halo",
+						"harema",
+						"hornero",
+						"juni",
+						"luciernaga",
+						"marin",
+						"meridian",
+						"nira",
+						"noeul",
+						"nuri",
+						"pearl",
+						"quartz",
+						"ripple",
+						"sage",
+						"shida",
+						"shimmer",
+						"sillage",
+						"stone",
+						"tempo",
+						"verse",
+						"vesper",
+						"willow"
+					],
+					"transports": ["websocket", "webrtc"]
+				}
+			},
+			"pricing": {
+				"audioInputCentsPerSecond": 0.083333
+			},
+			"notes": "GPT-Live (wss /openai/v1/live/sessions, or POST for WebRTC; Bearer key; deployment name as the model). Azure documents no SIP transport. Azure Global meter 'Live 1 Gl': $3.00 per hour of session ($0.05 per minute), the same as OpenAI's; the backend model's tokens are billed at its own rates. Each WebRTC session bills at least 15 seconds."
+		},
 		"gpt-realtime-2.1": {
 			"operations": {
 				"audio.converse.realtime": {

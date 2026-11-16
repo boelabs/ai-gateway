@@ -58,8 +58,8 @@ credentials and choose a model available to your provider account. See
   WebSocket (`wss://{resource}.openai.azure.com/openai/v1/realtime`, the deployment name as the model,
   the `api-key` header). Prices are Azure's Global meters. `gpt-realtime-1.5` has no Azure price
   meter, and the preview Realtime API (`gpt-4o-realtime-preview`) is retired, so neither is offered.
-  [GPT-Live](/docs/live-sessions) is not offered on Azure yet: Microsoft lists `gpt-live-1` by region
-  but documents no endpoint or price for it.
+  `gpt-live-1` serves [live sessions](/docs/live-sessions) over WebSocket and WebRTC
+  (`/openai/v1/live/sessions`, the key as a Bearer token); Azure documents no SIP transport for it.
 - Catalog: `src/adapters/azureopenai/catalog.json`.
 
 ## Next steps

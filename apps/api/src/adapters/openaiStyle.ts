@@ -1264,7 +1264,25 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 		...(videoTransportConfig ? { videoGeneration } : {}),
 		...(config.audioTranscriptions ? { audioTranscription } : {}),
 		...(config.live && realtimeDeps
-			? { liveSession: makeOpenAILiveHandler(realtimeDeps) }
+			? {
+					// GPT-Live takes the key as a Bearer token on every provider, Azure included,
+					// where the rest of the v1 surface also accepts the `api-key` header.
+					liveSession: makeOpenAILiveHandler({
+						...realtimeDeps,
+						resolveConnection(ctx) {
+							const credentials = resolveCreds(ctx);
+							const { "api-key": _apiKey, ...headers } =
+								buildAuthHeaders(credentials);
+							return {
+								url: credentials.base,
+								headers: {
+									...headers,
+									authorization: `Bearer ${credentials.apiKey}`,
+								},
+							};
+						},
+					}),
+				}
 			: {}),
 		...(config.realtime && realtimeDeps
 			? {
