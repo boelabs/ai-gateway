@@ -502,6 +502,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/realtime/translations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Realtime speech translation WebSocket (OpenAI-compatible)
+         * @description Requires Upgrade: websocket and ?model=<public model with audio.translate.realtime>. OpenAI's translation protocol: session.update (audio.output.language, audio.input.transcription, audio.input.noise_reduction), session.input_audio_buffer.append (24 kHz PCM16), session.close; the server sends session.created/updated, session.input_transcript.delta, session.output_transcript.delta, session.output_audio.delta, error and session.closed. Served by OpenAI and Azure OpenAI natively and by Gemini Live in translation mode.
+         */
+        get: operations["openRealtimeTranslation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/live/sessions": {
         parameters: {
             query?: never;
@@ -2393,7 +2413,7 @@ export interface paths {
                     bucket?: "hour" | "day";
                     publicModel?: string;
                     deploymentId?: string;
-                    operation?: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.speech" | "audio.transcribe.realtime" | "audio.converse.realtime" | "audio.live" | "embedding.create" | "rerank" | "decision.create";
+                    operation?: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.speech" | "audio.transcribe.realtime" | "audio.converse.realtime" | "audio.translate.realtime" | "audio.live" | "embedding.create" | "rerank" | "decision.create";
                 };
                 header?: never;
                 path?: never;
@@ -3891,6 +3911,10 @@ export interface components {
                     json: components["schemas"]["ExecutionPolicy"];
                     stream: components["schemas"]["ExecutionPolicy"];
                 };
+                "realtime.translation": {
+                    json: components["schemas"]["ExecutionPolicy"];
+                    stream: components["schemas"]["ExecutionPolicy"];
+                };
                 "live.session": {
                     json: components["schemas"]["ExecutionPolicy"];
                     stream: components["schemas"]["ExecutionPolicy"];
@@ -5158,6 +5182,30 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             413: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    openRealtimeTranslation: {
+        parameters: {
+            query: {
+                model: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Switching Protocols */
+            101: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            426: components["responses"]["Error"];
             429: components["responses"]["Error"];
         };
     };

@@ -28,6 +28,7 @@ test("guided templates cover every operation without enabling speculative text c
 		"audio.transcribe",
 		"audio.speech",
 		"audio.live",
+		"audio.translate.realtime",
 		"embedding.create",
 		"rerank",
 		"decision.create",

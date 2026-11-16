@@ -997,6 +997,7 @@ const routerSettingsSchema = z
 				"audio.speech",
 				"realtime.transcription",
 				"realtime.conversation",
+				"realtime.translation",
 				"live.session",
 				"embeddings",
 				"rerank",

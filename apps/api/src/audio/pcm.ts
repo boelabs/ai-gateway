@@ -193,13 +193,14 @@ export function createAudioInputDecoder(
 }
 
 /**
- * Canonical 16 kHz PCM16 at another rate, for a provider that takes only that rate (OpenAI's
- * Realtime API: 24 kHz).
+ * PCM16 at another rate, for a provider that takes only that rate: canonical 16 kHz to OpenAI's
+ * 24 kHz by default, or any other pair (24 kHz translation audio to Gemini's 16 kHz).
  */
 export function createPcmResampler(
 	outputRate: number,
+	inputRate: number = REALTIME_AUDIO_SAMPLE_RATE,
 ): (pcm: Buffer) => Buffer {
-	const resampler = new Resampler(REALTIME_AUDIO_SAMPLE_RATE, outputRate);
+	const resampler = new Resampler(inputRate, outputRate);
 	let carry: Buffer | null = null;
 	return (chunk) => {
 		const data: Buffer = carry ? Buffer.concat([carry, chunk]) : chunk;

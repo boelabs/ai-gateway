@@ -1,0 +1,69 @@
+---
+title: "Traducción en tiempo real"
+description: "GET /v1/realtime/translations: la traducción de voz en tiempo real de OpenAI, en OpenAI, Azure OpenAI y Gemini."
+---
+
+Traduce voz en vivo a otro idioma por WebSocket. El endpoint habla la API de traducción en tiempo
+real de OpenAI, así que los clientes de OpenAI funcionan sin cambios. El modelo público debe admitir
+`audio.translate.realtime`:
+
+| Modelo | Proveedor | Precio |
+|---|---|---|
+| `gpt-realtime-translate` | OpenAI, Azure OpenAI | $0.034 por minuto de audio, cobrado por segundo |
+| `gemini-3.5-live-translate-preview` | Google AI Studio | Tokens de audio: $3.50 de entrada y $21.00 de salida por 1M (unos $0.037 por minuto) |
+
+## Conexión [#connecting]
+
+Abre un WebSocket a `$GATEWAY/v1/realtime/translations?model=<public model>` con tu virtual key en
+`Authorization: Bearer`. El gateway responde con `session.created`; la sesión con el proveedor se abre
+con el primer audio.
+
+## Eventos [#events]
+
+El cliente envía tres eventos:
+
+```json
+{ "type": "session.update", "session": { "audio": { "output": { "language": "es" }, "input": { "transcription": { "model": "gpt-realtime-whisper" } } } } }
+```
+
+- `session.update`: `audio.output.language` (el idioma de destino), `audio.input.transcription`
+  (`{ "model": ... }` para recibir la transcripción de origen, `null` para quitarla) y
+  `audio.input.noise_reduction`. Se responde con `session.updated`.
+- `session.input_audio_buffer.append`: PCM16 en base64, mono, a 24 kHz. Sigue enviando, silencio
+  incluido, mientras la sesión esté activa; los fragmentos de 200 ms coinciden con los del proveedor.
+- `session.close`: el proveedor termina de traducir lo que ya recibió; luego el gateway envía
+  `session.closed` y cierra el socket.
+
+El servidor envía `session.output_audio.delta` (PCM16 a 24 kHz, con `sample_rate` y `channels`),
+`session.output_transcript.delta`, `session.input_transcript.delta` cuando la transcripción de origen
+está activa, y `error`. Los deltas solo agregan texto y llevan `elapsed_ms`. No hay turnos ni
+`response.create`.
+
+## Proveedores [#providers]
+
+- **OpenAI y Azure OpenAI** ejecutan `gpt-realtime-translate` de forma nativa. En Azure la URL es
+  `/openai/v1/realtime/translations` del recurso, con el nombre del deployment como modelo. La
+  transcripción de origen corre en el modelo indicado en `transcription.model` (por defecto
+  `gpt-realtime-whisper`). Ese modelo se cobra a su propia tarifa por segundo, así que tiene que estar
+  permitido para la key y tener precio en el catálogo.
+- **Gemini** (`gemini-3.5-live-translate-preview`) funciona a través de Gemini Live en modo traducción.
+  El gateway convierte el audio a las frecuencias de Gemini y de vuelta. `language` pasa a ser el
+  idioma de destino de Gemini (inglés si no se indica), y la transcripción de origen es la de Gemini,
+  diga lo que diga `transcription.model`. `noise_reduction` se acepta y no se envía. Gemini fija su
+  configuración por conexión, así que cambiar el idioma reconecta detrás del mismo socket. Gemini
+  también cierra cada conexión cada unos 10 minutos; el gateway se reconecta por él. Se rechazan los
+  idiomas de destino fuera de la lista de Gemini.
+
+Cambiar el idioma o la transcripción a mitad de sesión se aplica a la voz que sigue.
+
+## Límites y facturación [#limits-and-billing]
+
+Una conexión dura como máximo 60 minutos. Cada conexión es una operación `realtime.translation`. La
+virtual key se cobra cada 10 segundos de audio y cada vez que el proveedor informa uso. Cuando se
+agota su presupuesto, el gateway envía un `error` con código `budget_exceeded` y cierra el socket con
+1008. WebRTC (`/v1/realtime/translations/calls`) no se sirve: el audio no pasaría por el gateway y la
+API de traducción no informa uso con el que medirlo.
+
+La extensión anterior de AI Gateway, `session.translation` en
+[Conversaciones en tiempo real](/docs/realtime-conversations), sigue funcionando para
+`gemini-3.5-live-translate-preview`. Los clientes nuevos deberían usar este endpoint.

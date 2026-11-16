@@ -3951,6 +3951,19 @@
 			},
 			"notes": "GPT-Live (/v1/live/sessions): full-duplex voice over WebSocket, WebRTC or SIP, delegating reasoning and tools to a backend model (responses or decisions delegation) or to the client. $0.05 per minute of session, billed per second; the backend model's tokens are billed at its own rates."
 		},
+		"gpt-realtime-translate": {
+			"operations": {
+				"audio.translate.realtime": {
+					"supportsInputTranscription": true,
+					"separateInputTranscription": true,
+					"supportsNoiseReduction": true
+				}
+			},
+			"pricing": {
+				"audioInputCentsPerSecond": 0.056667
+			},
+			"notes": "Realtime speech-to-speech translation (wss /v1/realtime/translations?model=). 16k context, 2,000 max output tokens. The source transcript runs on a separate model (transcription.model, e.g. gpt-realtime-whisper), billed at its own rate. $0.034 per minute of audio, billed here by the second."
+		},
 		"gpt-realtime-whisper": {
 			"operations": {
 				"audio.transcribe.realtime": {

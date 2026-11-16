@@ -5,6 +5,7 @@ import type { UpstreamTransport } from "#core/transport.ts";
 import type { TranscriptionProfile } from "#core/audio.ts";
 import type { SpeechProfile } from "#core/speech.ts";
 import type { LiveProfile } from "#core/live.ts";
+import type { RealtimeTranslationProfile } from "#core/realtimeTranslation.ts";
 import type { OperationId } from "#operations/registry.ts";
 import type { DecisionProfile } from "#core/decisions.ts";
 import type { ImageModelProfile } from "#core/images.ts";
@@ -83,6 +84,7 @@ export interface OperationProfiles {
 	"audio.transcribe.realtime"?: RealtimeTranscriptionProfile &
 		OperationTransport;
 	"audio.converse.realtime"?: RealtimeConversationProfile & OperationTransport;
+	"audio.translate.realtime"?: RealtimeTranslationProfile & OperationTransport;
 	"audio.live"?: LiveProfile & OperationTransport;
 	"embedding.create"?: EmbeddingProfile & OperationTransport;
 	rerank?: RerankProfile & OperationTransport;

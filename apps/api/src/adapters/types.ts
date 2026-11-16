@@ -56,6 +56,10 @@ import type {
 	CanonicalRerankRequest,
 } from "#core/rerank.ts";
 import type {
+	CanonicalRealtimeTranslationConfig,
+	CanonicalRealtimeTranslationEvent,
+} from "#core/realtimeTranslation.ts";
+import type {
 	CanonicalSpeechResponse,
 	CanonicalSpeechRequest,
 } from "#core/speech.ts";
@@ -331,6 +335,28 @@ export interface RealtimeConversationHandler {
 	) => Promise<RealtimeConversationSession>;
 }
 
+/** One realtime translation session at the provider, possibly over several connections. */
+export interface RealtimeTranslationSession {
+	/** 16-bit little-endian mono PCM at `TRANSLATION_AUDIO_RATE` (24 kHz). */
+	appendAudio: (pcm: Buffer) => void;
+	/** Applies a new configuration (same model); resolves once the provider accepted it. */
+	reconfigure: (config: CanonicalRealtimeTranslationConfig) => Promise<void>;
+	/** Flushes the audio still being translated; resolves once its output has been emitted. */
+	finish: () => Promise<void>;
+	/** Ends when the session closes; throws a GatewayError when the provider fails it. */
+	events: AsyncIterable<CanonicalRealtimeTranslationEvent>;
+	close: () => void;
+}
+
+/** An adapter's realtime speech-translation handler. */
+export interface RealtimeTranslationHandler {
+	/** Resolves once the provider accepted the session configuration. */
+	connect: (
+		config: CanonicalRealtimeTranslationConfig,
+		ctx: AdapterContext,
+	) => Promise<RealtimeTranslationSession>;
+}
+
 /** One server event of a live session: the frame as received, and its parsed form. */
 export interface LiveServerFrame {
 	text: string;
@@ -494,6 +520,7 @@ export interface Adapter {
 	speech?: SpeechHandler;
 	realtimeTranscription?: RealtimeTranscriptionHandler;
 	realtimeConversation?: RealtimeConversationHandler;
+	realtimeTranslation?: RealtimeTranslationHandler;
 	liveSession?: LiveSessionHandler;
 	embeddings?: EmbeddingsHandler;
 	rerank?: RerankHandler;

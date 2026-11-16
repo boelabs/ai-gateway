@@ -56,6 +56,7 @@ test("admin mounts the new platform behind master authentication", async () => {
 				"audio.speech",
 				"audio.transcribe.realtime",
 				"audio.converse.realtime",
+				"audio.translate.realtime",
 				"audio.live",
 				"embedding.create",
 				"rerank",

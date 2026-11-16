@@ -6,6 +6,7 @@ import { makeOpenAILiveHandler } from "./openaiLive.ts";
 import {
 	makeOpenAIRealtimeTranscriptionHandler,
 	makeOpenAIRealtimeConversationHandler,
+	makeOpenAIRealtimeTranslationHandler,
 	type OpenAIRealtimeDeps,
 } from "./openaiRealtime.ts";
 import { upstreamFetch } from "#gateway/instrumentedTransport.ts";
@@ -1163,6 +1164,7 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 	if (config.realtime) {
 		supportedCallTypes.add("realtime.conversation");
 		supportedCallTypes.add("realtime.transcription");
+		supportedCallTypes.add("realtime.translation");
 	}
 	if (config.live) {
 		supportedCallTypes.add("live.session");
@@ -1290,6 +1292,8 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 						makeOpenAIRealtimeConversationHandler(realtimeDeps),
 					realtimeTranscription:
 						makeOpenAIRealtimeTranscriptionHandler(realtimeDeps),
+					realtimeTranslation:
+						makeOpenAIRealtimeTranslationHandler(realtimeDeps),
 				}
 			: {}),
 		...(config.embeddings ? { embeddings } : {}),
@@ -1329,6 +1333,10 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 							default: "realtime",
 						},
 						"realtime.transcription": {
+							supported: ["realtime"],
+							default: "realtime",
+						},
+						"realtime.translation": {
 							supported: ["realtime"],
 							default: "realtime",
 						},

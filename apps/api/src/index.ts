@@ -4,6 +4,7 @@ import {
 	openAIDecisionsHandler,
 } from "./endpoints/decisions.ts";
 import { realtimeClientSecretsHandler } from "./endpoints/realtimeClientSecrets.ts";
+import { realtimeTranslationsHandler } from "./endpoints/realtimeTranslation.ts";
 import {
 	liveAttachSocketHandler,
 	liveSessionsSocketHandler,
@@ -351,6 +352,7 @@ app.post("/v1/chat/completions", chatCompletionsHandler);
 app.post("/v1/responses", responsesHandler);
 app.get("/v1/responses", responsesWebSocketHandler);
 app.get("/v1/realtime", realtimeWebSocketHandler);
+app.get("/v1/realtime/translations", realtimeTranslationsHandler);
 app.post("/v1/realtime/client_secrets", realtimeClientSecretsHandler);
 app.get("/v1/live/sessions", liveSessionsSocketHandler);
 app.post("/v1/live/sessions", liveCreateHandler);

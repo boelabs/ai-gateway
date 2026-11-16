@@ -1,0 +1,67 @@
+---
+title: "Realtime translation"
+description: "GET /v1/realtime/translations — OpenAI's realtime speech translation, on OpenAI, Azure OpenAI and Gemini."
+---
+
+Translate live speech into another language over a WebSocket. The endpoint speaks OpenAI's realtime
+translation API, so OpenAI's clients work unchanged. The public model must support
+`audio.translate.realtime`:
+
+| Model | Provider | Price |
+|---|---|---|
+| `gpt-realtime-translate` | OpenAI, Azure OpenAI | $0.034 per minute of audio, billed per second |
+| `gemini-3.5-live-translate-preview` | Google AI Studio | Audio tokens: $3.50 in and $21.00 out per 1M (about $0.037 per minute) |
+
+## Connecting
+
+Open a WebSocket to `$GATEWAY/v1/realtime/translations?model=<public model>` with your virtual key in
+`Authorization: Bearer`. The gateway answers with `session.created`; the provider session opens with
+the first audio.
+
+## Events
+
+The client sends three events:
+
+```json
+{ "type": "session.update", "session": { "audio": { "output": { "language": "es" }, "input": { "transcription": { "model": "gpt-realtime-whisper" } } } } }
+```
+
+- `session.update`: `audio.output.language` (the target language),
+  `audio.input.transcription` (`{ "model": ... }` to receive the source transcript, `null` to stop)
+  and `audio.input.noise_reduction`. Answered with `session.updated`.
+- `session.input_audio_buffer.append`: base64 PCM16, mono, 24 kHz. Keep sending, silence included,
+  while the session is active; 200 ms chunks match the provider's frames.
+- `session.close`: the provider finishes translating what it already received, then the gateway sends
+  `session.closed` and closes the socket.
+
+The server sends `session.output_audio.delta` (24 kHz PCM16, with `sample_rate` and `channels`),
+`session.output_transcript.delta`, `session.input_transcript.delta` when the source transcript is on,
+and `error`. Deltas are append-only and carry `elapsed_ms`. There are no turns and no
+`response.create`.
+
+## Providers
+
+- **OpenAI and Azure OpenAI** run `gpt-realtime-translate` natively. On Azure the URL is the
+  resource's `/openai/v1/realtime/translations` with the deployment name as the model. The source
+  transcript runs on the model named in `transcription.model` (default `gpt-realtime-whisper`). That
+  model is billed at its own per-second rate, so it must be one the key may use and the catalog prices.
+- **Gemini** (`gemini-3.5-live-translate-preview`) runs through Gemini Live in translation mode. The
+  gateway converts the audio to and from Gemini's rates. `language` becomes Gemini's target language
+  (English when unset), and a source transcript is Gemini's own, whatever `transcription.model` says.
+  `noise_reduction` is accepted and not sent. Gemini fixes its configuration per connection, so
+  changing the language reconnects behind the same socket. Gemini also ends a connection about every
+  10 minutes; the gateway reconnects for it. Target languages outside Gemini's list are refused.
+
+Changing the language or the transcript mid-session applies to the speech that follows.
+
+## Limits and billing
+
+A connection lasts at most 60 minutes. Each connection is one `realtime.translation` operation. A
+virtual key is charged every 10 seconds of audio and whenever the provider reports usage. Once its
+budget is spent, the gateway sends an `error` with code `budget_exceeded` and closes the socket with
+1008. WebRTC (`/v1/realtime/translations/calls`) is not served: the media would bypass the gateway,
+and the translation API reports no usage to meter it by.
+
+The older AI Gateway extension, `session.translation` on
+[Realtime conversations](/docs/realtime-conversations), keeps working for
+`gemini-3.5-live-translate-preview`. New clients should use this endpoint.

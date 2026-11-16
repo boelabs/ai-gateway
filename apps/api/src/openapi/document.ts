@@ -617,6 +617,30 @@ export function buildOpenApiDocument() {
 					},
 				},
 			},
+			"/v1/realtime/translations": {
+				get: {
+					operationId: "openRealtimeTranslation",
+					tags: ["Inference"],
+					summary: "Realtime speech translation WebSocket (OpenAI-compatible)",
+					description:
+						"Requires Upgrade: websocket and ?model=<public model with audio.translate.realtime>. OpenAI's translation protocol: session.update (audio.output.language, audio.input.transcription, audio.input.noise_reduction), session.input_audio_buffer.append (24 kHz PCM16), session.close; the server sends session.created/updated, session.input_transcript.delta, session.output_transcript.delta, session.output_audio.delta, error and session.closed. Served by OpenAI and Azure OpenAI natively and by Gemini Live in translation mode.",
+					parameters: [
+						{
+							name: "model",
+							in: "query",
+							required: true,
+							schema: { type: "string" },
+						},
+					],
+					responses: {
+						"101": { description: "Switching Protocols" },
+						"400": errorResponse,
+						"401": errorResponse,
+						"426": errorResponse,
+						"429": errorResponse,
+					},
+				},
+			},
 			"/v1/live/sessions": {
 				get: {
 					operationId: "openLiveSession",
