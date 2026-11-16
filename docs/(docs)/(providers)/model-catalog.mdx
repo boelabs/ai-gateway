@@ -80,8 +80,8 @@ rules the admin API enforces.
 - For custom models, `catalogEntry.operations` is required and the gateway validates per-operation
   minimums: text requires `capabilities.tools|vision|reasoning|structuredOutputs`; `strictTools` is
   optional and must only be set when the upstream guarantees schema-adherent function arguments; image requires
-  `outputFormats`, `responseFormats`, and `sizes`, `arbitrarySize`, or `autoSize`; audio transcribe requires
-  `responseFormats`.
+  `outputFormats`, `responseFormats`, and `sizes`, `arbitrarySize`, or `autoSize`; audio transcribe and audio
+  speech require `responseFormats`.
 - Embeddings are declared with `embedding.create`. The profile may indicate `dimensions`,
   `supportsDimensions`, `minDimensions`, `maxDimensions`, `encodingFormats`, input limits, and
   `supportsTokenInput`. The presence of `embedding.create` enables `/v1/embeddings`.

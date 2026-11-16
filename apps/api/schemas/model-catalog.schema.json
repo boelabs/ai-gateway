@@ -87,6 +87,7 @@
 				"image.edit": { "$ref": "#/$defs/imageModelProfile" },
 				"video.generate": { "$ref": "#/$defs/videoModelProfile" },
 				"audio.transcribe": { "$ref": "#/$defs/transcriptionProfile" },
+				"audio.speech": { "$ref": "#/$defs/speechProfile" },
 				"audio.transcribe.realtime": {
 					"$ref": "#/$defs/realtimeTranscriptionProfile"
 				},
@@ -455,6 +456,29 @@
 					}
 				},
 				"maxFileBytes": { "type": "integer", "minimum": 1 }
+			}
+		},
+		"speechProfile": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["responseFormats"],
+			"properties": {
+				"transport": { "type": "string" },
+				"responseFormats": {
+					"type": "array",
+					"items": { "enum": ["mp3", "opus", "aac", "flac", "wav", "pcm"] },
+					"minItems": 1,
+					"uniqueItems": true
+				},
+				"voices": {
+					"type": "array",
+					"items": { "type": "string", "minLength": 1 },
+					"minItems": 1
+				},
+				"supportsInstructions": { "type": "boolean" },
+				"supportsSpeed": { "type": "boolean" },
+				"maxInputCharacters": { "type": "integer", "minimum": 1 },
+				"maxOutputTokens": { "type": "integer", "minimum": 1 }
 			}
 		},
 		"realtimeTranscriptionProfile": {

@@ -1,3 +1,4 @@
+import { SPEECH_RESPONSE_FORMATS } from "#core/speech.ts";
 import { UPSTREAM_TRANSPORTS } from "#core/transport.ts";
 import { OPERATION_IDS } from "#operations/registry.ts";
 import { CALL_TYPE_VALUES } from "#core/callType.ts";
@@ -378,6 +379,23 @@ const transcriptionOperationProfileSchema = z
 	})
 	.strict();
 
+const speechOperationProfileSchema = z
+	.object({
+		...transportField,
+		responseFormats: z
+			.array(z.enum(SPEECH_RESPONSE_FORMATS))
+			.min(1)
+			.refine((formats) => new Set(formats).size === formats.length, {
+				message: "must not repeat a format",
+			}),
+		voices: z.array(z.string().min(1)).min(1).optional(),
+		supportsInstructions: z.boolean().optional(),
+		supportsSpeed: z.boolean().optional(),
+		maxInputCharacters: z.int().positive().optional(),
+		maxOutputTokens: z.int().positive().optional(),
+	})
+	.strict();
+
 const realtimeTranscriptionOperationProfileSchema = z
 	.object({
 		...transportField,
@@ -609,6 +627,7 @@ export const operationProfilesSchema = z
 		"image.edit": imageOperationProfileSchema.optional(),
 		"video.generate": videoOperationProfileSchema.optional(),
 		"audio.transcribe": transcriptionOperationProfileSchema.optional(),
+		"audio.speech": speechOperationProfileSchema.optional(),
 		"audio.transcribe.realtime":
 			realtimeTranscriptionOperationProfileSchema.optional(),
 		"audio.converse.realtime":

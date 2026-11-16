@@ -994,6 +994,7 @@ const routerSettingsSchema = z
 				"images.edits",
 				"videos.generations",
 				"audio.transcriptions",
+				"audio.speech",
 				"realtime.transcription",
 				"realtime.conversation",
 				"embeddings",

@@ -65,6 +65,11 @@ import type {
 } from "#core/rerank.ts";
 
 import type {
+	CanonicalSpeechResponse,
+	CanonicalSpeechRequest,
+} from "#core/speech.ts";
+
+import type {
 	CanonicalDecisionResponse,
 	CanonicalDecisionRequest,
 } from "#core/decisions.ts";
@@ -113,6 +118,13 @@ export type TranscriptionExecResult =
 export interface EmbeddingsExecResult {
 	kind: "json";
 	response: CanonicalEmbeddingsResponse;
+	terminal: CanonicalTerminal;
+	diagnostics: AdapterDiagnostics;
+}
+
+export interface SpeechExecResult {
+	kind: "json";
+	response: CanonicalSpeechResponse;
 	terminal: CanonicalTerminal;
 	diagnostics: AdapterDiagnostics;
 }
@@ -494,6 +506,41 @@ export async function executeEmbeddings(
 			class: "server",
 			code: "upstream_protocol_error",
 			message: "Upstream embeddings response contained no embeddings",
+			failureKind: "transient",
+			deploymentHealth: "penalize",
+		});
+	}
+	return {
+		kind: "json",
+		response,
+		terminal: completedTerminal(),
+		diagnostics: adapterContextDiagnostics(ctx),
+	};
+}
+
+/** Executes a text-to-speech call; an answer without audio is a protocol error, not silence. */
+export async function executeSpeech(
+	adapter: Adapter,
+	req: CanonicalSpeechRequest,
+	ctx: AdapterContext,
+): Promise<SpeechExecResult> {
+	const handler = adapter.speech;
+	if (!handler) {
+		throw new Error(`Adapter "${adapter.key}" does not implement speech`);
+	}
+
+	const res = await dispatch(
+		handler.buildRequest(req, ctx),
+		ctx,
+		handler.mapError,
+	);
+
+	const response = handler.parseResponse(await readBody(res, ctx), ctx, req);
+	if (response.audio.byteLength === 0) {
+		throw new GatewayError({
+			class: "server",
+			code: "upstream_protocol_error",
+			message: "Upstream speech response contained no audio",
 			failureKind: "transient",
 			deploymentHealth: "penalize",
 		});

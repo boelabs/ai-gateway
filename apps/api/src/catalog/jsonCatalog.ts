@@ -1,3 +1,4 @@
+import { SPEECH_RESPONSE_FORMATS } from "#core/speech.ts";
 import { EFFORT_ORDER, type ReasoningControlKind } from "#core/reasoning.ts";
 import { ADAPTER_KEY_PATTERN, ADAPTER_KEY_RULE } from "#adapters/key.ts";
 import type { OperationProfiles } from "#profiles/types.ts";
@@ -31,6 +32,7 @@ const OPERATION_IDS = new Set<keyof OperationProfiles>([
 	"image.edit",
 	"video.generate",
 	"audio.transcribe",
+	"audio.speech",
 	"audio.transcribe.realtime",
 	"audio.converse.realtime",
 	"embedding.create",
@@ -589,6 +591,35 @@ function validateOperations(value: unknown, path: string): void {
 							`unknown format "${format}"`,
 						);
 					}
+				}
+			}
+		} else if (operation === "audio.speech") {
+			assertStringArray(
+				profile.responseFormats,
+				`${path}.${operation}.responseFormats`,
+			);
+			if (profile.responseFormats.length === 0) {
+				fail(`${path}.${operation}.responseFormats`, "must not be empty");
+			}
+			for (const format of profile.responseFormats) {
+				if (!(SPEECH_RESPONSE_FORMATS as readonly string[]).includes(format)) {
+					fail(
+						`${path}.${operation}.responseFormats`,
+						`unknown format "${format}"`,
+					);
+				}
+			}
+			if (profile.voices !== undefined) {
+				assertStringArray(profile.voices, `${path}.${operation}.voices`);
+			}
+			for (const key of ["supportsInstructions", "supportsSpeed"]) {
+				if (profile[key] !== undefined) {
+					assertBoolean(profile[key], `${path}.${operation}.${key}`);
+				}
+			}
+			for (const key of ["maxInputCharacters", "maxOutputTokens"]) {
+				if (profile[key] !== undefined) {
+					assertNumber(profile[key], `${path}.${operation}.${key}`);
 				}
 			}
 		} else if (operation === "rerank") {

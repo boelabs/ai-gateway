@@ -1,6 +1,7 @@
 import { buildOpenApiDocument } from "./document.ts";
 import assert from "node:assert/strict";
-import { parse, stringify } from "yaml";
+import { renderOpenApiYaml } from "./yaml.ts";
+import { parse } from "yaml";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
@@ -34,21 +35,16 @@ const doc = buildOpenApiDocument() as {
 };
 
 test("openapi: committed openapi.yaml is up to date with the generator", () => {
-	// Mirror scripts/openapi-generate.ts exactly so a stale committed file fails CI.
-	const banner =
-		"# GENERATED FILE - do not edit by hand.\n" +
-		"# Source: src/openapi/*.ts. Regenerate with `bun run openapi:generate`.\n";
-	const regenerated = banner + stringify(doc, { lineWidth: 0 });
 	assert.equal(
 		committed,
-		regenerated,
+		renderOpenApiYaml(doc),
 		"openapi.yaml is stale — run `bun run openapi:generate`",
 	);
 });
 
 test("openapi: document is a structurally valid 3.1 spec with resolving refs", () => {
 	assert.equal(doc.openapi, "3.1.0");
-	assert.equal(Object.keys(doc.paths).length, 60);
+	assert.equal(Object.keys(doc.paths).length, 61);
 
 	// Every local $ref must resolve to a defined component.
 	const text = JSON.stringify(doc);

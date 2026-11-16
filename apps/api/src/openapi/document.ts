@@ -7,6 +7,7 @@
 import { createDocument, type ZodOpenApiRequestBodyObject } from "zod-openapi";
 import { detailedMetrics, metricsQuery } from "#admin/metricsSchema.ts";
 import * as c from "./components.ts";
+import { SPEECH_CONTENT_TYPES } from "#core/speech.ts";
 import { z } from "zod/v4";
 
 const errorResponse = { $ref: "#/components/responses/Error" } as const;
@@ -569,6 +570,37 @@ export function buildOpenApiDocument() {
 								"text/plain": { schema: z.string() },
 								"text/event-stream": { schema: z.string() },
 							},
+						},
+						"400": errorResponse,
+						"401": errorResponse,
+						"403": errorResponse,
+						"413": errorResponse,
+						"429": errorResponse,
+					},
+				},
+			},
+			"/v1/audio/speech": {
+				post: {
+					operationId: "createSpeech",
+					tags: ["Inference"],
+					summary: "Generate speech from text (OpenAI-compatible)",
+					description:
+						"Returns the audio whole, in the requested `response_format` or the model's default. Formats, `instructions` and `speed` are checked against the model before any upstream call.",
+					requestBody: {
+						required: true,
+						content: {
+							"application/json": { schema: c.AudioSpeechRequest },
+						},
+					},
+					responses: {
+						"200": {
+							description: "The generated audio",
+							content: Object.fromEntries(
+								Object.values(SPEECH_CONTENT_TYPES).map((type) => [
+									type,
+									{ schema: { type: "string", format: "binary" } },
+								]),
+							),
 						},
 						"400": errorResponse,
 						"401": errorResponse,

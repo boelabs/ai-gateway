@@ -148,6 +148,15 @@ embeddings, rerankers, image and video models. Known transcription models today:
 `gpt-realtime-translate` and `gpt-realtime-whisper` are out of scope (no per-minute pricing, and no
 realtime transcription or translation on the OpenAI adapter yet).
 
+Text-to-speech models (`*-tts`, "text-to-speech") take the `audio.speech` operation. Known today:
+Google `gemini-3.8-flash-tts` and `gemini-3.8-flash-lite-tts`. Their profile lists the audio
+`responseFormats` the provider returns (default first; the gateway never transcodes), the prebuilt
+`voices`, `supportsInstructions`, `supportsSpeed` and `maxOutputTokens`; their pricing must declare
+`audioOutputCentsPerMTokens` in the base, in every service tier and in every scheduled change. Google's
+older `gemini-3.1-flash-tts-preview` and `gemini-2.5-*-preview-tts` take another request shape and are
+not catalogued; OpenAI's `gpt-4o-mini-tts`, `tts-1` and `tts-1-hd` are out of scope (no speech on the
+OpenAI adapter yet, and `tts-1` is priced per character).
+
 **Azure is read for you.** The aggregators never list Azure's deployment ids, so `catalog:sync` reads
 Microsoft's own list (`https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure`,
 both tabs) and reports "Listed by Azure, missing from the catalog" and "Retired by Azure, not

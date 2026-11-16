@@ -3875,6 +3875,168 @@
 				"inputCentsPerMTokens": 10,
 				"outputCentsPerMTokens": 0
 			}
+		},
+		"gemini-3.8-flash-tts": {
+			"operations": {
+				"audio.speech": {
+					"responseFormats": ["wav", "pcm"],
+					"voices": [
+						"Zephyr",
+						"Puck",
+						"Charon",
+						"Kore",
+						"Fenrir",
+						"Leda",
+						"Orus",
+						"Aoede",
+						"Callirrhoe",
+						"Autonoe",
+						"Enceladus",
+						"Iapetus",
+						"Umbriel",
+						"Algieba",
+						"Despina",
+						"Erinome",
+						"Algenib",
+						"Rasalgethi",
+						"Laomedeia",
+						"Achernar",
+						"Alnilam",
+						"Schedar",
+						"Gacrux",
+						"Pulcherrima",
+						"Achird",
+						"Zubenelgenubi",
+						"Vindemiatrix",
+						"Sadachbia",
+						"Sadaltager",
+						"Sulafat"
+					],
+					"supportsInstructions": true,
+					"maxOutputTokens": 16384
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 50,
+				"outputCentsPerMTokens": 900,
+				"audioOutputCentsPerMTokens": 900,
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 25,
+						"outputCentsPerMTokens": 450,
+						"audioOutputCentsPerMTokens": 450
+					},
+					"priority": {
+						"inputCentsPerMTokens": 90,
+						"outputCentsPerMTokens": 1620,
+						"audioOutputCentsPerMTokens": 1620
+					}
+				},
+				"scheduled": [
+					{
+						"effectiveFrom": "2027-01-01",
+						"pricing": {
+							"inputCentsPerMTokens": 100,
+							"outputCentsPerMTokens": 1800,
+							"audioOutputCentsPerMTokens": 1800,
+							"serviceTiers": {
+								"flex": {
+									"inputCentsPerMTokens": 50,
+									"outputCentsPerMTokens": 900,
+									"audioOutputCentsPerMTokens": 900
+								},
+								"priority": {
+									"inputCentsPerMTokens": 180,
+									"outputCentsPerMTokens": 3240,
+									"audioOutputCentsPerMTokens": 3240
+								}
+							}
+						}
+					}
+				]
+			},
+			"notes": "Text-to-speech (/v1/audio/speech). 8,192 input tokens. Output is audio, billed as output tokens; WAV or raw 24 kHz 16-bit PCM. Voices: the 30 prebuilt ones, the Extended Voice Library, or a designed or replicated voice_... id."
+		},
+		"gemini-3.8-flash-lite-tts": {
+			"operations": {
+				"audio.speech": {
+					"responseFormats": ["wav", "pcm"],
+					"voices": [
+						"Zephyr",
+						"Puck",
+						"Charon",
+						"Kore",
+						"Fenrir",
+						"Leda",
+						"Orus",
+						"Aoede",
+						"Callirrhoe",
+						"Autonoe",
+						"Enceladus",
+						"Iapetus",
+						"Umbriel",
+						"Algieba",
+						"Despina",
+						"Erinome",
+						"Algenib",
+						"Rasalgethi",
+						"Laomedeia",
+						"Achernar",
+						"Alnilam",
+						"Schedar",
+						"Gacrux",
+						"Pulcherrima",
+						"Achird",
+						"Zubenelgenubi",
+						"Vindemiatrix",
+						"Sadachbia",
+						"Sadaltager",
+						"Sulafat"
+					],
+					"supportsInstructions": true,
+					"maxOutputTokens": 16384
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 50,
+				"outputCentsPerMTokens": 600,
+				"audioOutputCentsPerMTokens": 600,
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 25,
+						"outputCentsPerMTokens": 300,
+						"audioOutputCentsPerMTokens": 300
+					},
+					"priority": {
+						"inputCentsPerMTokens": 90,
+						"outputCentsPerMTokens": 1080,
+						"audioOutputCentsPerMTokens": 1080
+					}
+				},
+				"scheduled": [
+					{
+						"effectiveFrom": "2027-01-01",
+						"pricing": {
+							"inputCentsPerMTokens": 100,
+							"outputCentsPerMTokens": 1200,
+							"audioOutputCentsPerMTokens": 1200,
+							"serviceTiers": {
+								"flex": {
+									"inputCentsPerMTokens": 50,
+									"outputCentsPerMTokens": 600,
+									"audioOutputCentsPerMTokens": 600
+								},
+								"priority": {
+									"inputCentsPerMTokens": 180,
+									"outputCentsPerMTokens": 2160,
+									"audioOutputCentsPerMTokens": 2160
+								}
+							}
+						}
+					}
+				]
+			},
+			"notes": "Text-to-speech (/v1/audio/speech), the cheaper and faster sibling of gemini-3.8-flash-tts. 8,192 input tokens. Output is audio, billed as output tokens; WAV or raw 24 kHz 16-bit PCM."
 		}
 	}
 }

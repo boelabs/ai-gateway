@@ -10,6 +10,7 @@ import {
 	embeddingProfileFor,
 	decisionProfileFor,
 	rerankProfileFor,
+	speechProfileFor,
 	imageProfileFor,
 	videoProfileFor,
 } from "#catalog/types.ts";
@@ -96,6 +97,9 @@ function resolveCandidates(
 				callType === "audio.transcriptions" &&
 				!transcriptionProfileFor(meta)
 			) {
+				continue;
+			}
+			if (callType === "audio.speech" && !speechProfileFor(meta)) {
 				continue;
 			}
 			if (

@@ -75,6 +75,8 @@ export function operationTemplate(id: string): Record<string, unknown> {
 			return { durations: ["5"], sizes: { "1280x720": {} } };
 		case "audio.transcribe":
 			return { responseFormats: ["json"] };
+		case "audio.speech":
+			return { responseFormats: ["mp3"] };
 		case "embedding.create":
 			return {};
 		case "rerank":
