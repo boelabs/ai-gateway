@@ -327,7 +327,7 @@ export function DeploymentForm({
 										: credential.name,
 								};
 							})}
-							label="Saved credential (optional)"
+							label="Reuse credentials"
 							onValueChange={setCredentialId}
 							searchPlaceholder="Search credentials"
 							value={credentialId}
@@ -373,13 +373,13 @@ export function DeploymentForm({
 				<div className="grid gap-4 sm:grid-cols-2">
 					<Input
 						defaultValue={existing?.label ?? ""}
-						label="Label (optional)"
+						label="Label"
 						name="label"
 						placeholder="e.g. primary key, EU region"
 					/>
 					<Input
 						defaultValue={existing?.failureDomain ?? ""}
-						label="Shared quota (optional)"
+						label="Shared quota"
 						name="failureDomain"
 						placeholder="e.g. openai-main-account"
 						title="Deployments with the same value share one provider quota: when one is throttled, all of them back off."
@@ -436,7 +436,7 @@ export function DeploymentForm({
 								? JSON.stringify(existing.metadata, null, 2)
 								: ""
 						}
-						label="Metadata (optional)"
+						label="Metadata"
 						name="metadata"
 						placeholder='{ "owner": "platform-team" }'
 						rows={4}

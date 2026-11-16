@@ -322,9 +322,9 @@ width. Build it from the page's own components and layout:
   `pending || navigating`). A failure never navigates, so the button unlocks with the error.
 - Full-page forms are a column of `Panel`s, one per group of related fields, then `FormActions`,
   across the content's full width like Billete's product form (two-column grids inside panels).
-  Required panels come first; optional groups follow in their own panels, labelled *(optional)*
-  field by field.
-- Labels are sentence case; optional fields say "(optional)" in the label.
+  Required panels come first; optional groups follow in their own panels.
+- Labels are sentence case. A required field's label ends in an asterisk, drawn by the field kit
+  from the control's `required`; an optional field's label carries no mark.
 - Creation selects for providers, models and roles start with a placeholder and require an explicit
   choice; editing preserves stored values; filters may default to *All*.
 - Put required credentials directly in the form flow. Keep help that changes a decision (*Leave a
