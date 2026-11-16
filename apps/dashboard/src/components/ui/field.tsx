@@ -32,7 +32,7 @@ function Root({
 			<BaseField.Root
 				{...props}
 				className={mergeClassName(
-					"flex min-w-0 flex-col items-start gap-2",
+					"group/field flex min-w-0 flex-col items-start gap-2",
 					className,
 				)}
 				style={mergeStyle({ borderRadius, width }, style)}

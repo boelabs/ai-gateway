@@ -21,20 +21,29 @@ export function CredentialFields({
 }) {
 	return (
 		<div className="grid gap-4 sm:grid-cols-2">
-			{required.map((field) => (
-				<Input
-					autoComplete="off"
+			{required.map((field, index) => (
+				// Two per row; a field left alone on its row takes the whole of it.
+				<div
+					className={
+						index === required.length - 1 && index % 2 === 0
+							? "sm:col-span-2"
+							: undefined
+					}
 					key={`${adapterKey}:${field}`}
-					label={CREDENTIAL_LABELS[field] ?? field}
-					name={`cred_${field}`}
-					required={!optional}
-					type={field === "baseUrl" ? "url" : "password"}
-				/>
+				>
+					<Input
+						autoComplete="off"
+						label={CREDENTIAL_LABELS[field] ?? field}
+						name={`cred_${field}`}
+						required={!optional}
+						type={field === "baseUrl" ? "url" : "password"}
+					/>
+				</div>
 			))}
 			<div className="sm:col-span-2">
 				<Textarea
 					className="resize-y font-mono text-xs"
-					label="Extra credentials (optional)"
+					label="Extra credentials"
 					name="credentialsExtra"
 					placeholder='{ "baseUrl": "https://…" }'
 					rows={2}

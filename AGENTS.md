@@ -161,8 +161,9 @@ bun test --preload ./tests/support/unitSetup.ts src/router/strategies.test.ts
 - Put required credentials directly in the form flow. Avoid decorative fieldsets and copy about
   encryption, validation or adapter internals. Keep help that changes a decision, such as leaving
   a credential blank to preserve it. Explain permissions next to the role selector, not in a page banner.
-- On a form page, required panels come first and optional groups follow in their own panels,
-  each optional field labelled "(optional)". Nothing optional hides behind a collapsed section.
+- On a form page, required panels come first and optional groups follow in their own panels. A
+  required field's label ends in an asterisk, drawn from the control's `required`; optional fields
+  carry no mark. Nothing optional hides behind a collapsed section.
 - Choose charts by the question: areas for activity over time, lines for latency, bars for interval
   volumes or category comparisons, and stacked meters (one bar split by share) for the parts of one total. Never
   stack overlapping subsets (cache writes, reasoning) or mix units on one axis. Missing measurements
