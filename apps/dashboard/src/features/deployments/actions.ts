@@ -2,8 +2,9 @@
 
 import { deleteDeployment, saveDeployment, updateDeployment } from "./api.ts";
 import type { CreateDeploymentInput } from "./common.ts";
+import { CACHE_TAGS } from "#/shared/api/cacheTags.ts";
+import { revalidatePath, updateTag } from "next/cache";
 import { attempt } from "#/shared/lib/action.ts";
-import { revalidatePath } from "next/cache";
 
 /**
  * Every write the models page can make.
@@ -13,6 +14,16 @@ import { revalidatePath } from "next/cache";
  * ends up in a request the browser composed.
  */
 const PAGE = "/models";
+
+/**
+ * Refreshes everything a deployment write changes: the models page, and the playground's cached
+ * copy of `GET /v1/models`. `updateTag` rather than `revalidateTag`, so the next visit waits for the
+ * new list instead of being served the old one once more.
+ */
+function revalidateDeployments() {
+	revalidatePath(PAGE);
+	updateTag(CACHE_TAGS.PUBLIC_MODELS);
+}
 
 export async function saveDeploymentAction(
 	body: CreateDeploymentInput,
@@ -24,7 +35,7 @@ export async function saveDeploymentAction(
 		"The deployment could not be saved.",
 	);
 	if (result.ok) {
-		revalidatePath(PAGE);
+		revalidateDeployments();
 	}
 	return result;
 }
@@ -35,7 +46,7 @@ export async function toggleDeploymentAction(id: string, enabled: boolean) {
 		"The deployment could not be updated.",
 	);
 	if (result.ok) {
-		revalidatePath(PAGE);
+		revalidateDeployments();
 	}
 	return result;
 }
@@ -46,7 +57,7 @@ export async function deleteDeploymentAction(id: string) {
 		"The deployment could not be deleted.",
 	);
 	if (result.ok) {
-		revalidatePath(PAGE);
+		revalidateDeployments();
 	}
 	return result;
 }
