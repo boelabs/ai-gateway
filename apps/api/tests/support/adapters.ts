@@ -7,6 +7,7 @@ type Capability =
 	| "imageEdit"
 	| "videoGeneration"
 	| "audioTranscription"
+	| "speech"
 	| "embeddings"
 	| "rerank";
 

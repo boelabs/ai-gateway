@@ -26,6 +26,7 @@ test("guided templates cover every operation without enabling speculative text c
 		"image.edit",
 		"video.generate",
 		"audio.transcribe",
+		"audio.speech",
 		"embedding.create",
 		"rerank",
 		"decision.create",

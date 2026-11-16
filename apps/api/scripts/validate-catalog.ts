@@ -110,7 +110,8 @@ function checkReplacements(
 /**
  * Providers bill audio tokens far above text, so an audio model priced only by its text rates is
  * under-billed on every request. A model with an audio operation and token pricing must say what its
- * audio costs: input always, output too when it speaks (realtime conversation).
+ * audio costs: input when it listens (transcription, conversation), output when it speaks
+ * (conversation, speech).
  */
 function checkAudioRates(
 	adapterKey: string,
@@ -127,13 +128,18 @@ function checkAudioRates(
 		) {
 			continue;
 		}
+		const listens = operations.some(
+			(operation) =>
+				operation.startsWith("audio.") && operation !== "audio.speech",
+		);
+		const speaks =
+			operations.includes("audio.converse.realtime") ||
+			operations.includes("audio.speech");
 		const required: Array<
 			"audioInputCentsPerMTokens" | "audioOutputCentsPerMTokens"
 		> = [
-			"audioInputCentsPerMTokens",
-			...(operations.includes("audio.converse.realtime")
-				? (["audioOutputCentsPerMTokens"] as const)
-				: []),
+			...(listens ? (["audioInputCentsPerMTokens"] as const) : []),
+			...(speaks ? (["audioOutputCentsPerMTokens"] as const) : []),
 		];
 		for (const field of required) {
 			if (pricing[field] === undefined) {

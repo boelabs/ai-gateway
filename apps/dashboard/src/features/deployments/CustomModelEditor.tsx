@@ -393,6 +393,16 @@ function OperationFields({
 			/>
 		);
 	}
+	if (id === "audio.speech") {
+		return (
+			<ListInput
+				description="Comma-separated, default first: mp3, opus, aac, flac, wav, pcm."
+				label="Speech response formats"
+				onChange={(responseFormats) => onChange({ responseFormats })}
+				value={profile.responseFormats}
+			/>
+		);
+	}
 	if (id === "rerank") {
 		return (
 			<ProfileNumber

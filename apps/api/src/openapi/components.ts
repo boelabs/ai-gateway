@@ -21,6 +21,7 @@ import "zod-openapi"; // ambient types for `.meta({ id, ... })`
 
 import { EXECUTION_POLICY_MAX_TOTAL_MS } from "#core/executionPolicy.ts";
 import { transcriptionFieldsSchema } from "#contracts/openai/audio.ts";
+import { speechRequestSchema } from "#contracts/openai/speech.ts";
 import { openAIDecisionRequestSchema } from "#contracts/openai/decisions.ts";
 import { geminiDecisionRequestSchema } from "#contracts/google/decisions.ts";
 import { systemOneRequestSchema } from "#contracts/typesafe/systemone.ts";
@@ -432,6 +433,14 @@ export const CompactResponseObject = z
 		usage: ResponsesUsage,
 	})
 	.meta({ id: "CompactResponseObject" });
+
+/* -------------------------------------------------------------------- speech */
+
+export const AudioSpeechRequest = speechRequestSchema.meta({
+	id: "AudioSpeechRequest",
+	description:
+		"Text to speak. `response_format` must be one the model returns; the gateway does not transcode. `stream_format: sse` is not served.",
+});
 
 /* ---------------------------------------------------------------- embeddings */
 
@@ -1200,6 +1209,7 @@ export const RouterSettings = z
 				"images.edits": OperationExecutionPolicy,
 				"videos.generations": OperationExecutionPolicy,
 				"audio.transcriptions": OperationExecutionPolicy,
+				"audio.speech": OperationExecutionPolicy,
 				"realtime.transcription": OperationExecutionPolicy,
 				"realtime.conversation": OperationExecutionPolicy,
 				embeddings: OperationExecutionPolicy,

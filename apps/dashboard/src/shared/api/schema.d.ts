@@ -482,6 +482,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/audio/speech": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate speech from text (OpenAI-compatible)
+         * @description Returns the audio whole, in the requested `response_format` or the model's default. Formats, `instructions` and `speed` are checked against the model before any upstream call.
+         */
+        post: operations["createSpeech"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/realtime/client_secrets": {
         parameters: {
             query?: never;
@@ -2291,7 +2311,7 @@ export interface paths {
                     bucket?: "hour" | "day";
                     publicModel?: string;
                     deploymentId?: string;
-                    operation?: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.transcribe.realtime" | "audio.converse.realtime" | "embedding.create" | "rerank" | "decision.create";
+                    operation?: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.speech" | "audio.transcribe.realtime" | "audio.converse.realtime" | "embedding.create" | "rerank" | "decision.create";
                 };
                 header?: never;
                 path?: never;
@@ -2921,6 +2941,20 @@ export interface components {
             };
             /** Format: binary */
             file: string;
+        };
+        /** @description Text to speak. `response_format` must be one the model returns; the gateway does not transcode. `stream_format: sse` is not served. */
+        AudioSpeechRequest: {
+            model: string;
+            input: string;
+            voice: string | {
+                id: string;
+            };
+            instructions?: string;
+            /** @enum {string} */
+            response_format?: "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm";
+            speed?: number;
+            /** @enum {string} */
+            stream_format?: "audio" | "sse";
         };
         RealtimeClientSecretRequest: {
             expires_after?: {
@@ -3760,6 +3794,10 @@ export interface components {
                     stream: components["schemas"]["ExecutionPolicy"];
                 };
                 "audio.transcriptions": {
+                    json: components["schemas"]["ExecutionPolicy"];
+                    stream: components["schemas"]["ExecutionPolicy"];
+                };
+                "audio.speech": {
                     json: components["schemas"]["ExecutionPolicy"];
                     stream: components["schemas"]["ExecutionPolicy"];
                 };
@@ -4992,6 +5030,40 @@ export interface operations {
                     "application/json": components["schemas"]["AudioTranscriptionResponse"];
                     "text/plain": string;
                     "text/event-stream": string;
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            413: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    createSpeech: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AudioSpeechRequest"];
+            };
+        };
+        responses: {
+            /** @description The generated audio */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/mpeg": string;
+                    "audio/opus": string;
+                    "audio/aac": string;
+                    "audio/flac": string;
+                    "audio/wav": string;
+                    "audio/pcm": string;
                 };
             };
             400: components["responses"]["Error"];

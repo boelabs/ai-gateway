@@ -78,6 +78,13 @@
       "when": 1794451158522,
       "tag": "0010_decisions_execution_policy",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794794042881,
+      "tag": "0011_speech_execution_policy",
+      "breakpoints": true
     }
   ]
 }
