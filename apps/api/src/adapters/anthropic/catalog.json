@@ -4,7 +4,6 @@
 	"provider": {
 		"id": "anthropic",
 		"adapterKey": "anthropic",
-		"name": "Anthropic",
 		"docs": [
 			"https://platform.claude.com/docs/en/about-claude/models/overview",
 			"https://platform.claude.com/docs/en/about-claude/pricing"

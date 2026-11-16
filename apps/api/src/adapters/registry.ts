@@ -93,6 +93,9 @@ export function registerAdapter(adapter: Adapter): void {
 	if (registry.has(adapter.key)) {
 		throw new Error(`Duplicate adapter: "${adapter.key}"`);
 	}
+	if (adapter.label.trim() === "") {
+		throw new Error(`Adapter "${adapter.key}" has no label.`);
+	}
 	// Consistency: every declared CallType must have its handler implemented.
 	for (const ct of adapter.supportedCallTypes) {
 		const capKey = HANDLER_KEY[ct];

@@ -2,6 +2,7 @@ import { DeploymentHeaderActions } from "#/features/deployments/DeploymentHeader
 import { RouteBoundary } from "#/shared/components/RouteBoundary.tsx";
 import { ButtonSkeleton } from "#/shared/components/Skeleton.tsx";
 import { savedCredentials } from "#/features/credentials/api.ts";
+import { adapterLabel } from "#/features/deployments/common.ts";
 import { TextSkeleton } from "#/shared/components/TextSkeleton";
 import { Breadcrumbs } from "#/shared/components/Breadcrumbs";
 import { PageHeader } from "#/components/ui/page";
@@ -10,15 +11,16 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import {
+	listDeployments,
+	adapterRegistry,
+	adapterLabels,
+	getDeployment,
+} from "#/features/deployments/api.ts";
+
+import {
 	DeploymentFormSkeleton,
 	DeploymentForm,
 } from "#/features/deployments/DeploymentForm.tsx";
-
-import {
-	listDeployments,
-	adapterRegistry,
-	getDeployment,
-} from "#/features/deployments/api.ts";
 
 /** One deployment's page: its identity and state up top, its editor below. */
 export default function DeploymentPage(
@@ -39,9 +41,10 @@ async function Deployment({
 	params: PageProps<"/models/[deployment]">["params"];
 }) {
 	const { deployment: id } = await params;
-	const [deployment, registry, credentials] = await Promise.all([
+	const [deployment, registry, labels, credentials] = await Promise.all([
 		getDeployment(id),
 		adapterRegistry(),
+		adapterLabels(),
 		savedCredentials(),
 	]);
 	if (!deployment) {
@@ -55,6 +58,7 @@ async function Deployment({
 	})
 		.then((page) => page.data.filter((row) => row.id !== deployment.id).length)
 		.catch(() => 1);
+	const provider = adapterLabel(labels, deployment.adapterKey);
 	return (
 		<>
 			<Breadcrumbs
@@ -62,12 +66,13 @@ async function Deployment({
 					{ label: "Models", href: "/models" },
 					{ label: deployment.publicModel },
 				]}
-				recent={`${deployment.publicModel} · ${deployment.adapterKey}`}
+				recent={`${deployment.publicModel} · ${provider}`}
 			/>
 			<PageHeader
 				actions={
 					<DeploymentHeaderActions
 						deployment={deployment}
+						provider={provider}
 						siblings={siblings}
 					/>
 				}
@@ -76,7 +81,7 @@ async function Deployment({
 						{deployment.enabled ? "Enabled" : "Disabled"}
 					</Status>
 				}
-				description={`${deployment.adapterKey} · ${deployment.upstreamModel}`}
+				description={`${provider} · ${deployment.upstreamModel}`}
 				title={deployment.publicModel}
 			/>
 			<DeploymentForm

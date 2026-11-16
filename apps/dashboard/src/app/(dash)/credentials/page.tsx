@@ -4,6 +4,7 @@ import { CREDENTIAL_HEADERS } from "#/features/credentials/common.ts";
 import { RouteBoundary } from "#/shared/components/RouteBoundary.tsx";
 import { TableSkeleton } from "#/shared/components/Skeleton.tsx";
 import { listCredentials } from "#/features/credentials/api.ts";
+import { adapterLabels } from "#/features/deployments/api.ts";
 import { PageHeader } from "#/components/ui/page";
 import { Suspense } from "react";
 
@@ -31,6 +32,9 @@ export default function CredentialsPage() {
 }
 
 async function Credentials() {
-	const { data } = await listCredentials({ limit: 200 });
-	return <CredentialsTable credentials={data} />;
+	const [{ data }, labels] = await Promise.all([
+		listCredentials({ limit: 200 }),
+		adapterLabels(),
+	]);
+	return <CredentialsTable adapterLabels={labels} credentials={data} />;
 }

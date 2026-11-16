@@ -122,7 +122,7 @@ export function CredentialForm({
 						disabled={editing}
 						items={adapters.map((entry) => ({
 							value: entry.id,
-							label: entry.id,
+							label: entry.label,
 						}))}
 						label="Adapter"
 						name="adapterKey"

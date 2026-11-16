@@ -35,6 +35,11 @@ import {
 	rate,
 } from "./metrics-data";
 
+import {
+	type AdapterLabels,
+	adapterLabel,
+} from "#/features/deployments/common.ts";
+
 type Deployment = DetailedMetrics["deployments"][number];
 type Model = DetailedMetrics["models"][number];
 type Failure = DetailedMetrics["failures"][number];
@@ -204,11 +209,13 @@ export function Metrics({
 	onChange,
 	actors = [],
 	keyNames = {},
+	adapterLabels = {},
 }: {
 	data: DetailedMetrics;
 	/** Usage per API key or operator for the same window (unfiltered by model or deployment). */
 	actors?: readonly UsageRow[];
 	keyNames?: Readonly<Record<string, string>>;
+	adapterLabels?: AdapterLabels;
 	options: Pick<DetailedMetrics, "models" | "deployments">;
 	search: MetricsSearch;
 	/** Covers a filter navigation as well as a refresh: both replace what is on screen. */
@@ -217,6 +224,8 @@ export function Metrics({
 }) {
 	const { requests } = data;
 	const { attempts } = data;
+	const provider = (key: string | null | undefined) =>
+		key ? adapterLabel(adapterLabels, key) : null;
 	const modelOptions = options.models.flatMap((row) =>
 		row.key ? [{ value: row.key, label: row.key }] : [],
 	);
@@ -231,7 +240,7 @@ export function Metrics({
 			? [
 					{
 						value: row.key,
-						label: `${row.label ?? row.key.slice(0, 8)} · ${row.adapter ?? "unknown adapter"} · ${row.key.slice(0, 8)}`,
+						label: `${row.label ?? row.key.slice(0, 8)} · ${provider(row.adapter) ?? "unknown adapter"} · ${row.key.slice(0, 8)}`,
 					},
 				]
 			: [],
@@ -255,7 +264,7 @@ export function Metrics({
 					disabled={!row.key}
 					onClick={() => onChange({ deploymentId: row.key ?? undefined })}
 					size="sm"
-					title={[row.adapter, row.key].filter(Boolean).join(" · ")}
+					title={[provider(row.adapter), row.key].filter(Boolean).join(" · ")}
 					variant="link"
 				>
 					{row.label ?? row.key?.slice(0, 8) ?? "Unattributed"}
@@ -595,7 +604,8 @@ export function Metrics({
 								(a, b) => b.totalTokens - a.totalTokens,
 							)}
 							search={{
-								getText: (row) => `${row.label} ${row.adapter} ${row.key}`,
+								getText: (row) =>
+									`${row.label} ${row.adapter} ${provider(row.adapter) ?? ""} ${row.key}`,
 								placeholder: "Search deployments…",
 							}}
 						/>

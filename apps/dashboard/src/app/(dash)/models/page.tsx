@@ -1,6 +1,6 @@
+import { listDeployments, adapterLabels } from "#/features/deployments/api.ts";
 import { ModelsSkeleton } from "#/features/deployments/ModelsSkeleton.tsx";
 import { RouteBoundary } from "#/shared/components/RouteBoundary.tsx";
-import { listDeployments } from "#/features/deployments/api.ts";
 import { PageHeader } from "#/components/ui/page";
 import { Suspense } from "react";
 
@@ -31,6 +31,9 @@ export default function ModelsPage() {
 }
 
 async function Deployments() {
-	const page = await listDeployments({ limit: 200 });
-	return <ModelsView deployments={page.data} />;
+	const [page, labels] = await Promise.all([
+		listDeployments({ limit: 200 }),
+		adapterLabels(),
+	]);
+	return <ModelsView adapterLabels={labels} deployments={page.data} />;
 }

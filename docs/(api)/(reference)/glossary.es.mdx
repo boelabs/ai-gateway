@@ -32,7 +32,7 @@ El identificador exacto que el adapter envía al proveedor. Puede diferir de `pu
 
 ## Adapter [#adapter]
 
-Código que implementa controladores canonical y sabe cómo traducirlos a uno o más transports ascendentes. Declara `supportedCallTypes`, `transports` y los controladores disponibles. El catálogo del proveedor se encuentra al lado del adapter; si falta, ese proveedor no está registrado.
+Código que implementa controladores canonical y sabe cómo traducirlos a uno o más transports ascendentes. Declara un `label` (el nombre del proveedor que ven los operadores), `supportedCallTypes`, `transports` y los controladores disponibles. El catálogo del proveedor se encuentra al lado del adapter; si falta, ese proveedor no está registrado.
 
 ## Transport [#transport]
 

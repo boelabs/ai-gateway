@@ -1,4 +1,5 @@
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { AdapterOperations } from "#openapi/components.ts";
 import { GatewayError } from "#core/errors.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -23,6 +24,28 @@ function adminAppWithErrors(): Hono {
 	app.route("/", platformAdminApp);
 	return app;
 }
+
+test("admin operations answers exactly its documented schema", async () => {
+	const response = await platformAdminApp.request("/operations");
+	const { data } = (await response.json()) as { data: unknown };
+	// Parsing strips undocumented fields, so equality also catches a field the schema is missing.
+	assert.deepEqual(AdapterOperations.parse(data), data);
+});
+
+test("admin operations names every adapter for operators", async () => {
+	const response = await platformAdminApp.request("/operations");
+	const body = (await response.json()) as {
+		data: { adapters: Array<{ id: string; label: string }> };
+	};
+	const labels = new Map(
+		body.data.adapters.map((adapter) => [adapter.id, adapter.label]),
+	);
+	assert.equal(labels.get("googleaistudio"), "Google AI Studio");
+	assert.equal(labels.get("openaicompatible"), "OpenAI-compatible");
+	for (const [id, label] of labels) {
+		assert.ok(label.trim(), `adapter ${id} has no label`);
+	}
+});
 
 test("admin operations exposes embeddings by operation, endpoint, and transport per adapter", async () => {
 	const response = await platformAdminApp.request("/operations");

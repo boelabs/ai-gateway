@@ -4438,11 +4438,56 @@ export interface components {
         };
         /** @description Available operations, required credentials and transports, per registered adapter. */
         AdapterOperations: {
-            adapters: {
-                [key: string]: unknown;
+            operations: {
+                /** @enum {string} */
+                id: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.speech" | "audio.transcribe.realtime" | "audio.converse.realtime" | "audio.translate.realtime" | "audio.live" | "embedding.create" | "rerank" | "decision.create";
+                /** @enum {string} */
+                family: "text" | "image" | "video" | "audio" | "embedding" | "reranking" | "decision";
+                label: string;
+                /** @enum {string} */
+                callType: "chat" | "images.generations" | "images.edits" | "videos.generations" | "audio.transcriptions" | "audio.speech" | "realtime.transcription" | "realtime.conversation" | "realtime.translation" | "live.session" | "embeddings" | "rerank" | "decisions";
+                publicEndpoints: string[];
             }[];
-        } & {
-            [key: string]: unknown;
+            adapters: components["schemas"]["AdapterSummary"][];
+        };
+        AdapterSummary: {
+            /** @description Adapter key, as adapterKey. */
+            id: string;
+            /** @description Provider name for people (Google AI Studio). */
+            label: string;
+            credentials: {
+                required: string[];
+            };
+            supportedCallTypes: ("chat" | "images.generations" | "images.edits" | "videos.generations" | "audio.transcriptions" | "audio.speech" | "realtime.transcription" | "realtime.conversation" | "realtime.translation" | "live.session" | "embeddings" | "rerank" | "decisions")[];
+            /** @description Models the adapter's catalog knows. Empty for openaicompatible, which ships no catalog. */
+            models: {
+                id: string;
+                operations: string[];
+                /** @constant */
+                deprecated?: true;
+            }[];
+            operations: {
+                /** @enum {string} */
+                id: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.speech" | "audio.transcribe.realtime" | "audio.converse.realtime" | "audio.translate.realtime" | "audio.live" | "embedding.create" | "rerank" | "decision.create";
+                /** @enum {string} */
+                family: "text" | "image" | "video" | "audio" | "embedding" | "reranking" | "decision";
+                label: string;
+                /** @enum {string} */
+                callType: "chat" | "images.generations" | "images.edits" | "videos.generations" | "audio.transcriptions" | "audio.speech" | "realtime.transcription" | "realtime.conversation" | "realtime.translation" | "live.session" | "embeddings" | "rerank" | "decisions";
+                publicEndpoints: string[];
+                transports: string[];
+                defaultTransport: string | null;
+                contentInputs: {
+                    [key: string]: {
+                        [key: string]: components["schemas"]["ContentInputSupport"];
+                    };
+                };
+            }[];
+        };
+        ContentInputSupport: {
+            sources: ("provider_file_id" | "url" | "data_url")[];
+            mimeTypes?: string[];
+            maxBytes?: number;
         };
         /** @description Dry-run resolution of a deployment body: effective capabilities, operations and transports, without saving. */
         ResolvedDeployment: {

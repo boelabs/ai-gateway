@@ -81,6 +81,21 @@ test("JSON provider catalogs keep model ids as object keys", () => {
 	}
 });
 
+test("a catalog's provider block rejects fields the loader does not know", () => {
+	const source = new URL("../adapters/deepseek/catalog.json", import.meta.url);
+	const doc = JSON.parse(readFileSync(source, "utf8"));
+	const dir = mkdtempSync(join(tmpdir(), "catalog-"));
+	const url = pathToFileURL(join(dir, "catalog.json"));
+	try {
+		// The provider's name is the adapter's label; a catalog copy would drift from it.
+		doc.provider.name = "DeepSeek";
+		writeFileSync(url, JSON.stringify(doc));
+		assert.throws(() => loadCatalogDocument(url), /unknown field "name"/u);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
 test("a Gemini thinkingLevel ladder only declares levels Gemini accepts", () => {
 	const source = new URL("../adapters/google/catalog.json", import.meta.url);
 	const doc = JSON.parse(readFileSync(source, "utf8"));

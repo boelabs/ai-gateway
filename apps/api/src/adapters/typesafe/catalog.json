@@ -4,7 +4,6 @@
 	"provider": {
 		"id": "typesafe",
 		"adapterKey": "typesafe",
-		"name": "TypeSafe",
 		"docs": [
 			"https://docs.typesafe.ai/api",
 			"https://docs.typesafe.ai/models",

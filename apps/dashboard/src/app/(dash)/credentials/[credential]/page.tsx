@@ -1,8 +1,9 @@
 import { CredentialHeaderActions } from "#/features/credentials/CredentialHeaderActions.tsx";
+import { adapterRegistry, adapterLabels } from "#/features/deployments/api.ts";
 import { RouteBoundary } from "#/shared/components/RouteBoundary.tsx";
 import { credentialHint } from "#/features/credentials/common.ts";
 import { ButtonSkeleton } from "#/shared/components/Skeleton.tsx";
-import { adapterRegistry } from "#/features/deployments/api.ts";
+import { adapterLabel } from "#/features/deployments/common.ts";
 import { TextSkeleton } from "#/shared/components/TextSkeleton";
 import { getCredential } from "#/features/credentials/api.ts";
 import { Breadcrumbs } from "#/shared/components/Breadcrumbs";
@@ -36,14 +37,16 @@ export default function CredentialPage(
 
 async function Credential({ params }: { params: Params }) {
 	const { credential: id } = await params;
-	const [credential, registry] = await Promise.all([
+	const [credential, registry, labels] = await Promise.all([
 		CREDENTIAL_ID.test(id) ? getCredential(id) : null,
 		adapterRegistry(),
+		adapterLabels(),
 	]);
 	if (!credential) {
 		notFound();
 	}
 	const hint = credentialHint(credential);
+	const provider = adapterLabel(labels, credential.adapterKey);
 	return (
 		<>
 			<Breadcrumbs
@@ -58,11 +61,10 @@ async function Credential({ params }: { params: Params }) {
 				description={
 					hint ? (
 						<>
-							{credential.adapterKey} ·{" "}
-							<span className="font-mono">{hint}</span>
+							{provider} · <span className="font-mono">{hint}</span>
 						</>
 					) : (
-						credential.adapterKey
+						provider
 					)
 				}
 				title={credential.name}

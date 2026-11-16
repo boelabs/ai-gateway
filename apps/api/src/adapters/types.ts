@@ -495,6 +495,8 @@ export interface VideoHandler {
  */
 export interface Adapter {
 	key: string;
+	/** Provider name shown to operators ("Google AI Studio"); the key stays the stored identifier. */
+	label: string;
 	credentials: {
 		required: readonly string[];
 	};

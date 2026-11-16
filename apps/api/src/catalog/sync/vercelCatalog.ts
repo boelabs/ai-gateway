@@ -725,7 +725,6 @@ export function buildVercelCatalog(
 			provider: {
 				id: "vercel",
 				adapterKey: "vercel",
-				name: "Vercel AI Gateway",
 				docs: [
 					"https://vercel.com/docs/ai-gateway/sdks-and-apis",
 					"https://vercel.com/docs/ai-gateway/models-and-providers",

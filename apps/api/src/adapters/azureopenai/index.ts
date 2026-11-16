@@ -8,7 +8,7 @@ import {
 	makeAzurev1Adapter,
 } from "#adapters/azurev1.ts";
 
-const LABEL = "Azure OpenAI v1";
+const LABEL = "Azure OpenAI";
 
 /** Chat, Responses, and embeddings use Azure's OpenAI-compatible v1 surface. */
 const base = makeAzurev1Adapter({

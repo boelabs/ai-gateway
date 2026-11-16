@@ -2645,6 +2645,7 @@ const geminiConversation = makeGeminiRealtimeConversationHandler({
 
 export const googleAdapter: Adapter = {
 	key: "googleaistudio",
+	label: "Google AI Studio",
 	credentials: { required: ["apiKey"] },
 	serviceModes: SERVICE_MODES,
 	supportedCallTypes: new Set([

@@ -4,7 +4,6 @@
 	"provider": {
 		"id": "azurefoundry",
 		"adapterKey": "azurefoundry",
-		"name": "Azure AI Foundry",
 		"docs": [
 			"https://learn.microsoft.com/azure/ai-foundry/foundry-models/concepts/models"
 		]

@@ -8,6 +8,7 @@ import type { Adapter, ProviderModule } from "#adapters/types.ts";
  */
 export const typesafeAdapter = {
 	key: "typesafe",
+	label: "TypeSafe",
 	credentials: { required: ["apiKey"] },
 	supportedCallTypes: new Set(["decisions"]),
 	decisions: makeSystemOneDecisionsHandler(),

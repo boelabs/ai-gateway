@@ -123,7 +123,6 @@ export function buildOpenRouterRerankCatalog(
 			provider: {
 				id: "openrouter",
 				adapterKey: "openrouter",
-				name: "OpenRouter",
 				docs: [
 					"https://openrouter.ai/docs/api/api-reference/rerank/submit-a-rerank-request",
 					"https://openrouter.ai/docs/guides/routing/provider-selection",
