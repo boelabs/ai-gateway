@@ -397,6 +397,17 @@ const speechOperationProfileSchema = z
 	})
 	.strict();
 
+const realtimeTranslationOperationProfileSchema = z
+	.object({
+		...transportField,
+		languages: z.array(z.string().min(1)).min(1).optional(),
+		supportsInputTranscription: z.boolean().optional(),
+		separateInputTranscription: z.boolean().optional(),
+		supportsNoiseReduction: z.boolean().optional(),
+		maxUpstreamSessionSeconds: z.int().positive().optional(),
+	})
+	.strict();
+
 const liveOperationProfileSchema = z
 	.object({
 		...transportField,
@@ -642,6 +653,8 @@ export const operationProfilesSchema = z
 			realtimeTranscriptionOperationProfileSchema.optional(),
 		"audio.converse.realtime":
 			realtimeConversationOperationProfileSchema.optional(),
+		"audio.translate.realtime":
+			realtimeTranslationOperationProfileSchema.optional(),
 		"audio.live": liveOperationProfileSchema.optional(),
 		"embedding.create": embeddingOperationProfileSchema.optional(),
 		rerank: rerankOperationProfileSchema.optional(),

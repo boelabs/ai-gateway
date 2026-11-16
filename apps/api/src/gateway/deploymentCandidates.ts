@@ -12,6 +12,7 @@ import {
 	rerankProfileFor,
 	speechProfileFor,
 	liveProfileFor,
+	realtimeTranslationProfileFor,
 	imageProfileFor,
 	videoProfileFor,
 } from "#catalog/types.ts";
@@ -104,6 +105,12 @@ function resolveCandidates(
 				continue;
 			}
 			if (callType === "live.session" && !liveProfileFor(meta)) {
+				continue;
+			}
+			if (
+				callType === "realtime.translation" &&
+				!realtimeTranslationProfileFor(meta)
+			) {
 				continue;
 			}
 			if (

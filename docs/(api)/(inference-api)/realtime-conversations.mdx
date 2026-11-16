@@ -95,7 +95,7 @@ the secret was minted with (`type: "transcription"` opens a transcription sessio
 | `max_output_tokens` | Per session. |
 | `reasoning.effort` | Only on models that take it: `low`/`medium`/`high` on `gemini-3.8-live-extended-thinking` (which requires one: `low`, OpenAI's default, when unset), `minimal` to `high` on `gemini-3.1-flash-live-preview`. `gemini-3.8-live` reasons on its own and refuses it. |
 | `truncation` | `auto` (default) lets the provider compress old context so a conversation can run past its context window; `disabled` keeps everything (Gemini then ends audio sessions after 15 minutes). |
-| `translation` | AI Gateway extension, required by `gemini-3.5-live-translate-preview`: `{ "target_language": "es", "echo_target_language": false }`. The source language is detected. Translation streams without turns, so each response is one phrase: it ends after 1.5 seconds without translated speech, and the silence between phrases is not sent. |
+| `translation` | AI Gateway extension, required by `gemini-3.5-live-translate-preview` here; new clients should use the standard [Realtime translation](/docs/realtime-translations) endpoint instead: `{ "target_language": "es", "echo_target_language": false }`. The source language is detected. Translation streams without turns, so each response is one phrase: it ends after 1.5 seconds without translated speech, and the silence between phrases is not sent. |
 
 Gemini fixes a session's setup when it opens, and a resumed session keeps its old setup. So
 changing instructions, tools, voice, turn detection or any other provider setting mid-session opens

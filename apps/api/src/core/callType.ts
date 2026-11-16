@@ -12,6 +12,7 @@ const CALL_TYPES = [
 	"audio.speech",
 	"realtime.transcription",
 	"realtime.conversation",
+	"realtime.translation",
 	"live.session",
 	"embeddings",
 	"rerank",

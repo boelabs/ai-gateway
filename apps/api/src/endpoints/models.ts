@@ -133,6 +133,11 @@ function addModalitiesForOperation(
 			output.add("audio");
 			output.add("text");
 			break;
+		case "audio.translate.realtime":
+			input.add("audio");
+			output.add("audio");
+			output.add("text");
+			break;
 		case "audio.live":
 			input.add("audio");
 			input.add("text");

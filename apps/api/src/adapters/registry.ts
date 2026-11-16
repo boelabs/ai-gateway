@@ -19,6 +19,7 @@ const HANDLER_KEY: Partial<Record<CallType, keyof Adapter>> = {
 	"audio.speech": "speech",
 	"realtime.transcription": "realtimeTranscription",
 	"realtime.conversation": "realtimeConversation",
+	"realtime.translation": "realtimeTranslation",
 	"live.session": "liveSession",
 	embeddings: "embeddings",
 	rerank: "rerank",

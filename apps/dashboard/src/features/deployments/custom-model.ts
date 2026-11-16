@@ -78,6 +78,7 @@ export function operationTemplate(id: string): Record<string, unknown> {
 		case "audio.speech":
 			return { responseFormats: ["mp3"] };
 		case "audio.live":
+		case "audio.translate.realtime":
 			return {};
 		case "embedding.create":
 			return {};

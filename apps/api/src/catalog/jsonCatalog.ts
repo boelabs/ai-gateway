@@ -36,6 +36,7 @@ const OPERATION_IDS = new Set<keyof OperationProfiles>([
 	"audio.speech",
 	"audio.transcribe.realtime",
 	"audio.converse.realtime",
+	"audio.translate.realtime",
 	"audio.live",
 	"embedding.create",
 	"rerank",
@@ -642,6 +643,19 @@ function validateOperations(value: unknown, path: string): void {
 			}
 			if (profile.voices !== undefined) {
 				assertStringArray(profile.voices, `${path}.${operation}.voices`);
+			}
+		} else if (operation === "audio.translate.realtime") {
+			if (profile.languages !== undefined) {
+				assertStringArray(profile.languages, `${path}.${operation}.languages`);
+			}
+			for (const key of [
+				"supportsInputTranscription",
+				"separateInputTranscription",
+				"supportsNoiseReduction",
+			]) {
+				if (profile[key] !== undefined) {
+					assertBoolean(profile[key], `${path}.${operation}.${key}`);
+				}
 			}
 		} else if (operation === "rerank") {
 			assertStringArray(

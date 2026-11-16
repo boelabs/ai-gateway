@@ -603,6 +603,19 @@
 			},
 			"notes": "Realtime transcription (wss /openai/v1/realtime?intent=transcription, deployment name as the model). No server VAD: the client commits each utterance. Azure Global meter: $1.02 per hour of audio ($0.017 per minute), billed here by the second."
 		},
+		"gpt-realtime-translate": {
+			"operations": {
+				"audio.translate.realtime": {
+					"supportsInputTranscription": true,
+					"separateInputTranscription": true,
+					"supportsNoiseReduction": true
+				}
+			},
+			"pricing": {
+				"audioInputCentsPerSecond": 0.056667
+			},
+			"notes": "Realtime speech-to-speech translation (wss /openai/v1/realtime/translations?model=<deployment>). The source transcript runs on a separate deployment (transcription.model), billed at its own rate. Azure Global meter: $2.04 per hour of audio ($0.034 per minute)."
+		},
 		"gpt-realtime-whisper": {
 			"operations": {
 				"audio.transcribe.realtime": {

@@ -94,6 +94,9 @@
 				"audio.converse.realtime": {
 					"$ref": "#/$defs/realtimeConversationProfile"
 				},
+				"audio.translate.realtime": {
+					"$ref": "#/$defs/realtimeTranslationProfile"
+				},
 				"audio.live": { "$ref": "#/$defs/liveProfile" },
 				"embedding.create": { "$ref": "#/$defs/embeddingProfile" },
 				"rerank": { "$ref": "#/$defs/rerankProfile" },
@@ -480,6 +483,22 @@
 				"supportsSpeed": { "type": "boolean" },
 				"maxInputCharacters": { "type": "integer", "minimum": 1 },
 				"maxOutputTokens": { "type": "integer", "minimum": 1 }
+			}
+		},
+		"realtimeTranslationProfile": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"transport": { "type": "string" },
+				"languages": {
+					"type": "array",
+					"items": { "type": "string", "minLength": 1 },
+					"minItems": 1
+				},
+				"supportsInputTranscription": { "type": "boolean" },
+				"separateInputTranscription": { "type": "boolean" },
+				"supportsNoiseReduction": { "type": "boolean" },
+				"maxUpstreamSessionSeconds": { "type": "integer", "minimum": 1 }
 			}
 		},
 		"liveProfile": {

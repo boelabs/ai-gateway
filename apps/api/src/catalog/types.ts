@@ -5,6 +5,7 @@ import type { UpstreamTransport } from "#core/transport.ts";
 import type { TranscriptionProfile } from "#core/audio.ts";
 import type { SpeechProfile } from "#core/speech.ts";
 import type { LiveProfile } from "#core/live.ts";
+import type { RealtimeTranslationProfile } from "#core/realtimeTranslation.ts";
 import type { OperationId } from "#operations/registry.ts";
 import type { RuntimeModelMetadata } from "#db/schema.ts";
 import type { DecisionProfile } from "#core/decisions.ts";
@@ -85,6 +86,12 @@ export function speechProfileFor(
 	meta: ResolvedModelMetadata,
 ): SpeechProfile | undefined {
 	return meta.operations?.["audio.speech"];
+}
+
+export function realtimeTranslationProfileFor(
+	meta: ResolvedModelMetadata,
+): RealtimeTranslationProfile | undefined {
+	return meta.operations?.["audio.translate.realtime"];
 }
 
 export function liveProfileFor(

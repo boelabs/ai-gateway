@@ -1,5 +1,6 @@
 import type { ServiceMode } from "#core/serviceMode.ts";
 import { makeGeminiRealtimeConversationHandler } from "./liveConversation.ts";
+import { makeGeminiRealtimeTranslationHandler } from "./liveTranslation.ts";
 import { mergeExtraBody, mergeExtraBodyDeep } from "#core/extraBody.ts";
 import { type BaseCreds, requireApiKeyCreds } from "#adapters/creds.ts";
 import { makeGeminiDecisionsHandler } from "#adapters/decisions.ts";
@@ -2637,6 +2638,11 @@ const audioTranscription: TranscriptionHandler = {
 	},
 };
 
+const geminiConversation = makeGeminiRealtimeConversationHandler({
+	creds,
+	mapError: mapGoogleError,
+});
+
 export const googleAdapter: Adapter = {
 	key: "googleaistudio",
 	credentials: { required: ["apiKey"] },
@@ -2650,6 +2656,7 @@ export const googleAdapter: Adapter = {
 		"audio.speech",
 		"realtime.transcription",
 		"realtime.conversation",
+		"realtime.translation",
 		"embeddings",
 		"decisions",
 	]),
@@ -2663,10 +2670,8 @@ export const googleAdapter: Adapter = {
 		creds,
 		mapError: mapGoogleError,
 	}),
-	realtimeConversation: makeGeminiRealtimeConversationHandler({
-		creds,
-		mapError: mapGoogleError,
-	}),
+	realtimeConversation: geminiConversation,
+	realtimeTranslation: makeGeminiRealtimeTranslationHandler(geminiConversation),
 	embeddings,
 	decisions: makeGeminiDecisionsHandler(
 		DEFAULT_BASE,
@@ -2786,6 +2791,10 @@ export const googleAdapter: Adapter = {
 			default: "bidi_generate_content",
 		},
 		"realtime.conversation": {
+			supported: ["bidi_generate_content"],
+			default: "bidi_generate_content",
+		},
+		"realtime.translation": {
 			supported: ["bidi_generate_content"],
 			default: "bidi_generate_content",
 		},

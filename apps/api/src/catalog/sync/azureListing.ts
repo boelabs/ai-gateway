@@ -51,8 +51,6 @@ export const AZURE_LISTING_UNSERVED: Readonly<
 			"Deprecated by OpenAI, and Azure publishes no Global price meter for it.",
 		"gpt-realtime-1.5":
 			"Azure publishes no Global price meter for it, so it could not be billed.",
-		"gpt-realtime-translate":
-			"Realtime translation (/realtime/translations); AI Gateway has no translation operation.",
 		tts: "Text to speech; AI Gateway has no speech operation.",
 		"tts-hd": "Text to speech; AI Gateway has no speech operation.",
 		"gpt-4o-mini-tts": "Text to speech; AI Gateway has no speech operation.",

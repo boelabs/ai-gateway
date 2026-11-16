@@ -2,7 +2,16 @@ import { upstreamWebSocket } from "#gateway/instrumentedTransport.ts";
 import { EventQueue, closeStatus, rawText } from "./google/live.ts";
 import { abortGatewayError } from "#gateway/abortReason.ts";
 import { createPcmResampler } from "#audio/pcm.ts";
-import { realtimeTranscriptionProfileFor } from "#catalog/types.ts";
+import {
+	realtimeTranscriptionProfileFor,
+	realtimeTranslationProfileFor,
+} from "#catalog/types.ts";
+import {
+	type CanonicalRealtimeTranslationConfig,
+	type CanonicalRealtimeTranslationEvent,
+	type RealtimeTranslationProfile,
+	TRANSLATION_AUDIO_RATE,
+} from "#core/realtimeTranslation.ts";
 import { GatewayError } from "#core/errors.ts";
 
 import type {
@@ -17,6 +26,8 @@ import type {
 } from "#core/realtime.ts";
 
 import type {
+	RealtimeTranslationSession,
+	RealtimeTranslationHandler,
 	RealtimeTranscriptionHandler,
 	RealtimeTranscriptionSession,
 	RealtimeConversationHandler,
@@ -820,6 +831,184 @@ export function makeOpenAIRealtimeTranscriptionHandler(
 				endUtterance() {
 					audio.flush();
 					open.send({ type: "input_audio_buffer.commit" });
+				},
+				events: queue.iterate(),
+				close() {
+					if (open.closed) {
+						return;
+					}
+					open.close();
+					queue.end();
+				},
+			};
+		},
+	};
+}
+
+/* ------------------------------------------------------------------ translation */
+
+/** The source transcript model used when the client enables one without naming it. */
+const DEFAULT_TRANSLATION_TRANSCRIPTION_MODEL = "gpt-realtime-whisper";
+/** Translation audio is sent in the 200 ms frames the engine consumes. */
+const TRANSLATION_CHUNK_BYTES = (TRANSLATION_AUDIO_RATE / 5) * 2;
+/** How long `finish` waits for `session.closed` before giving up on the remaining output. */
+const TRANSLATION_FINISH_MS = 10_000;
+
+/** `https://api.openai.com/v1` -> `wss://api.openai.com/v1/realtime/translations?model=…`. */
+export function openAIRealtimeTranslationUrl(
+	base: string,
+	model: string,
+): string {
+	const url = new URL(openAIRealtimeUrl(base, model));
+	url.pathname = `${url.pathname}/translations`;
+	return url.toString();
+}
+
+/** The canonical configuration as a translation `session.update`. */
+export function openAITranslationSession(
+	config: CanonicalRealtimeTranslationConfig,
+	profile: RealtimeTranslationProfile | undefined,
+): Record<string, unknown> {
+	return {
+		audio: {
+			input: {
+				transcription: config.inputTranscription
+					? {
+							model:
+								config.inputTranscription.model ??
+								DEFAULT_TRANSLATION_TRANSCRIPTION_MODEL,
+						}
+					: null,
+				...(profile?.supportsNoiseReduction
+					? { noise_reduction: config.noiseReduction }
+					: {}),
+			},
+			...(config.language ? { output: { language: config.language } } : {}),
+		},
+	};
+}
+
+function elapsedMs(value: unknown): number | null {
+	return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * OpenAI's realtime translation API (`/v1/realtime/translations`, gpt-realtime-translate) as a
+ * translation upstream, on OpenAI or Azure's v1 surface. Audio is already at the 24 kHz it takes.
+ */
+export function makeOpenAIRealtimeTranslationHandler(
+	deps: OpenAIRealtimeDeps,
+): RealtimeTranslationHandler {
+	return {
+		async connect(config, ctx): Promise<RealtimeTranslationSession> {
+			const queue = new EventQueue<CanonicalRealtimeTranslationEvent>();
+			const profile = realtimeTranslationProfileFor(ctx.meta);
+			let finished: (() => void) | null = null;
+			let connection: OpenAIRealtimeConnection | undefined;
+			const onEvent = (raw: unknown) => {
+				const event = record(raw) ?? {};
+				const at = elapsedMs(event.elapsed_ms);
+				const delta = typeof event.delta === "string" ? event.delta : "";
+				switch (event.type) {
+					case "session.input_transcript.delta":
+						if (delta) {
+							queue.push({
+								kind: "input_transcript",
+								text: delta,
+								elapsedMs: at,
+							});
+						}
+						return;
+					case "session.output_transcript.delta":
+						if (delta) {
+							queue.push({
+								kind: "output_transcript",
+								text: delta,
+								elapsedMs: at,
+							});
+						}
+						return;
+					case "session.output_audio.delta":
+						if (delta) {
+							queue.push({
+								kind: "output_audio",
+								pcm: Buffer.from(delta, "base64"),
+								elapsedMs: at,
+							});
+						}
+						return;
+					case "error": {
+						const error = record(event.error);
+						queue.push({
+							kind: "provider_error",
+							code: typeof error?.code === "string" ? error.code : null,
+						});
+						return;
+					}
+					case "session.closed":
+						// The provider drained its output; close before it hangs up on us.
+						connection?.close();
+						queue.end();
+						finished?.();
+						return;
+					default:
+						return;
+				}
+			};
+			connection = await connectOpenAIRealtime({
+				ctx,
+				deps,
+				url: openAIRealtimeTranslationUrl(
+					deps.resolveConnection(ctx).url,
+					ctx.upstreamModel,
+				),
+				session: openAITranslationSession(config, profile),
+				onEvent,
+				onFail: (error) => queue.fail(error),
+			});
+			const open = connection;
+			let pending: Buffer[] = [];
+			let pendingBytes = 0;
+			const flush = () => {
+				if (pendingBytes === 0) {
+					return;
+				}
+				const audio = Buffer.concat(pending);
+				pending = [];
+				pendingBytes = 0;
+				open.send({
+					type: "session.input_audio_buffer.append",
+					audio: audio.toString("base64"),
+				});
+			};
+
+			return {
+				appendAudio(pcm) {
+					if (open.closed) {
+						return;
+					}
+					pending.push(pcm);
+					pendingBytes += pcm.byteLength;
+					if (pendingBytes >= TRANSLATION_CHUNK_BYTES) {
+						flush();
+					}
+				},
+				reconfigure: (next) =>
+					open.update(openAITranslationSession(next, profile)),
+				finish() {
+					if (open.closed) {
+						return Promise.resolve();
+					}
+					flush();
+					open.send({ type: "session.close" });
+					return new Promise<void>((resolve) => {
+						const timer = setTimeout(resolve, TRANSLATION_FINISH_MS);
+						timer.unref?.();
+						finished = () => {
+							clearTimeout(timer);
+							resolve();
+						};
+					});
 				},
 				events: queue.iterate(),
 				close() {

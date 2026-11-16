@@ -48,6 +48,7 @@ const operations = [
 	["audio.speech", "Speech generation"],
 	["audio.transcribe.realtime", "Realtime transcription"],
 	["audio.converse.realtime", "Realtime conversation"],
+	["audio.translate.realtime", "Realtime translation"],
 	["audio.live", "Live voice sessions"],
 	["video.generate", "Video generation"],
 	["rerank", "Reranking"],

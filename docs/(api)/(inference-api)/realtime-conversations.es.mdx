@@ -96,7 +96,7 @@ emitió el secreto (`type: "transcription"` abre una sesión de transcripción).
 | `max_output_tokens` | Por sesión. |
 | `reasoning.effort` | Solo en los modelos que lo aceptan: `low`/`medium`/`high` en `gemini-3.8-live-extended-thinking` (que lo exige: `low`, el predeterminado de OpenAI, si no se envía), de `minimal` a `high` en `gemini-3.1-flash-live-preview`. `gemini-3.8-live` razona por su cuenta y lo rechaza. |
 | `truncation` | `auto` (predeterminado) deja que el proveedor comprima el contexto antiguo para que la conversación supere su ventana de contexto; `disabled` lo conserva todo (Gemini termina entonces las sesiones de audio a los 15 minutos). |
-| `translation` | Extensión de AI Gateway, obligatoria en `gemini-3.5-live-translate-preview`: `{ "target_language": "es", "echo_target_language": false }`. El idioma de origen se detecta. La traducción fluye sin turnos, así que cada respuesta es una frase: termina tras 1,5 segundos sin voz traducida, y el silencio entre frases no se envía. |
+| `translation` | Extensión de AI Gateway, obligatoria aquí en `gemini-3.5-live-translate-preview`; los clientes nuevos deberían usar el endpoint estándar de [Traducción en tiempo real](/docs/realtime-translations): `{ "target_language": "es", "echo_target_language": false }`. El idioma de origen se detecta. La traducción fluye sin turnos, así que cada respuesta es una frase: termina tras 1,5 segundos sin voz traducida, y el silencio entre frases no se envía. |
 
 Gemini fija el setup de una sesión al abrirla, y una sesión reanudada conserva el setup anterior.
 Por eso, cambiar a mitad de sesión las instrucciones, las herramientas, la voz, la detección de

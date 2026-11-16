@@ -147,8 +147,13 @@ embeddings, rerankers, image and video models. Known transcription models today:
 `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, `gpt-realtime-1.5`. OpenAI's
 `gpt-live-transcribe` and `gpt-realtime-whisper` run on the OpenAI and Azure OpenAI adapters'
 transcription sessions and are priced per minute as `audioInputCentsPerSecond` (the minute price /
-60); declare only the hints and turn detection the model page documents. `gpt-realtime-translate` is
-out of scope (no realtime translation operation).
+60); declare only the hints and turn detection the model page documents.
+
+Realtime translation models take the `audio.translate.realtime` operation. Known today: OpenAI and
+Azure `gpt-realtime-translate` (per minute, as `audioInputCentsPerSecond`; Azure's Global meter is
+named `gpt-realtime-translate Opt Gl`, per hour) and Google `gemini-3.5-live-translate-preview` (audio
+tokens, plus the `languages` list from Google's live-translate guide). A Gemini translation model also
+keeps its `audio.converse.realtime` profile for the older `session.translation` extension.
 
 GPT-Live models (`gpt-live-*`, OpenAI's `/v1/live/sessions`) take the `audio.live` operation. Known
 today: OpenAI `gpt-live-1`. The session is priced per minute as `audioInputCentsPerSecond`; the backend
