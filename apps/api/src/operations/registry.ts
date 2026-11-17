@@ -19,16 +19,19 @@ export const OPERATION_IDS = [
 
 export type OperationId = (typeof OPERATION_IDS)[number];
 
+export const OPERATION_FAMILIES = [
+	"text",
+	"image",
+	"video",
+	"audio",
+	"embedding",
+	"reranking",
+	"decision",
+] as const;
+
 export interface OperationDefinition {
 	id: OperationId;
-	family:
-		| "text"
-		| "image"
-		| "video"
-		| "audio"
-		| "embedding"
-		| "reranking"
-		| "decision";
+	family: (typeof OPERATION_FAMILIES)[number];
 	label: string;
 	callType: CallType;
 	publicEndpoints: string[];

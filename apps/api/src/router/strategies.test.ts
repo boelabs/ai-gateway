@@ -9,6 +9,7 @@ function cand(id: string, weight = 1): DeploymentCandidate {
 		row: { id, weight } as DeploymentCandidate["row"],
 		adapter: {
 			key: "fake",
+			label: "Test",
 			credentials: { required: [] },
 			supportedCallTypes: new Set(["chat"]),
 		} as DeploymentCandidate["adapter"],

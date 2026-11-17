@@ -38,6 +38,7 @@ function candidate(): DeploymentCandidate {
 		},
 		adapter: {
 			key: "fake",
+			label: "Test",
 			credentials: { required: [] },
 			supportedCallTypes: new Set(),
 			transports: {

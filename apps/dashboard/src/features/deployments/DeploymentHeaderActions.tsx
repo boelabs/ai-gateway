@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveCredentialDialog } from "#/features/credentials/SaveCredentialDialog.tsx";
 import { deleteDeploymentAction, toggleDeploymentAction } from "./actions.ts";
 import { useConfirm } from "#/shared/feedback/confirm.tsx";
 import { useMutation } from "#/shared/lib/mutation.ts";
@@ -7,37 +8,53 @@ import { Can } from "#/features/auth/session.tsx";
 import { Button } from "#/components/ui/button";
 import type { Deployment } from "./common.ts";
 import { useRouter } from "next/navigation";
-import { TrashIcon as Trash2 } from "@phosphor-icons/react/dist/ssr";
+import { useState } from "react";
+
+import {
+	TrashIcon as Trash2,
+	VaultIcon as Vault,
+} from "@phosphor-icons/react/dist/ssr";
 
 /**
- * A deployment page's header actions: turning it on or off, and deleting it. Only for roles that
+ * A deployment page's header actions: saving its credentials for reuse, turning it on or off, and
+ * deleting it. Only for roles that
  * may write deployments; everyone else reads the form.
  */
 export function DeploymentHeaderActions({
 	deployment,
+	provider,
 	siblings,
 }: {
 	deployment: Deployment;
+	/** The adapter's provider name, as the page header shows it. */
+	provider: string;
 	/** Other enabled deployments of the same public model, to say what deleting this one does. */
 	siblings: number;
 }) {
 	return (
 		<Can permissions={["deployments:write"]}>
-			<Actions deployment={deployment} siblings={siblings} />
+			<Actions
+				deployment={deployment}
+				provider={provider}
+				siblings={siblings}
+			/>
 		</Can>
 	);
 }
 
 function Actions({
 	deployment,
+	provider,
 	siblings,
 }: {
 	deployment: Deployment;
+	provider: string;
 	siblings: number;
 }) {
 	const router = useRouter();
 	const confirm = useConfirm();
 	const { pending, run } = useMutation();
+	const [saving, setSaving] = useState(false);
 
 	async function toggle() {
 		const result = await run(
@@ -55,7 +72,7 @@ function Actions({
 	async function remove() {
 		const last = deployment.enabled && siblings === 0;
 		const confirmed = await confirm({
-			title: `Delete this ${deployment.adapterKey} deployment?`,
+			title: `Delete this ${provider} deployment?`,
 			description: last
 				? `${deployment.publicModel} has no other enabled deployment, so deleting this one stops the model from routing at all.`
 				: `Requests for ${deployment.publicModel} will be spread across its remaining deployments. Credentials stored here are removed with it.`,
@@ -90,6 +107,20 @@ function Actions({
 			>
 				{deployment.enabled ? "Disable" : "Enable"}
 			</Button>
+			<Button
+				disabled={pending}
+				onClick={() => setSaving(true)}
+				variant="secondary"
+			>
+				<Vault aria-hidden className="size-4" />
+				Save credentials
+			</Button>
+			<SaveCredentialDialog
+				deploymentId={deployment.id}
+				isOpen={saving}
+				onClose={() => setSaving(false)}
+				provider={provider}
+			/>
 		</>
 	);
 }

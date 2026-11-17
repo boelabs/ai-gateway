@@ -1207,6 +1207,7 @@ export function makeOpenAIStyleAdapter(config: OpenAIStyleConfig): Adapter {
 
 	return {
 		key: config.key,
+		label: config.label,
 		credentials: {
 			required: config.defaultBaseUrl ? ["apiKey"] : ["apiKey", "baseUrl"],
 		},

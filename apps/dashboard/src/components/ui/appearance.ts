@@ -108,7 +108,11 @@ export const overlayFadeStyles =
 export const popupStyles = `z-50 max-h-(--available-height) max-w-[calc(100vw-2rem)] overflow-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg/5 outline-none ${overlayFadeStyles}`;
 export const itemStyles =
 	"relative flex min-h-9 cursor-default select-none items-center gap-2 rounded-(--ui-radius-item) px-2 py-1 text-base outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-64 sm:text-sm";
+/**
+ * A field whose control is required marks its label with an asterisk; an optional one says nothing.
+ * Read from the control's own `required`, so the mark cannot disagree with what the form enforces.
+ */
 export const labelStyles =
-	"inline-flex items-center gap-2 font-medium text-base/4.5 text-foreground data-disabled:opacity-64 sm:text-sm/4";
+	"inline-flex items-center gap-2 font-medium text-base/4.5 text-foreground data-disabled:opacity-64 sm:text-sm/4 group-has-[:required]/field:after:-ms-1.5 group-has-[:required]/field:after:text-destructive-foreground group-has-[:required]/field:after:content-['*']";
 export const descriptionStyles = "text-xs text-muted-foreground";
 export const errorStyles = "text-xs text-destructive-foreground";

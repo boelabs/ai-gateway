@@ -998,6 +998,51 @@ export interface paths {
         patch: operations["updateDeployment"];
         trace?: never;
     };
+    "/admin/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List saved provider credentials (paginated) */
+        get: operations["listProviderCredentials"];
+        put?: never;
+        /**
+         * Save a provider credential for reuse
+         * @description Saves credentials under a unique name so deployments can be filled from them (`credentialId`). Saving the same secret twice for one adapter is refused (`credential_duplicate`).
+         */
+        post: operations["createProviderCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/credentials/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdPath"];
+            };
+            cookie?: never;
+        };
+        /** Retrieve a saved credential (without its secret) */
+        get: operations["retrieveProviderCredential"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a saved credential
+         * @description Deployments filled from it keep their own copy and keep working.
+         */
+        delete: operations["deleteProviderCredential"];
+        options?: never;
+        head?: never;
+        /** Rename a saved credential or replace its fields */
+        patch: operations["updateProviderCredential"];
+        trace?: never;
+    };
     "/docs/export.json": {
         parameters: {
             query?: never;
@@ -3656,6 +3701,11 @@ export interface components {
             credentials?: {
                 [key: string]: unknown;
             };
+            /**
+             * Format: uuid
+             * @description Accepted for body reuse with POST /admin/deployments, but ignored by resolve.
+             */
+            credentialId?: string;
             /** @description Accepted for body reuse with POST /admin/deployments, but ignored by resolve. */
             label?: string | null;
             /** @description Accepted for body reuse with POST /admin/deployments, but ignored by resolve. */
@@ -3766,10 +3816,15 @@ export interface components {
             adapterKey: string;
             /** @description Exact ID; preserves slash namespaces. */
             upstreamModel: string;
-            /** @description Inline provider credentials. Required keys are exposed by GET /admin/operations under adapter.credentials.required. Encrypted; never returned. */
-            credentials: {
+            /** @description Inline provider credentials. Required keys are exposed by GET /admin/operations under adapter.credentials.required. Send this or credentialId, not both. Encrypted; never returned. */
+            credentials?: {
                 [key: string]: unknown;
             };
+            /**
+             * Format: uuid
+             * @description A saved credential of the same adapter whose fields are copied into the deployment, instead of credentials. A copy, not a reference: changing or deleting the credential later does not affect the deployment.
+             */
+            credentialId?: string;
             /** @description Human identifier to tell deployments of the same publicModel apart (e.g. which API key). Snapshotted into operation metadata and attempt records. */
             label?: string | null;
             /** @description Shared provider account or quota domain. Deployments with the same value share upstream throttle state; null keeps the deployment independent. */
@@ -3793,10 +3848,15 @@ export interface components {
         UpdateDeployment: {
             publicModel?: string;
             upstreamModel?: string;
-            /** @description Credential patch; re-encrypted, never returned. */
+            /** @description Credential patch merged over the stored fields; null removes a field. Not with credentialId. Re-encrypted, never returned. */
             credentials?: {
                 [key: string]: unknown;
             };
+            /**
+             * Format: uuid
+             * @description Replaces the stored credentials with a copy of this saved credential's fields. Not with credentials.
+             */
+            credentialId?: string;
             /** @description Human identifier; null clears it. */
             label?: string | null;
             /** @description Shared quota domain; null clears it. */
@@ -3813,6 +3873,28 @@ export interface components {
             weight?: number;
             tpmLimit?: number | null;
             rpmLimit?: number | null;
+        };
+        CreateProviderCredential: {
+            /** @description Unique name, regardless of case. */
+            name: string;
+            /** @description The adapter whose fields this holds. With credentials. */
+            adapterKey?: string;
+            /** @description The adapter's credential fields (adapter.credentials.required in GET /admin/operations). Encrypted; never returned. */
+            credentials?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Format: uuid
+             * @description Saves the credentials an existing deployment holds, instead of adapterKey and credentials.
+             */
+            fromDeploymentId?: string;
+        };
+        UpdateProviderCredential: {
+            name?: string;
+            /** @description Merged over the stored fields; null removes one. Deployments filled earlier keep their own copy. */
+            credentials?: {
+                [key: string]: unknown;
+            };
         };
         Login: {
             /** @description DASH_ROOT_USER, or the username of a row in dashboard_users. Compared case-insensitively. */
@@ -4356,11 +4438,56 @@ export interface components {
         };
         /** @description Available operations, required credentials and transports, per registered adapter. */
         AdapterOperations: {
-            adapters: {
-                [key: string]: unknown;
+            operations: {
+                /** @enum {string} */
+                id: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.speech" | "audio.transcribe.realtime" | "audio.converse.realtime" | "audio.translate.realtime" | "audio.live" | "embedding.create" | "rerank" | "decision.create";
+                /** @enum {string} */
+                family: "text" | "image" | "video" | "audio" | "embedding" | "reranking" | "decision";
+                label: string;
+                /** @enum {string} */
+                callType: "chat" | "images.generations" | "images.edits" | "videos.generations" | "audio.transcriptions" | "audio.speech" | "realtime.transcription" | "realtime.conversation" | "realtime.translation" | "live.session" | "embeddings" | "rerank" | "decisions";
+                publicEndpoints: string[];
             }[];
-        } & {
-            [key: string]: unknown;
+            adapters: components["schemas"]["AdapterSummary"][];
+        };
+        AdapterSummary: {
+            /** @description Adapter key, as adapterKey. */
+            id: string;
+            /** @description Provider name for people (Google AI Studio). */
+            label: string;
+            credentials: {
+                required: string[];
+            };
+            supportedCallTypes: ("chat" | "images.generations" | "images.edits" | "videos.generations" | "audio.transcriptions" | "audio.speech" | "realtime.transcription" | "realtime.conversation" | "realtime.translation" | "live.session" | "embeddings" | "rerank" | "decisions")[];
+            /** @description Models the adapter's catalog knows. Empty for openaicompatible, which ships no catalog. */
+            models: {
+                id: string;
+                operations: string[];
+                /** @constant */
+                deprecated?: true;
+            }[];
+            operations: {
+                /** @enum {string} */
+                id: "text.generate" | "image.generate" | "image.edit" | "video.generate" | "audio.transcribe" | "audio.speech" | "audio.transcribe.realtime" | "audio.converse.realtime" | "audio.translate.realtime" | "audio.live" | "embedding.create" | "rerank" | "decision.create";
+                /** @enum {string} */
+                family: "text" | "image" | "video" | "audio" | "embedding" | "reranking" | "decision";
+                label: string;
+                /** @enum {string} */
+                callType: "chat" | "images.generations" | "images.edits" | "videos.generations" | "audio.transcriptions" | "audio.speech" | "realtime.transcription" | "realtime.conversation" | "realtime.translation" | "live.session" | "embeddings" | "rerank" | "decisions";
+                publicEndpoints: string[];
+                transports: string[];
+                defaultTransport: string | null;
+                contentInputs: {
+                    [key: string]: {
+                        [key: string]: components["schemas"]["ContentInputSupport"];
+                    };
+                };
+            }[];
+        };
+        ContentInputSupport: {
+            sources: ("provider_file_id" | "url" | "data_url")[];
+            mimeTypes?: string[];
+            maxBytes?: number;
         };
         /** @description Dry-run resolution of a deployment body: effective capabilities, operations and transports, without saving. */
         ResolvedDeployment: {
@@ -4399,6 +4526,25 @@ export interface components {
             nextOffset: number | null;
             nextCursor?: string | null;
             totalIsLowerBound?: boolean;
+        };
+        /** @description A saved provider credential. It fills deployments when they are created or edited; the secret is never returned. */
+        ProviderCredential: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            adapterKey: string;
+            fields: string[];
+            /** @description Enough to recognize the credential, never to use it. */
+            hint: {
+                /** @description Last four characters of the API key, when it is long enough. */
+                apiKey?: string;
+                /** @description Host of the base URL. */
+                baseUrl?: string;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
         };
         /** @description Whether human authentication exists on this deployment. Unauthenticated and content-free. */
         DashboardConfig: {
@@ -5905,6 +6051,143 @@ export interface operations {
                     };
                 };
             };
+            404: components["responses"]["Error"];
+        };
+    };
+    listProviderCredentials: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+                /** @description Only the credentials of this adapter. */
+                adapterKey?: string;
+                /** @description Case-insensitive substring of the name. */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated credentials (without secrets) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProviderCredential"][];
+                        pagination: components["schemas"]["Pagination"];
+                    };
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    createProviderCredential: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Opt-in. Retrying a create with the same key returns the first response (marked with `Idempotent-Replay: true`) instead of creating a second resource. Reusing a key for a different body is a 409. Keys are scoped to the caller and expire after 24 hours. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKeyHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProviderCredential"];
+            };
+        };
+        responses: {
+            /** @description Credential saved; the secret is never returned */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProviderCredential"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    retrieveProviderCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Credential */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProviderCredential"];
+                    };
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteProviderCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    updateProviderCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProviderCredential"];
+            };
+        };
+        responses: {
+            /** @description Credential updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProviderCredential"];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
             404: components["responses"]["Error"];
         };
     };

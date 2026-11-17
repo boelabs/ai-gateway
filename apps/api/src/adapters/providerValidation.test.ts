@@ -10,6 +10,7 @@ const fakeChat = {} as ChatHandler;
 function adapterWithKinds(...kinds: ReasoningSpec["kind"][]): Adapter {
 	return {
 		key: "fake",
+		label: "Test",
 		credentials: { required: [] },
 		supportedCallTypes: new Set(["chat"]),
 		chat: fakeChat,
@@ -57,6 +58,7 @@ test("validateProvider: without catalog or reasoningKinds it does not validate",
 	);
 	const adapterNoKinds: Adapter = {
 		key: "x",
+		label: "Test",
 		credentials: { required: [] },
 		supportedCallTypes: new Set(["chat"]),
 		chat: fakeChat,

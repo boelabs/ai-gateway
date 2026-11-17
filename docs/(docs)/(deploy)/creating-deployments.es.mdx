@@ -22,7 +22,8 @@ Authorization: Bearer $MASTER_KEY
 | `publicModel` | si | El nombre público del modelo; es lo que pone el cliente en `"model"`. |
 | `adapterKey` | si | El adapter de primera clase para ejecutar (`openai`, `googleaistudio`, `openaicompatible`, etc.). |
 | `upstreamModel` | si | La identificación real del proveedor (clave de catálogo o el nombre del deployment en Azure). |
-| `credentials` | si | `{ apiKey, baseUrl?, ... }` dependiendo del adapter (ver tabla). Cifrado en reposo. En `PATCH`, el objeto se **fusiona** con el almacenado: envía solo los campos que está cambiando y `null` para eliminar uno. |
+| `credentials` | si, o `credentialId` | `{ apiKey, baseUrl?, ... }` dependiendo del adapter (ver tabla). Cifrado en reposo. En `PATCH`, el objeto se **fusiona** con el almacenado: envía solo los campos que está cambiando y `null` para eliminar uno. |
+| `credentialId` | no | Una [credencial guardada](/docs/creating-deployments#saved-credentials) del mismo adapter de la que copiar las credenciales, en lugar de `credentials`, nunca ambos. En `PATCH`, reemplaza las credenciales almacenadas. |
 | `catalogEntry` | solo personalizado | Entrada de catálogo en línea para un modelo **no** presente en el catálogo. Utiliza la misma forma que `catalog.json`; para los modelos de catálogo **debe omitirse**. Si una versión posterior añade el modelo al catálogo, un deployment existente sigue usando su propia entrada. |
 | `pricing` | no | `{ inputCentsPerMTokens?, outputCentsPerMTokens?, cacheReadCentsPerMTokens?, cacheWriteCentsPerMTokens?, imageInputCentsPerMTokens?, imageOutputCentsPerMTokens?, audioInputCentsPerMTokens?, audioOutputCentsPerMTokens?, searchUnitCents? }`. |
 | `transportOverrides` | no | Anulación de transport por operación. El valor predeterminado del adapter se aplica a todos los endpoints públicos. |
@@ -49,6 +50,25 @@ Authorization: Bearer $MASTER_KEY
 | `openaicompatible` | `apiKey`, `baseUrl` |
 
 `GET /admin/operations` devuelve la lista de adapters en vivo, las credenciales requeridas, las operaciones y los transports.
+
+## Credenciales guardadas [#saved-credentials]
+
+Guarda las credenciales de un proveedor una vez con un nombre y úsalas para rellenar cualquier deployment de ese adapter, en lugar de pegar la clave otra vez:
+
+```text
+POST /admin/credentials
+{ "name": "Anthropic production", "adapterKey": "anthropic", "credentials": { "apiKey": "sk-ant-..." } }
+
+POST /admin/deployments
+{ "publicModel": "claude", "adapterKey": "anthropic", "upstreamModel": "claude-sonnet-4-5",
+  "credentialId": "<id returned above>" }
+```
+
+Una credencial guardada es una **fuente, no una dependencia**: el deployment guarda su propia copia cifrada. Reemplazar o eliminar después la credencial guardada no cambia ningún deployment, y eliminar un deployment deja la credencial donde está.
+
+- `POST /admin/credentials` con `{ "name", "fromDeploymentId" }` guarda las credenciales que ya tiene un deployment, así que una clave que ya nadie puede ver se puede reutilizar.
+- Los nombres son únicos sin distinguir mayúsculas, y el mismo secreto no se puede guardar dos veces para un adapter.
+- El secreto nunca se devuelve. Las respuestas incluyen los nombres de los campos guardados y una pista para reconocerla: los últimos cuatro caracteres de la API key (solo en claves de 16 caracteres o más) y el host de la base URL.
 
 ## Modelos del catálogo y modelos personalizados [#catalog-vs-custom]
 

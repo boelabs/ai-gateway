@@ -1,8 +1,9 @@
 import { MetricsSkeleton } from "#/features/observability/MetricsSkeleton.tsx";
 import { RefreshControls } from "#/shared/components/RefreshControls.tsx";
+import { detailedMetrics, usage } from "#/features/observability/api.ts";
 import { MetricsView } from "#/features/observability/MetricsView.tsx";
 import { RouteBoundary } from "#/shared/components/RouteBoundary.tsx";
-import { detailedMetrics, usage } from "#/features/observability/api.ts";
+import { adapterLabels } from "#/features/deployments/api.ts";
 import { listKeys } from "#/features/keys/api.ts";
 import { PageHeader } from "#/components/ui/page";
 import { connection } from "next/server";
@@ -60,7 +61,7 @@ async function Window({
 	 * The unfiltered query only runs when a filter is set, and only to keep the pickers populated:
 	 * narrowing to one model must not remove every other model from the list that narrowed it.
 	 */
-	const [data, options, actors, names] = await Promise.all([
+	const [data, options, actors, names, labels] = await Promise.all([
 		detailedMetrics(filtered),
 		search.publicModel || search.deploymentId
 			? detailedMetrics(base)
@@ -72,10 +73,12 @@ async function Window({
 			end: new Date(Date.parse(window.end) - 1).toISOString(),
 		}),
 		keyNames(),
+		adapterLabels(),
 	]);
 	return (
 		<MetricsView
 			actors={actors}
+			adapterLabels={labels}
 			data={data}
 			keyNames={names}
 			options={options ?? data}

@@ -29,6 +29,7 @@ test("registers and retrieves an adapter; validates CallTypes<->handlers", () =>
 	__resetRegistry();
 	const adapter: Adapter = {
 		key: "fake",
+		label: "Test",
 		credentials: { required: [] },
 		supportedCallTypes: new Set(["chat"]),
 		chat: fakeChat,
@@ -43,6 +44,7 @@ test("rejects duplicates", () => {
 	__resetRegistry();
 	const adapter: Adapter = {
 		key: "dup",
+		label: "Test",
 		credentials: { required: [] },
 		supportedCallTypes: new Set(["chat"]),
 		chat: fakeChat,
@@ -55,6 +57,7 @@ test("rejects adapter keys with separators or uppercase letters", () => {
 	__resetRegistry();
 	const bad: Adapter = {
 		key: "bad-key",
+		label: "Test",
 		credentials: { required: [] },
 		supportedCallTypes: new Set(["chat"]),
 		chat: fakeChat,
@@ -62,10 +65,23 @@ test("rejects adapter keys with separators or uppercase letters", () => {
 	assert.throws(() => registerAdapter(bad), /adapter keys/u);
 });
 
+test("rejects an adapter without a label", () => {
+	__resetRegistry();
+	const unlabeled: Adapter = {
+		key: "unlabeled",
+		label: " ",
+		credentials: { required: [] },
+		supportedCallTypes: new Set(["chat"]),
+		chat: fakeChat,
+	};
+	assert.throws(() => registerAdapter(unlabeled), /has no label/u);
+});
+
 test("rejects chat support declaration without handler implementation", () => {
 	__resetRegistry();
 	const broken: Adapter = {
 		key: "broken",
+		label: "Test",
 		credentials: { required: [] },
 		supportedCallTypes: new Set(["chat"]),
 	};
@@ -76,6 +92,7 @@ test("rejects content inputs declared for an unsupported transport", () => {
 	__resetRegistry();
 	const broken: Adapter = {
 		key: "brokeninputs",
+		label: "Test",
 		credentials: { required: [] },
 		supportedCallTypes: new Set(["chat"]),
 		chat: fakeChat,
@@ -93,6 +110,7 @@ test("rejects malformed content input limits and source lists", () => {
 	__resetRegistry();
 	const base: Adapter = {
 		key: "brokeninputs",
+		label: "Test",
 		credentials: { required: [] },
 		supportedCallTypes: new Set(["chat"]),
 		chat: fakeChat,

@@ -30,6 +30,18 @@ La especificación se genera a partir de los mismos esquemas Zod con los que val
 | `PATCH /admin/deployments/:id` | Actualizar un deployment. |
 | `DELETE /admin/deployments/:id` | Eliminar un deployment. |
 
+## Credenciales guardadas [#saved-credentials]
+
+Credenciales de proveedor guardadas para reutilizarlas; rellenan el `credentialId` de un deployment (consulta [Credenciales guardadas](/docs/creating-deployments#saved-credentials)). Mismos permisos que los deployments.
+
+| Ruta | Propósito |
+|---|---|
+| `GET /admin/credentials` | Listarlas, nunca sus secretos. Consulta: `limit`, `offset`, `adapterKey`, `q` (nombre). |
+| `POST /admin/credentials` | Guardar `{ name, adapterKey, credentials }` o `{ name, fromDeploymentId }`. |
+| `GET /admin/credentials/:id` | Leer una. |
+| `PATCH /admin/credentials/:id` | Renombrarla o fusionar `credentials` con los campos guardados (`null` elimina uno). |
+| `DELETE /admin/credentials/:id` | Eliminarla. Los deployments rellenados con ella conservan su propia copia. |
+
 ## Virtual keys [#virtual-keys]
 
 | Ruta | Propósito |

@@ -100,7 +100,8 @@ export const createDeploymentSchema = z
 		publicModel: z.string().min(1).max(200),
 		adapterKey: adapterKeySchema,
 		upstreamModel: z.string().min(1).max(300),
-		credentials: z.record(z.string(), z.unknown()),
+		credentials: z.record(z.string(), z.unknown()).optional(),
+		credentialId: z.uuid().optional(),
 		label: labelSchema.optional(),
 		failureDomain: failureDomainSchema.optional(),
 		metadata: metadataSchema.optional(),
@@ -113,7 +114,15 @@ export const createDeploymentSchema = z
 		tpmLimit: z.int().nullable().optional(),
 		rpmLimit: z.int().nullable().optional(),
 	})
-	.strict();
+	.strict()
+	.refine(
+		(input) =>
+			(input.credentials === undefined) !== (input.credentialId === undefined),
+		{
+			message: "send either credentials or credentialId",
+			path: ["credentials"],
+		},
+	);
 
 const resolveDeploymentSchema = z
 	.object({
@@ -126,6 +135,7 @@ const resolveDeploymentSchema = z
 		executionPolicyOverrides: executionPolicyOverridesSchema.optional(),
 		// Accepted (and ignored) so the same body as POST /deployments can be reused.
 		credentials: z.record(z.string(), z.unknown()).optional(),
+		credentialId: z.uuid().optional(),
 		label: labelSchema.optional(),
 		failureDomain: failureDomainSchema.optional(),
 		metadata: metadataSchema.optional(),
@@ -137,6 +147,7 @@ export const updateDeploymentSchema = z
 		publicModel: z.string().min(1).max(200).optional(),
 		upstreamModel: z.string().min(1).max(300).optional(),
 		credentials: credentialsPatchSchema.optional(),
+		credentialId: z.uuid().optional(),
 		label: labelSchema.optional(),
 		failureDomain: failureDomainSchema.optional(),
 		metadata: metadataSchema.optional(),
@@ -149,7 +160,15 @@ export const updateDeploymentSchema = z
 		tpmLimit: z.int().nullable().optional(),
 		rpmLimit: z.int().nullable().optional(),
 	})
-	.strict();
+	.strict()
+	.refine(
+		(input) =>
+			input.credentials === undefined || input.credentialId === undefined,
+		{
+			message: "send either credentials or credentialId, not both",
+			path: ["credentials"],
+		},
+	);
 
 /** Validates that the requested code adapter exists. */
 function resolveAdapterKey(adapterKey: string): string {
@@ -192,6 +211,7 @@ platformAdminApp.get("/operations", (c) =>
 		operations: OPERATIONS.map(publicOperationView),
 		adapters: listAdapters().map((adapter) => ({
 			id: adapter.key,
+			label: adapter.label,
 			credentials: { required: [...adapter.credentials.required] },
 			supportedCallTypes: [...adapter.supportedCallTypes].sort(),
 			/**
@@ -276,7 +296,12 @@ platformAdminApp.post("/deployments", async (c) => {
 		publicModel: input.publicModel,
 		adapterKey,
 		upstreamModel: input.upstreamModel,
-		credentials: input.credentials,
+		...(input.credentials === undefined
+			? {}
+			: { credentials: input.credentials }),
+		...(input.credentialId === undefined
+			? {}
+			: { credentialId: input.credentialId }),
 		...(input.transportOverrides === undefined
 			? {}
 			: { transportOverrides: input.transportOverrides }),
@@ -330,6 +355,9 @@ platformAdminApp.patch("/deployments/:id", async (c) => {
 		...(input.credentials === undefined
 			? {}
 			: { credentials: input.credentials }),
+		...(input.credentialId === undefined
+			? {}
+			: { credentialId: input.credentialId }),
 		...(input.label === undefined ? {} : { label: input.label }),
 		...(input.failureDomain === undefined
 			? {}

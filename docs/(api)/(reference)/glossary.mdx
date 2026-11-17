@@ -48,7 +48,8 @@ upstream models or providers may serve the same Public Model.
 ## Adapter
 
 Code that implements canonical handlers and knows how to translate them to one or more upstream
-transports. It declares `supportedCallTypes`, `transports`, and the available handlers. The provider's
+transports. It declares a `label` (the provider name operators see), `supportedCallTypes`,
+`transports`, and the available handlers. The provider's
 catalog lives next to the adapter; if it is missing, that provider is not registered.
 
 ## Transport

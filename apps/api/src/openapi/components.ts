@@ -26,7 +26,7 @@ import { openAIDecisionRequestSchema } from "#contracts/openai/decisions.ts";
 import { geminiDecisionRequestSchema } from "#contracts/google/decisions.ts";
 import { systemOneRequestSchema } from "#contracts/typesafe/systemone.ts";
 import { rerankRequestSchema } from "#contracts/openrouter/rerank.ts";
-import { OPERATION_IDS } from "#operations/registry.ts";
+import { OPERATION_FAMILIES, OPERATION_IDS } from "#operations/registry.ts";
 import { CALL_TYPE_VALUES } from "#core/callType.ts";
 import { pricingSchema } from "#profiles/schema.ts";
 import { EFFORT_ORDER } from "#core/reasoning.ts";
@@ -1009,9 +1009,13 @@ export const CreateDeployment = z
 		upstreamModel: z
 			.string()
 			.meta({ description: "Exact ID; preserves slash namespaces." }),
-		credentials: z.record(z.string(), z.unknown()).meta({
+		credentials: z.record(z.string(), z.unknown()).optional().meta({
 			description:
-				"Inline provider credentials. Required keys are exposed by GET /admin/operations under adapter.credentials.required. Encrypted; never returned.",
+				"Inline provider credentials. Required keys are exposed by GET /admin/operations under adapter.credentials.required. Send this or credentialId, not both. Encrypted; never returned.",
+		}),
+		credentialId: z.uuid().optional().meta({
+			description:
+				"A saved credential of the same adapter whose fields are copied into the deployment, instead of credentials. A copy, not a reference: changing or deleting the credential later does not affect the deployment.",
 		}),
 		label: nullableString.optional().meta({
 			description:
@@ -1072,6 +1076,10 @@ export const ResolveDeployment = z
 			description:
 				"Accepted for body reuse with POST /admin/deployments, but ignored by resolve.",
 		}),
+		credentialId: z.uuid().optional().meta({
+			description:
+				"Accepted for body reuse with POST /admin/deployments, but ignored by resolve.",
+		}),
 		label: nullableString.optional().meta({
 			description:
 				"Accepted for body reuse with POST /admin/deployments, but ignored by resolve.",
@@ -1092,7 +1100,12 @@ export const UpdateDeployment = z
 		publicModel: z.string().optional(),
 		upstreamModel: z.string().optional(),
 		credentials: z.record(z.string(), z.unknown()).optional().meta({
-			description: "Credential patch; re-encrypted, never returned.",
+			description:
+				"Credential patch merged over the stored fields; null removes a field. Not with credentialId. Re-encrypted, never returned.",
+		}),
+		credentialId: z.uuid().optional().meta({
+			description:
+				"Replaces the stored credentials with a copy of this saved credential's fields. Not with credentials.",
 		}),
 		label: nullableString.optional().meta({
 			description: "Human identifier; null clears it.",
@@ -1113,6 +1126,35 @@ export const UpdateDeployment = z
 		rpmLimit: nullableInteger.optional(),
 	})
 	.meta({ id: "UpdateDeployment" });
+
+/* -------------------------------------------------------- provider credentials */
+
+export const CreateProviderCredential = z
+	.object({
+		name: z.string().meta({ description: "Unique name, regardless of case." }),
+		adapterKey: z.string().optional().meta({
+			description: "The adapter whose fields this holds. With credentials.",
+		}),
+		credentials: z.record(z.string(), z.unknown()).optional().meta({
+			description:
+				"The adapter's credential fields (adapter.credentials.required in GET /admin/operations). Encrypted; never returned.",
+		}),
+		fromDeploymentId: z.uuid().optional().meta({
+			description:
+				"Saves the credentials an existing deployment holds, instead of adapterKey and credentials.",
+		}),
+	})
+	.meta({ id: "CreateProviderCredential" });
+
+export const UpdateProviderCredential = z
+	.object({
+		name: z.string().optional(),
+		credentials: z.record(z.string(), z.unknown()).optional().meta({
+			description:
+				"Merged over the stored fields; null removes one. Deployments filled earlier keep their own copy.",
+		}),
+	})
+	.meta({ id: "UpdateProviderCredential" });
 
 /* ---------------------------------------------------------------- virtual keys */
 
@@ -1401,6 +1443,36 @@ export const Deployment = z
 		id: "Deployment",
 		description:
 			"A deployment as returned by the admin API. Credentials are never included, encrypted or otherwise.",
+	});
+
+export const ProviderCredential = z
+	.object({
+		id: z.uuid(),
+		name: z.string(),
+		adapterKey: z.string(),
+		/** Credential field names stored, so a client knows what it will fill. */
+		fields: z.array(z.string()),
+		hint: z
+			.object({
+				apiKey: z.string().optional().meta({
+					description:
+						"Last four characters of the API key, when it is long enough.",
+				}),
+				baseUrl: z
+					.string()
+					.optional()
+					.meta({ description: "Host of the base URL." }),
+			})
+			.meta({
+				description: "Enough to recognize the credential, never to use it.",
+			}),
+		createdAt: timestamp,
+		updatedAt: timestamp,
+	})
+	.meta({
+		id: "ProviderCredential",
+		description:
+			"A saved provider credential. It fills deployments when they are created or edited; the secret is never returned.",
 	});
 
 export const VirtualKey = z
@@ -1874,16 +1946,66 @@ export const ExtensionInstance = loose(
 	{ id: "ExtensionInstance" },
 );
 
-export const AdapterOperations = loose(
-	{
-		adapters: z.array(z.record(z.string(), z.unknown())),
-	},
-	{
+const operationView = {
+	id: z.enum(OPERATION_IDS),
+	family: z.enum(OPERATION_FAMILIES),
+	label: z.string(),
+	callType: z.enum(CALL_TYPE_VALUES),
+	publicEndpoints: z.array(z.string()),
+};
+
+const ContentInputSupport = z
+	.object({
+		sources: z.array(z.enum(["provider_file_id", "url", "data_url"])),
+		mimeTypes: z.array(z.string()).optional(),
+		maxBytes: z.int().optional(),
+	})
+	.meta({ id: "ContentInputSupport" });
+
+export const AdapterSummary = z
+	.object({
+		id: z.string().meta({ description: "Adapter key, as adapterKey." }),
+		label: z.string().meta({
+			description: "Provider name for people (Google AI Studio).",
+		}),
+		credentials: z.object({ required: z.array(z.string()) }),
+		supportedCallTypes: z.array(z.enum(CALL_TYPE_VALUES)),
+		models: z
+			.array(
+				z.object({
+					id: z.string(),
+					operations: z.array(z.string()),
+					deprecated: z.literal(true).optional(),
+				}),
+			)
+			.meta({
+				description:
+					"Models the adapter's catalog knows. Empty for openaicompatible, which ships no catalog.",
+			}),
+		operations: z.array(
+			z.object({
+				...operationView,
+				transports: z.array(z.string()),
+				defaultTransport: nullableString,
+				contentInputs: z.record(
+					z.string(),
+					z.record(z.string(), ContentInputSupport),
+				),
+			}),
+		),
+	})
+	.meta({ id: "AdapterSummary" });
+
+export const AdapterOperations = z
+	.object({
+		operations: z.array(z.object(operationView)),
+		adapters: z.array(AdapterSummary),
+	})
+	.meta({
 		id: "AdapterOperations",
 		description:
 			"Available operations, required credentials and transports, per registered adapter.",
-	},
-);
+	});
 
 export const ResolvedDeployment = loose(
 	{},

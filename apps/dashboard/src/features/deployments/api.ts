@@ -1,11 +1,12 @@
 import type { components } from "#/shared/api/schema";
 import { api, unwrap } from "#/shared/api/client.ts";
-import { z } from "zod/v4";
+import { cache } from "react";
 
 import type {
 	CreateDeploymentInput,
 	UpdateDeploymentInput,
 	AdapterSummary,
+	AdapterLabels,
 } from "./common.ts";
 
 export async function listDeployments(params?: {
@@ -83,7 +84,9 @@ export async function saveDeployment(
 		catalogEntry: body.catalogEntry ?? null,
 		pricing: body.pricing ?? null,
 		transportOverrides: body.transportOverrides ?? {},
-		...(Object.keys(credentials).length > 0 ? { credentials } : {}),
+		...(credentials && Object.keys(credentials).length > 0
+			? { credentials }
+			: {}),
 	});
 }
 
@@ -96,41 +99,33 @@ export async function deleteDeployment(id: string): Promise<void> {
 	}
 }
 
-const adapterRegistrySchema = z.object({
-	adapters: z.array(
-		z.object({
-			id: z.string(),
-			credentials: z.object({ required: z.array(z.string()) }),
-			supportedCallTypes: z.array(z.string()),
-			models: z.array(
-				z.object({
-					id: z.string(),
-					operations: z.array(z.string()),
-					deprecated: z.boolean().optional(),
-				}),
-			),
-			operations: z.array(
-				z.object({
-					id: z.string(),
-					label: z.string(),
-					transports: z.array(z.string()),
-					defaultTransport: z.string().nullable(),
-				}),
-			),
-		}),
-	),
-});
+/**
+ * The adapters the gateway runs, by provider name. Cached per request: a page that needs both the
+ * registry and its labels reads it once.
+ */
+export const adapterRegistry = cache(
+	async (): Promise<{ adapters: AdapterSummary[] }> => {
+		const { adapters } = unwrap(await api.GET("/admin/operations")).data;
+		return {
+			adapters: adapters.slice().sort((a, b) => a.label.localeCompare(b.label)),
+		};
+	},
+);
 
-export async function adapterRegistry(): Promise<{
-	adapters: AdapterSummary[];
-}> {
-	const data = adapterRegistrySchema.parse(
-		unwrap(await api.GET("/admin/operations")).data,
-	);
-	return {
-		adapters: data.adapters.slice().sort((a, b) => a.id.localeCompare(b.id)),
-	};
-}
+/**
+ * Provider names for screens that show an adapter key. A courtesy, never a reason to fail the page:
+ * when the registry cannot be read, every key is shown as it is.
+ */
+export const adapterLabels = cache(async (): Promise<AdapterLabels> => {
+	try {
+		const { adapters } = await adapterRegistry();
+		return Object.fromEntries(
+			adapters.map((adapter) => [adapter.id, adapter.label]),
+		);
+	} catch {
+		return {};
+	}
+});
 
 /**
  * Dry run: resolves the effective capabilities, operations and transports for a body without saving

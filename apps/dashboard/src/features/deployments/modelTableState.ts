@@ -1,4 +1,4 @@
-import type { Deployment } from "./common";
+import { type AdapterLabels, type Deployment, adapterLabel } from "./common";
 
 export interface ModelFilters {
 	query: string;
@@ -20,7 +20,11 @@ export function isModelOrder(value: string): value is ModelOrder {
 	return MODEL_ORDERS.some((order) => order.value === value);
 }
 
-export function filterModelRows(rows: Deployment[], filters: ModelFilters) {
+export function filterModelRows(
+	rows: Deployment[],
+	filters: ModelFilters,
+	adapterLabels: AdapterLabels = {},
+) {
 	const query = filters.query.trim().toLocaleLowerCase();
 	return rows.filter(
 		(row) =>
@@ -32,6 +36,7 @@ export function filterModelRows(rows: Deployment[], filters: ModelFilters) {
 					row.publicModel,
 					row.upstreamModel,
 					row.adapterKey,
+					adapterLabel(adapterLabels, row.adapterKey),
 					row.label ?? "",
 				].some((value) => value.toLocaleLowerCase().includes(query))),
 	);

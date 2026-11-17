@@ -33,8 +33,9 @@ public API. OpenRouter currently supports reranking and decisions; TypeSafe supp
 Adapters with a built-in upstream host do not require `baseUrl`. `openaicompatible`, Azure OpenAI,
 and Azure Foundry require `baseUrl` because the operator chooses the target endpoint.
 
-`GET /admin/operations` returns this same adapter list live, including required credential keys and
-which operations/transports each adapter actually implements.
+`GET /admin/operations` returns this same adapter list live, including each provider's name
+(`label`), required credential keys, and which operations/transports each adapter actually
+implements.
 
 ## Next steps
 

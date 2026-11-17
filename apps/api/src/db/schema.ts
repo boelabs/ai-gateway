@@ -284,6 +284,53 @@ export const modelDeployments = pgTable(
 	],
 );
 
+/* --------------------------------------------------- provider_credentials */
+
+/**
+ * What an operator may see of a saved credential to recognize it: the API key's last characters and
+ * the base URL's host. Computed when the secret is written; never enough to use the credential.
+ */
+export interface ProviderCredentialHint {
+	apiKey?: string;
+	baseUrl?: string;
+}
+
+/**
+ * A saved provider credential: fills a deployment's credentials when one is created or edited. It is
+ * a source, not a dependency — the deployment keeps its own encrypted copy, so either side can be
+ * changed or deleted without touching the other. Write-only: the API never returns the secret.
+ */
+export const providerCredentials = pgTable(
+	"provider_credentials",
+	{
+		/** Assigned by the application: the envelope's AAD binds the ciphertext to it. */
+		id: uuid("id").primaryKey(),
+		/** Operator-facing name, unique regardless of case. */
+		name: text("name").notNull(),
+		/** The adapter whose credential fields this holds. */
+		adapterKey: text("adapter_key").notNull(),
+		/** Purpose-bound, row-bound AES-256-GCM envelope of the credential fields. */
+		secret: jsonb("secret").$type<EncEnvelope>().notNull(),
+		hint: jsonb("hint").$type<ProviderCredentialHint>().notNull().default({}),
+		/** Credential field names present in `secret`, so a client knows what it will fill. */
+		fields: text("fields").array().notNull().default([]),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [
+		uniqueIndex("provider_credentials_name_idx").on(sql`lower(${t.name})`),
+		index("provider_credentials_adapter_key_idx").on(t.adapterKey),
+		check(
+			"provider_credentials_adapter_key_format",
+			sql`${t.adapterKey} ~ '^[a-z0-9]+$'`,
+		),
+	],
+);
+
 /* ------------------------------------------------------- router_settings */
 
 /** Singleton (id = 1). The router's global config. */

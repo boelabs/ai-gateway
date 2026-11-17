@@ -385,7 +385,7 @@ function KeyFields({
 					title="Expiry"
 				>
 					<Input
-						label="Expires (optional)"
+						label="Expires"
 						onValueChange={(value) => set("expiresAt", value)}
 						type="datetime-local"
 						value={draft.expiresAt}

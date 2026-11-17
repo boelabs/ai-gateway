@@ -1,13 +1,13 @@
 "use client";
 
+import { type AdapterLabels, type Deployment, adapterLabel } from "./common.ts";
 import { deleteDeploymentAction, toggleDeploymentAction } from "./actions.ts";
+import { PlusIcon as IconPlus } from "@phosphor-icons/react/dist/ssr";
 import { ButtonSkeleton } from "#/shared/components/Skeleton.tsx";
 import { Can, useSession } from "#/features/auth/session.tsx";
 import { useConfirm } from "#/shared/feedback/confirm.tsx";
 import { useRowActions } from "#/shared/lib/mutation.ts";
 import { Button } from "#/components/ui/button";
-import { PlusIcon as IconPlus } from "@phosphor-icons/react/dist/ssr";
-import type { Deployment } from "./common.ts";
 import { useRouter } from "next/navigation";
 import { ModelsTable } from "./ModelsTable";
 import { Suspense } from "react";
@@ -43,7 +43,13 @@ export function NewDeploymentButton() {
  * Each row opens its deployment's page; the row menu toggles or deletes it in place, and deletion
  * checks the complete public model pool.
  */
-export function ModelsView({ deployments }: { deployments: Deployment[] }) {
+export function ModelsView({
+	deployments,
+	adapterLabels,
+}: {
+	deployments: Deployment[];
+	adapterLabels: AdapterLabels;
+}) {
 	const router = useRouter();
 	const confirm = useConfirm();
 	const { rows, act } = useRowActions(deployments, (row) => row.id);
@@ -55,7 +61,7 @@ export function ModelsView({ deployments }: { deployments: Deployment[] }) {
 		);
 		const last = deployment.enabled && siblings.length === 1;
 		const confirmed = await confirm({
-			title: `Delete this ${deployment.adapterKey} deployment?`,
+			title: `Delete this ${adapterLabel(adapterLabels, deployment.adapterKey)} deployment?`,
 			description: last
 				? `${deployment.publicModel} has no other enabled deployment, so deleting this one stops the model from routing at all.`
 				: `Requests for ${deployment.publicModel} will be spread across its remaining deployments. Credentials stored here are removed with it.`,
@@ -83,6 +89,7 @@ export function ModelsView({ deployments }: { deployments: Deployment[] }) {
 
 	return (
 		<ModelsTable
+			adapterLabels={adapterLabels}
 			deployments={[...rows]}
 			onDelete={(deployment) => void remove(deployment)}
 			onEdit={(deployment) => router.push(`/models/${deployment.id}`)}

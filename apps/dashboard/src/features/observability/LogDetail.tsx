@@ -27,6 +27,11 @@ import {
 	shortId,
 } from "./trace.ts";
 
+import {
+	type AdapterLabels,
+	adapterLabel,
+} from "#/features/deployments/common.ts";
+
 type Attempt = components["schemas"]["UpstreamAttempt"];
 type PayloadState = components["schemas"]["RetainedPayloadState"];
 type Json = Record<string, unknown>;
@@ -167,10 +172,12 @@ function AttemptStep({
 	attempt,
 	operationStart,
 	last,
+	adapterLabels,
 }: {
 	attempt: Attempt;
 	operationStart: number;
 	last: boolean;
+	adapterLabels: AdapterLabels;
 }) {
 	const failed = attempt.outcome === "error";
 	const provider = attempt.error?.provider;
@@ -216,7 +223,11 @@ function AttemptStep({
 							(attempt.deploymentId ? shortId(attempt.deploymentId) : "—")}
 					</span>
 					<span className="font-mono text-xs text-muted-foreground">
-						{[attempt.adapterKey, attempt.upstreamModel]
+						{[
+							attempt.adapterKey &&
+								adapterLabel(adapterLabels, attempt.adapterKey),
+							attempt.upstreamModel,
+						]
 							.filter(Boolean)
 							.join(" · ")}
 					</span>
@@ -415,7 +426,13 @@ function Identifier({ value, label }: { value: string; label: string }) {
  * how it went (the figures), what failed, which deployments it went through, what was sent and
  * received, and the identifiers to quote.
  */
-export function LogDetail({ detail }: { detail: OperationDetail }) {
+export function LogDetail({
+	detail,
+	adapterLabels = {},
+}: {
+	detail: OperationDetail;
+	adapterLabels?: AdapterLabels;
+}) {
 	const { attempts } = detail;
 	const opError = detail.error;
 	const operationStart = Date.parse(detail.startedAt);
@@ -503,6 +520,7 @@ export function LogDetail({ detail }: { detail: OperationDetail }) {
 						<ol className="flex flex-col">
 							{attempts.map((attempt, index) => (
 								<AttemptStep
+									adapterLabels={adapterLabels}
 									attempt={attempt}
 									key={attempt.id}
 									last={index === attempts.length - 1}

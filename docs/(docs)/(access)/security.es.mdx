@@ -84,6 +84,8 @@ La respuesta de crear o rotar una clave nunca se guarda para un reintento con `I
 
 Cada credencial (`apiKey`, `baseUrl`, etc.) se cifra con **AES-256-GCM** antes de almacenarse. Cada sobre versionado registra una identificación de clave y un propósito autenticado como AAD, y obtiene su propio IV aleatorio. La etiqueta de autenticación de GCM significa que la manipulación del texto cifrado almacenado hace que no se pueda descifrar en lugar de devolver basura silenciosamente. **Ninguna respuesta de API de administrador (`GET`, `POST` o `PATCH` en `/admin/deployments`) incluye credenciales**, cifradas o no; se eliminan antes de que se construya la respuesta.
 
+Las [credenciales guardadas](/docs/creating-deployments#saved-credentials) se sellan igual con su propio propósito, `provider-credential`, y el AAD incluye además el id de la fila: un sobre copiado a otra fila no se descifra. `/admin/credentials` tampoco devuelve nunca uno, solo los nombres de los campos y una pista (los últimos cuatro caracteres de la API key y el host de la base URL).
+
 La pérdida de cada copia de una entrada del keyring mientras los sobres todavía hacen referencia a ella hace que esos valores sean permanentemente irrecuperables. Mantén el keyring fuera de la base de datos que descifra y nunca lo añadas a Git. Para conocer el procedimiento de rotación en línea para `MASTER_KEY` y el conjunto de claves de cifrado, consulta [Operaciones → Secretos](/docs/operations#secrets).
 
 ## Lo que el gateway oculta públicamente [#what-the-gateway-redacts-publicly]

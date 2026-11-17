@@ -4,7 +4,6 @@
 	"provider": {
 		"id": "googleaistudio",
 		"adapterKey": "googleaistudio",
-		"name": "Google AI Studio",
 		"docs": [
 			"https://ai.google.dev/gemini-api/docs/models",
 			"https://ai.google.dev/gemini-api/docs/pricing",
