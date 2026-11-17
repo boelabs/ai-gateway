@@ -120,7 +120,22 @@
 						"outputCentsPerMTokens": 240,
 						"cacheReadCentsPerMTokens": 12
 					}
-				]
+				],
+				"serviceTiers": {
+					"priority": {
+						"inputCentsPerMTokens": 45,
+						"outputCentsPerMTokens": 180,
+						"cacheReadCentsPerMTokens": 9,
+						"tiers": [
+							{
+								"aboveInputTokens": 512000,
+								"inputCentsPerMTokens": 90,
+								"outputCentsPerMTokens": 360,
+								"cacheReadCentsPerMTokens": 18
+							}
+						]
+					}
+				}
 			}
 		},
 		"MiniMax-M2.7": {
