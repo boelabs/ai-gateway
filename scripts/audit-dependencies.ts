@@ -30,6 +30,13 @@ const ACCEPTED_ADVISORIES: readonly {
 		reason:
 			"No fixed release exists; only reached through micromatch <- fast-glob <- ultracite (lint tooling).",
 	},
+	{
+		packageName: "picomatch",
+		url: "https://github.com/advisories/GHSA-fc5q-39xc-vjpf",
+		vulnerableVersions: "<=4.0.7",
+		reason:
+			"No fixed release exists; only reached through micromatch <- fast-glob <- ultracite (lint tooling).",
+	},
 ];
 
 function accepted(packageName: string, advisory: Advisory) {
