@@ -432,6 +432,7 @@
 				"cacheReadCentsPerMTokens": 10
 			},
 			"deprecated": true,
+			"retiresOn": "2026-08-31",
 			"notes": "Moonshot discontinued kimi-k2.5 on 2026-08-31; replacement kimi-k3."
 		},
 		"kimi-latest": {
@@ -449,6 +450,7 @@
 				}
 			},
 			"deprecated": true,
+			"retiresOn": "2026-01-28",
 			"notes": "Moonshot discontinued kimi-latest on 2026-01-28; replacement kimi-k3."
 		},
 		"kimi-k2-thinking": {
@@ -487,6 +489,7 @@
 				"cacheReadCentsPerMTokens": 14.1
 			},
 			"deprecated": true,
+			"retiresOn": "2026-05-25",
 			"notes": "Moonshot discontinued the kimi-k2 series, including kimi-k2-thinking, on 2026-05-25; replacement kimi-k3."
 		}
 	}

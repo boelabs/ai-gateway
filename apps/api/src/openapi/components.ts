@@ -1976,6 +1976,10 @@ export const AdapterSummary = z
 					id: z.string(),
 					operations: z.array(z.string()),
 					deprecated: z.literal(true).optional(),
+					retiresOn: z.iso.date().optional().meta({
+						description:
+							"The day the provider stops serving the model (UTC), as it announced. Information only: routing ignores it.",
+					}),
 				}),
 			)
 			.meta({

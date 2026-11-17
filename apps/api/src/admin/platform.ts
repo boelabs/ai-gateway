@@ -202,6 +202,7 @@ function catalogModels(adapterKey: string) {
 			id,
 			operations: Object.keys(entry.operations ?? {}).sort(),
 			...(entry.deprecated ? { deprecated: true } : {}),
+			...(entry.retiresOn ? { retiresOn: entry.retiresOn } : {}),
 		}))
 		.sort((a, b) => a.id.localeCompare(b.id));
 }

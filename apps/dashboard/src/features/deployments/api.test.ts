@@ -1,8 +1,16 @@
-import { type CreateDeploymentInput, isKnownUpstreamModel } from "./common";
 import { afterEach, mock, test } from "node:test";
 import { api } from "#/shared/api/client.ts";
 import assert from "node:assert/strict";
 import { saveDeployment } from "./api";
+
+import {
+	type CreateDeploymentInput,
+	isKnownUpstreamModel,
+	retirementNotice,
+	retirementLabel,
+	catalogModelFor,
+	retirementOf,
+} from "./common";
 
 afterEach(() => mock.restoreAll());
 
@@ -180,4 +188,36 @@ test("custom inference follows the adapter catalog including snapshot aliases", 
 	assert.equal(isKnownUpstreamModel(models, "gpt-4.1-04-2026"), true);
 	assert.equal(isKnownUpstreamModel(models, "gpt-4.1-nano"), false);
 	assert.equal(isKnownUpstreamModel(models, "other-model"), false);
+});
+
+test("a catalog model's retirement date reads as retiring, then retired on the day itself", () => {
+	const models = [
+		{
+			id: "gpt-4.1",
+			operations: ["text.generate"],
+			deprecated: true as const,
+			retiresOn: "2027-01-14",
+		},
+	];
+	const model = catalogModelFor(models, "gpt-4.1-2025-04-14");
+	assert.equal(model?.id, "gpt-4.1");
+
+	const retiring = retirementOf(model, "2027-01-13");
+	assert.deepEqual(retiring, { state: "retiring", on: "2027-01-14" });
+	assert.equal(retiring && retirementLabel(retiring), "Retires Jan 14, 2027");
+
+	const retired = retirementOf(model, "2027-01-14");
+	assert.deepEqual(retired, { state: "retired", on: "2027-01-14" });
+	assert.equal(
+		retired && retirementNotice(retired),
+		"The provider retired this model on Jan 14, 2027.",
+	);
+
+	assert.equal(
+		retirementOf({ id: "gpt-5", operations: [] }, "2027-01-14"),
+		undefined,
+	);
+	assert.equal(retirementOf(undefined, "2027-01-14"), undefined);
+	// A prerendered shell has no "today": it says nothing rather than guess.
+	assert.equal(retirementOf(model, undefined), undefined);
 });

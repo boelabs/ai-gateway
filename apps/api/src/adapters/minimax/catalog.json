@@ -163,6 +163,7 @@
 				"cacheWriteCentsPerMTokens": 37.5
 			},
 			"deprecated": true,
+			"retiresOn": "2026-11-18",
 			"notes": "MiniMax retires MiniMax-M2.7 on 2026-11-18 (closed to new users from 2026-10-19); no pay-as-you-go replacement is named, and M Plan/Token Plan requests are routed to MiniMax-M3.1-Flash."
 		},
 		"MiniMax-M2.7-highspeed": {
@@ -198,6 +199,7 @@
 				"cacheWriteCentsPerMTokens": 37.5
 			},
 			"deprecated": true,
+			"retiresOn": "2026-11-18",
 			"notes": "MiniMax retires MiniMax-M2.7-highspeed on 2026-11-18 (closed to new users from 2026-10-19); no pay-as-you-go replacement is named, and M Plan/Token Plan requests are routed to MiniMax-M3.1-Flash."
 		},
 		"MiniMax-M2.5": {
@@ -246,6 +248,7 @@
 				"cacheWriteCentsPerMTokens": 37.5
 			},
 			"deprecated": true,
+			"retiresOn": "2026-11-18",
 			"notes": "MiniMax retires MiniMax-M2.5 on 2026-11-18 (closed to new users from 2026-10-19); no pay-as-you-go replacement is named, and M Plan/Token Plan requests are routed to MiniMax-M3.1-Flash."
 		},
 		"MiniMax-M2.5-highspeed": {
@@ -281,6 +284,7 @@
 				"cacheWriteCentsPerMTokens": 37.5
 			},
 			"deprecated": true,
+			"retiresOn": "2026-11-18",
 			"notes": "MiniMax retires MiniMax-M2.5-highspeed on 2026-11-18 (closed to new users from 2026-10-19); no pay-as-you-go replacement is named, and M Plan/Token Plan requests are routed to MiniMax-M3.1-Flash."
 		},
 		"MiniMax-M2.1": {

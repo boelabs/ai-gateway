@@ -18,7 +18,8 @@ You may:
   already serves that operation.
 - Correct `pricing`, `maxInputTokens`, `maxOutputTokens`, `capabilities`, `parameters` and
   `reasoning` of an existing entry, when the provider's own docs say otherwise.
-- Mark a model `deprecated: true` when the provider announced its deprecation or retirement.
+- Mark a model `deprecated: true` when the provider announced its deprecation or retirement, and
+  record the shutdown day in `retiresOn` when the provider published one.
 - Regenerate the Vercel and OpenRouter snapshots with their scripts.
 
 You must not:
@@ -28,8 +29,8 @@ You must not:
   the adapter cannot send), leave it out and list it under "Out of scope" in the pull request.
   The one exception is `AZURE_LISTING_UNSERVED` in `src/catalog/sync/azureListing.ts` (3.2): you may
   add entries there and nothing else in that file, and the pull request then waits for a human.
-- Remove a model from a hand-maintained catalog, or clear `deprecated` on one. Operators' deployments
-  reference these ids; retirement is a flag, and only a human reverses it.
+- Remove a model from a hand-maintained catalog, or clear `deprecated` or `retiresOn` on one.
+  Operators' deployments reference these ids; retirement is a flag, and only a human reverses it.
 - Add a provider, a transport, or a new operation to a model.
 - Tag, release, or touch `release.yml`. Merges go to `main` only.
 - Bypass branch protection, force-push, or merge with any check red or pending.
@@ -260,6 +261,13 @@ to the old id are routed elsewhere after shutdown.
 - A deprecated entry keeps its `operations` and `pricing` untouched and gets `"deprecated": true`
   and a `notes` line in the established style, for example:
   `"OpenAI deprecated gpt-x; it shuts down on 2027-01-14 (replacement: gpt-y)."`
+- When the provider names the day it stops serving the model, add `"retiresOn": "2027-01-14"` next
+  to `deprecated`, the same day the note gives. That includes a redirect: from the day requests to
+  the old id are answered by another model, the old one is retired. Leave it out when the provider
+  gives no exact day ("by the end of December"), or when its own pages disagree, and say so under
+  "Needs human review". A date that moves later is the provider extending the model; the guard holds
+  that pull request for a human. A retired service tier is not a retired model: remove the tier on
+  the day it goes, as before.
 - Edit JSON with a script or by hand, then always run `bun run format` from the repository root.
 
 ### 3.5 Verify
@@ -281,9 +289,9 @@ bun run --filter @boelabs/ai-gateway-api catalog:guard
 | Exit | Meaning | What you do |
 |---|---|---|
 | 0 | Catalog-only change, no risky moves, every Azure-listed id resolved | Open the pull request and merge it when CI is green |
-| 2 | Plausible but risky: a price moved by 1.5x or more, a price disappeared, `AZURE_LISTING_UNSERVED` changed, or the Azure list could not be read | Open the pull request, put the findings under "Needs human review", do not merge |
+| 2 | Plausible but risky: a price moved by 1.5x or more, a price disappeared, a `retiresOn` moved later, `AZURE_LISTING_UNSERVED` changed, or the Azure list could not be read | Open the pull request, put the findings under "Needs human review", do not merge |
 | 2 | An Azure-listed id is unresolved | Go back to 3.2 and resolve it. Open the pull request with it still unresolved only if you could not, and say why under "Needs human review" |
-| 1 | Not a valid catalog sync: a non-catalog file other than `azureListing.ts`, a removed model, an undone deprecation, a new catalog | Fix it. If you cannot, discard the change and report it |
+| 1 | Not a valid catalog sync: a non-catalog file other than `azureListing.ts`, a removed model, an undone deprecation or dropped `retiresOn`, a new catalog | Fix it. If you cannot, discard the change and report it |
 
 If a test fails because of your catalog change (a test pins a model or a price), you may not edit
 the test: leave the pull request open, unmerged, and explain.

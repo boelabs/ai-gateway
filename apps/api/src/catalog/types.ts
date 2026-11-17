@@ -35,6 +35,12 @@ export interface CatalogEntry {
 	/** Flagged as not recommended (does not affect behavior). */
 	deprecated?: boolean;
 	/**
+	 * The day the provider stops serving the model (`YYYY-MM-DD`, UTC), as the provider announced it.
+	 * Information for operators only: routing ignores it, because a provider may keep a model up past
+	 * its date and a dead one fails on its own. Only a deprecated model has one.
+	 */
+	retiresOn?: string;
+	/**
 	 * Dot-paths (e.g. "operations.text.generate.reasoning") the catalog sync auto-drafted from a source
 	 * that can't express our exact schema (currently: reasoning specs from models.dev's `reasoning_options`).
 	 * `scripts/validate-catalog.ts` fails the build while this is non-empty, so a drafted field can't reach
