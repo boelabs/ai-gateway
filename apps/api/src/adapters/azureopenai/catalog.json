@@ -2370,6 +2370,74 @@
 				]
 			}
 		},
+		"gpt-6.2-sol": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"max_tokens": true,
+						"stop": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"max_completion_tokens": true,
+						"seed": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high", "xhigh", "max"]
+					}
+				}
+			},
+			"notes": "Listed by Azure, but Azure's Retail Prices API has no 6.2 meters yet, so it is unpriced. Reasoning effort 'none' is rejected."
+		},
+		"gpt-6.2-astra": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1050000,
+					"maxOutputTokens": 128000,
+					"parameters": {
+						"max_tokens": true,
+						"stop": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"max_completion_tokens": true,
+						"seed": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true,
+						"verbosity": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high", "xhigh", "max"]
+					}
+				}
+			},
+			"notes": "Listed by Azure, but Azure's Retail Prices API has no 6.2 meters yet, so it is unpriced. Reasoning effort 'none' is rejected."
+		},
 		"gpt-6.1-terra": {
 			"operations": {
 				"text.generate": {
