@@ -11,6 +11,13 @@ import { Input } from "#/components/ui/input";
 import { cn } from "#/shared/lib/classes";
 
 /**
+ * A search's share of a list toolbar: a 9rem start on a phone and 12rem from 40rem up, growing
+ * with the row. Also for a search's loading ghost, so the fallback draws the same toolbar.
+ */
+export const SEARCH_WIDTH =
+	"min-w-0 flex-[1_1_9rem] @min-[40rem]:flex-[1_1_12rem]";
+
+/**
  * A list's search box, Billete's: it asks once the operator pauses (300 ms), and a clear button
  * empties it. `value` is what the list searches now; the box keeps what is being typed.
  *
@@ -29,7 +36,7 @@ export function SearchField({
 	onSearch: (value: string) => void;
 	placeholder?: string;
 	label: string;
-	/** Its width: by default the list toolbar's, which fills a phone and is 16rem from 40rem up. */
+	/** Its width: by default the list toolbar's (`SEARCH_WIDTH`). */
 	className?: string;
 }) {
 	const [text, setText] = useState(value);
@@ -51,12 +58,7 @@ export function SearchField({
 	useEffect(() => search(settled), [settled]);
 
 	return (
-		<div
-			className={cn(
-				"relative min-w-0 flex-1 @min-[40rem]:w-64 @min-[40rem]:flex-none",
-				className,
-			)}
-		>
+		<div className={cn("relative", SEARCH_WIDTH, className)}>
 			<IconSearch
 				aria-hidden
 				className="pointer-events-none absolute start-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground"

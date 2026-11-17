@@ -2,7 +2,7 @@
 
 import { ListToolbar, ListSelect } from "#/shared/components/ListToolbar.tsx";
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
-import { SearchField } from "#/shared/components/SearchField.tsx";
+import { SEARCH_WIDTH, SearchField } from "#/shared/components/SearchField.tsx";
 import { type KeysFilters, KEY_STATES } from "./filters.ts";
 import { Can } from "#/features/auth/session.tsx";
 import { type ReactNode, Suspense } from "react";
@@ -18,15 +18,15 @@ import {
 /** A control's ghost while the page loads, sized as the control is in the toolbar. */
 function Ghost({
 	loading,
+	width = "min-w-0 flex-1",
 	children,
 }: {
 	loading: boolean;
+	width?: string;
 	children: ReactNode;
 }) {
 	return loading ? (
-		<GhostSkeleton className="min-w-0 flex-1 @min-[40rem]:flex-none">
-			{children}
-		</GhostSkeleton>
+		<GhostSkeleton className={width}>{children}</GhostSkeleton>
 	) : (
 		children
 	);
@@ -47,7 +47,7 @@ export function KeysToolbar({
 	const toolbar = (
 		<ListToolbar
 			controls={
-				<Ghost loading={loading}>
+				<Ghost loading={loading} width={SEARCH_WIDTH}>
 					<SearchField
 						label="Search keys"
 						onSearch={(value) => filter({ q: value })}

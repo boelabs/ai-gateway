@@ -2,7 +2,7 @@
 
 import { type Role, ROLE_LABELS, ROLE_SUMMARY, ROLES } from "./common.ts";
 import { useIdempotencyKey } from "#/shared/lib/useIdempotencyKey.ts";
-import { SearchField } from "#/shared/components/SearchField.tsx";
+import { SEARCH_WIDTH, SearchField } from "#/shared/components/SearchField.tsx";
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
 import { ListToolbar } from "#/shared/components/ListToolbar.tsx";
 import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
@@ -50,9 +50,7 @@ export function UsersToolbar({
 		<div aria-hidden="true" inert>
 			<ListToolbar
 				controls={
-					<GhostSkeleton className="min-w-0 flex-1 @min-[40rem]:flex-none">
-						{search}
-					</GhostSkeleton>
+					<GhostSkeleton className={SEARCH_WIDTH}>{search}</GhostSkeleton>
 				}
 			/>
 		</div>
