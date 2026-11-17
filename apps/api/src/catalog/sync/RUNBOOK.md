@@ -43,7 +43,7 @@ Aggregators tell you **that** something changed; only the provider tells you **w
 |---|---|
 | Discovering candidates | `catalog:sync` report (Vercel AI Gateway, OpenRouter, models.dev) |
 | Every number and every field you write | The provider's own docs: the URLs in each catalog's `provider.docs`, plus its models page, pricing page, API reference, changelog and deprecations page |
-| Azure prices | The Retail Prices API, `https://prices.azure.com/api/retail/prices?$filter=contains(meterName,'<model>')`; take the lowest Global (`glbl`) meter. A model with only Data Zone meters stays unpriced. Azure's HTML pricing pages render prices with JavaScript and show nothing |
+| Azure prices | The Retail Prices API, `https://prices.azure.com/api/retail/prices?$filter=contains(meterName,'<model>')`; take the lowest Global (`glbl`) meter. Until Azure publishes one, a model OpenAI also sells takes OpenAI's Standard price (base and long-context `tiers`; no `serviceTiers`, `scheduled` or Batch rates) and its `notes` say so; replace it with the meter once it appears. Never leave such a model unpriced: Azure has never billed an OpenAI model below OpenAI's own rate. Only a model OpenAI does not sell stays unpriced without a Global meter. Azure's HTML pricing pages render prices with JavaScript and show nothing |
 
 Rules learned the hard way:
 
@@ -179,7 +179,8 @@ deprecated here". **Resolve every id in those sections this run; none may be ski
 over:**
 
 - Servable (the adapter has the operation and transport): research and add it like any new model
-  (3.3). Without a Global meter it goes in unpriced; that is not a reason to leave it out.
+  (3.3). Without a Global meter it takes OpenAI's Standard price when OpenAI sells it (Sources, Azure
+  prices), otherwise it goes in unpriced; neither is a reason to leave it out.
 - Not servable: add it to `AZURE_LISTING_UNSERVED` with a one-line reason in the style of the
   entries already there. Never use that list for a model you merely could not research.
 - Retired by Azure: mark it `deprecated` (3.4).
