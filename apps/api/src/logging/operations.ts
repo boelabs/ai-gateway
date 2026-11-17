@@ -1,6 +1,5 @@
 import { deriveActiveKey, decryptJson, encryptJson } from "#db/crypto.ts";
 import { EXECUTION_POLICY_MAX_TOTAL_MS } from "#core/executionPolicy.ts";
-import { providerErrorDetail, internalMessage } from "./errorRecord.ts";
 import { and, asc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { PersistenceHealthTracker } from "./persistenceHealth.ts";
 import { purgeExpiredAuditEntries } from "#db/repos/audit.ts";
@@ -26,6 +25,12 @@ import {
 	upstreamAttempts,
 	payloadSamples,
 } from "#db/schema.ts";
+
+import {
+	providerErrorDetail,
+	internalMessage,
+	scrubSecrets,
+} from "./errorRecord.ts";
 
 const pending = new Set<Promise<void>>();
 const persistenceHealth = new PersistenceHealthTracker();
@@ -61,7 +66,7 @@ let drainingFinalizations = false;
  * readable in the logs.
  */
 const SENSITIVE_KEY =
-	/authorization|api[-_]?key|token$|secret|password|cookie/iu;
+	/authorization|api[-_]?key|access[-_]?key|private[-_]?key|credential|token$|secret|password|cookie/iu;
 const OPERATION_LEASE_TTL_SECONDS =
 	Math.ceil(EXECUTION_POLICY_MAX_TOTAL_MS / 1000) + 300;
 const operationLeaseKey = (operationId: string) =>
@@ -271,7 +276,14 @@ function safeSummary(
 	return summary;
 }
 
+/**
+ * Removes credentials from a value about to be retained: by key name, and inside free text too, so a
+ * key pasted into a prompt does not outlive the request in a sample.
+ */
 export function redact(value: unknown): unknown {
+	if (typeof value === "string") {
+		return scrubSecrets(value);
+	}
 	if (Array.isArray(value)) {
 		return value.map(redact);
 	}
@@ -294,7 +306,7 @@ function boundedPayloadComponent(value: unknown): unknown {
 		return { unavailable: "not_serializable" };
 	}
 	const limit = env.OBSERVABILITY_PAYLOAD_MAX_BYTES;
-	if (Buffer.byteLength(redacted) <= limit) {
+	if (limit === 0 || Buffer.byteLength(redacted) <= limit) {
 		return JSON.parse(redacted) as unknown;
 	}
 	let clipped = redacted;

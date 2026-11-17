@@ -382,6 +382,7 @@ function streamResponses(
 		let lastChunkAt: number | null = null;
 		let streamError: GatewayError | null = null;
 		let statePersisted = false;
+		let completedResponse: Record<string, unknown> | null = null;
 		let metadata: Record<string, unknown> = { downstream };
 		let responseIdentity: {
 			id: string;
@@ -540,6 +541,7 @@ function streamResponses(
 					} catch {
 						completed = undefined;
 					}
+					completedResponse = completed ?? completedResponse;
 					if (completed && !statePersisted) {
 						await persistResponseState({
 							auth,
@@ -647,7 +649,9 @@ function streamResponses(
 				cost,
 				firstOutputMs:
 					firstTokenAt === null ? null : firstTokenAt - log.startedAt,
-				responseBody: { streamed: true },
+				responseBody: completedResponse
+					? { ...completedResponse, streamed: true }
+					: { streamed: true },
 				metadata,
 				error: streamError ? streamError.toLog() : null,
 			});

@@ -1,4 +1,5 @@
 import { messagesRequestSchema } from "#contracts/anthropic/messages.ts";
+import { StreamedResponseCapture } from "#logging/streamedResponse.ts";
 import { candidateMetadata } from "#gateway/candidateMetadata.ts";
 import { hasContentInputs } from "#files/requestContentInputs.ts";
 import type { CanonicalChatRequest } from "#core/canonical.ts";
@@ -82,6 +83,7 @@ function streamMessages(
 		let lastChunkAt: number | null = null;
 		let streamError: GatewayError | null = null;
 		let metadata: Record<string, unknown> = { downstream };
+		const captured = new StreamedResponseCapture();
 		try {
 			routed = await awaitWithSSEHeartbeats(routePromise, () =>
 				writeSSEHeartbeat(stream, downstream),
@@ -149,6 +151,7 @@ function streamMessages(
 					if (transformed.usage) {
 						({ usage } = transformed);
 					}
+					captured.add(transformed);
 					yield transformed;
 				}
 			}
@@ -238,7 +241,7 @@ function streamMessages(
 				cost,
 				firstOutputMs:
 					firstTokenAt === null ? null : firstTokenAt - log.startedAt,
-				responseBody: { streamed: true },
+				responseBody: captured.toLog(),
 				metadata,
 				error: streamError ? streamError.toLog() : null,
 			});

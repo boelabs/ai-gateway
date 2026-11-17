@@ -39,7 +39,7 @@ El gateway valida su entorno al inicio y sale si falta una variable requerida o 
 | `OBSERVABILITY_PAYLOAD_RETENTION_DAYS` | `7` | Retención de carga útil forense cifrada. |
 | `OBSERVABILITY_METADATA_RETENTION_DAYS` | `30` | Retención de metadatos de operación completada y intentos ascendentes. |
 | `ADMIN_AUDIT_RETENTION_DAYS` | `365` | Retención del registro de auditoría `/admin`. Sobrevive a los metadatos de operación: una fila por cambio de configuración, consultado meses después. |
-| `OBSERVABILITY_PAYLOAD_MAX_BYTES` | `32768` | Tamaño máximo de cada componente de solicitud, respuesta, error e intento en una muestra cifrada después de ocultar los secretos. |
+| `OBSERVABILITY_PAYLOAD_MAX_BYTES` | `0` | Tamaño máximo de cada componente de solicitud, respuesta, error e intento en una muestra cifrada después de ocultar los secretos. `0` los guarda completos; si no, al menos `128`. |
 | `IMAGES_MAX_MULTIPART_BYTES` | `805000000` (~805 MB) | Límite agregado en una carga de imágenes de varias partes (imágenes + máscara + campos), transmitida a un disco temporal. |
 | `AUDIO_MAX_MULTIPART_BYTES` | `30000000` (30MB) | Límite agregado en una carga de varias partes de una transcripción de audio. |
 | `RESPONSES_STORE_DEFAULT` | `true` | Valor predeterminado para `store` cuando una solicitud `/v1/responses` lo omite. Configura `false` para deployments que prioricen la privacidad. |
