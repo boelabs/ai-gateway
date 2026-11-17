@@ -2402,7 +2402,22 @@
 					}
 				}
 			},
-			"notes": "Listed by Azure, but Azure's Retail Prices API has no 6.2 meters yet, so it is unpriced. Reasoning effort 'none' is rejected."
+			"pricing": {
+				"inputCentsPerMTokens": 200,
+				"outputCentsPerMTokens": 1000,
+				"cacheReadCentsPerMTokens": 10,
+				"cacheWriteCentsPerMTokens": 250,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 400,
+						"outputCentsPerMTokens": 1500,
+						"cacheReadCentsPerMTokens": 20,
+						"cacheWriteCentsPerMTokens": 500
+					}
+				]
+			},
+			"notes": "Priced at OpenAI's Standard rate until Azure's Retail Prices API publishes a Global meter for it. Reasoning effort 'none' is rejected."
 		},
 		"gpt-6.2-astra": {
 			"operations": {
@@ -2436,7 +2451,22 @@
 					}
 				}
 			},
-			"notes": "Listed by Azure, but Azure's Retail Prices API has no 6.2 meters yet, so it is unpriced. Reasoning effort 'none' is rejected."
+			"pricing": {
+				"inputCentsPerMTokens": 800,
+				"outputCentsPerMTokens": 4000,
+				"cacheReadCentsPerMTokens": 40,
+				"cacheWriteCentsPerMTokens": 1000,
+				"tiers": [
+					{
+						"aboveInputTokens": 272000,
+						"inputCentsPerMTokens": 1600,
+						"outputCentsPerMTokens": 6000,
+						"cacheReadCentsPerMTokens": 80,
+						"cacheWriteCentsPerMTokens": 2000
+					}
+				]
+			},
+			"notes": "Priced at OpenAI's Standard rate until Azure's Retail Prices API publishes a Global meter for it. Reasoning effort 'none' is rejected."
 		},
 		"gpt-6.1-terra": {
 			"operations": {
