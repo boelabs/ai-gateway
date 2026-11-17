@@ -242,9 +242,11 @@ test("Anthropic catalog exposes Opus 5 reasoning, fast mode, and model-specific 
 	const opus5Fast = opus5Entry?.pricing?.serviceTiers?.fast;
 	assert.equal(opus5Fast?.inputCentsPerMTokens, 1000);
 	assert.equal(opus5Fast?.outputCentsPerMTokens, 5000);
-	assert.ok(
+	// Anthropic removed fast mode for Opus 4.7 on 2026-07-24; the tier must not come back.
+	assert.equal(
 		getCatalogEntry("anthropic", "claude-opus-4-7")?.pricing?.serviceTiers
 			?.fast,
+		undefined,
 	);
 
 	const opus48 = getCatalogEntry("anthropic", "claude-opus-4-8")?.operations[

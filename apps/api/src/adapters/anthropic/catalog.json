@@ -259,20 +259,9 @@
 				"cacheWriteCentsPerMTokensByTtl": {
 					"300": 625,
 					"3600": 1000
-				},
-				"serviceTiers": {
-					"fast": {
-						"inputCentsPerMTokens": 3000,
-						"outputCentsPerMTokens": 15000,
-						"cacheReadCentsPerMTokens": 300,
-						"cacheWriteCentsPerMTokens": 3750,
-						"cacheWriteCentsPerMTokensByTtl": {
-							"300": 3750,
-							"3600": 6000
-						}
-					}
 				}
-			}
+			},
+			"notes": "Anthropic removed fast mode for claude-opus-4-7 on 2026-07-24; requests with speed fast now return an error."
 		},
 		"claude-opus-4-6": {
 			"operations": {

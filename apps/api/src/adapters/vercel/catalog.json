@@ -1167,14 +1167,15 @@
 					},
 					"reasoning": {
 						"kind": "openai_effort",
-						"levels": ["none", "low", "medium", "high"]
+						"levels": ["none", "low", "high", "xhigh"]
 					}
 				}
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 150,
 				"outputCentsPerMTokens": 450,
-				"cacheReadCentsPerMTokens": 7.5
+				"cacheReadCentsPerMTokens": 7.5,
+				"cacheWriteCentsPerMTokens": 187.5
 			}
 		},
 		"amazon/nova-2-lite": {
@@ -14384,6 +14385,46 @@
 				"inputCentsPerMTokens": 41.7,
 				"outputCentsPerMTokens": 125.05,
 				"cacheReadCentsPerMTokens": 2.1
+			}
+		},
+		"tencent/hy4-flash": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 1024000,
+					"maxOutputTokens": 64000,
+					"modalities": {
+						"input": ["image", "text"],
+						"output": ["text"]
+					},
+					"contracts": ["chat.completions", "responses"],
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"reasoning_effort": true,
+						"response_format": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "high"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 3.5,
+				"outputCentsPerMTokens": 14.05,
+				"cacheReadCentsPerMTokens": 0.15
 			}
 		},
 		"tencent/hy4-preview": {
