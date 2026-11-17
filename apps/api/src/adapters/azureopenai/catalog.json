@@ -589,7 +589,9 @@
 				"audioOutputCentsPerMTokens": 6400,
 				"imageInputCentsPerMTokens": 500
 			},
-			"notes": "Realtime API (wss /openai/v1/realtime, deployment name as the model). Reasoning model: 128k context, 32k max output. gpt-realtime-2.1 improves on it. Prices are Azure's Global meters."
+			"deprecated": true,
+			"retiresOn": "2027-01-20",
+			"notes": "Microsoft deprecated gpt-realtime-2; it retires on 2027-01-20 (replacement: gpt-realtime-2.1). Realtime API (wss /openai/v1/realtime, deployment name as the model). Reasoning model: 128k context, 32k max output. Prices are Azure's Global meters."
 		},
 		"gpt-live-transcribe": {
 			"operations": {

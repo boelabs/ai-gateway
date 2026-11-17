@@ -3000,7 +3000,7 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 0.3,
-				"imageOutputCentsPerImage": 3.5
+				"imageOutputCentsPerImage": 9
 			}
 		},
 		"callstack/apex": {
@@ -13052,6 +13052,45 @@
 			},
 			"pricing": {
 				"imageOutputCentsPerImage": 21
+			}
+		},
+		"recursive/flint-v1.0": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": false,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 262144,
+					"maxOutputTokens": 262144,
+					"modalities": {
+						"input": ["text"],
+						"output": ["text"]
+					},
+					"contracts": ["chat.completions", "responses"],
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"reasoning_effort": true,
+						"response_format": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["none", "low", "medium", "high"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 0,
+				"outputCentsPerMTokens": 0
 			}
 		},
 		"reflection/beam": {
