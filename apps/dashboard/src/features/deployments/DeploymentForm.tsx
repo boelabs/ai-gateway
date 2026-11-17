@@ -3,7 +3,6 @@
 import { ArrowCounterClockwiseIcon as IconReset } from "@phosphor-icons/react/dist/ssr";
 import { CredentialFields } from "#/features/credentials/CredentialFields.tsx";
 import { useIdempotencyKey } from "#/shared/lib/useIdempotencyKey.ts";
-import { useMemo, useRef, useState, useTransition } from "react";
 import { ModelInput } from "#/shared/components/ModelPicker.tsx";
 import { FormSkeleton } from "#/shared/components/Skeleton.tsx";
 import { useNotify } from "#/shared/feedback/notifications.tsx";
@@ -25,9 +24,13 @@ import { Form } from "#/components/ui/form";
 
 import {
 	type CreateDeploymentInput,
-	isKnownUpstreamModel,
 	type AdapterSummary,
+	type CatalogModel,
+	retirementNotice,
+	retirementLabel,
+	catalogModelFor,
 	type Deployment,
+	retirementOf,
 } from "./common.ts";
 
 import {
@@ -42,6 +45,14 @@ import {
 	parseCustomEntry,
 	parseObject,
 } from "./custom-model";
+
+import {
+	useSyncExternalStore,
+	useTransition,
+	useState,
+	useMemo,
+	useRef,
+} from "react";
 
 const LIST = "/models";
 
@@ -121,7 +132,10 @@ export function DeploymentForm({
 		(credential) => credential.id === credentialId,
 	);
 	const catalog = adapter?.models ?? [];
-	const known = isKnownUpstreamModel(catalog, upstreamModel);
+	const catalogModel = catalogModelFor(catalog, upstreamModel);
+	const known = catalogModel !== undefined;
+	const today = useToday();
+	const retirement = retirementOf(catalogModel, today);
 	const custom = !known;
 	const sameStoredModel = existing?.upstreamModel === upstreamModel.trim();
 	const catalogTransports = sameStoredModel
@@ -270,6 +284,9 @@ export function DeploymentForm({
 						 * catalog — a select would make both impossible.
 						 */
 						<ModelInput
+							{...(retirement
+								? { description: retirementNotice(retirement) }
+								: {})}
 							emptyHint="Not in the catalog. Press Enter to use it as a custom model."
 							label="Upstream model"
 							models={catalog.map((model) => model.id)}
@@ -278,9 +295,10 @@ export function DeploymentForm({
 							renderItem={(id) => (
 								<>
 									{id}
-									{catalog.find((model) => model.id === id)?.deprecated ? (
-										<Status tone="warning">Deprecated</Status>
-									) : null}
+									<CatalogStatus
+										model={catalog.find((model) => model.id === id)}
+										today={today}
+									/>
 								</>
 							)}
 							required
@@ -514,5 +532,38 @@ export function DeploymentFormSkeleton() {
 		<FormSkeleton>
 			<DeploymentForm adapters={[]} />
 		</FormSkeleton>
+	);
+}
+
+/** Where a catalog model stands: retired, retiring on a date, or deprecated with no date yet. */
+function CatalogStatus({
+	model,
+	today,
+}: {
+	model: CatalogModel | undefined;
+	today: string | undefined;
+}) {
+	const retirement = retirementOf(model, today);
+	if (retirement) {
+		return (
+			<Status tone={retirement.state === "retired" ? "danger" : "warning"}>
+				{retirementLabel(retirement)}
+			</Status>
+		);
+	}
+	return model?.deprecated ? <Status tone="warning">Deprecated</Status> : null;
+}
+
+const noSubscription = () => () => undefined;
+
+/**
+ * Today's date in UTC, read in the browser only. The form's shell is prerendered, and a date read
+ * there would be frozen into it; on the server this is `undefined` and retirements wait for hydration.
+ */
+function useToday(): string | undefined {
+	return useSyncExternalStore(
+		noSubscription,
+		() => new Date().toISOString().slice(0, 10),
+		() => undefined,
 	);
 }

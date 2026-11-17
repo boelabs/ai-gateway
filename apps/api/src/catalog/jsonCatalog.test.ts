@@ -202,3 +202,30 @@ test("a scheduled price change must keep pricing every service tier", () => {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("a retirement date is a real day on a deprecated model", () => {
+	const source = new URL("../adapters/deepseek/catalog.json", import.meta.url);
+	const doc = JSON.parse(readFileSync(source, "utf8"));
+	const dir = mkdtempSync(join(tmpdir(), "catalog-"));
+	const url = pathToFileURL(join(dir, "catalog.json"));
+	const id = "deepseek-chat";
+	const withRetirement = (fields: Record<string, unknown>) => {
+		const { deprecated: _d, retiresOn: _r, ...rest } = doc.models[id];
+		doc.models[id] = { ...rest, ...fields };
+		writeFileSync(url, JSON.stringify(doc));
+	};
+	try {
+		withRetirement({ deprecated: true, retiresOn: "2027-01-31" });
+		assert.doesNotThrow(() => loadCatalogDocument(url));
+		for (const [fields, message] of [
+			[{ deprecated: true, retiresOn: "Jan 31" }, /YYYY-MM-DD/u],
+			[{ deprecated: true, retiresOn: "2027-02-30" }, /YYYY-MM-DD/u],
+			[{ retiresOn: "2027-01-31" }, /requires deprecated: true/u],
+		] as const) {
+			withRetirement(fields);
+			assert.throws(() => loadCatalogDocument(url), message);
+		}
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

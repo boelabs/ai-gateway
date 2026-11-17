@@ -141,7 +141,8 @@
 				"videoOutputCentsPerMTokens": 1750
 			},
 			"notes": "Output is limited to inline-safe 360p and 720p because this integration does not use the Files API. Video output is billed by token (360p 1,931 and 720p 5,792 tokens per second); usage is settled when the job reaches a terminal state. Google announced on 2026-11-05 that requests to gemini-omni-1.1-flash are routed to gemini-omni-1.2-flash from 2026-12-03 (replacement: gemini-omni-1.2-flash).",
-			"deprecated": true
+			"deprecated": true,
+			"retiresOn": "2026-12-03"
 		},
 		"veo-3.1-generate-preview": {
 			"operations": {
@@ -184,6 +185,7 @@
 				}
 			},
 			"deprecated": true,
+			"retiresOn": "2026-10-22",
 			"notes": "Google's deprecations page schedules veo-3.1-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.2-flash."
 		},
 		"veo-3.1-fast-generate-preview": {
@@ -227,6 +229,7 @@
 				}
 			},
 			"deprecated": true,
+			"retiresOn": "2026-10-22",
 			"notes": "Google's deprecations page schedules veo-3.1-fast-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.2-flash."
 		},
 		"veo-3.1-lite-generate-preview": {
@@ -261,6 +264,7 @@
 				}
 			},
 			"deprecated": true,
+			"retiresOn": "2026-10-22",
 			"notes": "Google's deprecations page schedules veo-3.1-lite-generate-preview for shutdown on 2026-10-22; replacement gemini-omni-1.2-flash."
 		},
 		"gemini-3.5-transcribe": {
@@ -349,6 +353,7 @@
 				"outputCentsPerMTokens": 0
 			},
 			"deprecated": true,
+			"retiresOn": "2028-05-14",
 			"notes": "Google deprecated gemini-embedding-001; it shuts down on 2028-05-14 (replacement: gemini-embedding-2)."
 		},
 		"gemini-nano-banana-2.1": {
@@ -2348,6 +2353,7 @@
 				"cacheWriteCentsPerMTokens": 4.166667
 			},
 			"deprecated": true,
+			"retiresOn": "2027-05-07",
 			"notes": "Google deprecated gemini-3.1-flash-lite; it shuts down on 2027-05-07 (replacement: gemini-3.5-flash-lite)."
 		},
 		"gemini-2.5-pro": {
@@ -2402,6 +2408,7 @@
 				"cacheWriteCentsPerMTokens": 37.5
 			},
 			"deprecated": true,
+			"retiresOn": "2026-12-01",
 			"notes": "Google deprecated gemini-2.5-pro on 2026-11-02; from 2026-12-01 requests route to gemini-3.8-flash and bill at its rates (replacement: gemini-3.8-flash)."
 		},
 		"gemini-2.5-flash": {
@@ -2448,6 +2455,7 @@
 				"cacheWriteCentsPerMTokens": 8.333333
 			},
 			"deprecated": true,
+			"retiresOn": "2026-12-01",
 			"notes": "Google deprecated gemini-2.5-flash on 2026-11-02; from 2026-12-01 requests route to gemini-3.5-flash-lite and bill at its rates (replacement: gemini-3.5-flash-lite)."
 		},
 		"gemini-2.5-flash-lite": {
@@ -2582,6 +2590,7 @@
 				"cacheWriteCentsPerMTokens": 4.166667
 			},
 			"deprecated": true,
+			"retiresOn": "2026-05-25",
 			"notes": "Shut down by Google on 2026-05-25 (deprecations page); replacement gemini-3.1-flash-lite."
 		},
 		"gemini-3.1-flash-image-preview": {
@@ -3102,6 +3111,7 @@
 				"imageOutputCentsPerMTokens": 6000
 			},
 			"deprecated": true,
+			"retiresOn": "2026-06-25",
 			"notes": "Shut down by Google on 2026-06-25 (deprecations page); replacement gemini-nano-banana-2.1."
 		},
 		"gemini-3-pro-image-preview": {
@@ -3404,6 +3414,7 @@
 				"imageOutputCentsPerMTokens": 12000
 			},
 			"deprecated": true,
+			"retiresOn": "2026-06-25",
 			"notes": "Shut down by Google on 2026-06-25 (deprecations page); replacement gemini-3-pro-image."
 		},
 		"gemini-2.5-flash-lite-preview-09-2025": {
@@ -3439,6 +3450,7 @@
 				"cacheWriteCentsPerMTokens": 8.333333
 			},
 			"deprecated": true,
+			"retiresOn": "2026-03-31",
 			"notes": "Google shut down gemini-2.5-flash-lite-preview-09-2025 on 2026-03-31 (deprecations page); replacement gemini-3.1-flash-lite."
 		},
 		"gemini-2.5-pro-preview-05-06": {
@@ -3482,6 +3494,7 @@
 				]
 			},
 			"deprecated": true,
+			"retiresOn": "2025-12-02",
 			"notes": "Google redirected gemini-2.5-pro-preview-05-06 to gemini-2.5-pro on 2025-06-26 and shut it down on 2025-12-02 (deprecations page); replacement gemini-3.1-pro-preview."
 		},
 		"gemma-4-31b-it": {
@@ -3778,6 +3791,7 @@
 				"imageInputCentsPerMTokens": 100
 			},
 			"deprecated": true,
+			"retiresOn": "2026-11-17",
 			"notes": "Google deprecated gemini-3.1-flash-live-preview; it shuts down on 2026-11-17 (replacement: gemini-3.8-live). Live API (BidiGenerateContent), native audio. Legacy: Google recommends gemini-3.8-live. Synchronous function calling only. Answers in audio only; text sessions are served from the transcript."
 		},
 		"gemini-2.5-flash-native-audio-preview-12-2025": {
@@ -3837,6 +3851,7 @@
 				"imageInputCentsPerMTokens": 300
 			},
 			"deprecated": true,
+			"retiresOn": "2026-11-17",
 			"notes": "Google deprecated gemini-2.5-flash-native-audio-preview-12-2025; it shuts down on 2026-11-17 (replacement: gemini-3.8-live). Live API (BidiGenerateContent), native audio. Google limits 2.5 access to projects that already used it. Answers in audio only; text sessions are served from the transcript."
 		},
 		"gemini-3.5-live-translate-preview": {

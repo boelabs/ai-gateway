@@ -671,6 +671,7 @@ export const operationProfilesSchema = z
 const catalogEntrySchema = z
 	.object({
 		deprecated: z.boolean().optional(),
+		retiresOn: z.iso.date().optional(),
 		operations: operationProfilesSchema,
 		pricing: pricingSchema.optional(),
 		notes: z.string().min(1).optional(),

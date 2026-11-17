@@ -156,6 +156,40 @@ function priceFindings(
 }
 
 /**
+ * A retirement date may be added or brought forward freely: both only warn operators sooner. Dropping
+ * one undoes a retirement, which only a human does; pushing one later is usually a provider extending
+ * the model's life, and is plausible enough to keep but not to merge unseen.
+ */
+function retirementFindings(
+	label: string,
+	oldEntry: Record<string, unknown>,
+	newEntry: Record<string, unknown>,
+): GuardFinding[] {
+	const before = oldEntry.retiresOn;
+	const after = newEntry.retiresOn;
+	if (typeof before !== "string") {
+		return [];
+	}
+	if (typeof after !== "string") {
+		return [
+			{
+				level: "block",
+				message: `${label} lost its retirement date ${before}; only a human reverses a retirement`,
+			},
+		];
+	}
+	if (after > before) {
+		return [
+			{
+				level: "review",
+				message: `${label}: retiresOn ${before} -> ${after}`,
+			},
+		];
+	}
+	return [];
+}
+
+/**
  * Compares one catalog before and after the sync. A model never disappears from a hand-maintained
  * catalog (operators' deployments reference it; retirement is `deprecated: true`), and a retirement is
  * never undone automatically.
@@ -190,6 +224,7 @@ export function guardCatalog(
 				message: `${label} is no longer deprecated; only a human reverses a retirement`,
 			});
 		}
+		findings.push(...retirementFindings(label, oldEntry, newEntry));
 		findings.push(...priceFindings(label, oldEntry.pricing, newEntry.pricing));
 	}
 	return findings;

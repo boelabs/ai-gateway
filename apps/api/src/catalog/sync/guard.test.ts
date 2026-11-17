@@ -93,6 +93,24 @@ describe("guardCatalog", () => {
 		);
 	});
 
+	test("a retirement date may be added or brought forward, never dropped", () => {
+		const retiring = (retiresOn?: string) =>
+			catalog({ a: { deprecated: true, ...(retiresOn ? { retiresOn } : {}) } });
+		const levels = (before: unknown, after: unknown) =>
+			guardCatalog("openai", before, after).map((f) => f.level);
+
+		assert.deepEqual(levels(retiring(), retiring("2027-01-31")), []);
+		assert.deepEqual(
+			levels(retiring("2027-01-31"), retiring("2026-12-01")),
+			[],
+		);
+		assert.deepEqual(levels(retiring("2027-01-31"), retiring()), ["block"]);
+		// A later date is usually the provider extending the model: plausible, but a human looks.
+		assert.deepEqual(levels(retiring("2026-12-01"), retiring("2027-01-31")), [
+			"review",
+		]);
+	});
+
 	test("sends large or removed price changes to a human, tiers included", () => {
 		const before = catalog({
 			a: {

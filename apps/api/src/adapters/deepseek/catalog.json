@@ -82,6 +82,7 @@
 				"cacheReadCentsPerMTokens": 0.6
 			},
 			"deprecated": true,
+			"retiresOn": "2026-09-10",
 			"notes": "DeepSeek retired deepseek-v4-flash on 2026-09-10; the name is still accepted, served by DeepSeek-V4.1-Flash-1017 and billed at the Flash price (replacement: deepseek-flash)."
 		},
 		"deepseek-v4-pro": {
@@ -192,6 +193,7 @@
 				"cacheReadCentsPerMTokens": 0.6
 			},
 			"deprecated": true,
+			"retiresOn": "2026-07-24",
 			"notes": "DeepSeek discontinued the legacy deepseek-chat name on 2026-07-24 (announced 2026-04-24); replacement deepseek-flash."
 		},
 		"deepseek-reasoner": {
@@ -219,6 +221,7 @@
 				"cacheReadCentsPerMTokens": 0.6
 			},
 			"deprecated": true,
+			"retiresOn": "2026-07-24",
 			"notes": "DeepSeek discontinued the legacy deepseek-reasoner name on 2026-07-24 (announced 2026-04-24); replacement deepseek-flash."
 		},
 		"deepseek-flash": {
@@ -335,6 +338,7 @@
 				"cacheReadCentsPerMTokens": 0.6
 			},
 			"deprecated": true,
+			"retiresOn": "2026-09-10",
 			"notes": "DeepSeek retired deepseek-v4-flash-vision-exp on 2026-09-10; the name is still accepted, served by DeepSeek-V4.1-Flash-1017 and billed at the Flash price (replacement: deepseek-flash)."
 		}
 	}

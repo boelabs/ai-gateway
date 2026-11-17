@@ -4465,6 +4465,11 @@ export interface components {
                 operations: string[];
                 /** @constant */
                 deprecated?: true;
+                /**
+                 * Format: date
+                 * @description The day the provider stops serving the model (UTC), as it announced. Information only: routing ignores it.
+                 */
+                retiresOn?: string;
             }[];
             operations: {
                 /** @enum {string} */

@@ -54,10 +54,11 @@ const REASONING_KINDS = new Set<ReasoningControlKind>([
 ]);
 
 // Deliberately minimal: only data the gateway actually consumes (operations/pricing) plus the few
-// human-facing fields (deprecated/notes/needsHumanReview). Descriptive metadata (lifecycle, modalities,
+// human-facing fields (deprecated/retiresOn/notes/needsHumanReview). Descriptive metadata (lifecycle, modalities,
 // sources, aliases...) was removed on purpose - anything else here is an unknown-field failure.
 const MODEL_KEYS = new Set([
 	"deprecated",
+	"retiresOn",
 	"operations",
 	"pricing",
 	"notes",
@@ -190,11 +191,7 @@ function validateScheduledPricing(
 			fail(at, "must be an object");
 		}
 		const { effectiveFrom, pricing } = entry;
-		if (
-			typeof effectiveFrom !== "string" ||
-			!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u.test(effectiveFrom) ||
-			Number.isNaN(Date.parse(`${effectiveFrom}T00:00:00Z`))
-		) {
+		if (typeof effectiveFrom !== "string" || !isCalendarDate(effectiveFrom)) {
 			fail(`${at}.effectiveFrom`, "must be a YYYY-MM-DD date");
 		}
 		if (effectiveFrom <= previous) {
@@ -869,6 +866,36 @@ function validateDocument(
 		if (model.deprecated !== undefined) {
 			assertBoolean(model.deprecated, `${path}.models.${modelId}.deprecated`);
 		}
+		if (model.retiresOn !== undefined) {
+			assertRetirementDate(
+				model.retiresOn,
+				model.deprecated,
+				`${path}.models.${modelId}.retiresOn`,
+			);
+		}
+	}
+}
+
+/** A real calendar day, so a typo like 2026-02-30 fails here instead of rolling over into March. */
+function isCalendarDate(value: string): boolean {
+	if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u.test(value)) {
+		return false;
+	}
+	const date = new Date(`${value}T00:00:00Z`);
+	return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
+}
+
+/** A retirement is a deprecation with a date: one without the other is a half-applied sync. */
+function assertRetirementDate(
+	value: unknown,
+	deprecated: unknown,
+	path: string,
+): void {
+	if (typeof value !== "string" || !isCalendarDate(value)) {
+		fail(path, "must be a YYYY-MM-DD date");
+	}
+	if (deprecated !== true) {
+		fail(path, "requires deprecated: true");
 	}
 }
 

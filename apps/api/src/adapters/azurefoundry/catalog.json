@@ -31,6 +31,7 @@
 				"outputCentsPerMTokens": 320
 			},
 			"deprecated": true,
+			"retiresOn": "2026-10-16",
 			"notes": "Microsoft retired Cohere-command-a-plus-05-2026 (preview) in Foundry on 2026-10-16; the replacements are Hugging Face collection models for managed compute, not serverless."
 		},
 		"Cohere-command-a": {
@@ -51,6 +52,7 @@
 				"outputCentsPerMTokens": 1000
 			},
 			"deprecated": true,
+			"retiresOn": "2027-02-15",
 			"notes": "Microsoft lists Cohere-command-a for retirement on 2027-02-15 in its model retirement schedule, with no replacement listed."
 		},
 		"DeepSeek-V4-Pro": {
@@ -145,6 +147,7 @@
 				"cacheReadCentsPerMTokens": 1.4
 			},
 			"deprecated": true,
+			"retiresOn": "2026-12-03",
 			"notes": "Microsoft lists DeepSeek-V4-Flash-0731 for retirement on 2026-12-03 in its model retirement schedule, with no replacement listed."
 		},
 		"DeepSeek-V3.2-Speciale": {
@@ -193,6 +196,7 @@
 				"outputCentsPerMTokens": 494
 			},
 			"deprecated": true,
+			"retiresOn": "2026-07-13",
 			"notes": "Microsoft retired DeepSeek-V3.1 in Foundry on 2026-07-13 (replacement: DeepSeek-V4-Flash)."
 		},
 		"DeepSeek-R1-0528": {
@@ -209,6 +213,7 @@
 				}
 			},
 			"deprecated": true,
+			"retiresOn": "2026-07-13",
 			"notes": "Microsoft retired DeepSeek-R1-0528 in Foundry on 2026-07-13 (replacement: DeepSeek-V4-Pro)."
 		},
 		"DeepSeek-V3-0324": {
@@ -225,6 +230,7 @@
 				}
 			},
 			"deprecated": true,
+			"retiresOn": "2026-07-13",
 			"notes": "Microsoft retired DeepSeek-V3-0324 in Foundry on 2026-07-13 (replacement: DeepSeek-V4-Flash)."
 		},
 		"DeepSeek-R1": {
@@ -245,6 +251,7 @@
 				"outputCentsPerMTokens": 540
 			},
 			"deprecated": true,
+			"retiresOn": "2026-08-13",
 			"notes": "Microsoft retired DeepSeek-R1 in Foundry on 2026-08-13 (replacement: DeepSeek-V4-Pro)."
 		},
 		"Llama-4-Maverick-17B-128E-Instruct-FP8": {
@@ -265,6 +272,7 @@
 				"outputCentsPerMTokens": 100
 			},
 			"deprecated": true,
+			"retiresOn": "2026-11-19",
 			"notes": "Microsoft lists Llama-4-Maverick-17B-128E-Instruct-FP8 for retirement on 2026-11-19 in its partner models table, with no replacement listed."
 		},
 		"Llama-3.3-70B-Instruct": {
@@ -285,6 +293,7 @@
 				"outputCentsPerMTokens": 71
 			},
 			"deprecated": true,
+			"retiresOn": "2027-01-31",
 			"notes": "Microsoft lists Llama-3.3-70B-Instruct for retirement on 2027-01-31 in its model retirement schedule, with no replacement listed."
 		},
 		"Mistral-Large-3": {
@@ -417,6 +426,7 @@
 				"cacheReadCentsPerMTokens": 10
 			},
 			"deprecated": true,
+			"retiresOn": "2027-01-26",
 			"notes": "Microsoft lists Kimi-K2.5 for retirement on 2027-01-26 in its model retirement schedule, with no replacement listed."
 		},
 		"grok-4.7": {
@@ -600,6 +610,7 @@
 				"outputCentsPerMTokens": 1500
 			},
 			"deprecated": true,
+			"retiresOn": "2027-01-31",
 			"notes": "Microsoft lists grok-4 for retirement on 2027-01-31 in its model retirement schedule, with no replacement listed."
 		},
 		"grok-code-fast-1": {
@@ -620,6 +631,7 @@
 				"outputCentsPerMTokens": 150
 			},
 			"deprecated": true,
+			"retiresOn": "2027-01-31",
 			"notes": "Microsoft lists grok-code-fast-1 for retirement on 2027-01-31 in its model retirement schedule, with no replacement listed."
 		}
 	}

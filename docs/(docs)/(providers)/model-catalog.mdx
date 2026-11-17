@@ -104,8 +104,9 @@ rules the admin API enforces.
   `strict` is `true` is routed only to deployments that declare this capability; it is never silently
   downgraded or dropped by `unsupportedParameterStrategy`.
 - Entries are deliberately minimal: only `operations` and `pricing` (the data the runtime consumes)
-  plus the human-facing `deprecated`, `notes`, and `needsHumanReview`. Descriptive metadata the gateway
-  never reads (names, lifecycle dates, modalities lists, provenance) is rejected by the validator.
+  plus the human-facing `deprecated`, `retiresOn`, `notes`, and `needsHumanReview`. Descriptive
+  metadata the gateway never reads (names, other lifecycle dates, modalities lists, provenance) is
+  rejected by the validator.
 
 The loader is in `src/catalog/jsonCatalog.ts`; `getCatalogEntry()` indexes by provider/model and
 resolves dated snapshots like `gpt-5.5-2026-04-23` against their base model.
@@ -187,6 +188,7 @@ Besides `operations` and `pricing`, each entry under `models` accepts:
 | Field | Purpose |
 |---|---|
 | `deprecated` | Flags a model as not recommended; informational, never changes behavior. |
+| `retiresOn` | The day (`YYYY-MM-DD`, UTC) the provider stops serving the model, as it announced. Requires `deprecated`; the dashboard shows it when picking a model, and routing ignores it. |
 | `notes` | Free-form human notes (e.g. why a model is deprecated). |
 | `needsHumanReview` | Dot-paths auto-drafted by the catalog sync; `catalog:validate` fails while non-empty. |
 
