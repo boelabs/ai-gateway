@@ -105,7 +105,7 @@ key.
 `OBSERVABILITY_METADATA_RETENTION_DAYS`. Encrypted `payload_samples` expire after
 `OBSERVABILITY_PAYLOAD_RETENTION_DAYS`; an in-process maintenance job
 also reconciles stale in-progress operations and attempts as `abandoned`. Operation metadata never
-stores full request or response bodies; bounded forensic samples are separately encrypted and expired.
+stores full request or response bodies; the forensic samples that do are separately encrypted and expired.
 
 ## `response_states` GC
 

@@ -140,11 +140,17 @@ export const env = createEnv({
 		 * change is nothing next to one row per request.
 		 */
 		ADMIN_AUDIT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+		/**
+		 * Cap on each request, response, error and attempt component of a retained sample, after
+		 * redaction. 0 (the default) keeps them whole: a clipped body cannot reproduce the request.
+		 */
 		OBSERVABILITY_PAYLOAD_MAX_BYTES: z.coerce
 			.number()
 			.int()
-			.min(128)
-			.default(32_768),
+			.refine((bytes) => bytes === 0 || bytes >= 128, {
+				message: "Must be 0 (unlimited) or at least 128",
+			})
+			.default(0),
 		/** 16x50 MB + mask/fields; uploads are streamed to temporary disk, not memory. */
 		IMAGES_MAX_MULTIPART_BYTES: z.coerce
 			.number()

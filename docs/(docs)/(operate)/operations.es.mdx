@@ -69,7 +69,7 @@ Si `MASTER_KEY` tiene fugas: gírelo inmediatamente (arriba) y audite `gateway_o
 
 ## Retención de operación [#operation-retention]
 
-`gateway_operations` y `upstream_attempts` son la fuente operativa actual y caducan después de `OBSERVABILITY_METADATA_RETENTION_DAYS`. El `payload_samples` cifrado caduca después de `OBSERVABILITY_PAYLOAD_RETENTION_DAYS`; un trabajo de mantenimiento en proceso también concilia operaciones obsoletas en progreso e intentos como `abandoned`. Los metadatos de operación nunca almacenan los cuerpos completos de solicitud o respuesta; las muestras forenses limitadas se cifran y caducan por separado.
+`gateway_operations` y `upstream_attempts` son la fuente operativa actual y caducan después de `OBSERVABILITY_METADATA_RETENTION_DAYS`. El `payload_samples` cifrado caduca después de `OBSERVABILITY_PAYLOAD_RETENTION_DAYS`; un trabajo de mantenimiento en proceso también concilia operaciones obsoletas en progreso e intentos como `abandoned`. Los metadatos de operación nunca almacenan los cuerpos completos de solicitud o respuesta; las muestras forenses, que sí los guardan, se cifran y caducan por separado.
 
 ## `response_states` GC [#response_states-gc]
 

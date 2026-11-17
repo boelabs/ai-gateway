@@ -1,3 +1,4 @@
+import { StreamedResponseCapture } from "#logging/streamedResponse.ts";
 import { candidateMetadata } from "#gateway/candidateMetadata.ts";
 import { hasContentInputs } from "#files/requestContentInputs.ts";
 import { chatChunkSemantic } from "#gateway/streamLifecycle.ts";
@@ -79,7 +80,7 @@ function streamChatCompletion(
 		let finalUsage: Usage | null = null;
 		let firstTokenAt: number | null = null;
 		let lastChunkAt: number | null = null;
-		let content = "";
+		const captured = new StreamedResponseCapture();
 		let streamError: GatewayError | null = null;
 		let metadata: Record<string, unknown> = { downstream };
 		try {
@@ -144,10 +145,7 @@ function streamChatCompletion(
 					canonical.model,
 					chunk,
 				);
-				const delta = transformed.choices[0]?.delta;
-				if (delta?.content) {
-					content += delta.content;
-				}
+				captured.add(transformed);
 				if (transformed.usage) {
 					finalUsage = transformed.usage;
 				}
@@ -265,7 +263,7 @@ function streamChatCompletion(
 				cost,
 				firstOutputMs:
 					firstTokenAt === null ? null : firstTokenAt - log.startedAt,
-				responseBody: { streamed: true, content },
+				responseBody: captured.toLog(),
 				metadata,
 				error: streamError ? streamError.toLog() : null,
 			});

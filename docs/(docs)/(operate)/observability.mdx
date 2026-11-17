@@ -96,7 +96,9 @@ and user agents are fingerprinted rather than stored verbatim. Every finished op
 sample under the versioned encryption keyring — the successful ones too, because a request that
 returned 200 and the wrong answer is the case you cannot reconstruct from metadata. Encryption and
 fingerprinting use separate, purpose-bound derived subkeys; request, response, error, and attempt
-components are each capped at 32 KiB after recursive secret-field redaction. What bounds the
+components are kept whole after recursive secret-field redaction, and a streamed response is kept as
+the answer it assembled, not a marker. `OBSERVABILITY_PAYLOAD_MAX_BYTES` can cap each component when
+disk demands it. What bounds the
 exposure is the retention window (`OBSERVABILITY_PAYLOAD_RETENTION_DAYS`), not chance.
 
 ### Reading one
