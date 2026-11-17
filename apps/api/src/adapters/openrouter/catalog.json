@@ -127,18 +127,6 @@
 				}
 			}
 		},
-		"nvidia/llama-nemotron-rerank-vl-1b-v2:free": {
-			"operations": {
-				"rerank": {
-					"documentModalities": ["text"],
-					"maxDocuments": 1000,
-					"maxTokensPerDocument": 10240
-				}
-			},
-			"pricing": {
-				"searchUnitCents": 0
-			}
-		},
 		"nvidia/nemotron-3.5-rerank-8b:free": {
 			"operations": {
 				"rerank": {
