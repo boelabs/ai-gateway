@@ -33,9 +33,14 @@ export interface ListOption {
 	label: string;
 }
 
+/** A segment select's icon, for a searchable select that filters the same list beside it. */
+export function SegmentIcon() {
+	return <ListFilter aria-hidden="true" />;
+}
+
 /**
  * One choice of a list — its segments (*All keys, Enabled, Disabled*) or its order — as Billete's:
- * a select with an icon, 11rem wide from a 40rem toolbar up, however many options there are.
+ * a select with an icon. The toolbar sizes it (see `ListToolbar`); its value truncates to one line.
  * Choosing the first option is the list's default.
  */
 export function ListSelect({
@@ -68,10 +73,7 @@ export function ListSelect({
 		>
 			<SelectTrigger
 				aria-label={label}
-				className={cn(
-					"min-w-0 flex-1 @min-[40rem]:w-44 @min-[40rem]:flex-none",
-					className,
-				)}
+				className={cn("min-w-0 flex-1", className)}
 			>
 				<Icon aria-hidden="true" />
 				<SelectValue />
@@ -121,6 +123,10 @@ function FiltersSheet({ children }: { children: ReactNode }) {
  * Above a list, Billete's: its segments and order on one side; its search, filters and actions on
  * the other. Both share a row when the toolbar (not the window: the sidebar takes part of it) fits
  * them, and wrap otherwise. Under 40rem the selects move into *Filters*, beside the search.
+ *
+ * The toolbar always spans the list's width: each side grows into its row, every select from 9rem
+ * and every search from 12rem (`SEARCH_WIDTH`), while buttons keep their own width. A row too narrow
+ * for its controls wraps them rather than squeezing them, and values truncate to one line.
  */
 export function ListToolbar({
 	selects,
@@ -133,14 +139,12 @@ export function ListToolbar({
 		<div className="@container flex flex-col gap-3" data-slot="list-toolbar">
 			<div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
 				{selects ? (
-					<div className="hidden min-w-0 flex-wrap items-center gap-2 @min-[40rem]:flex">
+					<div className="hidden min-w-0 flex-[1_1_auto] flex-wrap items-center gap-2 *:min-w-0 *:flex-[1_1_9rem] @min-[40rem]:flex">
 						{selects}
 					</div>
-				) : (
-					<span aria-hidden="true" className="hidden @min-[40rem]:block" />
-				)}
+				) : null}
 				{controls || selects ? (
-					<div className="flex w-full min-w-0 flex-wrap items-center gap-2 @min-[40rem]:w-auto">
+					<div className="flex w-full min-w-0 flex-[1_1_auto] flex-wrap items-center gap-2 @min-[40rem]:w-auto">
 						{controls}
 						{selects ? <FiltersSheet>{selects}</FiltersSheet> : null}
 					</div>

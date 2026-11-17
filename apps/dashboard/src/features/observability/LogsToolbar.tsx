@@ -1,13 +1,17 @@
 "use client";
 
-import { ListToolbar, ListSelect } from "#/shared/components/ListToolbar.tsx";
+import {
+	SegmentIcon,
+	ListToolbar,
+	ListSelect,
+} from "#/shared/components/ListToolbar.tsx";
 import { SearchableSelect } from "#/components/ui/select";
 import { RefreshControls } from "#/shared/components/RefreshControls.tsx";
 import {
 	RangeFilterSkeleton,
 	RangeFilter,
 } from "#/shared/components/RangeFilter.tsx";
-import { SearchField } from "#/shared/components/SearchField.tsx";
+import { SEARCH_WIDTH, SearchField } from "#/shared/components/SearchField.tsx";
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
 import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
 import { createTableRows } from "#/shared/lib/tableRows.tsx";
@@ -117,26 +121,23 @@ function ExportButton() {
 	);
 }
 
-/** A control's ghost while the page loads; `grow` for the ones that fill a phone's row. */
+/** What a select takes of a phone's row; the toolbar sizes it from 40rem up. */
+const FILL = "min-w-0 flex-1";
+
+/** A control's ghost while the page loads, as wide as the control it stands for. */
 function Ghost({
 	loading,
-	grow = false,
+	width,
 	children,
 }: {
 	loading: boolean;
-	grow?: boolean;
+	width?: string;
 	children: ReactNode;
 }) {
 	if (!loading) {
 		return children;
 	}
-	return (
-		<GhostSkeleton
-			className={grow ? "min-w-0 flex-1 @min-[40rem]:flex-none" : undefined}
-		>
-			{children}
-		</GhostSkeleton>
-	);
+	return <GhostSkeleton className={width}>{children}</GhostSkeleton>;
 }
 
 /**
@@ -167,7 +168,7 @@ export function LogsToolbar({
 		<ListToolbar
 			controls={
 				<>
-					<Ghost grow loading={loading}>
+					<Ghost loading={loading} width={SEARCH_WIDTH}>
 						<SearchField
 							label="Filter by actor"
 							onSearch={(value) => filter({ actor: value })}
@@ -175,7 +176,7 @@ export function LogsToolbar({
 							value={actor}
 						/>
 					</Ghost>
-					<Ghost grow loading={loading}>
+					<Ghost loading={loading} width={SEARCH_WIDTH}>
 						<SearchField
 							label="Find a request ID"
 							onSearch={(value) => filter({ requestId: value || undefined })}
@@ -212,7 +213,7 @@ export function LogsToolbar({
 							value={filters}
 						/>
 					)}
-					<Ghost grow loading={loading}>
+					<Ghost loading={loading} width={FILL}>
 						<ListSelect
 							kind="segment"
 							label="Filter by outcome"
@@ -223,7 +224,7 @@ export function LogsToolbar({
 							value={outcome ?? ALL}
 						/>
 					</Ghost>
-					<Ghost grow loading={loading}>
+					<Ghost loading={loading} width={FILL}>
 						<ListSelect
 							kind="segment"
 							label="Filter by failure cause"
@@ -236,12 +237,13 @@ export function LogsToolbar({
 					</Ghost>
 					{/* While loading, the model list is not known yet; most roles get the filter. */}
 					{loading || models.length > 0 ? (
-						<Ghost grow loading={loading}>
-							<div className="min-w-0 flex-1 @min-[40rem]:w-44 @min-[40rem]:flex-none">
+						<Ghost loading={loading} width={FILL}>
+							<div className={FILL}>
 								<SearchableSelect
 									aria-label="Filter by public model"
 									className="w-full"
 									clearLabel="All models"
+									icon={<SegmentIcon />}
 									items={models.map((model) => ({
 										value: model,
 										label: model,

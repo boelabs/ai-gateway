@@ -7,7 +7,7 @@ import {
 	RangeFilter,
 } from "#/shared/components/RangeFilter.tsx";
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
-import { SearchField } from "#/shared/components/SearchField.tsx";
+import { SEARCH_WIDTH, SearchField } from "#/shared/components/SearchField.tsx";
 import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
 import { type AuditFilters, isFiltered } from "./filters.ts";
 import { createTableRows } from "#/shared/lib/tableRows.tsx";
@@ -70,26 +70,23 @@ function ExportButton() {
 	);
 }
 
-/** A control's ghost while the page loads; `grow` for the ones that fill a phone's row. */
+/** What a select takes of a phone's row; the toolbar sizes it from 40rem up. */
+const FILL = "min-w-0 flex-1";
+
+/** A control's ghost while the page loads, as wide as the control it stands for. */
 function Ghost({
 	loading,
-	grow = false,
+	width,
 	children,
 }: {
 	loading: boolean;
-	grow?: boolean;
+	width?: string;
 	children: ReactNode;
 }) {
 	if (!loading) {
 		return children;
 	}
-	return (
-		<GhostSkeleton
-			className={grow ? "min-w-0 flex-1 @min-[40rem]:flex-none" : undefined}
-		>
-			{children}
-		</GhostSkeleton>
-	);
+	return <GhostSkeleton className={width}>{children}</GhostSkeleton>;
 }
 
 /**
@@ -110,7 +107,7 @@ export function AuditToolbar({
 		<ListToolbar
 			controls={
 				<>
-					<Ghost grow loading={loading}>
+					<Ghost loading={loading} width={SEARCH_WIDTH}>
 						<SearchField
 							label="Filter by actor"
 							onSearch={(value) => filter({ actor: value })}
@@ -118,7 +115,7 @@ export function AuditToolbar({
 							value={filters.actor ?? ""}
 						/>
 					</Ghost>
-					<Ghost grow loading={loading}>
+					<Ghost loading={loading} width={SEARCH_WIDTH}>
 						<SearchField
 							label="Filter by action"
 							onSearch={(value) => filter({ action: value })}
@@ -149,7 +146,7 @@ export function AuditToolbar({
 							value={filters}
 						/>
 					)}
-					<Ghost grow loading={loading}>
+					<Ghost loading={loading} width={FILL}>
 						<ListSelect
 							kind="segment"
 							label="Filter by kind"

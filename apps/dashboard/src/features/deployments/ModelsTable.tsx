@@ -1,8 +1,12 @@
 "use client";
 
 import { Select, SelectItem, SearchableSelect } from "#/components/ui/select";
-import { ListToolbar, ListSelect } from "#/shared/components/ListToolbar";
-import { SearchField } from "#/shared/components/SearchField";
+import {
+	SegmentIcon,
+	ListToolbar,
+	ListSelect,
+} from "#/shared/components/ListToolbar";
+import { SEARCH_WIDTH, SearchField } from "#/shared/components/SearchField";
 import { RowActions } from "#/shared/components/RowActions";
 import { Frame, FrameFooter } from "#/components/ui/frame";
 import { useState, type ReactNode } from "react";
@@ -87,8 +91,8 @@ const STATE_OPTIONS = [
 	{ value: "enabled", label: "Enabled" },
 	{ value: "disabled", label: "Disabled" },
 ] as const;
-/** The width a toolbar control takes: a phone's whole row, or its own from 40rem up. */
-const GROW = "min-w-0 flex-1 @min-[40rem]:flex-none";
+/** What a select takes of a phone's row; the toolbar sizes it from 40rem up. */
+const FILL = "min-w-0 flex-1";
 const DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
 	month: "short",
 	day: "numeric",
@@ -356,7 +360,7 @@ export function ModelsTable({
 				<ListToolbar
 					controls={
 						<>
-							<Placeholder className={GROW} loading={loading}>
+							<Placeholder className={SEARCH_WIDTH} loading={loading}>
 								<SearchField
 									label="Search models and deployments"
 									onSearch={(value) => updateFilter("query", value)}
@@ -380,7 +384,8 @@ export function ModelsTable({
 								<MenuRoot>
 									<MenuTrigger render={<Button variant="secondary" />}>
 										<Columns3 aria-hidden className="size-4" />
-										Columns
+										{/* On a phone the icon alone keeps search, columns and filters on one row. */}
+										<span className="@max-[40rem]:sr-only">Columns</span>
 									</MenuTrigger>
 									<MenuPortal>
 										<MenuPositioner align="end">
@@ -416,12 +421,13 @@ export function ModelsTable({
 					}
 					selects={
 						<>
-							<Placeholder className={GROW} loading={loading}>
-								<div className="min-w-0 flex-1 @min-[40rem]:w-44 @min-[40rem]:flex-none">
+							<Placeholder className={FILL} loading={loading}>
+								<div className={FILL}>
 									<SearchableSelect
 										aria-label="Filter by provider"
 										className="w-full"
 										clearLabel="All providers"
+										icon={<SegmentIcon />}
 										items={providers}
 										onValueChange={(value) =>
 											updateFilter("provider", value ?? "")
@@ -432,7 +438,7 @@ export function ModelsTable({
 									/>
 								</div>
 							</Placeholder>
-							<Placeholder className={GROW} loading={loading}>
+							<Placeholder className={FILL} loading={loading}>
 								<ListSelect
 									kind="segment"
 									label="Filter by state"
@@ -443,7 +449,7 @@ export function ModelsTable({
 									value={filters.state || ALL}
 								/>
 							</Placeholder>
-							<Placeholder className={GROW} loading={loading}>
+							<Placeholder className={FILL} loading={loading}>
 								<ListSelect
 									kind="sort"
 									label="Order models"

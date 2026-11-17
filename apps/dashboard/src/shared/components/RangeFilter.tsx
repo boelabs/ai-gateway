@@ -50,6 +50,15 @@ function fromIso(iso: string | undefined): Date | undefined {
 }
 
 /**
+ * The trigger is drawn as a select is, so it lines up with the selects beside it in a toolbar: the
+ * same inset, its icon and value where a select's are, its chevron as far from the edge. The value
+ * takes the room the toolbar gives. `!` because the button nudges every icon with its own margins.
+ */
+const TRIGGER = "justify-start px-[calc(--spacing(3)-1px)] font-normal";
+const ICON = "mx-0! opacity-80";
+const CHEVRON = "ms-0! -me-1! opacity-80";
+
+/**
  * The time range control, shared by every page that has one: one button that says which range is
  * in force, opening coss's date picker with presets — the periods on the left, a calendar for
  * custom dates on the right.
@@ -101,14 +110,17 @@ export function RangeFilter({
 		<PopoverRoot onOpenChange={setOpen} open={open}>
 			<PopoverTrigger
 				aria-label={`${label ?? "Time range"}: ${current}`}
-				render={<Button className="justify-start" variant="secondary" />}
+				className={TRIGGER}
+				render={<Button variant="secondary" />}
 			>
-				<IconCalendar aria-hidden />
+				<IconCalendar aria-hidden className={ICON} />
 				{label ? (
 					<span className="font-normal text-muted-foreground">{label}</span>
 				) : null}
-				<span className="tabular-nums">{current}</span>
-				<ChevronDown aria-hidden className="ms-auto -me-1 opacity-60" />
+				<span className="min-w-0 flex-1 truncate text-start tabular-nums">
+					{current}
+				</span>
+				<ChevronDown aria-hidden className={CHEVRON} />
 			</PopoverTrigger>
 			<Popover
 				aria-label="Time range"
@@ -203,11 +215,13 @@ export function RangeFilterSkeleton({
 }) {
 	return (
 		<GhostSkeleton>
-			<Button className="justify-start" variant="secondary">
-				<IconCalendar aria-hidden />
+			<Button className={TRIGGER} variant="secondary">
+				<IconCalendar aria-hidden className={ICON} />
 				{label ? <span className="font-normal">{label}</span> : null}
-				<span>{RANGES[period]}</span>
-				<ChevronDown aria-hidden className="ms-auto -me-1" />
+				<span className="min-w-0 flex-1 truncate text-start">
+					{RANGES[period]}
+				</span>
+				<ChevronDown aria-hidden className={CHEVRON} />
 			</Button>
 		</GhostSkeleton>
 	);

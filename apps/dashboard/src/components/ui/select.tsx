@@ -20,6 +20,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 
 import {
+	selectTriggerIconClassName,
 	selectTriggerVariants,
 	selectPopupVariants,
 } from "./primitives/select";
@@ -223,6 +224,8 @@ export interface SearchableSelectProps
 	extends Omit<ComboboxRootProps, "items">,
 		ControlProps {
 	items: readonly SearchableSelectOption[];
+	/** Drawn before the value, as a list toolbar's selects draw theirs. */
+	icon?: ReactNode;
 	label?: ReactNode;
 	description?: ReactNode;
 	errorMessage?: ReactNode;
@@ -236,6 +239,7 @@ type ComboboxRootProps =
 	import("@base-ui/react/combobox").Combobox.Root.Props<string>;
 export function SearchableSelect({
 	items,
+	icon,
 	label,
 	description,
 	errorMessage,
@@ -288,7 +292,8 @@ export function SearchableSelect({
 					size={size}
 					variant={variant}
 				>
-					<span className="truncate">
+					{icon}
+					<span className="min-w-0 flex-1 truncate text-start">
 						<Combobox.Value>
 							{(value: string | null) =>
 								value
@@ -297,7 +302,8 @@ export function SearchableSelect({
 							}
 						</Combobox.Value>
 					</span>
-					<IconSelector aria-hidden className="size-4 shrink-0 text-fg-muted" />
+					{/* The primitive select's chevron, so both kinds line up in a toolbar. */}
+					<IconSelector aria-hidden className={selectTriggerIconClassName} />
 				</Combobox.Trigger>
 				<Combobox.Portal>
 					<Combobox.Positioner className="z-50" sideOffset={6}>
