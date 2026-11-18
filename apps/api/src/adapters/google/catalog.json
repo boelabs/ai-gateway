@@ -1762,7 +1762,8 @@
 				"imageOutputCentsPerMTokens": 3000
 			},
 			"deprecated": true,
-			"notes": "Google deprecated gemini-2.5-flash-image; its deprecations page lists shutdown on 2027-03-15 (the pricing page says 2026-10-02); replacement gemini-3.1-flash-lite-image."
+			"retiresOn": "2027-03-15",
+			"notes": "Google deprecated gemini-2.5-flash-image; it shuts down on 2027-03-15 (replacement: gemini-3.1-flash-lite-image)."
 		},
 		"gemini-4-argon": {
 			"operations": {
