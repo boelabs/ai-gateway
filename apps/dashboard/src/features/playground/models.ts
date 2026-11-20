@@ -42,6 +42,31 @@ export interface PlaygroundModel extends PlaygroundCapabilities {
 	/** The public contracts text generation is available under. Empty for a model that has none. */
 	endpoints: PublicEndpoint[];
 	acceptsImages: boolean;
+	/** What video generation accepts; absent when the gateway does not say (an older one). */
+	video?: VideoOptions;
+}
+
+/** A size the model accepts, with the proportion and resolution it amounts to. */
+export interface VideoSizeOption {
+	size: string;
+	aspectRatio?: string;
+	resolution?: string;
+}
+
+/** The gateway's `video_capabilities`: only values no deployment of the model would refuse. */
+export interface VideoOptions {
+	tasks: string[];
+	durations: number[];
+	/** Absent when the model declares no size table, so any dimensions go through unchecked. */
+	sizes?: VideoSizeOption[];
+	qualities: string[];
+	seed: boolean;
+	generateAudio: boolean;
+	references: {
+		image: boolean;
+		video: boolean;
+		frameImages: boolean;
+	};
 }
 
 const endpointPaths: Record<PublicEndpoint, string> = {
@@ -68,6 +93,29 @@ const publicModelsSchema = z.object({
 			architecture: z
 				.object({ input_modalities: z.array(z.string()).optional() })
 				.optional(),
+			video_capabilities: z
+				.object({
+					tasks: z.array(z.string()),
+					durations: z.array(z.string()),
+					sizes: z
+						.array(
+							z.object({
+								size: z.string(),
+								aspect_ratio: z.string().optional(),
+								resolution: z.string().optional(),
+							}),
+						)
+						.optional(),
+					qualities: z.array(z.string()),
+					seed: z.boolean(),
+					generate_audio: z.boolean(),
+					input_references: z.object({
+						image: z.boolean(),
+						video: z.boolean(),
+						frame_images: z.boolean(),
+					}),
+				})
+				.optional(),
 			text_capabilities: z
 				.object({
 					contracts: z.array(z.string()),
@@ -81,6 +129,36 @@ const publicModelsSchema = z.object({
 		}),
 	),
 });
+
+type PublicVideoCapabilities = NonNullable<
+	z.infer<typeof publicModelsSchema>["data"][number]["video_capabilities"]
+>;
+
+function videoOptions(video: PublicVideoCapabilities): VideoOptions {
+	return {
+		tasks: video.tasks,
+		durations: video.durations
+			.map(Number)
+			.filter((seconds) => Number.isFinite(seconds) && seconds > 0),
+		...(video.sizes
+			? {
+					sizes: video.sizes.map((entry) => ({
+						size: entry.size,
+						...(entry.aspect_ratio ? { aspectRatio: entry.aspect_ratio } : {}),
+						...(entry.resolution ? { resolution: entry.resolution } : {}),
+					})),
+				}
+			: {}),
+		qualities: video.qualities,
+		seed: video.seed,
+		generateAudio: video.generate_audio,
+		references: {
+			image: video.input_references.image,
+			video: video.input_references.video,
+			frameImages: video.input_references.frame_images,
+		},
+	};
+}
 
 export function parsePublicModels(body: unknown): PlaygroundModel[] {
 	return publicModelsSchema
@@ -143,6 +221,9 @@ export function parsePublicModels(body: unknown): PlaygroundModel[] {
 					...(capabilities?.max_output_tokens === undefined
 						? {}
 						: { maxOutputTokens: capabilities.max_output_tokens }),
+					...(model.video_capabilities
+						? { video: videoOptions(model.video_capabilities) }
+						: {}),
 				},
 			];
 		})

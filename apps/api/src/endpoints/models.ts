@@ -4,6 +4,7 @@ import {
 	supportsServiceMode,
 } from "#core/serviceMode.ts";
 import type { OperationProfiles, TransportOverrides } from "#profiles/types.ts";
+import { publicVideoCapabilities } from "#catalog/publicVideoCapabilities.ts";
 import { publicTextCapabilities } from "#catalog/publicTextCapabilities.ts";
 import { enforcePublicModelRateLimit } from "./modelsRateLimit.ts";
 import type { DeploymentRow } from "#db/repos/deployments.ts";
@@ -370,6 +371,7 @@ function toModelObject(group: PublicModelGroup): Record<string, unknown> {
 		supported_parameters: aggregateSupportedParameters(group),
 		service_modes: serviceModes(group.rows, group.metas),
 		text_capabilities: publicTextCapabilities(group.metas),
+		video_capabilities: publicVideoCapabilities(group.metas),
 		endpoint_count: group.rows.length,
 	};
 }

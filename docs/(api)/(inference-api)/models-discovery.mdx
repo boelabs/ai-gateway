@@ -78,6 +78,11 @@ Aggregation rules:
   declared output limit. Clients can use this shape for controls without assuming deployment pinning.
   Missing contract declarations mean all three text contracts; missing reasoning specs expose no
   selectable efforts. Provider-specific translation fields are never included.
+- **`video_capabilities`** — for video generation, what every deployment of the pool accepts:
+  `tasks`, `durations` (seconds strings), `sizes` (each `size` with its `aspect_ratio` and
+  `resolution`), `qualities`, `seed`, `generate_audio`, and `input_references` (`image`, `video`,
+  `audio`, `frame_images`, and `max` when limited). Empty lists mean the parameter is refused. `sizes`
+  is absent when no deployment declares a size table, since dimensions are then forwarded unchecked.
 
 Nothing here reveals deployment labels, credentials, database ids, or the exact upstream model id —
 only what a caller needs to decide whether to use this model.

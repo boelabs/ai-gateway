@@ -1,11 +1,13 @@
 "use client";
 
+import { type VideoSettings, type VideoTask, videoChoices } from "./videos";
 import { Select, SelectItem } from "#/components/ui/select";
 import { ToggleGroup } from "#/components/ui/toggle-group";
 import { NumberField } from "#/components/ui/number-field";
 import { buttonStyles } from "#/components/ui/button";
 import { Toggle } from "#/components/ui/toggle";
 import { Input } from "#/components/ui/input";
+import type { VideoOptions } from "./models";
 import { useState } from "react";
 
 import {
@@ -18,15 +20,6 @@ import {
 	DialogBody,
 	DialogRoot,
 } from "#/components/ui/dialog";
-
-import {
-	VIDEO_ASPECT_RATIOS,
-	type VideoSettings,
-	VIDEO_RESOLUTIONS,
-	VIDEO_QUALITIES,
-	type VideoTask,
-	VIDEO_TASKS,
-} from "./videos";
 
 const DEFAULT = "default";
 
@@ -93,12 +86,16 @@ export function VideoSettingsDialog({
 	onOpenChange,
 	settings,
 	onSettings,
+	options,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	settings: VideoSettings;
 	onSettings: (settings: VideoSettings) => void;
+	/** What the selected model takes; only those values are offered. */
+	options: VideoOptions | undefined;
 }) {
+	const choices = videoChoices(options, settings);
 	/**
 	 * Which form is on screen is the operator's choice, not a reading of the settings: picking
 	 * "Proportion" has to show the two selects before either of them has a value. The settings still
@@ -146,143 +143,186 @@ export function VideoSettingsDialog({
 				</DialogHeader>
 				<DialogBody>
 					<div className="grid gap-4 sm:grid-cols-2">
-						<Optional
-							description="What kind of generation this is. Left out, the model decides from the attachments."
-							label="Task"
-							onChange={(value) => set("task", value as VideoTask | undefined)}
-							value={settings.task}
-							values={VIDEO_TASKS}
-						/>
-						<Optional
-							label="Quality"
-							onChange={(value) => set("quality", value)}
-							value={settings.quality}
-							values={VIDEO_QUALITIES}
-						/>
-						<NumberField.Root
-							max={300}
-							min={1}
-							onValueChange={(value) => set("seconds", value ?? undefined)}
-							step={1}
-							value={settings.seconds ?? null}
-						>
-							<NumberField.ScrubArea>
-								<label
-									className="text-sm font-medium"
-									htmlFor="playground-video-seconds"
-								>
-									Duration
-								</label>
-							</NumberField.ScrubArea>
-							<NumberField.Group>
-								<NumberField.Decrement aria-label="Shorter video" />
-								<NumberField.Input
-									id="playground-video-seconds"
-									placeholder="Default"
-								/>
-								<NumberField.Increment aria-label="Longer video" />
-							</NumberField.Group>
-							<p className="text-xs text-fg-muted">
-								Seconds. Most models accept only a few fixed lengths.
-							</p>
-						</NumberField.Root>
-						<NumberField.Root
-							max={2_147_483_647}
-							min={0}
-							onValueChange={(value) => set("seed", value ?? undefined)}
-							step={1}
-							value={settings.seed ?? null}
-						>
-							<NumberField.ScrubArea>
-								<label
-									className="text-sm font-medium"
-									htmlFor="playground-video-seed"
-								>
-									Seed
-								</label>
-							</NumberField.ScrubArea>
-							<NumberField.Group>
-								<NumberField.Decrement aria-label="Lower seed" />
-								<NumberField.Input
-									id="playground-video-seed"
-									placeholder="Default"
-								/>
-								<NumberField.Increment aria-label="Higher seed" />
-							</NumberField.Group>
-							<p className="text-xs text-fg-muted">
-								The same seed and prompt should give the same video again.
-							</p>
-						</NumberField.Root>
-						<Select
-							description="Whether the model should score the video."
-							label="Audio"
-							onValueChange={(value) =>
-								set(
-									"generateAudio",
-									value === DEFAULT || value === null
-										? undefined
-										: value === "on",
-								)
-							}
-							value={audioChoice(settings.generateAudio)}
-						>
-							<SelectItem value={DEFAULT}>Default</SelectItem>
-							<SelectItem value="on">Generate audio</SelectItem>
-							<SelectItem value="off">Silent</SelectItem>
-						</Select>
-					</div>
-					<fieldset className="flex flex-col gap-3">
-						<legend className="text-sm font-medium">Dimensions</legend>
-						<p className="-mt-1 text-xs text-fg-muted">
-							A proportion or exact pixels — the two are the same setting said
-							two ways, and a model takes one of them.
-						</p>
-						<ToggleGroup
-							aria-label="How to give the dimensions"
-							onValueChange={(value) => {
-								const [next] = value;
-								if (next) {
-									chooseDimensions(next as Dimensions);
+						{choices.tasks.length ? (
+							<Optional
+								description="What kind of generation this is. Left out, the model decides from the attachments."
+								label="Task"
+								onChange={(value) =>
+									set("task", value as VideoTask | undefined)
 								}
-							}}
-							value={[dimensions]}
-						>
-							<Toggle size="xs" value="default" variant="ghost">
-								Default
-							</Toggle>
-							<Toggle size="xs" value="ratio" variant="ghost">
-								Proportion
-							</Toggle>
-							<Toggle size="xs" value="size" variant="ghost">
-								Exact size
-							</Toggle>
-						</ToggleGroup>
-						{dimensions === "ratio" ? (
-							<div className="grid gap-4 sm:grid-cols-2">
-								<Optional
-									label="Aspect ratio"
-									onChange={(value) => set("aspectRatio", value)}
-									value={settings.aspectRatio}
-									values={VIDEO_ASPECT_RATIOS}
-								/>
-								<Optional
-									label="Resolution"
-									onChange={(value) => set("resolution", value)}
-									value={settings.resolution}
-									values={VIDEO_RESOLUTIONS}
-								/>
-							</div>
-						) : null}
-						{dimensions === "size" ? (
-							<Input
-								description="Width by height in pixels, such as 1280x720."
-								label="Size"
-								onChange={(event) => set("size", event.target.value.trim())}
-								placeholder="1280x720"
-								value={settings.size ?? ""}
+								value={settings.task}
+								values={choices.tasks}
 							/>
 						) : null}
-					</fieldset>
+						{choices.qualities.length ? (
+							<Optional
+								label="Quality"
+								onChange={(value) => set("quality", value)}
+								value={settings.quality}
+								values={choices.qualities}
+							/>
+						) : null}
+						{choices.durations?.length ? (
+							<Optional
+								description="Seconds."
+								label="Duration"
+								onChange={(value) =>
+									set(
+										"seconds",
+										value === undefined ? undefined : Number(value),
+									)
+								}
+								value={
+									settings.seconds === undefined
+										? undefined
+										: String(settings.seconds)
+								}
+								values={choices.durations.map(String)}
+							/>
+						) : null}
+						{choices.durations ? null : (
+							<NumberField.Root
+								max={300}
+								min={1}
+								onValueChange={(value) => set("seconds", value ?? undefined)}
+								step={1}
+								value={settings.seconds ?? null}
+							>
+								<NumberField.ScrubArea>
+									<label
+										className="text-sm font-medium"
+										htmlFor="playground-video-seconds"
+									>
+										Duration
+									</label>
+								</NumberField.ScrubArea>
+								<NumberField.Group>
+									<NumberField.Decrement aria-label="Shorter video" />
+									<NumberField.Input
+										id="playground-video-seconds"
+										placeholder="Default"
+									/>
+									<NumberField.Increment aria-label="Longer video" />
+								</NumberField.Group>
+								<p className="text-xs text-fg-muted">
+									Seconds. Most models accept only a few fixed lengths.
+								</p>
+							</NumberField.Root>
+						)}
+						{choices.seed ? (
+							<NumberField.Root
+								max={2_147_483_647}
+								min={0}
+								onValueChange={(value) => set("seed", value ?? undefined)}
+								step={1}
+								value={settings.seed ?? null}
+							>
+								<NumberField.ScrubArea>
+									<label
+										className="text-sm font-medium"
+										htmlFor="playground-video-seed"
+									>
+										Seed
+									</label>
+								</NumberField.ScrubArea>
+								<NumberField.Group>
+									<NumberField.Decrement aria-label="Lower seed" />
+									<NumberField.Input
+										id="playground-video-seed"
+										placeholder="Default"
+									/>
+									<NumberField.Increment aria-label="Higher seed" />
+								</NumberField.Group>
+								<p className="text-xs text-fg-muted">
+									The same seed and prompt should give the same video again.
+								</p>
+							</NumberField.Root>
+						) : null}
+						{choices.generateAudio ? (
+							<Select
+								description="Whether the model should score the video."
+								label="Audio"
+								onValueChange={(value) =>
+									set(
+										"generateAudio",
+										value === DEFAULT || value === null
+											? undefined
+											: value === "on",
+									)
+								}
+								value={audioChoice(settings.generateAudio)}
+							>
+								<SelectItem value={DEFAULT}>Default</SelectItem>
+								<SelectItem value="on">Generate audio</SelectItem>
+								<SelectItem value="off">Silent</SelectItem>
+							</Select>
+						) : null}
+					</div>
+					{choices.dimensions ? (
+						<fieldset className="flex flex-col gap-3">
+							<legend className="text-sm font-medium">Dimensions</legend>
+							<p className="-mt-1 text-xs text-fg-muted">
+								A proportion or exact pixels — the two are the same setting said
+								two ways, and a model takes one of them.
+							</p>
+							<ToggleGroup
+								aria-label="How to give the dimensions"
+								onValueChange={(value) => {
+									const [next] = value;
+									if (next) {
+										chooseDimensions(next as Dimensions);
+									}
+								}}
+								value={[dimensions]}
+							>
+								<Toggle size="xs" value="default" variant="ghost">
+									Default
+								</Toggle>
+								{choices.proportions ? (
+									<Toggle size="xs" value="ratio" variant="ghost">
+										Proportion
+									</Toggle>
+								) : null}
+								<Toggle size="xs" value="size" variant="ghost">
+									Exact size
+								</Toggle>
+							</ToggleGroup>
+							{dimensions === "ratio" ? (
+								<div className="grid gap-4 sm:grid-cols-2">
+									<Optional
+										label="Aspect ratio"
+										onChange={(value) => set("aspectRatio", value)}
+										value={settings.aspectRatio}
+										values={choices.aspectRatios}
+									/>
+									<Optional
+										label="Resolution"
+										onChange={(value) => set("resolution", value)}
+										value={settings.resolution}
+										values={choices.resolutions}
+									/>
+								</div>
+							) : null}
+							{dimensions === "size" && choices.sizes ? (
+								<Optional
+									description="Width by height in pixels."
+									label="Size"
+									onChange={(value) => set("size", value)}
+									value={settings.size}
+									values={choices.sizes}
+								/>
+							) : null}
+							{dimensions === "size" && !choices.sizes ? (
+								<Input
+									description="Width by height in pixels, such as 1280x720."
+									label="Size"
+									onChange={(event) => set("size", event.target.value.trim())}
+									placeholder="1280x720"
+									value={settings.size ?? ""}
+								/>
+							) : null}
+						</fieldset>
+					) : null}
 				</DialogBody>
 				<DialogFooter>
 					<DialogClose
