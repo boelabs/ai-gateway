@@ -24,8 +24,9 @@ import {
 import {
 	type EmbeddingSettings,
 	emptyEmbeddingSettings,
+	fitEmbeddingSettings,
+	embeddingChoices,
 	type EmbeddingRun,
-	ENCODING_FORMATS,
 	runEmbeddings,
 	vectorsFrom,
 } from "./embeddings";
@@ -65,6 +66,14 @@ export function EmbeddingWorkspace({
 	const alive = useRef(true);
 	const scroll = useRef<HTMLDivElement>(null);
 	const busy = runs.some((run) => run.state === "running");
+	const options = model.embedding;
+	const choices = embeddingChoices(options);
+
+	// Switching models drops the settings the new one would refuse, before anything is sent.
+	const fitted = fitEmbeddingSettings(settings, options);
+	if (fitted !== settings) {
+		setSettings(fitted);
+	}
 
 	useEffect(() => {
 		alive.current = true;
@@ -252,66 +261,75 @@ export function EmbeddingWorkspace({
 						</DialogDescription>
 					</DialogHeader>
 					<DialogBody>
-						<NumberField.Root
-							max={8192}
-							min={1}
-							onValueChange={(value) =>
-								setSettings((current) => {
-									const next = { ...current };
-									if (value === null) {
-										delete next.dimensions;
-									} else {
-										next.dimensions = value;
-									}
-									return next;
-								})
-							}
-							step={1}
-							value={settings.dimensions ?? null}
-						>
-							<NumberField.ScrubArea>
-								<label
-									className="text-sm font-medium"
-									htmlFor="playground-embedding-dimensions"
-								>
-									Dimensions
-								</label>
-							</NumberField.ScrubArea>
-							<NumberField.Group>
-								<NumberField.Decrement aria-label="Fewer dimensions" />
-								<NumberField.Input
-									id="playground-embedding-dimensions"
-									placeholder="Default"
-								/>
-								<NumberField.Increment aria-label="More dimensions" />
-							</NumberField.Group>
-							<p className="text-xs text-fg-muted">
-								Only models that support shortening accept this.
+						{choices.dimensions || choices.encodingFormats.length > 1 ? null : (
+							<p className="text-sm text-fg-muted">
+								This model has no settings to change.
 							</p>
-						</NumberField.Root>
-						<Select
-							description="base64 is the same vector, a quarter of the bytes; it is decoded here either way."
-							label="Encoding format"
-							onValueChange={(value) =>
-								setSettings((current) => {
-									const next = { ...current };
-									if (value === "default" || value === null) {
-										delete next.encodingFormat;
-									} else {
-										next.encodingFormat = value;
-									}
-									return next;
-								})
-							}
-							value={settings.encodingFormat ?? "default"}
-						>
-							<SelectItem value="default">Default</SelectItem>
-							{ENCODING_FORMATS.map((format) => (
-								<SelectItem key={format} value={format}>
-									{format}
-								</SelectItem>
-							))}
-						</Select>
+						)}
+						{choices.dimensions ? (
+							<NumberField.Root
+								max={choices.dimensions.max}
+								min={choices.dimensions.min}
+								onValueChange={(value) =>
+									setSettings((current) => {
+										const next = { ...current };
+										if (value === null) {
+											delete next.dimensions;
+										} else {
+											next.dimensions = value;
+										}
+										return next;
+									})
+								}
+								step={1}
+								value={settings.dimensions ?? null}
+							>
+								<NumberField.ScrubArea>
+									<label
+										className="text-sm font-medium"
+										htmlFor="playground-embedding-dimensions"
+									>
+										Dimensions
+									</label>
+								</NumberField.ScrubArea>
+								<NumberField.Group>
+									<NumberField.Decrement aria-label="Fewer dimensions" />
+									<NumberField.Input
+										id="playground-embedding-dimensions"
+										placeholder="Default"
+									/>
+									<NumberField.Increment aria-label="More dimensions" />
+								</NumberField.Group>
+								<p className="text-xs text-fg-muted">
+									Between {choices.dimensions.min} and {choices.dimensions.max}.
+								</p>
+							</NumberField.Root>
+						) : null}
+						{choices.encodingFormats.length > 1 ? (
+							<Select
+								description="base64 is the same vector, a quarter of the bytes; it is decoded here either way."
+								label="Encoding format"
+								onValueChange={(value) =>
+									setSettings((current) => {
+										const next = { ...current };
+										if (value === "default" || value === null) {
+											delete next.encodingFormat;
+										} else {
+											next.encodingFormat = value;
+										}
+										return next;
+									})
+								}
+								value={settings.encodingFormat ?? "default"}
+							>
+								<SelectItem value="default">Default</SelectItem>
+								{choices.encodingFormats.map((format) => (
+									<SelectItem key={format} value={format}>
+										{format}
+									</SelectItem>
+								))}
+							</Select>
+						) : null}
 					</DialogBody>
 					<DialogFooter>
 						<DialogClose

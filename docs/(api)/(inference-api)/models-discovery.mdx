@@ -83,6 +83,12 @@ Aggregation rules:
   the model's limits), `qualities`, `output_formats`, `transparent_background`, `style`, `mask`, and
   `max_n` and `max_input_images` when limited. `size` and `quality` of `auto` are always accepted and
   not listed.
+- **`embedding_capabilities`** — for embeddings, what every deployment of the pool accepts:
+  `dimensions` (`min` and, when known, `max`) only when every deployment can shorten its vectors,
+  `encoding_formats`, and `max_inputs` when limited.
+- **`transcription_capabilities`** — for transcription, what every deployment of the pool accepts:
+  `response_formats` and `timestamp_granularities` (empty when timestamps are refused; they also
+  need `response_format=verbose_json`).
 - **`video_capabilities`** — for video generation, what every deployment of the pool accepts:
   `tasks`, `durations` (seconds strings), `sizes` (each `size` with its `aspect_ratio` and
   `resolution`), `qualities`, `seed`, `generate_audio`, and `input_references` (`image`, `video`,

@@ -1,4 +1,5 @@
 import { type GatewayRequest, gatewayForm } from "./gateway";
+import type { TranscriptionOptions } from "./models";
 import { z } from "zod";
 
 /**
@@ -45,6 +46,62 @@ export interface TranscriptionSettings {
 }
 
 export const emptyTranscriptionSettings = (): TranscriptionSettings => ({});
+
+/**
+ * What the settings offer for one model. Without the gateway saying (an older one), every format
+ * and granularity is offered as before and the gateway remains the one to refuse.
+ */
+export function transcriptionChoices(
+	options: TranscriptionOptions | undefined,
+): {
+	responseFormats: readonly ResponseFormat[];
+	timestampGranularities: readonly string[];
+} {
+	if (!options) {
+		return {
+			responseFormats: RESPONSE_FORMATS,
+			timestampGranularities: TIMESTAMP_GRANULARITIES,
+		};
+	}
+	return {
+		responseFormats: RESPONSE_FORMATS.filter((format) =>
+			options.responseFormats.includes(format),
+		),
+		timestampGranularities: options.timestampGranularities,
+	};
+}
+
+/** The settings without what the model refuses; the same object when nothing had to go. */
+export function fitTranscriptionSettings(
+	settings: TranscriptionSettings,
+	options: TranscriptionOptions | undefined,
+): TranscriptionSettings {
+	if (!options) {
+		return settings;
+	}
+	const { responseFormats, timestampGranularities } =
+		transcriptionChoices(options);
+	const next = { ...settings };
+	if (
+		next.responseFormat !== undefined &&
+		!responseFormats.includes(next.responseFormat)
+	) {
+		delete next.responseFormat;
+	}
+	if (
+		next.timestampGranularities !== undefined &&
+		(next.responseFormat !== "verbose_json" ||
+			next.timestampGranularities.some(
+				(granularity) => !timestampGranularities.includes(granularity),
+			))
+	) {
+		delete next.timestampGranularities;
+	}
+	const changed = (
+		Object.keys(settings) as (keyof TranscriptionSettings)[]
+	).some((key) => !(key in next));
+	return changed ? next : settings;
+}
 
 export interface TranscriptionSegment {
 	start?: number;
