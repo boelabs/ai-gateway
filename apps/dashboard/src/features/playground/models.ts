@@ -44,6 +44,26 @@ export interface PlaygroundModel extends PlaygroundCapabilities {
 	acceptsImages: boolean;
 	/** What video generation accepts; absent when the gateway does not say (an older one). */
 	video?: VideoOptions;
+	/** What image generation and editing accept; absent when the gateway does not say. */
+	image?: ImageOptions;
+}
+
+/** The gateway's `image_capabilities` for one operation; `auto` size and quality always go. */
+export interface ImageOperationOptions {
+	sizes: string[];
+	arbitrarySizes: boolean;
+	qualities: string[];
+	outputFormats: string[];
+	transparentBackground: boolean;
+	style: boolean;
+	mask: boolean;
+	maxN?: number;
+	maxInputImages?: number;
+}
+
+export interface ImageOptions {
+	generate?: ImageOperationOptions;
+	edit?: ImageOperationOptions;
 }
 
 /** A size the model accepts, with the proportion and resolution it amounts to. */
@@ -80,6 +100,17 @@ const constraintSchema = z.object({
 	max: z.number().optional(),
 	values: z.array(z.union([z.string(), z.number(), z.boolean()])).optional(),
 });
+const imageOperationSchema = z.object({
+	sizes: z.array(z.string()),
+	arbitrary_sizes: z.boolean(),
+	qualities: z.array(z.string()),
+	output_formats: z.array(z.string()),
+	transparent_background: z.boolean(),
+	style: z.boolean(),
+	mask: z.boolean(),
+	max_n: z.number().int().positive().optional(),
+	max_input_images: z.number().int().positive().optional(),
+});
 const publicModelsSchema = z.object({
 	data: z.array(
 		z.object({
@@ -92,6 +123,12 @@ const publicModelsSchema = z.object({
 			service_modes: z.array(z.string()).optional(),
 			architecture: z
 				.object({ input_modalities: z.array(z.string()).optional() })
+				.optional(),
+			image_capabilities: z
+				.object({
+					generate: imageOperationSchema.optional(),
+					edit: imageOperationSchema.optional(),
+				})
 				.optional(),
 			video_capabilities: z
 				.object({
@@ -129,6 +166,34 @@ const publicModelsSchema = z.object({
 		}),
 	),
 });
+
+function imageOperation(
+	operation: z.infer<typeof imageOperationSchema>,
+): ImageOperationOptions {
+	return {
+		sizes: operation.sizes,
+		arbitrarySizes: operation.arbitrary_sizes,
+		qualities: operation.qualities,
+		outputFormats: operation.output_formats,
+		transparentBackground: operation.transparent_background,
+		style: operation.style,
+		mask: operation.mask,
+		...(operation.max_n === undefined ? {} : { maxN: operation.max_n }),
+		...(operation.max_input_images === undefined
+			? {}
+			: { maxInputImages: operation.max_input_images }),
+	};
+}
+
+function imageOptions(image: {
+	generate?: z.infer<typeof imageOperationSchema> | undefined;
+	edit?: z.infer<typeof imageOperationSchema> | undefined;
+}): ImageOptions {
+	return {
+		...(image.generate ? { generate: imageOperation(image.generate) } : {}),
+		...(image.edit ? { edit: imageOperation(image.edit) } : {}),
+	};
+}
 
 type PublicVideoCapabilities = NonNullable<
 	z.infer<typeof publicModelsSchema>["data"][number]["video_capabilities"]
@@ -223,6 +288,9 @@ export function parsePublicModels(body: unknown): PlaygroundModel[] {
 						: { maxOutputTokens: capabilities.max_output_tokens }),
 					...(model.video_capabilities
 						? { video: videoOptions(model.video_capabilities) }
+						: {}),
+					...(model.image_capabilities
+						? { image: imageOptions(model.image_capabilities) }
 						: {}),
 				},
 			];

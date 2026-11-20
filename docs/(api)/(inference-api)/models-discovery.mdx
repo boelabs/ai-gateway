@@ -78,6 +78,11 @@ Aggregation rules:
   declared output limit. Clients can use this shape for controls without assuming deployment pinning.
   Missing contract declarations mean all three text contracts; missing reasoning specs expose no
   selectable efforts. Provider-specific translation fields are never included.
+- **`image_capabilities`** — for image generation and editing, what every deployment of the pool
+  accepts, under `generate` and `edit`: `sizes`, `arbitrary_sizes` (other `WIDTHxHEIGHT` values within
+  the model's limits), `qualities`, `output_formats`, `transparent_background`, `style`, `mask`, and
+  `max_n` and `max_input_images` when limited. `size` and `quality` of `auto` are always accepted and
+  not listed.
 - **`video_capabilities`** — for video generation, what every deployment of the pool accepts:
   `tasks`, `durations` (seconds strings), `sizes` (each `size` with its `aspect_ratio` and
   `resolution`), `qualities`, `seed`, `generate_audio`, and `input_references` (`image`, `video`,

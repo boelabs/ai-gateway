@@ -13,6 +13,7 @@ import { Composer } from "./Composer";
 import {
 	type ImageSettings,
 	emptyImageSettings,
+	fitImageSettings,
 	type ImageRun,
 	imagesFrom,
 	runImages,
@@ -62,6 +63,13 @@ export function ImageWorkspace({
 	const scroll = useRef<HTMLDivElement>(null);
 	const canEdit = model.operations.includes(IMAGE_EDIT);
 	const busy = runs.some((run) => run.state === "running");
+	const options = model.image;
+
+	// Switching models drops the settings the new one would refuse, before anything is sent.
+	const fitted = fitImageSettings(settings, options, canEdit);
+	if (fitted !== settings) {
+		setSettings(fitted);
+	}
 
 	useEffect(() => {
 		alive.current = true;
@@ -272,8 +280,11 @@ export function ImageWorkspace({
 			<ImageSettingsDialog
 				canEdit={canEdit}
 				onOpenChange={setSettingsOpen}
-				onSettings={setSettings}
+				onSettings={(next) =>
+					setSettings(fitImageSettings(next, options, canEdit))
+				}
 				open={settingsOpen}
+				options={options}
 				settings={settings}
 			/>
 		</Workspace>
