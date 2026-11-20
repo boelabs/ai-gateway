@@ -4327,6 +4327,15 @@
 			},
 			"notes": "GPT-Live (/v1/live/sessions): full-duplex voice over WebSocket, WebRTC or SIP, delegating reasoning and tools to a backend model (responses or decisions delegation) or to the client. $0.05 per minute of session, billed per second; the backend model's tokens are billed at its own rates."
 		},
+		"gpt-live-1.1": {
+			"operations": {
+				"audio.live": {}
+			},
+			"pricing": {
+				"audioInputCentsPerSecond": 0.083333
+			},
+			"notes": "GPT-Live 1.1 (/v1/live/sessions): full-duplex voice with more accurate transcription and a more consistent accent across languages. $0.05 per minute of active session, billed per second; WebRTC standby ($0.02 per minute) is not priced here. The backend model's tokens are billed at its own rates. OpenAI documents no voice list for this model, so none is declared."
+		},
 		"gpt-realtime-translate": {
 			"operations": {
 				"audio.translate.realtime": {
