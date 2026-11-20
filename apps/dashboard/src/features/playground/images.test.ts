@@ -4,7 +4,9 @@ import { test } from "node:test";
 
 import {
 	type ImageSettings,
+	fitImageSettings,
 	generationBody,
+	imageChoices,
 	imagesFrom,
 	runImages,
 	editForm,
@@ -119,4 +121,57 @@ test("the gateway's own message survives a failure, instead of a bare status", a
 		),
 		/size is not supported/u,
 	);
+});
+
+const gemini = {
+	sizes: ["1024x1024", "1344x768"],
+	arbitrarySizes: false,
+	qualities: ["low", "high"],
+	outputFormats: ["png", "jpeg", "webp"],
+	transparentBackground: false,
+	style: false,
+	mask: false,
+	maxN: 1,
+	maxInputImages: 14,
+};
+
+test("the image settings offer only what the model accepts", () => {
+	const choices = imageChoices({ generate: gemini, edit: gemini }, true);
+	assert.deepEqual(choices.sizes, ["auto", "1024x1024", "1344x768"]);
+	assert.deepEqual(choices.qualities, ["auto", "low", "high"]);
+	assert.deepEqual(choices.backgrounds, ["auto", "opaque"]);
+	assert.deepEqual(choices.styles, []);
+	assert.equal(choices.maxN, 1);
+	assert.equal(choices.compression, true);
+});
+
+test("a model that also edits offers only what both operations accept", () => {
+	const choices = imageChoices(
+		{
+			generate: { ...gemini, transparentBackground: true, maxN: 10 },
+			edit: { ...gemini, qualities: ["high"], maxN: 4 },
+		},
+		true,
+	);
+	assert.deepEqual(choices.qualities, ["auto", "high"]);
+	assert.deepEqual(choices.backgrounds, ["auto", "opaque"]);
+	assert.equal(choices.maxN, 4);
+});
+
+test("without the model's options every image value is offered", () => {
+	const choices = imageChoices(undefined, true);
+	assert.ok(choices.qualities.includes("hd"));
+	assert.ok(choices.backgrounds.includes("transparent"));
+	assert.equal(choices.maxN, 10);
+});
+
+test("switching image models drops the settings the new model would refuse", () => {
+	assert.deepEqual(fitImageSettings(settings, { generate: gemini }, false), {
+		quality: "high",
+		outputFormat: "webp",
+		outputCompression: 80,
+	});
+	const kept: ImageSettings = { size: "1344x768", quality: "low" };
+	assert.equal(fitImageSettings(kept, { generate: gemini }, false), kept);
+	assert.equal(fitImageSettings(settings, undefined, false), settings);
 });

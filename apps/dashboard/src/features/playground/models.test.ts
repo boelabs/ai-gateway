@@ -355,3 +355,41 @@ test("reads what a video model accepts, and leaves it unknown when the gateway d
 	});
 	assert.equal(legacy?.video, undefined);
 });
+
+test("reads what an image model accepts per operation", () => {
+	const operation = {
+		sizes: ["1024x1024"],
+		arbitrary_sizes: true,
+		qualities: ["low", "high"],
+		output_formats: ["png"],
+		transparent_background: true,
+		style: false,
+		mask: true,
+		max_n: 10,
+		max_input_images: 16,
+	};
+	const [image] = parsePublicModels({
+		data: [
+			{
+				id: "gpt-image",
+				operations: [
+					{ id: "image.generate", endpoints: ["/v1/images/generations"] },
+				],
+				image_capabilities: { generate: operation },
+			},
+		],
+	});
+	assert.deepEqual(image?.image, {
+		generate: {
+			sizes: ["1024x1024"],
+			arbitrarySizes: true,
+			qualities: ["low", "high"],
+			outputFormats: ["png"],
+			transparentBackground: true,
+			style: false,
+			mask: true,
+			maxN: 10,
+			maxInputImages: 16,
+		},
+	});
+});

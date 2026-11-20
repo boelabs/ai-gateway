@@ -1,4 +1,5 @@
 import { gatewayForm, gatewayJson, type GatewayRequest } from "./gateway";
+import type { ImageOperationOptions, ImageOptions } from "./models";
 import { z } from "zod";
 
 /**
@@ -48,6 +49,115 @@ export interface ImageSettings {
 }
 
 export const emptyImageSettings = (): ImageSettings => ({});
+
+/**
+ * What the settings dialog offers for one model. Without the gateway saying what the model takes
+ * (an older gateway), every value is offered and the gateway remains the one to refuse.
+ */
+export interface ImageChoices {
+	/** Generation only: an edit keeps the source size. Empty hides the control. */
+	sizes: readonly string[];
+	qualities: readonly string[];
+	backgrounds: readonly string[];
+	formats: readonly string[];
+	styles: readonly string[];
+	/** Most images one run may ask for; 1 hides the control. */
+	maxN: number;
+	/** Whether a chosen format can be compressed at all. */
+	compression: boolean;
+}
+
+const MAX_IMAGES_PER_RUN = 10;
+
+function intersect(lists: string[][]): string[] {
+	return (lists[0] ?? []).filter((value) =>
+		lists.every((list) => list.includes(value)),
+	);
+}
+
+/**
+ * The shared controls apply to whichever request a run turns out to be, so for a model that also
+ * edits they offer only what both operations accept.
+ */
+export function imageChoices(
+	options: ImageOptions | undefined,
+	canEdit: boolean,
+): ImageChoices {
+	const generate = options?.generate;
+	const operations = [generate, ...(canEdit ? [options?.edit] : [])].filter(
+		(entry): entry is ImageOperationOptions => entry !== undefined,
+	);
+	if (!(options && operations.length)) {
+		return {
+			sizes: IMAGE_SIZES,
+			qualities: IMAGE_QUALITIES,
+			backgrounds: IMAGE_BACKGROUNDS,
+			formats: IMAGE_FORMATS,
+			styles: IMAGE_STYLES,
+			maxN: MAX_IMAGES_PER_RUN,
+			compression: true,
+		};
+	}
+	const qualities = intersect(operations.map((entry) => entry.qualities));
+	const formats = intersect(operations.map((entry) => entry.outputFormats));
+	const limits = operations.flatMap((entry) =>
+		entry.maxN === undefined ? [] : [entry.maxN],
+	);
+	return {
+		sizes: generate?.sizes.length ? ["auto", ...generate.sizes] : [],
+		qualities: qualities.length ? ["auto", ...qualities] : [],
+		backgrounds: [
+			"auto",
+			...(operations.every((entry) => entry.transparentBackground)
+				? ["transparent"]
+				: []),
+			"opaque",
+		],
+		formats,
+		styles: generate?.style ? IMAGE_STYLES : [],
+		maxN: Math.min(MAX_IMAGES_PER_RUN, ...limits),
+		compression: formats.includes("jpeg") || formats.includes("webp"),
+	};
+}
+
+/**
+ * The settings with whatever the model does not take removed — what switching models leaves behind.
+ * Returns the same object when nothing had to go, so a caller can tell.
+ */
+export function fitImageSettings(
+	settings: ImageSettings,
+	options: ImageOptions | undefined,
+	canEdit: boolean,
+): ImageSettings {
+	if (!options) {
+		return settings;
+	}
+	const choices = imageChoices(options, canEdit);
+	const next = { ...settings };
+	const offered: [keyof ImageSettings, readonly string[]][] = [
+		["size", choices.sizes],
+		["quality", choices.qualities],
+		["background", choices.backgrounds],
+		["outputFormat", choices.formats],
+		["style", choices.styles],
+	];
+	for (const [key, values] of offered) {
+		const value = next[key];
+		if (typeof value === "string" && !values.includes(value)) {
+			delete next[key];
+		}
+	}
+	if (next.n !== undefined && next.n > choices.maxN) {
+		delete next.n;
+	}
+	if (next.outputCompression !== undefined && !choices.compression) {
+		delete next.outputCompression;
+	}
+	const changed = (Object.keys(settings) as (keyof ImageSettings)[]).some(
+		(key) => !(key in next),
+	);
+	return changed ? next : settings;
+}
 
 export interface ImageRun {
 	id: string;
