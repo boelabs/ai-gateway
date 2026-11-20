@@ -191,6 +191,65 @@ export function makeSystemOneDecisionsHandler(
 	};
 }
 
+export interface AzureSystemOneConfig {
+	label: string;
+	/** Resolves the operator's base URL to Azure's v1 surface (`.../openai/v1`). */
+	normalizeBaseUrl: (baseUrl: string) => string;
+	refineBadRequest?: (message: string, body: unknown) => ErrorClass | null;
+}
+
+/**
+ * Azure Foundry's Microsoft-Decision models: TypeSafe's SystemOne body at
+ * `POST {resource}/providers/microsoft/v1/systemone`, keyed by `api-key`, with `model` set to the
+ * deployment name. Images are referenced as `image:<name>`; there is no images header.
+ */
+export function makeAzureSystemOneDecisionsHandler(
+	config: AzureSystemOneConfig,
+): DecisionsHandler {
+	const { label } = config;
+	return {
+		buildRequest(req, ctx) {
+			const creds = requireApiKeyCreds<Creds>(ctx.credentials, label);
+			if (creds.baseUrl === undefined) {
+				throw new GatewayError({
+					class: "server",
+					failureKind: "configuration",
+					message: `${label}: missing 'baseUrl' in credentials`,
+				});
+			}
+			const resource = config
+				.normalizeBaseUrl(creds.baseUrl)
+				.replace(/\/openai\/v1$/iu, "");
+			const { body } = buildSystemOneBody(req, ctx.upstreamModel, "azure");
+			return {
+				method: "POST",
+				url: `${resource}/providers/microsoft/v1/systemone`,
+				headers: {
+					"content-type": "application/json",
+					"api-key": creds.apiKey,
+					...(creds.headers ?? {}),
+				},
+				body: JSON.stringify(body),
+			};
+		},
+		parseResponse(raw, ctx, req) {
+			return withProviderRequestId(parseSystemOneResponse(raw, req), ctx);
+		},
+		mapError(err, ctx) {
+			return mapUpstreamHttpError(
+				err,
+				{
+					label,
+					...(config.refineBadRequest
+						? { refineBadRequest: config.refineBadRequest }
+						: {}),
+				},
+				ctx,
+			);
+		},
+	};
+}
+
 /**
  * OpenRouter `POST /api/alpha/decisions`: TypeSafe's body, routed to any decision model OpenRouter
  * serves. The alpha path sits beside `/api/v1`, so it is derived from the configured base URL.

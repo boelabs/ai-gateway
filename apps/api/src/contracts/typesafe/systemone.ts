@@ -443,6 +443,12 @@ class AssetCollector {
 	readonly assets: Record<string, Record<string, unknown>> = {};
 	private count = 0;
 
+	readonly dialect: SystemOneDialect;
+
+	constructor(dialect: SystemOneDialect) {
+		this.dialect = dialect;
+	}
+
 	/** A reference no text is likely to contain by accident: TypeSafe matches references as plain text. */
 	add(part: Extract<DecisionContentPart, { type: "image" }>): string {
 		const { source } = part;
@@ -471,20 +477,41 @@ class AssetCollector {
 	}
 }
 
+/**
+ * Where the body goes. TypeSafe and OpenRouter match an asset's name wherever it appears; Azure's
+ * Microsoft-Decision models read a reference written `image:<name>` inside the text, so text and
+ * images are joined into one string there.
+ */
+export type SystemOneDialect = "typesafe" | "azure";
+
 /** Parts in TypeSafe's free JSON: one string or value when that is all there is, else a list. */
 function encodeParts(
 	parts: readonly DecisionContentPart[],
 	assets: AssetCollector,
 ): unknown {
 	const merged = mergeTextParts(parts);
+	if (
+		assets.dialect === "azure" &&
+		merged.some((part) => part.type === "image") &&
+		merged.every((part) => part.type === "text" || part.type === "image")
+	) {
+		return merged
+			.map((part) =>
+				part.type === "text" ? part.text : ` image:${assets.add(part)} `,
+			)
+			.join("")
+			.trim();
+	}
 	const encoded = merged.map((part) => {
 		switch (part.type) {
 			case "text":
 				return part.text;
 			case "json":
 				return part.data;
-			case "image":
-				return assets.add(part);
+			case "image": {
+				const ref = assets.add(part);
+				return assets.dialect === "azure" ? `image:${ref}` : ref;
+			}
 			default:
 				throw badRequest(
 					`Decisions on this provider cannot take ${part.type} input`,
@@ -572,8 +599,9 @@ export interface SystemOneBody {
 export function buildSystemOneBody(
 	req: CanonicalDecisionRequest,
 	upstreamModel: string,
+	dialect: SystemOneDialect = "typesafe",
 ): SystemOneBody {
-	const assets = new AssetCollector();
+	const assets = new AssetCollector(dialect);
 	const keys = upstreamQuestionKeys(req.questions);
 	const state = encodeParts(flattenDecisionInput(req.input), assets);
 	const questions = Object.fromEntries(

@@ -636,6 +636,36 @@
 			"deprecated": true,
 			"retiresOn": "2027-01-31",
 			"notes": "Microsoft lists grok-code-fast-1 for retirement on 2027-01-31 in its model retirement schedule, with no replacement listed."
+		},
+		"Microsoft-Decision-1.1": {
+			"operations": {
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score"],
+					"inputModalities": ["text", "image"],
+					"instructionModalities": ["image"]
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 4.2,
+				"outputCentsPerMTokens": 0
+			},
+			"notes": "Served on {resource}/providers/microsoft/v1/systemone (TypeSafe SystemOne body; images as image:<name> assets). Priced from the Global meter Decision 1.1 Gl, one rate per 1M tokens. Microsoft publishes no context window or question limits."
+		},
+		"Microsoft-Decision-1": {
+			"operations": {
+				"decision.create": {
+					"questionKinds": ["binary", "choice", "score"],
+					"inputModalities": ["text", "image"],
+					"instructionModalities": ["image"]
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 4.2,
+				"outputCentsPerMTokens": 0
+			},
+			"deprecated": true,
+			"retiresOn": "2027-02-04",
+			"notes": "Microsoft lists Microsoft-Decision-1 (preview) for retirement on 2027-02-04 in its model retirement schedule, with no replacement listed; Microsoft-Decision-1.1 is the generally available version. Served like Microsoft-Decision-1.1 on the SystemOne path. Priced from the Global meter Microsoft Decision 1 1M Tokens."
 		}
 	}
 }
