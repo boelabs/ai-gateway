@@ -261,6 +261,11 @@ export function EmbeddingWorkspace({
 						</DialogDescription>
 					</DialogHeader>
 					<DialogBody>
+						{choices.dimensions || choices.encodingFormats.length > 1 ? null : (
+							<p className="text-sm text-fg-muted">
+								This model has no settings to change.
+							</p>
+						)}
 						{choices.dimensions ? (
 							<NumberField.Root
 								max={choices.dimensions.max}
