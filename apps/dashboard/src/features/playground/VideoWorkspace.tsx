@@ -18,7 +18,8 @@ import {
 	type VideoSettings,
 	referenceRejection,
 	emptyVideoSettings,
-	REFERENCE_TYPES,
+	fitVideoSettings,
+	referenceTypes,
 	type VideoRun,
 	type VideoJob,
 	taskConflict,
@@ -63,11 +64,14 @@ function References({
 	onRole,
 	onRemove,
 	disabled,
+	frames,
 }: {
 	references: VideoReference[];
 	onRole: (id: string, role: ReferenceRole) => void;
 	onRemove: (id: string) => void;
 	disabled: boolean;
+	/** Whether the model can pin a first or last frame. */
+	frames: boolean;
 }) {
 	return (
 		<ScrollArea
@@ -105,7 +109,7 @@ function References({
 								>
 									{reference.filename}
 								</span>
-								{image ? (
+								{image && (frames || reference.role !== "reference") ? (
 									<Select
 										aria-label={`What ${reference.filename} is for`}
 										disabled={disabled}
@@ -119,8 +123,12 @@ function References({
 										variant="ghost"
 									>
 										<SelectItem value="reference">Reference</SelectItem>
-										<SelectItem value="first_frame">First frame</SelectItem>
-										<SelectItem value="last_frame">Last frame</SelectItem>
+										{frames ? (
+											<>
+												<SelectItem value="first_frame">First frame</SelectItem>
+												<SelectItem value="last_frame">Last frame</SelectItem>
+											</>
+										) : null}
 									</Select>
 								) : (
 									<span className="px-1 text-[11px] text-fg-muted">
@@ -178,6 +186,13 @@ export function VideoWorkspace({
 	const alive = useRef(true);
 	const scroll = useRef<HTMLDivElement>(null);
 	const busy = runs.some((run) => run.state === "running");
+	const options = model.video;
+
+	// Switching models drops the settings the new one would refuse, before anything is sent.
+	const fitted = fitVideoSettings(settings, options);
+	if (fitted !== settings) {
+		setSettings(fitted);
+	}
 
 	useEffect(() => {
 		const controllers = watching.current;
@@ -366,6 +381,7 @@ export function VideoWorkspace({
 					{references.length ? (
 						<References
 							disabled={busy}
+							frames={options?.references.frameImages ?? true}
 							onRemove={(id) =>
 								setReferences((current) =>
 									current.filter((reference) => reference.id !== id),
@@ -382,7 +398,7 @@ export function VideoWorkspace({
 						/>
 					) : null}
 					<Composer
-						accepted={REFERENCE_TYPES}
+						accepted={referenceTypes(options)}
 						busy={busy}
 						files={[]}
 						modelPicker={
@@ -435,8 +451,9 @@ export function VideoWorkspace({
 		>
 			<VideoSettingsDialog
 				onOpenChange={setSettingsOpen}
-				onSettings={setSettings}
+				onSettings={(next) => setSettings(fitVideoSettings(next, options))}
 				open={settingsOpen}
+				options={options}
 				settings={settings}
 			/>
 		</Workspace>

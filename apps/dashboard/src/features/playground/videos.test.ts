@@ -9,6 +9,9 @@ import {
 	referenceRejection,
 	videoContentUrl,
 	type VideoJob,
+	fitVideoSettings,
+	referenceTypes,
+	videoChoices,
 	taskConflict,
 	createVideo,
 	pollVideo,
@@ -276,4 +279,90 @@ test("the gateway's own message survives a failure, instead of a bare status", a
 		),
 		/duration is not supported/u,
 	);
+});
+
+const omni = {
+	tasks: ["text_to_video", "edit", "extend"],
+	durations: [3, 5, 10],
+	sizes: [
+		{ size: "640x360", aspectRatio: "16:9", resolution: "360p" },
+		{ size: "360x640", aspectRatio: "9:16", resolution: "360p" },
+		{ size: "1280x720", aspectRatio: "16:9", resolution: "720p" },
+	],
+	qualities: [],
+	seed: false,
+	generateAudio: false,
+	references: { image: true, video: true, frameImages: false },
+};
+
+test("the settings offer only what the model accepts, narrowed by what is chosen", () => {
+	const choices = videoChoices(omni);
+	assert.deepEqual(choices.tasks, ["text_to_video", "edit", "extend"]);
+	assert.deepEqual(choices.durations, [3, 5, 10]);
+	assert.deepEqual(choices.aspectRatios, ["16:9", "9:16"]);
+	assert.deepEqual(choices.resolutions, ["360p", "720p"]);
+	assert.deepEqual(choices.sizes, ["640x360", "360x640", "1280x720"]);
+	assert.equal(choices.seed, false);
+	assert.equal(choices.generateAudio, false);
+	assert.equal(choices.proportions, true);
+	assert.deepEqual(videoChoices(omni, { aspectRatio: "9:16" }).resolutions, [
+		"360p",
+	]);
+	assert.deepEqual(videoChoices(omni, { resolution: "720P" }).aspectRatios, [
+		"16:9",
+	]);
+});
+
+test("a model that takes exact sizes only offers no proportion", () => {
+	const choices = videoChoices({
+		...omni,
+		sizes: [{ size: "1280x720" }, { size: "720x1280" }],
+	});
+	assert.equal(choices.proportions, false);
+	assert.deepEqual(choices.sizes, ["1280x720", "720x1280"]);
+});
+
+test("without the model's options every value is offered and lengths are typed freely", () => {
+	const choices = videoChoices(undefined);
+	assert.ok(choices.resolutions.includes("4K"));
+	assert.equal(choices.durations, undefined);
+	assert.equal(choices.sizes, undefined);
+	assert.equal(choices.dimensions, true);
+});
+
+test("switching models drops the settings the new model would refuse", () => {
+	const fitted = fitVideoSettings(
+		{
+			task: "image_to_video",
+			seconds: 8,
+			aspectRatio: "9:16",
+			resolution: "4K",
+			seed: 1,
+			generateAudio: true,
+			quality: "high",
+		},
+		omni,
+	);
+	assert.deepEqual(fitted, { aspectRatio: "9:16" });
+	const kept: VideoSettings = { task: "edit", resolution: "720p" };
+	assert.equal(fitVideoSettings(kept, omni), kept);
+	assert.equal(fitVideoSettings(kept, undefined), kept);
+});
+
+test("the file picker offers only the attachments the model takes", () => {
+	assert.deepEqual(
+		referenceTypes({
+			...omni,
+			references: { image: false, video: true, frameImages: false },
+		}),
+		["video/mp4", "video/webm"],
+	);
+	assert.deepEqual(
+		referenceTypes({
+			...omni,
+			references: { image: false, video: false, frameImages: true },
+		}),
+		["image/png", "image/jpeg", "image/webp"],
+	);
+	assert.equal(referenceTypes(undefined).length, 5);
 });

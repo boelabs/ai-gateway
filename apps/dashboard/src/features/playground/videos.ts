@@ -1,4 +1,5 @@
 import { type GatewayRequest, gatewayJson, gatewayGet } from "./gateway";
+import type { VideoOptions } from "./models";
 import { z } from "zod";
 
 /**
@@ -102,6 +103,169 @@ export interface VideoSettings {
 }
 
 export const emptyVideoSettings = (): VideoSettings => ({});
+
+/**
+ * What the settings dialog offers for one model. Without the gateway saying what the model takes
+ * (an older gateway), every value is offered and the gateway remains the one to refuse; `durations`
+ * and `sizes` are then left undefined, which asks for free entry rather than a list.
+ */
+export interface VideoChoices {
+	tasks: readonly string[];
+	qualities: readonly string[];
+	durations?: number[];
+	aspectRatios: readonly string[];
+	resolutions: readonly string[];
+	sizes?: string[];
+	seed: boolean;
+	generateAudio: boolean;
+	/** Whether the model takes any dimensions at all. */
+	dimensions: boolean;
+	/** Whether they can be said as a proportion; some models take exact sizes only. */
+	proportions: boolean;
+}
+
+function sameResolution(a: string | undefined, b: string | undefined) {
+	return a?.toLowerCase() === b?.toLowerCase();
+}
+
+function unique(values: (string | undefined)[]): string[] {
+	const seen = new Set<string>();
+	const result: string[] = [];
+	for (const value of values) {
+		if (value !== undefined && !seen.has(value.toLowerCase())) {
+			seen.add(value.toLowerCase());
+			result.push(value);
+		}
+	}
+	return result;
+}
+
+/**
+ * The choices, narrowed by what is already chosen: picking 9:16 leaves only the resolutions that
+ * exist in 9:16, so an impossible pair cannot be put together.
+ */
+export function videoChoices(
+	options: VideoOptions | undefined,
+	settings: VideoSettings = {},
+): VideoChoices {
+	if (!options) {
+		return {
+			tasks: VIDEO_TASKS,
+			qualities: VIDEO_QUALITIES,
+			aspectRatios: VIDEO_ASPECT_RATIOS,
+			resolutions: VIDEO_RESOLUTIONS,
+			seed: true,
+			generateAudio: true,
+			dimensions: true,
+			proportions: true,
+		};
+	}
+	const { sizes } = options;
+	return {
+		tasks: options.tasks,
+		qualities: options.qualities,
+		durations: options.durations,
+		aspectRatios: sizes
+			? unique(
+					sizes
+						.filter(
+							(entry) =>
+								settings.resolution === undefined ||
+								sameResolution(entry.resolution, settings.resolution),
+						)
+						.map((entry) => entry.aspectRatio),
+				)
+			: VIDEO_ASPECT_RATIOS,
+		resolutions: sizes
+			? unique(
+					sizes
+						.filter(
+							(entry) =>
+								settings.aspectRatio === undefined ||
+								entry.aspectRatio === settings.aspectRatio,
+						)
+						.map((entry) => entry.resolution),
+				)
+			: VIDEO_RESOLUTIONS,
+		...(sizes ? { sizes: sizes.map((entry) => entry.size) } : {}),
+		seed: options.seed,
+		generateAudio: options.generateAudio,
+		dimensions: sizes === undefined || sizes.length > 0,
+		proportions:
+			sizes === undefined ||
+			sizes.some((entry) => entry.aspectRatio || entry.resolution),
+	};
+}
+
+/**
+ * The settings with whatever the model does not take removed — what switching models leaves behind.
+ * Returns the same object when nothing had to go, so a caller can tell.
+ */
+export function fitVideoSettings(
+	settings: VideoSettings,
+	options: VideoOptions | undefined,
+): VideoSettings {
+	if (!options) {
+		return settings;
+	}
+	const next = { ...settings };
+	if (next.task !== undefined && !options.tasks.includes(next.task)) {
+		delete next.task;
+	}
+	if (next.quality !== undefined && !options.qualities.includes(next.quality)) {
+		delete next.quality;
+	}
+	if (next.seconds !== undefined && !options.durations.includes(next.seconds)) {
+		delete next.seconds;
+	}
+	if (next.seed !== undefined && !options.seed) {
+		delete next.seed;
+	}
+	if (next.generateAudio !== undefined && !options.generateAudio) {
+		delete next.generateAudio;
+	}
+	const { sizes } = options;
+	if (sizes) {
+		if (
+			next.size !== undefined &&
+			!sizes.some((entry) => entry.size === next.size)
+		) {
+			delete next.size;
+		}
+		if (
+			next.aspectRatio !== undefined &&
+			!sizes.some((entry) => entry.aspectRatio === next.aspectRatio)
+		) {
+			delete next.aspectRatio;
+		}
+		if (
+			next.resolution !== undefined &&
+			!sizes.some(
+				(entry) =>
+					sameResolution(entry.resolution, next.resolution) &&
+					(next.aspectRatio === undefined ||
+						entry.aspectRatio === next.aspectRatio),
+			)
+		) {
+			delete next.resolution;
+		}
+	}
+	const changed = (Object.keys(settings) as (keyof VideoSettings)[]).some(
+		(key) => !(key in next),
+	);
+	return changed ? next : settings;
+}
+
+/** What the file picker offers for this model: images only if it takes them, videos likewise. */
+export function referenceTypes(options: VideoOptions | undefined): string[] {
+	if (!options) {
+		return REFERENCE_TYPES;
+	}
+	const { image, video, frameImages } = options.references;
+	return REFERENCE_TYPES.filter((type) =>
+		type.startsWith("image/") ? image || frameImages : video,
+	);
+}
 
 const videoJobSchema = z.looseObject({
 	id: z.string().min(1),

@@ -313,3 +313,45 @@ test("service modes come from the catalog and unknown ones are ignored", () => {
 	const [plain] = parsePublicModels({ data: [model()] });
 	assert.deepEqual(plain?.serviceModes, []);
 });
+
+test("reads what a video model accepts, and leaves it unknown when the gateway does not say", () => {
+	const [omni, legacy] = parsePublicModels({
+		data: [
+			{
+				id: "omni",
+				operations: [{ id: "video.generate", endpoints: ["/v1/videos"] }],
+				video_capabilities: {
+					tasks: ["text_to_video", "edit"],
+					durations: ["3", "10"],
+					sizes: [
+						{ size: "640x360", aspect_ratio: "16:9", resolution: "360p" },
+					],
+					qualities: [],
+					seed: false,
+					generate_audio: false,
+					input_references: {
+						image: true,
+						video: true,
+						audio: false,
+						frame_images: true,
+						max: 6,
+					},
+				},
+			},
+			{
+				id: "video-old",
+				operations: [{ id: "video.generate", endpoints: ["/v1/videos"] }],
+			},
+		],
+	});
+	assert.deepEqual(omni?.video, {
+		tasks: ["text_to_video", "edit"],
+		durations: [3, 10],
+		sizes: [{ size: "640x360", aspectRatio: "16:9", resolution: "360p" }],
+		qualities: [],
+		seed: false,
+		generateAudio: false,
+		references: { image: true, video: true, frameImages: true },
+	});
+	assert.equal(legacy?.video, undefined);
+});
