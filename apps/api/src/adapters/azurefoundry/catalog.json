@@ -99,7 +99,10 @@
 				"inputCentsPerMTokens": 30,
 				"outputCentsPerMTokens": 120,
 				"cacheReadCentsPerMTokens": 0.6
-			}
+			},
+			"deprecated": true,
+			"retiresOn": "2026-12-15",
+			"notes": "Microsoft lists DeepSeek-V4.1-Flash (preview) for retirement on 2026-12-15 in its model retirement schedule, with no replacement listed."
 		},
 		"DeepSeek-V4-Flash": {
 			"operations": {

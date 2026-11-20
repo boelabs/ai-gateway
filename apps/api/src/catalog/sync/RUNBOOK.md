@@ -262,6 +262,10 @@ to the old id are routed elsewhere after shutdown.
 - A deprecated entry keeps its `operations` and `pricing` untouched and gets `"deprecated": true`
   and a `notes` line in the established style, for example:
   `"OpenAI deprecated gpt-x; it shuts down on 2027-01-14 (replacement: gpt-y)."`
+- Azure's retirement schedule gives every Foundry model a date, GA ones included, so a date alone
+  is not a deprecation. Mark an Azure model deprecated, with that `retiresOn`, when its row's
+  lifecycle is Deprecated, Legacy or Retired, or its retirement date is 90 days away or less;
+  leave later dates alone until a run finds them within that window.
 - When the provider names the day it stops serving the model, add `"retiresOn": "2027-01-14"` next
   to `deprecated`, the same day the note gives. That includes a redirect: from the day requests to
   the old id are answered by another model, the old one is retired. Leave it out when the provider
