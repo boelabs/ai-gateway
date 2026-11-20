@@ -4,6 +4,8 @@ import {
 	supportsServiceMode,
 } from "#core/serviceMode.ts";
 import type { OperationProfiles, TransportOverrides } from "#profiles/types.ts";
+import { publicTranscriptionCapabilities } from "#catalog/publicTranscriptionCapabilities.ts";
+import { publicEmbeddingCapabilities } from "#catalog/publicEmbeddingCapabilities.ts";
 import { publicImageCapabilities } from "#catalog/publicImageCapabilities.ts";
 import { publicVideoCapabilities } from "#catalog/publicVideoCapabilities.ts";
 import { publicTextCapabilities } from "#catalog/publicTextCapabilities.ts";
@@ -374,6 +376,8 @@ function toModelObject(group: PublicModelGroup): Record<string, unknown> {
 		text_capabilities: publicTextCapabilities(group.metas),
 		image_capabilities: publicImageCapabilities(group.metas),
 		video_capabilities: publicVideoCapabilities(group.metas),
+		embedding_capabilities: publicEmbeddingCapabilities(group.metas),
+		transcription_capabilities: publicTranscriptionCapabilities(group.metas),
 		endpoint_count: group.rows.length,
 	};
 }

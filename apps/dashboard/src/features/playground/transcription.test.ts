@@ -3,6 +3,8 @@ import type { FetchLike } from "./api";
 import { test } from "node:test";
 
 import {
+	fitTranscriptionSettings,
+	transcriptionChoices,
 	transcriptionForm,
 	transcriptionFrom,
 	runTranscription,
@@ -123,5 +125,33 @@ test("the request is multipart to the relay, and failures keep the gateway's mes
 			{ fetch: failing, csrf: () => undefined },
 		),
 		/file is too large/u,
+	);
+});
+
+test("the transcription settings offer only the model's formats and timestamps", () => {
+	const choices = transcriptionChoices({
+		responseFormats: ["json", "text", "verbose_json"],
+		timestampGranularities: ["segment"],
+	});
+	assert.deepEqual(choices.responseFormats, ["json", "verbose_json", "text"]);
+	assert.deepEqual(choices.timestampGranularities, ["segment"]);
+	assert.ok(transcriptionChoices(undefined).responseFormats.includes("srt"));
+});
+
+test("switching transcription models drops the formats and timestamps it refuses", () => {
+	assert.deepEqual(
+		fitTranscriptionSettings(
+			{ responseFormat: "verbose_json", timestampGranularities: ["word"] },
+			{ responseFormats: ["json", "text"], timestampGranularities: [] },
+		),
+		{},
+	);
+	const kept = { responseFormat: "json" as const, language: "es" };
+	assert.equal(
+		fitTranscriptionSettings(kept, {
+			responseFormats: ["json"],
+			timestampGranularities: [],
+		}),
+		kept,
 	);
 });

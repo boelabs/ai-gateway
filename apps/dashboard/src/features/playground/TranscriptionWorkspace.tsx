@@ -19,10 +19,10 @@ import { Composer } from "./Composer";
 import {
 	type TranscriptionSettings,
 	emptyTranscriptionSettings,
-	TIMESTAMP_GRANULARITIES,
+	fitTranscriptionSettings,
+	transcriptionChoices,
 	type TranscriptionRun,
 	type ResponseFormat,
-	RESPONSE_FORMATS,
 	runTranscription,
 	AUDIO_TYPES,
 	timestamp,
@@ -265,6 +265,14 @@ export function TranscriptionWorkspace({
 	const alive = useRef(true);
 	const scroll = useRef<HTMLDivElement>(null);
 	const busy = runs.some((run) => run.state === "running");
+	const options = model.transcription;
+	const choices = transcriptionChoices(options);
+
+	// Switching models drops the settings the new one would refuse, before anything is sent.
+	const fitted = fitTranscriptionSettings(settings, options);
+	if (fitted !== settings) {
+		setSettings(fitted);
+	}
 
 	useEffect(() => {
 		alive.current = true;
@@ -526,13 +534,14 @@ export function TranscriptionWorkspace({
 							value={settings.responseFormat ?? "default"}
 						>
 							<SelectItem value="default">Default</SelectItem>
-							{RESPONSE_FORMATS.map((format) => (
+							{choices.responseFormats.map((format) => (
 								<SelectItem key={format} value={format}>
 									{format}
 								</SelectItem>
 							))}
 						</Select>
-						{settings.responseFormat === "verbose_json" ? (
+						{settings.responseFormat === "verbose_json" &&
+						choices.timestampGranularities.length ? (
 							<Select
 								description="Only verbose_json carries them."
 								label="Timestamps"
@@ -545,7 +554,7 @@ export function TranscriptionWorkspace({
 								value={settings.timestampGranularities?.[0] ?? "default"}
 							>
 								<SelectItem value="default">Default</SelectItem>
-								{TIMESTAMP_GRANULARITIES.map((granularity) => (
+								{choices.timestampGranularities.map((granularity) => (
 									<SelectItem key={granularity} value={granularity}>
 										{granularity}
 									</SelectItem>

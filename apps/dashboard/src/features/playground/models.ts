@@ -46,6 +46,22 @@ export interface PlaygroundModel extends PlaygroundCapabilities {
 	video?: VideoOptions;
 	/** What image generation and editing accept; absent when the gateway does not say. */
 	image?: ImageOptions;
+	/** What embeddings accept; absent when the gateway does not say. */
+	embedding?: EmbeddingOptions;
+	/** What transcription accepts; absent when the gateway does not say. */
+	transcription?: TranscriptionOptions;
+}
+
+export interface EmbeddingOptions {
+	/** Present only when the model can shorten its vectors. */
+	dimensions?: { min: number; max?: number };
+	encodingFormats: string[];
+}
+
+export interface TranscriptionOptions {
+	responseFormats: string[];
+	/** Empty when timestamps are refused; they also need `verbose_json`. */
+	timestampGranularities: string[];
 }
 
 /** The gateway's `image_capabilities` for one operation; `auto` size and quality always go. */
@@ -128,6 +144,23 @@ const publicModelsSchema = z.object({
 				.object({
 					generate: imageOperationSchema.optional(),
 					edit: imageOperationSchema.optional(),
+				})
+				.optional(),
+			embedding_capabilities: z
+				.object({
+					dimensions: z
+						.object({
+							min: z.number().int().positive(),
+							max: z.number().int().positive().optional(),
+						})
+						.optional(),
+					encoding_formats: z.array(z.string()),
+				})
+				.optional(),
+			transcription_capabilities: z
+				.object({
+					response_formats: z.array(z.string()),
+					timestamp_granularities: z.array(z.string()),
 				})
 				.optional(),
 			video_capabilities: z
@@ -291,6 +324,38 @@ export function parsePublicModels(body: unknown): PlaygroundModel[] {
 						: {}),
 					...(model.image_capabilities
 						? { image: imageOptions(model.image_capabilities) }
+						: {}),
+					...(model.embedding_capabilities
+						? {
+								embedding: {
+									...(model.embedding_capabilities.dimensions
+										? {
+												dimensions: {
+													min: model.embedding_capabilities.dimensions.min,
+													...(model.embedding_capabilities.dimensions.max ===
+													undefined
+														? {}
+														: {
+																max: model.embedding_capabilities.dimensions
+																	.max,
+															}),
+												},
+											}
+										: {}),
+									encodingFormats:
+										model.embedding_capabilities.encoding_formats,
+								},
+							}
+						: {}),
+					...(model.transcription_capabilities
+						? {
+								transcription: {
+									responseFormats:
+										model.transcription_capabilities.response_formats,
+									timestampGranularities:
+										model.transcription_capabilities.timestamp_granularities,
+								},
+							}
 						: {}),
 				},
 			];

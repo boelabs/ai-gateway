@@ -393,3 +393,37 @@ test("reads what an image model accepts per operation", () => {
 		},
 	});
 });
+
+test("reads what embedding and transcription models accept", () => {
+	const [embed, whisper] = parsePublicModels({
+		data: [
+			{
+				id: "embed",
+				operations: [{ id: "embedding.create", endpoints: ["/v1/embeddings"] }],
+				embedding_capabilities: {
+					dimensions: { min: 256, max: 3072 },
+					encoding_formats: ["float"],
+					max_inputs: 2048,
+				},
+			},
+			{
+				id: "whisper",
+				operations: [
+					{ id: "audio.transcribe", endpoints: ["/v1/audio/transcriptions"] },
+				],
+				transcription_capabilities: {
+					response_formats: ["json", "verbose_json"],
+					timestamp_granularities: ["segment", "word"],
+				},
+			},
+		],
+	});
+	assert.deepEqual(embed?.embedding, {
+		dimensions: { min: 256, max: 3072 },
+		encodingFormats: ["float"],
+	});
+	assert.deepEqual(whisper?.transcription, {
+		responseFormats: ["json", "verbose_json"],
+		timestampGranularities: ["segment", "word"],
+	});
+});

@@ -4,6 +4,8 @@ import type { FetchLike } from "./api";
 import { test } from "node:test";
 
 import {
+	fitEmbeddingSettings,
+	embeddingChoices,
 	cosineSimilarity,
 	decodeEmbedding,
 	embeddingsBody,
@@ -96,5 +98,47 @@ test("the request goes to the relay, and a failure keeps the gateway's message",
 			{ fetch: failing, csrf: () => undefined },
 		),
 		/dimensions is not supported/u,
+	);
+});
+
+test("the dimensions field appears only for models that shorten vectors, within their range", () => {
+	assert.deepEqual(
+		embeddingChoices({
+			dimensions: { min: 256, max: 3072 },
+			encodingFormats: ["float", "base64"],
+		}).dimensions,
+		{ min: 256, max: 3072 },
+	);
+	const fixed = embeddingChoices({ encodingFormats: ["float"] });
+	assert.equal(fixed.dimensions, undefined);
+	assert.deepEqual(fixed.encodingFormats, ["float"]);
+	assert.deepEqual(embeddingChoices(undefined).dimensions, {
+		min: 1,
+		max: 8192,
+	});
+});
+
+test("switching embedding models drops dimensions and formats the new model refuses", () => {
+	assert.deepEqual(
+		fitEmbeddingSettings(
+			{ dimensions: 512, encodingFormat: "base64" },
+			{ encodingFormats: ["float"] },
+		),
+		{},
+	);
+	assert.deepEqual(
+		fitEmbeddingSettings(
+			{ dimensions: 4096 },
+			{ dimensions: { min: 256, max: 3072 }, encodingFormats: ["float"] },
+		),
+		{},
+	);
+	const kept = { dimensions: 512 };
+	assert.equal(
+		fitEmbeddingSettings(kept, {
+			dimensions: { min: 256, max: 3072 },
+			encodingFormats: ["float"],
+		}),
+		kept,
 	);
 });

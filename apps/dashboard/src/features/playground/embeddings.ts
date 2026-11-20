@@ -1,4 +1,5 @@
 import { type GatewayRequest, gatewayJson } from "./gateway";
+import type { EmbeddingOptions } from "./models";
 import { z } from "zod";
 
 /**
@@ -17,6 +18,69 @@ export interface EmbeddingSettings {
 }
 
 export const emptyEmbeddingSettings = (): EmbeddingSettings => ({});
+
+/** The widest vector the dimensions field allows when the model does not say. */
+const MAX_DIMENSIONS = 8192;
+
+/**
+ * What the settings offer for one model. Without the gateway saying (an older one), both controls
+ * are offered as before and the gateway remains the one to refuse.
+ */
+export function embeddingChoices(options: EmbeddingOptions | undefined): {
+	/** Absent when the model cannot shorten its vectors, which hides the field. */
+	dimensions?: { min: number; max: number };
+	encodingFormats: readonly string[];
+} {
+	if (!options) {
+		return {
+			dimensions: { min: 1, max: MAX_DIMENSIONS },
+			encodingFormats: ENCODING_FORMATS,
+		};
+	}
+	return {
+		...(options.dimensions
+			? {
+					dimensions: {
+						min: options.dimensions.min,
+						max: options.dimensions.max ?? MAX_DIMENSIONS,
+					},
+				}
+			: {}),
+		encodingFormats: options.encodingFormats,
+	};
+}
+
+/** The settings without what the model refuses; the same object when nothing had to go. */
+export function fitEmbeddingSettings(
+	settings: EmbeddingSettings,
+	options: EmbeddingOptions | undefined,
+): EmbeddingSettings {
+	if (!options) {
+		return settings;
+	}
+	const { dimensions, encodingFormats } = embeddingChoices(options);
+	const next = { ...settings };
+	if (
+		next.dimensions !== undefined &&
+		!(
+			dimensions &&
+			next.dimensions >= dimensions.min &&
+			next.dimensions <= dimensions.max
+		)
+	) {
+		delete next.dimensions;
+	}
+	if (
+		next.encodingFormat !== undefined &&
+		!encodingFormats.includes(next.encodingFormat)
+	) {
+		delete next.encodingFormat;
+	}
+	const changed = (Object.keys(settings) as (keyof EmbeddingSettings)[]).some(
+		(key) => !(key in next),
+	);
+	return changed ? next : settings;
+}
 
 export interface EmbeddingRun {
 	id: string;
