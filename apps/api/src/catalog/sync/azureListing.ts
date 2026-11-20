@@ -82,7 +82,9 @@ export const AZURE_LISTING_UNSERVED: Readonly<
 			"Document parsing; AI Gateway has no OCR operation.",
 		"mistral-ocr-4-0": "Document parsing; AI Gateway has no OCR operation.",
 		"Microsoft-Decision-1":
-			"Decision scoring; AI Gateway has no classification operation.",
+			"Served on /providers/microsoft/v1/systemone; the azurefoundry adapter has no decisions transport.",
+		"Microsoft-Decision-1.1":
+			"Served on /providers/microsoft/v1/systemone; the azurefoundry adapter has no decisions transport.",
 		"MAI-Thinking-1":
 			"Served on /mai/v1, not the /openai/v1 surface the adapter calls.",
 		"model-router":

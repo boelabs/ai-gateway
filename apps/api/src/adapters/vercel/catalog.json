@@ -49,38 +49,6 @@
 				"outputCentsPerMTokens": 24
 			}
 		},
-		"alibaba/qwen-3-235b": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": false,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 262144,
-					"maxOutputTokens": 16384,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"max_tokens": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 22,
-				"outputCentsPerMTokens": 88
-			}
-		},
 		"alibaba/qwen-3-30b": {
 			"operations": {
 				"text.generate": {
@@ -157,39 +125,6 @@
 			"pricing": {
 				"inputCentsPerMTokens": 15,
 				"outputCentsPerMTokens": 60
-			}
-		},
-		"alibaba/qwen3-coder": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": false,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 262144,
-					"maxOutputTokens": 32768,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"max_tokens": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 22,
-				"outputCentsPerMTokens": 180,
-				"cacheReadCentsPerMTokens": 2.2
 			}
 		},
 		"alibaba/qwen3-coder-30b-a3b": {
@@ -355,66 +290,27 @@
 						"reasoning": false,
 						"structuredOutputs": true
 					},
-					"maxInputTokens": 262114,
-					"maxOutputTokens": 262114,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"max_tokens": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 15,
-				"outputCentsPerMTokens": 120
-			}
-		},
-		"alibaba/qwen3-next-80b-a3b-thinking": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": true,
-						"structuredOutputs": true
-					},
 					"maxInputTokens": 262144,
-					"maxOutputTokens": 262144,
+					"maxOutputTokens": 32768,
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
 					},
 					"contracts": ["chat.completions", "responses"],
 					"parameters": {
-						"include_reasoning": true,
 						"max_tokens": true,
-						"reasoning": true,
-						"reasoning_effort": true,
 						"response_format": true,
 						"stop": true,
 						"structured_outputs": true,
 						"temperature": true,
 						"tool_choice": true,
 						"tools": true
-					},
-					"reasoning": {
-						"kind": "fixed",
-						"levels": ["high"]
 					}
 				}
 			},
 			"pricing": {
-				"inputCentsPerMTokens": 15,
-				"outputCentsPerMTokens": 120
+				"inputCentsPerMTokens": 9,
+				"outputCentsPerMTokens": 110
 			}
 		},
 		"alibaba/qwen3-vl-instruct": {
@@ -7527,47 +7423,6 @@
 				"outputCentsPerMTokens": 760
 			}
 		},
-		"minimax/minimax-m2": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": true,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 205000,
-					"maxOutputTokens": 205000,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"reasoning_effort": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					},
-					"reasoning": {
-						"kind": "fixed",
-						"levels": ["high"]
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 30,
-				"outputCentsPerMTokens": 120,
-				"cacheReadCentsPerMTokens": 3,
-				"cacheWriteCentsPerMTokens": 37.5
-			}
-		},
 		"minimax/minimax-m2.1": {
 			"operations": {
 				"text.generate": {
@@ -7588,7 +7443,6 @@
 						"include_reasoning": true,
 						"max_tokens": true,
 						"reasoning": true,
-						"reasoning_effort": true,
 						"response_format": true,
 						"stop": true,
 						"structured_outputs": true,
@@ -7605,49 +7459,7 @@
 			"pricing": {
 				"inputCentsPerMTokens": 30,
 				"outputCentsPerMTokens": 120,
-				"cacheReadCentsPerMTokens": 3,
-				"cacheWriteCentsPerMTokens": 37.5
-			}
-		},
-		"minimax/minimax-m2.1-lightning": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": true,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 204800,
-					"maxOutputTokens": 131072,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"reasoning_effort": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					},
-					"reasoning": {
-						"kind": "fixed",
-						"levels": ["high"]
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 30,
-				"outputCentsPerMTokens": 240,
-				"cacheReadCentsPerMTokens": 3,
-				"cacheWriteCentsPerMTokens": 37.5
+				"cacheReadCentsPerMTokens": 15
 			}
 		},
 		"minimax/minimax-m2.5": {
@@ -7659,8 +7471,8 @@
 						"reasoning": true,
 						"structuredOutputs": true
 					},
-					"maxInputTokens": 204800,
-					"maxOutputTokens": 131000,
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 8192,
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -7670,7 +7482,6 @@
 						"include_reasoning": true,
 						"max_tokens": true,
 						"reasoning": true,
-						"reasoning_effort": true,
 						"response_format": true,
 						"stop": true,
 						"structured_outputs": true,
@@ -7686,50 +7497,7 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 30,
-				"outputCentsPerMTokens": 120,
-				"cacheReadCentsPerMTokens": 3,
-				"cacheWriteCentsPerMTokens": 37.5
-			}
-		},
-		"minimax/minimax-m2.5-highspeed": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": true,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 204800,
-					"maxOutputTokens": 131000,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"reasoning_effort": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					},
-					"reasoning": {
-						"kind": "fixed",
-						"levels": ["high"]
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 60,
-				"outputCentsPerMTokens": 240,
-				"cacheReadCentsPerMTokens": 3,
-				"cacheWriteCentsPerMTokens": 37.5
+				"outputCentsPerMTokens": 120
 			}
 		},
 		"minimax/minimax-m2.7": {
@@ -7739,10 +7507,10 @@
 						"tools": true,
 						"vision": false,
 						"reasoning": true,
-						"structuredOutputs": true
+						"structuredOutputs": false
 					},
-					"maxInputTokens": 204800,
-					"maxOutputTokens": 131000,
+					"maxInputTokens": 196608,
+					"maxOutputTokens": 196608,
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -7753,65 +7521,21 @@
 						"max_tokens": true,
 						"reasoning": true,
 						"reasoning_effort": true,
-						"response_format": true,
 						"stop": true,
-						"structured_outputs": true,
 						"temperature": true,
 						"tool_choice": true,
 						"tools": true
 					},
 					"reasoning": {
-						"kind": "fixed",
-						"levels": ["high"]
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high"]
 					}
 				}
 			},
 			"pricing": {
-				"inputCentsPerMTokens": 30,
-				"outputCentsPerMTokens": 120,
-				"cacheReadCentsPerMTokens": 6,
-				"cacheWriteCentsPerMTokens": 37.5
-			}
-		},
-		"minimax/minimax-m2.7-highspeed": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": true,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 204800,
-					"maxOutputTokens": 131100,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"reasoning_effort": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					},
-					"reasoning": {
-						"kind": "fixed",
-						"levels": ["high"]
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 60,
-				"outputCentsPerMTokens": 240,
-				"cacheReadCentsPerMTokens": 6,
-				"cacheWriteCentsPerMTokens": 37.5
+				"inputCentsPerMTokens": 21,
+				"outputCentsPerMTokens": 84,
+				"cacheReadCentsPerMTokens": 4.2
 			}
 		},
 		"minimax/minimax-m3": {

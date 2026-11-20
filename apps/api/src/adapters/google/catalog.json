@@ -1659,9 +1659,7 @@
 				"cacheReadCentsPerMTokens": 20,
 				"cacheWriteCentsPerMTokens": 37.5,
 				"imageOutputCentsPerMTokens": 12000
-			},
-			"deprecated": true,
-			"notes": "Google deprecated gemini-3-pro-image; no shutdown date is published yet (replacement: gemini-nano-banana-2.1)."
+			}
 		},
 		"gemini-2.5-flash-image": {
 			"operations": {
@@ -1762,7 +1760,8 @@
 				"imageOutputCentsPerMTokens": 3000
 			},
 			"deprecated": true,
-			"notes": "Google deprecated gemini-2.5-flash-image; its deprecations page lists shutdown on 2027-03-15 (the pricing page says 2026-10-02); replacement gemini-3.1-flash-lite-image."
+			"retiresOn": "2027-03-15",
+			"notes": "Google deprecated gemini-2.5-flash-image; it shuts down on 2027-03-15 (replacement: gemini-3.1-flash-lite-image)."
 		},
 		"gemini-4-argon": {
 			"operations": {
@@ -1944,6 +1943,53 @@
 						"inputCentsPerMTokens": 270,
 						"outputCentsPerMTokens": 1350,
 						"cacheReadCentsPerMTokens": 13.5
+					}
+				}
+			},
+			"notes": "Implicit caching only (no explicit cache or storage price). Output above 65,536 tokens needs long decode continuation hops the adapter does not run."
+		},
+		"gemini-4-neon": {
+			"operations": {
+				"text.generate": {
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"parameters": {
+						"max_tokens": true,
+						"tools": true,
+						"tool_choice": true,
+						"reasoning": true,
+						"include_reasoning": true,
+						"response_format": true,
+						"structured_outputs": true,
+						"reasoning_effort": true
+					},
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"structuredOutputs": true,
+						"reasoning": true,
+						"strictTools": true
+					},
+					"reasoning": {
+						"kind": "gemini_level",
+						"levels": ["low", "medium", "high", "xhigh"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 300,
+				"outputCentsPerMTokens": 1500,
+				"cacheReadCentsPerMTokens": 15,
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 150,
+						"outputCentsPerMTokens": 750,
+						"cacheReadCentsPerMTokens": 7.5
+					},
+					"priority": {
+						"inputCentsPerMTokens": 540,
+						"outputCentsPerMTokens": 2700,
+						"cacheReadCentsPerMTokens": 27
 					}
 				}
 			},
@@ -3790,9 +3836,7 @@
 				"audioOutputCentsPerMTokens": 1200,
 				"imageInputCentsPerMTokens": 100
 			},
-			"deprecated": true,
-			"retiresOn": "2026-11-17",
-			"notes": "Google deprecated gemini-3.1-flash-live-preview; it shuts down on 2026-11-17 (replacement: gemini-3.8-live). Live API (BidiGenerateContent), native audio. Legacy: Google recommends gemini-3.8-live. Synchronous function calling only. Answers in audio only; text sessions are served from the transcript."
+			"notes": "Live API (BidiGenerateContent), native audio. Legacy: Google recommends gemini-3.8-live; no shutdown date is announced. Synchronous function calling only. Answers in audio only; text sessions are served from the transcript."
 		},
 		"gemini-2.5-flash-native-audio-preview-12-2025": {
 			"operations": {
@@ -3851,8 +3895,8 @@
 				"imageInputCentsPerMTokens": 300
 			},
 			"deprecated": true,
-			"retiresOn": "2026-11-17",
-			"notes": "Google deprecated gemini-2.5-flash-native-audio-preview-12-2025; it shuts down on 2026-11-17 (replacement: gemini-3.8-live). Live API (BidiGenerateContent), native audio. Google limits 2.5 access to projects that already used it. Answers in audio only; text sessions are served from the transcript."
+			"retiresOn": "2027-03-31",
+			"notes": "Google deprecated gemini-2.5-flash-native-audio-preview-12-2025; it shuts down on 2027-03-31 (replacement: gemini-3.8-live). Live API (BidiGenerateContent), native audio. Google limits 2.5 access to projects that already used it. Answers in audio only; text sessions are served from the transcript."
 		},
 		"gemini-3.5-live-translate-preview": {
 			"operations": {
