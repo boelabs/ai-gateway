@@ -339,3 +339,71 @@ test("azureopenai: images reach the v1 surface with an api-version selector", as
 	);
 	assert.equal(chat.url.includes("api-version"), false);
 });
+
+test("azurefoundry: Microsoft-Decision goes to the resource's SystemOne path with image: references", () => {
+	const { decisions } = azurefoundryAdapter;
+	assert.ok(decisions);
+	const png = "iVBORw0KGgo=";
+	const req = {
+		model: "decide",
+		input: [
+			{
+				type: "message" as const,
+				role: "user" as const,
+				content: [
+					{ type: "text" as const, text: "Customer photo:" },
+					{
+						type: "image" as const,
+						source: {
+							kind: "data" as const,
+							data: png,
+							mimeType: "image/png",
+						},
+					},
+				],
+			},
+		],
+		questions: [
+			{
+				key: "damaged",
+				kind: "binary" as const,
+				instructions: [
+					{ type: "text" as const, text: "Does the photo show damage?" },
+				],
+			},
+		],
+	};
+	for (const baseUrl of [
+		"https://omni-resource.services.ai.azure.com",
+		"https://omni-resource.services.ai.azure.com/openai/v1/",
+	]) {
+		const built = decisions.buildRequest(req, {
+			...context("systemone", "my-decision-deployment"),
+			credentials: { apiKey: "azure-secret", baseUrl },
+		});
+		assert.equal(
+			built.url,
+			"https://omni-resource.services.ai.azure.com/providers/microsoft/v1/systemone",
+		);
+		assert.equal(built.headers["api-key"], "azure-secret");
+		assert.equal(built.headers.authorization, undefined);
+		assert.equal(built.headers["typesafe-danger-zone-images"], undefined);
+		const body = jsonBody(built);
+		assert.equal(body.model, "my-decision-deployment");
+		const [ref] = Object.keys(body.assets);
+		assert.equal(body.state, `Customer photo: image:${ref}`);
+		assert.deepEqual(body.assets[ref ?? ""], {
+			type: "image",
+			format: "png",
+			data_base64: png,
+		});
+		assert.deepEqual(body.questions.damaged, {
+			type: "noul",
+			instructions: "Does the photo show damage?",
+		});
+	}
+	assert.deepEqual(azurefoundryAdapter.transports?.decisions, {
+		supported: ["systemone"],
+		default: "systemone",
+	});
+});

@@ -25,6 +25,7 @@ can be answered by TypeSafe's Jev.
 |---|---|---|---|
 | OpenAI | `openai` | `gpt-6-luna` | `openai_decisions` (`POST /v1/decisions`) |
 | Azure OpenAI | `azureopenai` | `gpt-6-luna` (the Azure deployment name) | `openai_decisions` (`POST {resource}/openai/v1/decisions`) |
+| Azure Foundry | `azurefoundry` | `Microsoft-Decision-1.1`, `Microsoft-Decision-1` (the Azure deployment name) | `systemone` (`POST {resource}/providers/microsoft/v1/systemone`) |
 | Google AI Studio | `googleaistudio` | `gemini-decision-1` | `gemini_decisions` (`POST /v1beta/decisions`) |
 | TypeSafe | `typesafe` | `jev-1.14.0`, `jev-1.13.0`, `jev-latest` | `systemone` (`POST /v1/systemone`) |
 | OpenRouter | `openrouter` | `typesafe/jev-1.14`, `typesafe/jev-1.13`, `~typesafe/jev-latest`, `openai/gpt-6-luna-decisions`, `google/gemini-decision-1` | `openrouter_decisions` (`POST /api/alpha/decisions`) |
@@ -173,8 +174,12 @@ changes in these places:
 - **Question names.** A name the upstream cannot take (OpenAI allows any string or none) is replaced
   upstream by `q<index>`; answers always come back under the name you sent.
 - **Media.** Audio, video and documents are only accepted by Gemini. Images inside questions are only
-  accepted by OpenAI and TypeSafe. TypeSafe and OpenRouter take images only as inline PNG or JPEG
-  (TypeSafe up to 16 MiB each); an image URL can only go to OpenAI or Gemini.
+  accepted by OpenAI, TypeSafe and Azure Foundry. TypeSafe, Azure Foundry and OpenRouter take images
+  only as inline PNG or JPEG (TypeSafe up to 16 MiB each); an image URL can only go to OpenAI or
+  Gemini. Azure Foundry's Microsoft-Decision models read an image where the text says
+  `image:<name>`, so the gateway writes each image's reference that way.
+- **Azure Foundry** documents binary, choice and score questions only, and no context window or
+  question limits.
 - **Refusals.** OpenAI refuses per question; Gemini blocks the whole input. A Gemini-shaped response
   leaves a refused question out of `answers`, and reports a request where every question was refused
   as `prompt_feedback` with `block_reason`.
@@ -234,7 +239,8 @@ type, the input text size, the number of questions by kind, the answer kinds, us
 }
 ```
 
-Add `openai` or `azureopenai` with `gpt-6-luna`, `typesafe` with `jev-1.14.0` or `openrouter` with
+Add `openai` or `azureopenai` with `gpt-6-luna`, `azurefoundry` with your `Microsoft-Decision-1.1`
+deployment, `typesafe` with `jev-1.14.0` or `openrouter` with
 `typesafe/jev-1.14` under the same `publicModel` to build a mixed pool. TypeSafe's long context
 (262,144 tokens instead of 65,536) is opt-in: send its header from the deployment with
 `"credentials": { "apiKey": "...", "headers": { "TypeSafe-Danger-Zone-Long-Context": "true" } }`.
