@@ -85,6 +85,8 @@ use `transportOverrides` when a model needs another transport.
 - Image-to-video and first/last-frame interpolation use image references or `frame_images`.
 - Reference-to-video uses `task: "reference_to_video"` and image/video references.
 - Editing and extension require `task: "edit"` or `task: "extend"` plus exactly one `video_url`.
+  A video reference without `task` is rejected. An edit keeps the source video's duration and
+  aspect ratio: `seconds` is rejected and the aspect ratio is ignored.
 
 The integration intentionally does not use Google's Files API. Inputs are materialized as validated
 inline data, and completed output is fetched inline directly into AI Gateway object storage without
