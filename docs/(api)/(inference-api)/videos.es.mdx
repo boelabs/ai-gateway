@@ -59,6 +59,8 @@ Los adapters exponen la generación de video a través de transports: `videos` (
 - La interpolación de imagen a vídeo y del primer/último fotograma utiliza referencias de imagen o `frame_images`.
 - La referencia a vídeo utiliza `task: "reference_to_video"` y referencias de imagen/vídeo.
 - La edición y extensión requieren `task: "edit"` o `task: "extend"` más exactamente un `video_url`.
+  Una referencia de video sin `task` se rechaza. Una edición conserva la duración y la relación de
+  aspecto del video fuente: `seconds` se rechaza y la relación de aspecto se ignora.
 
 La integración no utiliza intencionalmente la API de Archivos de Google. Las entradas se materializan como datos en línea validados y la salida completa se recupera en línea directamente en el almacenamiento de objetos AI Gateway sin persistir en Postgres. En consecuencia, el perfil de acciones expone solo 360p y 720p, rechaza `file_id` y limita cada activo de entrada a 20 MB. Los videos subidos para edición/ampliación permanecen sujetos a las restricciones regionales y de 10 segundos de Google.
 

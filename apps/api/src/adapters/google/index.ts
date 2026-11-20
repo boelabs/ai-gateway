@@ -1964,10 +1964,12 @@ function googleInteractionMediaPart(
 function googleInteractionInput(req: CanonicalVideoRequest): unknown[] {
 	const refs = req.inputReferences ?? [];
 	if (refs.some((ref) => ref.type === "file_id" || ref.type === "audio_url")) {
+		const message =
+			"The selected model supports inline image and video references only.";
 		throw new GatewayError({
 			class: "bad_request",
-			message:
-				"Google Interactions video generation supports inline image and video references only",
+			message,
+			publicMessage: message,
 			param: "input_references",
 		});
 	}
@@ -1975,19 +1977,24 @@ function googleInteractionInput(req: CanonicalVideoRequest): unknown[] {
 		(ref): ref is VideoUrlReference => ref.type === "video_url",
 	);
 	if (videoRefs.length > 0 && req.task === undefined) {
+		const message =
+			"A video reference requires task=edit, task=extend, or task=reference_to_video.";
 		throw new GatewayError({
 			class: "bad_request",
 			code: "invalid_video_task",
-			message:
-				"Google Interactions requires task=reference_to_video, task=edit, or task=extend when a video reference is provided",
+			message,
+			publicMessage: message,
 			param: "task",
 		});
 	}
 	if (videoRefs.length > 3) {
+		const message =
+			"The selected model accepts at most three video references.";
 		throw new GatewayError({
 			class: "bad_request",
 			code: "unsupported_parameter",
-			message: "Google Interactions accepts at most three video references",
+			message,
+			publicMessage: message,
 			param: "input_references",
 		});
 	}
@@ -2075,12 +2082,27 @@ function googleInteractionBody(
 	req: CanonicalVideoRequest,
 	ctx: AdapterContext,
 ): Record<string, unknown> {
+	// An edit keeps the source video's length and framing: Google rejects a duration or an aspect
+	// ratio for it. The duration is refused, since the caller would not get what they asked for;
+	// the aspect ratio is dropped, as for extend, because a size also carries the resolution.
+	if (req.task === "edit" && req.seconds) {
+		const message =
+			"For task=edit, the output keeps the source video's duration; omit seconds.";
+		throw new GatewayError({
+			class: "bad_request",
+			code: "unsupported_parameter",
+			message,
+			publicMessage: message,
+			param: "duration",
+		});
+	}
 	const resolved = resolveVideoSize(req, videoProfileFor(ctx.meta));
+	const keepsSourceFraming = req.task === "edit" || req.task === "extend";
 	const responseFormat: Record<string, unknown> = {
 		type: "video",
 		delivery: "inline",
 		...(req.seconds ? { duration: `${req.seconds}s` } : {}),
-		...(req.task !== "extend" && resolved?.aspectRatio
+		...(!keepsSourceFraming && resolved?.aspectRatio
 			? { aspect_ratio: resolved.aspectRatio }
 			: {}),
 		...(resolved?.resolution ? { resolution: resolved.resolution } : {}),

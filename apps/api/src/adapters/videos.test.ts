@@ -1,9 +1,9 @@
-import { resolveModelMetadata } from "#catalog/index.ts";
 import { assertVideoRequestSupported } from "#gateway/videoRequestValidation.ts";
 import { sanitizeVideoRequestBody, resolveVideoSize } from "#core/videos.ts";
 import { jsonResponse, withStubbedFetch } from "#test-support/fetch.ts";
 import { openaicompatibleAdapter } from "./openaicompatible/index.ts";
 import type { ResolvedModelMetadata } from "#catalog/types.ts";
+import { resolveModelMetadata } from "#catalog/index.ts";
 import { googleAdapter } from "./google/index.ts";
 import { openaiAdapter } from "./openai/index.ts";
 import { must } from "#test-support/adapters.ts";
@@ -625,10 +625,8 @@ test("google interactions maps edit and extend source videos explicitly", async 
 			},
 		]);
 		const responseFormat = body.response_format as Record<string, unknown>;
-		assert.equal(
-			responseFormat.aspect_ratio,
-			task === "extend" ? undefined : "16:9",
-		);
+		assert.equal(responseFormat.aspect_ratio, undefined);
+		assert.equal(responseFormat.resolution, "720p");
 		assert.deepEqual(body.generation_config, { video_config: { task } });
 	}
 });
@@ -732,7 +730,28 @@ test("google interactions rejects ambiguous video input and managed state", asyn
 			},
 			{ ...ctx("interactions"), upstreamModel: "gemini-omni-1.1-flash" },
 		),
-		/task=/u,
+		(error: unknown) =>
+			error instanceof GatewayError &&
+			error.code === "invalid_video_task" &&
+			/task=edit/u.test(error.publicMessage),
+	);
+	await assert.rejects(
+		must(googleAdapter, "videoGeneration").submit(
+			{
+				model: "omni",
+				prompt: "make it blue",
+				task: "edit",
+				seconds: "3",
+				inputReferences: [
+					{ type: "video_url", url: "data:video/mp4;base64,SOURCE" },
+				],
+			},
+			{ ...ctx("interactions"), upstreamModel: "gemini-omni-1.2-flash" },
+		),
+		(error: unknown) =>
+			error instanceof GatewayError &&
+			error.param === "duration" &&
+			/omit seconds/u.test(error.publicMessage),
 	);
 	await assert.rejects(
 		must(googleAdapter, "videoGeneration").submit(
