@@ -81,6 +81,26 @@
 							"aspectRatio": "9:16",
 							"resolution": "720p",
 							"outputTokensPerSecond": 5792
+						},
+						"1920x1080": {
+							"aspectRatio": "16:9",
+							"resolution": "1080p",
+							"outputTokensPerSecond": 8688
+						},
+						"1080x1920": {
+							"aspectRatio": "9:16",
+							"resolution": "1080p",
+							"outputTokensPerSecond": 8688
+						},
+						"3840x2160": {
+							"aspectRatio": "16:9",
+							"resolution": "4k",
+							"outputTokensPerSecond": 17376
+						},
+						"2160x3840": {
+							"aspectRatio": "9:16",
+							"resolution": "4k",
+							"outputTokensPerSecond": 17376
 						}
 					}
 				}
@@ -90,7 +110,7 @@
 				"outputCentsPerMTokens": 900,
 				"videoOutputCentsPerMTokens": 1200
 			},
-			"notes": "Output is limited to inline-safe 360p and 720p because this integration does not use the Files API. Video output is billed by token (360p 1,931 and 720p 5,792 tokens per second); usage is settled when the job reaches a terminal state."
+			"notes": "Output is delivered inline (no Files API) at 360p, 720p, 1080p or 4K. Video output is billed by token (360p 1,931, 720p 5,792, 1080p 8,688 and 4K 17,376 tokens per second); usage is settled when the job reaches a terminal state."
 		},
 		"gemini-omni-1.1-flash": {
 			"operations": {
@@ -131,6 +151,26 @@
 							"aspectRatio": "9:16",
 							"resolution": "720p",
 							"outputTokensPerSecond": 5792
+						},
+						"1920x1080": {
+							"aspectRatio": "16:9",
+							"resolution": "1080p",
+							"outputTokensPerSecond": 8688
+						},
+						"1080x1920": {
+							"aspectRatio": "9:16",
+							"resolution": "1080p",
+							"outputTokensPerSecond": 8688
+						},
+						"3840x2160": {
+							"aspectRatio": "16:9",
+							"resolution": "4k",
+							"outputTokensPerSecond": 17376
+						},
+						"2160x3840": {
+							"aspectRatio": "9:16",
+							"resolution": "4k",
+							"outputTokensPerSecond": 17376
 						}
 					}
 				}
@@ -140,7 +180,7 @@
 				"outputCentsPerMTokens": 900,
 				"videoOutputCentsPerMTokens": 1750
 			},
-			"notes": "Output is limited to inline-safe 360p and 720p because this integration does not use the Files API. Video output is billed by token (360p 1,931 and 720p 5,792 tokens per second); usage is settled when the job reaches a terminal state. Google announced on 2026-11-05 that requests to gemini-omni-1.1-flash are routed to gemini-omni-1.2-flash from 2026-12-03 (replacement: gemini-omni-1.2-flash).",
+			"notes": "Output is delivered inline (no Files API) at 360p, 720p, 1080p or 4K. Video output is billed by token (360p 1,931, 720p 5,792, 1080p 8,688 and 4K 17,376 tokens per second); usage is settled when the job reaches a terminal state. Google announced on 2026-11-05 that requests to gemini-omni-1.1-flash are routed to gemini-omni-1.2-flash from 2026-12-03 (replacement: gemini-omni-1.2-flash).",
 			"deprecated": true,
 			"retiresOn": "2026-12-03"
 		},

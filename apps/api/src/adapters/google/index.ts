@@ -17,6 +17,12 @@ import { readFile } from "node:fs/promises";
 import type { Usage } from "#core/usage.ts";
 import { randomUUID } from "node:crypto";
 import { parseSSE } from "#core/sse.ts";
+import {
+	base64LiftedSink,
+	type LiftedSink,
+	liftedIndex,
+	parseJsonLifting,
+} from "./liftedJson.ts";
 
 import {
 	type CanonicalVideoProviderJob,
@@ -2242,21 +2248,50 @@ function parseGoogleInteractionJob(
 	};
 }
 
+/**
+ * Reads an interaction without holding its inline video whole: the base64 output is lifted out of
+ * the parsed document (a placeholder stands in for it) and, when `sink` is given, decoded into it
+ * as it arrives. A finished 4K job is tens of megabytes of base64 on every read.
+ */
 async function getGoogleInteraction(
 	job: { upstreamJobId: string },
 	ctx: AdapterContext,
+	sink?: LiftedSink,
 ): Promise<unknown> {
 	const c = creds(ctx);
 	const base = (c.baseUrl ?? DEFAULT_BASE).replace(/\/+$/u, "");
-	return googleFetchJson(
-		googleInteractionPath(base, job.upstreamJobId),
-		{
-			method: "GET",
-			headers: { "x-goog-api-key": c.apiKey, ...(c.headers ?? {}) },
-			...(ctx.signal ? { signal: ctx.signal } : {}),
-		},
-		ctx,
-	);
+	let res: Response;
+	try {
+		res = await upstreamFetch(
+			ctx,
+			googleInteractionPath(base, job.upstreamJobId),
+			{
+				method: "GET",
+				headers: { "x-goog-api-key": c.apiKey, ...(c.headers ?? {}) },
+				...(ctx.signal ? { signal: ctx.signal } : {}),
+			},
+		);
+	} catch (err) {
+		throw mapGoogleError(err, ctx);
+	}
+	if (!(res.ok && res.body)) {
+		throw mapGoogleError(
+			{ status: res.status, body: await parseJsonResponse(res) },
+			ctx,
+		);
+	}
+	try {
+		return await parseJsonLifting(res.body, sink);
+	} catch (err) {
+		if (ctx.signal?.aborted) {
+			throw mapGoogleError(err, ctx);
+		}
+		throw new GatewayError({
+			class: "server",
+			message: "Google Interactions response could not be read as JSON",
+			cause: err,
+		});
+	}
 }
 
 async function downloadGoogleInteraction(
@@ -2271,7 +2306,8 @@ async function downloadGoogleInteraction(
 			message: `Google Interactions does not provide ${variant}`,
 		});
 	}
-	const raw = await getGoogleInteraction(job, ctx);
+	const sink = base64LiftedSink();
+	const raw = await getGoogleInteraction(job, ctx, sink);
 	const video = googleInteractionVideo(raw);
 	if (!video?.data) {
 		throw new GatewayError({
@@ -2282,16 +2318,22 @@ async function downloadGoogleInteraction(
 				: "Google interaction does not contain inline video output",
 		});
 	}
-	const bytes = new Uint8Array(Buffer.from(video.data, "base64"));
+	const index = liftedIndex(video.data);
+	const chunks =
+		index === undefined
+			? [new Uint8Array(Buffer.from(video.data, "base64"))]
+			: (sink.bytes(index) ?? []);
 	return {
 		body: new ReadableStream<Uint8Array>({
 			start(controller) {
-				controller.enqueue(bytes);
+				for (const chunk of chunks) {
+					controller.enqueue(chunk);
+				}
 				controller.close();
 			},
 		}),
 		contentType: video.mimeType ?? "video/mp4",
-		contentLength: bytes.byteLength,
+		contentLength: chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0),
 	};
 }
 

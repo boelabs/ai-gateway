@@ -53,7 +53,7 @@ Los adapters exponen la generación de video a través de transports: `videos` (
 
 ### Gemini Omni Flash [#gemini-omni-flash]
 
-`gemini-omni-1.1-flash` utiliza el transport `interactions` de Google. Configura su deployment con `transportOverrides: { "video.generate": "interactions" }`.
+`gemini-omni-1.2-flash` y `gemini-omni-1.1-flash` utilizan el transport `interactions` de Google. Configura su deployment con `transportOverrides: { "video.generate": "interactions" }`.
 
 - La conversión de texto a video puede omitir `task` o configurar `text_to_video`.
 - La interpolación de imagen a vídeo y del primer/último fotograma utiliza referencias de imagen o `frame_images`.
@@ -62,11 +62,11 @@ Los adapters exponen la generación de video a través de transports: `videos` (
   Una referencia de video sin `task` se rechaza. Una edición conserva la duración y la relación de
   aspecto del video fuente: `seconds` se rechaza y la relación de aspecto se ignora.
 
-La integración no utiliza intencionalmente la API de Archivos de Google. Las entradas se materializan como datos en línea validados y la salida completa se recupera en línea directamente en el almacenamiento de objetos AI Gateway sin persistir en Postgres. En consecuencia, el perfil de acciones expone solo 360p y 720p, rechaza `file_id` y limita cada activo de entrada a 20 MB. Los videos subidos para edición/ampliación permanecen sujetos a las restricciones regionales y de 10 segundos de Google.
+La integración no utiliza intencionalmente la API de Archivos de Google. Las entradas se materializan como datos en línea validados y la salida completa se recupera en línea directamente en el almacenamiento de objetos AI Gateway sin persistir en Postgres. El perfil de serie expone 360p, 720p, 1080p y 4K; un video 4K de 15 segundos ocupa decenas de megabytes de base64 en línea, que el gateway transmite al almacenamiento de objetos sin cargar la respuesta completa en memoria. Rechaza `file_id` y limita cada activo de entrada a 20 MB. Los videos subidos para edición/ampliación permanecen sujetos a las restricciones regionales y de 10 segundos de Google.
 
 La continuación con estado tampoco está disponible intencionalmente. `previous_interaction_id` está bloqueado en `extra_body`; Aceptar una identificación de proveedor sin procesar evitaría la propiedad de AI Gateway y las comprobaciones de afinidad de deployment. En su lugar, una futura implementación debería exponer una identificación de video de fuente local.
 
-Omni factura la salida de video por token (`videoOutputCentsPerMTokens`; 360p son 1.931 y 720p son 5.792 tokens por segundo). Una virtual key con límite de tokens o de presupuesto reserva una cota superior al enviar, a partir de la duración y el tamaño solicitados (la mayor duración y el tamaño más denso si se omiten). Cuando el trabajo llega a un estado terminal, la reserva se liquida con el uso que informa Google, o se libera si el trabajo falló. Un trabajo completado sin uso informado cobra la estimación de su duración y tamaño. Eliminar un trabajo que no terminó se liquida igual, salvo que el proveedor confirme la cancelación, que la libera: una generación que el proveedor no detuvo puede facturarse igual. La liquidación queda en el `billing` del trabajo; una interrumpida a mitad la completa el poller de videos a los cinco minutos, y una reserva sin liquidar expira con su lease. Un deployment sin precios sigue cerrando con `budget_pricing_unavailable` las virtual keys con límite de presupuesto.
+Omni factura la salida de video por token (`videoOutputCentsPerMTokens`; por segundo, 360p son 1.931, 720p 5.792, 1080p 8.688 y 4K 17.376 tokens). Una virtual key con límite de tokens o de presupuesto reserva una cota superior al enviar, a partir de la duración y el tamaño solicitados (la mayor duración y el tamaño más denso si se omiten). Cuando el trabajo llega a un estado terminal, la reserva se liquida con el uso que informa Google, o se libera si el trabajo falló. Un trabajo completado sin uso informado cobra la estimación de su duración y tamaño. Eliminar un trabajo que no terminó se liquida igual, salvo que el proveedor confirme la cancelación, que la libera: una generación que el proveedor no detuvo puede facturarse igual. La liquidación queda en el `billing` del trabajo; una interrumpida a mitad la completa el poller de videos a los cinco minutos, y una reserva sin liquidar expira con su lease. Un deployment sin precios sigue cerrando con `budget_pricing_unavailable` las virtual keys con límite de presupuesto.
 
 ## Ciclo de vida [#lifecycle]
 
