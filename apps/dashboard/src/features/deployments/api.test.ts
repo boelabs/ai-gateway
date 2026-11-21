@@ -213,10 +213,7 @@ test("a catalog model's retirement date reads as retiring, then retired on the d
 		"The provider retired this model on Jan 14, 2027.",
 	);
 
-	assert.equal(
-		retirementOf({ id: "gpt-5", operations: [] }, "2027-01-14"),
-		undefined,
-	);
+	assert.equal(retirementOf({ retiresOn: undefined }, "2027-01-14"), undefined);
 	assert.equal(retirementOf(undefined, "2027-01-14"), undefined);
 	// A prerendered shell has no "today": it says nothing rather than guess.
 	assert.equal(retirementOf(model, undefined), undefined);

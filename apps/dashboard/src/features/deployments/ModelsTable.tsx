@@ -12,7 +12,15 @@ import { Frame, FrameFooter } from "#/components/ui/frame";
 import { useState, type ReactNode } from "react";
 import { Button } from "#/components/ui/button";
 import { Status } from "#/components/ui/status";
-import { type AdapterLabels, type Deployment, adapterLabel } from "./common";
+import {
+	type AdapterLabels,
+	type Deployment,
+	adapterLabel,
+	retirementLabel,
+	retirementNotice,
+	retirementOf,
+} from "./common";
+import { useToday } from "#/shared/lib/useToday.ts";
 import Link from "next/link";
 
 import {
@@ -222,12 +230,15 @@ function CellContent({
 			);
 		case "upstreamModel":
 			return (
-				<span
-					className="block truncate font-mono text-xs text-muted-foreground"
-					title={deployment.upstreamModel}
-				>
-					{deployment.upstreamModel}
-				</span>
+				<div className="flex min-w-0 flex-col items-start gap-1">
+					<span
+						className="block max-w-full truncate font-mono text-xs text-muted-foreground"
+						title={deployment.upstreamModel}
+					>
+						{deployment.upstreamModel}
+					</span>
+					<RetirementStatus retiresOn={deployment.retiresOn} />
+				</div>
 			);
 		case "label":
 			return deployment.label ? (
@@ -622,5 +633,26 @@ export function ModelsTable({
 				</div>
 			</Frame>
 		</div>
+	);
+}
+
+/**
+ * "Retired Oct 22, 2026" or "Retires Dec 3, 2026" under a catalog model the provider has scheduled
+ * for retirement. A retired model still routes (the provider may keep serving it), but new
+ * deployments of it are refused.
+ */
+function RetirementStatus({ retiresOn }: { retiresOn: string | undefined }) {
+	const retirement = retirementOf({ retiresOn }, useToday());
+	if (!retirement) {
+		return null;
+	}
+	return (
+		<Status
+			className="relative z-10"
+			title={retirementNotice(retirement)}
+			tone={retirement.state === "retired" ? "danger" : "warning"}
+		>
+			{retirementLabel(retirement)}
+		</Status>
 	);
 }

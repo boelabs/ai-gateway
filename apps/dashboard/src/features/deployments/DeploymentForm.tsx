@@ -3,6 +3,7 @@
 import { ArrowCounterClockwiseIcon as IconReset } from "@phosphor-icons/react/dist/ssr";
 import { CredentialFields } from "#/features/credentials/CredentialFields.tsx";
 import { useIdempotencyKey } from "#/shared/lib/useIdempotencyKey.ts";
+import { useToday } from "#/shared/lib/useToday.ts";
 import { ModelInput } from "#/shared/components/ModelPicker.tsx";
 import { FormSkeleton } from "#/shared/components/Skeleton.tsx";
 import { useNotify } from "#/shared/feedback/notifications.tsx";
@@ -46,13 +47,7 @@ import {
 	parseObject,
 } from "./custom-model";
 
-import {
-	useSyncExternalStore,
-	useTransition,
-	useState,
-	useMemo,
-	useRef,
-} from "react";
+import { useTransition, useState, useMemo, useRef } from "react";
 
 const LIST = "/models";
 
@@ -552,18 +547,4 @@ function CatalogStatus({
 		);
 	}
 	return model?.deprecated ? <Status tone="warning">Deprecated</Status> : null;
-}
-
-const noSubscription = () => () => undefined;
-
-/**
- * Today's date in UTC, read in the browser only. The form's shell is prerendered, and a date read
- * there would be frozen into it; on the server this is `undefined` and retirements wait for hydration.
- */
-function useToday(): string | undefined {
-	return useSyncExternalStore(
-		noSubscription,
-		() => new Date().toISOString().slice(0, 10),
-		() => undefined,
-	);
 }

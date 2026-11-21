@@ -2,6 +2,7 @@ import { ADAPTER_KEY_PATTERN, ADAPTER_KEY_RULE } from "#adapters/key.ts";
 import { getAdapter, listAdapters } from "#adapters/registry.ts";
 import type { RuntimeModelMetadata } from "#db/schema.ts";
 import type { CatalogEntry } from "#catalog/types.ts";
+import { getCatalogEntry } from "#catalog/index.ts";
 import { pageParams, uuidParam } from "./params.ts";
 import { MODEL_CATALOG } from "#adapters/index.ts";
 import { GatewayError } from "#core/errors.ts";
@@ -71,6 +72,15 @@ const credentialsPatchSchema = z
 		message: "credentials patch must include at least one field",
 	});
 
+/** The catalog's retirement day for a catalog model, so a list can flag it without the catalog. */
+function retiresOnField(row: DeploymentRow): { retiresOn?: string } {
+	if (row.catalogEntry != null) {
+		return {};
+	}
+	const on = getCatalogEntry(row.adapterKey, row.upstreamModel)?.retiresOn;
+	return on ? { retiresOn: on } : {};
+}
+
 /** Strips the encrypted credentials before returning a deployment. */
 function deploymentView(row: DeploymentRow) {
 	return {
@@ -83,6 +93,7 @@ function deploymentView(row: DeploymentRow) {
 		metadata: row.metadata,
 		custom: row.catalogEntry != null,
 		catalogEntry: row.catalogEntry,
+		...retiresOnField(row),
 		pricing: row.pricing,
 		transportOverrides: row.transportOverrides,
 		executionPolicyOverrides: row.executionPolicyOverrides,

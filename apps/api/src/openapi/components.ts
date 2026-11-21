@@ -1429,6 +1429,10 @@ export const Deployment = z
 		/** True when the deployment carries its own inline catalog entry. */
 		custom: z.boolean(),
 		catalogEntry: z.union([CatalogEntry, z.null()]),
+		retiresOn: z.iso.date().optional().meta({
+			description:
+				'For a catalog model the provider has scheduled for retirement: the first day it no longer serves it (UTC). Past that day the admin API refuses new deployments of the model, and a provider\'s "model not found" is answered as `model_retired`; routing still tries the deployment.',
+		}),
 		pricing: z.union([Pricing, z.null()]),
 		transportOverrides: TransportOverrides,
 		executionPolicyOverrides: ExecutionPolicyOverrides,
@@ -1978,7 +1982,7 @@ export const AdapterSummary = z
 					deprecated: z.literal(true).optional(),
 					retiresOn: z.iso.date().optional().meta({
 						description:
-							"The day the provider stops serving the model (UTC), as it announced. Information only: routing ignores it.",
+							"The day the provider stops serving the model (UTC), as it announced. Routing ignores it; from that day the admin API refuses new deployments of the model.",
 					}),
 				}),
 			)

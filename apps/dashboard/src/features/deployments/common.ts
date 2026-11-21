@@ -71,7 +71,7 @@ export type Retirement =
  * (a prerendered shell has no "today") there is nothing to say yet.
  */
 export function retirementOf(
-	model: CatalogModel | undefined,
+	model: Pick<CatalogModel, "retiresOn"> | undefined,
 	today: string | undefined,
 ): Retirement | undefined {
 	const on = model?.retiresOn;

@@ -190,7 +190,9 @@ When the pool fails, the caller receives what the provider would have said: the 
 answer's status and public message. Routing detail (attempts, reasons, cooldown causes) stays in the
 operation log. If every deployment circuit is open, the gateway returns `503 model_overloaded` with
 an accurate `Retry-After` header (`503 model_unavailable`, without one, when every circuit was opened
-by misconfiguration). If shared capacity is the blocker, it returns `429 rate_limit_exceeded`. The authenticated `GET /v1/models/{model}/deployments` view reports each
+by misconfiguration, and `404 model_retired` when every one was opened because the provider retired
+the model past its catalog `retiresOn`). Routing never skips a deployment for its retirement date
+alone: a provider may keep serving the model, or answer the old id with its replacement. If shared capacity is the blocker, it returns `429 rate_limit_exceeded`. The authenticated `GET /v1/models/{model}/deployments` view reports each
 deployment as `available`, `cooldown`, `half_open`, or `rate_limited`, plus `retry_after_ms`.
 
 ## Fallbacks

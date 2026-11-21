@@ -4467,7 +4467,7 @@ export interface components {
                 deprecated?: true;
                 /**
                  * Format: date
-                 * @description The day the provider stops serving the model (UTC), as it announced. Information only: routing ignores it.
+                 * @description The day the provider stops serving the model (UTC), as it announced. Routing ignores it; from that day the admin API refuses new deployments of the model.
                  */
                 retiresOn?: string;
             }[];
@@ -4512,6 +4512,11 @@ export interface components {
             };
             custom: boolean;
             catalogEntry: components["schemas"]["CatalogEntry"] | null;
+            /**
+             * Format: date
+             * @description For a catalog model the provider has scheduled for retirement: the first day it no longer serves it (UTC). Past that day the admin API refuses new deployments of the model, and a provider's "model not found" is answered as `model_retired`; routing still tries the deployment.
+             */
+            retiresOn?: string;
             pricing: components["schemas"]["Pricing"] | null;
             transportOverrides: components["schemas"]["TransportOverrides"];
             executionPolicyOverrides: components["schemas"]["ExecutionPolicyOverridesOutput"];

@@ -333,6 +333,7 @@ function safeCause(cause: CooldownCause): string {
 	}
 	return JSON.stringify({
 		class: cause.class,
+		...(cause.code === undefined ? {} : { code: cause.code }),
 		message: `Upstream ${cause.class} failure`,
 		...(cause.status === undefined ? {} : { status: cause.status }),
 		fingerprint: hash.digest("hex").slice(0, 24),

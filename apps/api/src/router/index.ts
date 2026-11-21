@@ -2,6 +2,7 @@ import type { UpstreamTransport } from "#core/transport.ts";
 import { getEffectiveSettings, type EffectiveSettings } from "./settings.ts";
 import type { AdapterContext, AdapterDiagnostics } from "#adapters/types.ts";
 import { buildRoutingError, type FailReason } from "./routingError.ts";
+import { explainRetiredModel, MODEL_RETIRED } from "#catalog/retirement.ts";
 import type { CanonicalTerminal } from "#gateway/streamLifecycle.ts";
 import { listFallbackPoliciesFor } from "#db/repos/deployments.ts";
 import { startAttemptWatchdog } from "#gateway/attemptWatchdog.ts";
@@ -1274,16 +1275,20 @@ export async function route<T>(
 						cancelled.attempts = attemptLog;
 						throw cancelled;
 					}
-					const ge = GatewayError.is(err)
-						? err
-						: new GatewayError({
-								class: "server",
-								message: String(err),
-								failureKind: "gateway",
-								deploymentHealth: "neutral",
-								retryable: false,
-								cause: err,
-							});
+					// A provider that no longer knows a retired model is told apart from a wrong model id.
+					const ge = explainRetiredModel(
+						GatewayError.is(err)
+							? err
+							: new GatewayError({
+									class: "server",
+									message: String(err),
+									failureKind: "gateway",
+									deploymentHealth: "neutral",
+									retryable: false,
+									cause: err,
+								}),
+						chosen.row,
+					);
 					finishUpstreamAttemptTelemetry(attemptTelemetry, {
 						endedAt: Date.now(),
 						outcome: "error",
@@ -1303,6 +1308,7 @@ export async function route<T>(
 					}
 					const cause: CooldownCause = {
 						class: ge.class,
+						...(ge.code === MODEL_RETIRED ? { code: MODEL_RETIRED } : {}),
 						message: ge.message,
 						...(ge.provider?.status === undefined
 							? {}

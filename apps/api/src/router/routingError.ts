@@ -71,6 +71,21 @@ export function buildRoutingError(p: {
 
 	if (p.reason === "cooldown") {
 		const causes = [...p.cooldownCauses.values()];
+		// Every deployment is held down because its provider retired the model: say so, as the
+		// attempt that opened the circuit did.
+		if (
+			causes.length > 0 &&
+			causes.every((item) => item.code === "model_retired")
+		) {
+			return new GatewayError({
+				class: "not_found",
+				status: 404,
+				message: internal,
+				publicMessage: `The provider retired the model behind \`${p.publicModel}\`.`,
+				code: "model_retired",
+				...cooldownProvider,
+			});
+		}
 		const misconfigured =
 			causes.length > 0 &&
 			causes.every((item) => CONFIGURATION_CLASSES.has(item.class));
