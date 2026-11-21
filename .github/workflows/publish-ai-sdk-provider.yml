@@ -1,0 +1,85 @@
+# Publishes @boelabs/ai-sdk-provider to npm.
+#
+# Push a tag `@boelabs/ai-sdk-provider@<version>` on a commit of main; the tag is the version, and
+# package.json stays at 0.0.0 in the repository. A prerelease (`1.2.0-beta.1`) goes out under the
+# `beta` dist-tag, a stable version under `latest`. The tag does not match release.yml's `v*`, so it
+# never publishes images or deploys.
+#
+# npm trusted publishing: the package's npm settings must trust this repository and this workflow
+# file. No token is stored; the job's OIDC identity publishes, with provenance. npm offers trusted
+# publishing only on a package that exists, so the very first version is published by hand.
+name: Publish AI SDK provider
+
+on:
+  push:
+    tags: ["@boelabs/ai-sdk-provider@*"]
+
+permissions:
+  contents: read
+  # OIDC for npm trusted publishing and provenance.
+  id-token: write
+
+concurrency:
+  group: publish-ai-sdk-provider-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require a semver tag on main
+        id: version
+        run: |
+          version="${TAG#@boelabs/ai-sdk-provider@}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$TAG' is not @boelabs/ai-sdk-provider@<semver>."
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::The tagged commit is not on main."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then echo "npm_tag=beta"; else echo "npm_tag=latest"; fi >> "$GITHUB_OUTPUT"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.x"
+
+      # No dependency cache: a poisoned cache must not reach what is published.
+      - name: Install (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck, test and build
+        working-directory: packages/ai-sdk-provider
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          npm pkg set "version=$VERSION"
+          bun run typecheck
+          bun run test
+          bun run build
+
+      - name: Publish
+        working-directory: packages/ai-sdk-provider
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          NPM_TAG: ${{ steps.version.outputs.npm_tag }}
+        run: |
+          if npm view "@boelabs/ai-sdk-provider@$VERSION" version > /dev/null 2>&1; then
+            echo "::notice::@boelabs/ai-sdk-provider@$VERSION is already on npm."
+            exit 0
+          fi
+          # Trusted publishing needs npm 11.5.1 or later.
+          npx --yes npm@11.21.3 publish --access public --provenance --tag "$NPM_TAG"

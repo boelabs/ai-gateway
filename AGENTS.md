@@ -60,6 +60,12 @@ does not currently have.
 - `docs/` — the documentation, MDX in English and Spanish. No site of its own: the gateway serves it
   as `GET /docs/export.json` and boelabs.com renders it (see [Documentation](#documentation)).
 - `packages/tsconfig` — shared strict TypeScript config (`@boelabs/tsconfig`).
+- `packages/ai-sdk-provider` — the AI SDK provider for the gateway, **published to npm** as
+  `@boelabs/ai-sdk-provider` (the only public package). It speaks the gateway's public wire, so a
+  change to a public contract (request fields, response or stream shape) is checked against it, and
+  its tests and [its page](docs/(docs)/(get-started)/ai-sdk.mdx) are updated in the same change.
+  It is released apart from the images: a `@boelabs/ai-sdk-provider@<version>` tag on main runs
+  [`publish-ai-sdk-provider.yml`](.github/workflows/publish-ai-sdk-provider.yml).
 - `docker/` — every Compose file and the stack's `.env.example`, with [its own README](docker/README.md).
 
 ## 3. Commands

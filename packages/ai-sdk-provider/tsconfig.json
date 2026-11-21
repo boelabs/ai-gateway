@@ -1,0 +1,8 @@
+{
+	"extends": "@boelabs/tsconfig/base.json",
+	"compilerOptions": {
+		"lib": ["ESNext", "DOM"],
+		"types": ["bun-types"]
+	},
+	"include": ["src", "tsdown.config.ts"]
+}
