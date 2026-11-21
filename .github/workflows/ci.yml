@@ -130,6 +130,10 @@ jobs:
       - name: Unit tests (turbo)
         run: bun run test
 
+      - name: Build the AI SDK provider package
+        # What npm would receive; a broken build fails here, not on the release tag.
+        run: bun run --filter @boelabs/ai-sdk-provider build
+
       - name: Audit dependencies (high and critical)
         # Bun can emit the registry's gzip body verbatim; the wrapper decodes JSON and keeps
         # the same high-severity threshold while failing closed on malformed/network responses.

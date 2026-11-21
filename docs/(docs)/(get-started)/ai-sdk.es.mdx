@@ -1,0 +1,348 @@
+---
+title: "Proveedor para AI SDK"
+description: "Usa el gateway desde el AI SDK de Vercel con @boelabs/ai-sdk-provider: texto, tools, imágenes, audio, embeddings, reranking y video."
+---
+
+`@boelabs/ai-sdk-provider` conecta el [AI SDK](https://ai-sdk.dev) con AI Gateway. Un solo proveedor cubre todas las superficies del gateway: texto con Responses o Chat Completions, embeddings, imágenes, transcripción, voz, reranking y video, además del catálogo de modelos.
+
+Los proveedores genéricos deciden qué enviar según el nombre del modelo. Un modelo del gateway es un nombre público que eligió el operador (`general`, `fast`), así que `@ai-sdk/openai` descarta `reasoning` sin avisar, y `@ai-sdk/openai-compatible` no tiene Responses API y pierde el estado de reasoning que devuelve el gateway. Este proveedor envía cada ajuste tal como lo pides y deja que decida la [política de parámetros](/docs/parameter-policy) del gateway, y además devuelve el estado del proveedor descrito en [Campos específicos del proveedor](/docs/provider-specific-fields).
+
+## Instalación [#install]
+
+El proveedor implementa la especificación de proveedores de AI SDK 7 (`v4`) y necesita Node.js 22 o superior, Bun u otro runtime con `fetch`.
+
+```bash
+npm install @boelabs/ai-sdk-provider ai
+```
+
+## Configuración [#configure]
+
+Define el origen del gateway y una virtual key, y luego importa el proveedor por defecto:
+
+```bash
+export BOELABS_AI_GATEWAY_URL="https://ai.example.com"
+export BOELABS_AI_GATEWAY_API_KEY="your-virtual-key"
+```
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+import { generateText } from "ai";
+
+const { text } = await generateText({
+  model: boelabsGateway("general"),
+  prompt: "Summarize the release notes in three bullets.",
+});
+```
+
+O crea una instancia con ajustes explícitos:
+
+```ts
+import { createBoelabsGateway } from "@boelabs/ai-sdk-provider";
+
+const gateway = createBoelabsGateway({
+  baseURL: "https://ai.example.com",
+  apiKey: process.env.GATEWAY_KEY,
+  textApi: "responses",
+  headers: { "x-team": "growth" },
+});
+```
+
+| Ajuste | Por defecto | Notas |
+|---|---|---|
+| `baseURL` | `BOELABS_AI_GATEWAY_URL` | Origen del gateway. Se añade `/v1` salvo que la URL ya termine así. |
+| `apiKey` | `BOELABS_AI_GATEWAY_API_KEY` | Se envía como `Authorization: Bearer`. El descubrimiento de modelos funciona sin ella. |
+| `textApi` | `responses` | Superficie detrás de `gateway(modelId)`: `responses` o `chat`. |
+| `headers` | ninguno | Headers que acompañan cada solicitud. |
+| `name` | `boelabsGateway` | Prefijo de `model.provider` y clave de `providerMetadata`. |
+| `fetch` | `fetch` global | Fetch propio para proxies, pruebas o logging. |
+
+Los ids de modelo son los nombres públicos del gateway. Añade un [modo de servicio](/docs/service-modes) al nombre (`gpt-6.1-sol:flex`) o usa `serviceMode` en las opciones de abajo.
+
+## Generación de texto [#text-generation]
+
+`gateway(modelId)` y `gateway.languageModel(modelId)` usan la Responses API por defecto. `gateway.responses(modelId)` y `gateway.chat(modelId)` eligen la superficie directamente.
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+import { streamText } from "ai";
+
+const result = streamText({
+  model: boelabsGateway("general"),
+  system: "You are a precise assistant.",
+  prompt: "Why is the sky blue?",
+  reasoning: "high",
+  temperature: 0.3,
+});
+
+for await (const delta of result.textStream) {
+  process.stdout.write(delta);
+}
+console.log(await result.reasoningText);
+```
+
+El ajuste `reasoning` del AI SDK se traduce a la escala del gateway, de `none` a `max`; el gateway lo ajusta a lo que admite el modelo servido, como explica [Reasoning](/docs/reasoning). Si lo omites, aplica el comportamiento por defecto del gateway, que no razona en los modelos que pueden desactivar el reasoning.
+
+Elige la superficie según lo que necesites:
+
+| Función | Responses | Chat Completions |
+|---|---|---|
+| `stopSequences`, `seed`, `topK` | No (aviso) | Sí |
+| Reasoning cifrado, thinking firmado y firmas de Gemini entre turnos | Sí, como output items | Sí, mediante `provider_specific_fields` |
+| Imágenes y archivos dentro de resultados de tools | Sí | Solo texto |
+| `previousResponseId`, `store` | Sí | Solo `store` |
+
+### Opciones del proveedor [#provider-options]
+
+Pasa las opciones del gateway en `providerOptions.boelabsGateway`:
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+import { generateText } from "ai";
+
+const result = await generateText({
+  model: boelabsGateway("general"),
+  prompt: "Draft the reply.",
+  providerOptions: {
+    boelabsGateway: {
+      reasoningEffort: "medium",
+      reasoningSummary: "detailed",
+      promptCacheKey: "tenant-42:support-v3",
+      serviceMode: "flex",
+      routingMetadata: true,
+      metadata: { tenant: "42" },
+    },
+  },
+});
+
+console.log(result.providerMetadata?.boelabsGateway?.routing);
+```
+
+| Opción | Superficies | Efecto |
+|---|---|---|
+| `reasoningEffort` | ambas | Esfuerzo de `none` a `max`; tiene prioridad sobre `reasoning`. |
+| `reasoningSummary` | Responses | `auto`, `concise`, `detailed` o `none`. |
+| `strictJsonSchema` | ambas | Envía `strict: true` con JSON schemas y function tools. |
+| `parallelToolCalls` | ambas | Permite varias llamadas a tools en un paso. |
+| `store` | ambas | Guarda la respuesta en el gateway. |
+| `previousResponseId` | Responses | Continúa una respuesta guardada; envía solo los mensajes nuevos. |
+| `instructions` | Responses | Se envía como `instructions` en lugar de un mensaje de sistema. |
+| `include` | Responses | Valores extra de `include`; el reasoning cifrado siempre se solicita. |
+| `promptCacheKey`, `promptCacheRetention`, `promptCacheOptions` | ambas | Prompt caching del proveedor; consulta [Prompt caching del proveedor](/docs/provider-prompt-caching). |
+| `logprobs` | ambas | `true` o un número de alternativas; vuelven en `providerMetadata`. |
+| `textVerbosity` | ambas | `low`, `medium` o `high`. |
+| `serviceTier`, `safetyIdentifier`, `user`, `metadata` | ambas | Se envían tal cual. |
+| `truncation`, `contextManagement` | Responses | Se envían tal cual. |
+| `logitBias`, `prediction` | Chat | Se envían tal cual. |
+| `systemMessageMode` | ambas | Envía los mensajes de sistema como `system` (por defecto) o `developer`. |
+
+En Responses, `textVerbosity`, `truncation`, `contextManagement`, un `logprobs` numérico y un `serviceTier` distinto de `auto` o `default` solo existen en deployments nativos de OpenAI, así que el gateway enruta esas solicitudes hacia ellos.
+
+Marca un punto de corte de caché en una parte del contenido:
+
+```ts
+const messages = [
+  {
+    role: "user" as const,
+    content: [
+      {
+        type: "text" as const,
+        text: stableManual,
+        providerOptions: { boelabsGateway: { promptCacheBreakpoint: true } },
+      },
+      { type: "text" as const, text: question },
+    ],
+  },
+];
+```
+
+### Opciones del gateway [#gateway-options]
+
+Estas opciones existen en todos los tipos de modelo:
+
+| Opción | Header o campo | Efecto |
+|---|---|---|
+| `cache` | `x-unified-cache` | `true`, o `{ ttl }` en segundos, activa la [caché de respuestas](/docs/caching). |
+| `routingMetadata` | `x-unified-routing-metadata` | Añade el reporte de enrutamiento en `providerMetadata.boelabsGateway.routing`. |
+| `requestId` | `x-request-id` | Tu propio id de solicitud, que el gateway devuelve. |
+| `serviceMode` | `model:mode` | `fast`, `flex` o `priority`. |
+| `extraBody` | `extra_body` | Campos específicos del proveedor que se fusionan en el body upstream. |
+
+Todo resultado incluye `providerMetadata.boelabsGateway.requestId`. Los resultados de texto incluyen además `responseId`, `serviceTier` y, en Responses, `reasoningEffort`, el esfuerzo con el que se ejecutó el modelo servido.
+
+## Tools [#tools]
+
+Las function tools funcionan como en cualquier proveedor del AI SDK. `strict` en una tool, o `strictJsonSchema`, le pide al gateway un deployment que garantice el schema.
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+import { generateText, stepCountIs, tool } from "ai";
+import { z } from "zod";
+
+const { text } = await generateText({
+  model: boelabsGateway("general"),
+  prompt: "What should I wear in Paris today?",
+  tools: {
+    weather: tool({
+      description: "Current weather for a city",
+      inputSchema: z.object({ city: z.string() }),
+      execute: async ({ city }) => ({ city, forecast: "sunny", celsius: 21 }),
+    }),
+  },
+  stopWhen: stepCountIs(5),
+});
+```
+
+Solo las function tools llegan al gateway. Las tools que ejecuta un proveedor, como la búsqueda web o la búsqueda en archivos de OpenAI, atarían el modelo a los deployments de ese proveedor, así que el proveedor las omite con un aviso.
+
+## Salida estructurada [#structured-output]
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+import { generateText, Output } from "ai";
+import { z } from "zod";
+
+const { output } = await generateText({
+  model: boelabsGateway("general"),
+  prompt: "Extract the invoice fields.",
+  output: Output.object({
+    schema: z.object({ number: z.string(), total: z.number() }),
+  }),
+  providerOptions: { boelabsGateway: { strictJsonSchema: true } },
+});
+```
+
+Sin schema, la solicitud usa el modo JSON, que algunos proveedores no ofrecen; consulta [Chat completions](/docs/chat-completions#structured-outputs).
+
+## Conversaciones y estado del proveedor [#conversations-and-provider-state]
+
+Devuelve los mensajes que entrega el AI SDK (`response.messages`) y el estado del proveedor viaja con ellos: los reasoning items conservan sus ids y su contenido cifrado, los mensajes del asistente conservan sus ids, y los ids de las llamadas a tools conservan su sufijo con la firma de Gemini. Así, cualquier proveedor del pool puede atender el siguiente turno. En Chat Completions el mismo estado viaja en `provider_specific_fields`, que los clientes estándar descartan y este proveedor devuelve.
+
+## Embeddings [#embeddings]
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+import { embedMany } from "ai";
+
+const { embeddings, usage } = await embedMany({
+  model: boelabsGateway.embedding("embed"),
+  values: ["red fox", "blue whale"],
+  providerOptions: { boelabsGateway: { cache: true } },
+});
+```
+
+El ajuste `dimensions` del AI SDK se envía como `dimensions` en los modelos que pueden acortar los vectores.
+
+## Imágenes [#images]
+
+`generateImage` llama a `/v1/images/generations`; con imágenes de entrada llama a `/v1/images/edits`.
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+import { generateImage } from "ai";
+
+const { image } = await generateImage({
+  model: boelabsGateway.image("image-default"),
+  prompt: "A red fox in fresh snow, morning light",
+  size: "1024x1024",
+  providerOptions: { boelabsGateway: { quality: "high", outputFormat: "webp" } },
+});
+```
+
+Opciones de imagen: `quality` (la escala del gateway), `background`, `outputFormat`, `outputCompression`, `moderation`, `inputFidelity`, `style` y `user`. Las imágenes usan `size`; `aspectRatio` y `seed` generan un aviso.
+
+## Transcripción [#transcription]
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+import { experimental_transcribe as transcribe } from "ai";
+import { readFile } from "node:fs/promises";
+
+const transcript = await transcribe({
+  model: boelabsGateway.transcription("transcribe"),
+  audio: await readFile("meeting.mp3"),
+  timestampGranularities: ["word", "segment"],
+  providerOptions: {
+    boelabsGateway: { keywords: ["AI Gateway"], languages: ["es", "en"] },
+  },
+});
+```
+
+Opciones: `language` o `languages`, `keywords`, `prompt`, `temperature`, `responseFormat` (`json`, `verbose_json` o `diarized_json`), `include` y `transcriptionMode`. Pedir marcas de tiempo cambia el formato a `verbose_json`. Los turnos por hablante de `diarized_json` están en `providerMetadata.boelabsGateway.speakerSegments`.
+
+## Voz [#speech]
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+import { generateSpeech } from "ai";
+
+const { audio } = await generateSpeech({
+  model: boelabsGateway.speech("speech"),
+  text: "Have a wonderful day!",
+  voice: "Kore",
+  instructions: "cheerful and friendly",
+  outputFormat: "wav",
+});
+```
+
+`outputFormat` es uno de `mp3`, `opus`, `aac`, `flac`, `wav` o `pcm`; el gateway no transcodifica. Pasa una voz personalizada como `voiceId`.
+
+## Reranking [#reranking]
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+import { rerank } from "ai";
+
+const { ranking } = await rerank({
+  model: boelabsGateway.reranking("search-reranker"),
+  query: "What is the capital of France?",
+  documents: ["Berlin is in Germany.", "Paris is the capital of France."],
+  topN: 1,
+});
+```
+
+`provider` envía las preferencias de enrutamiento de OpenRouter. Los documentos de tipo objeto se envían como texto JSON.
+
+## Video [#video]
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+import { experimental_generateVideo as generateVideo } from "ai";
+
+const { video } = await generateVideo({
+  model: boelabsGateway.video("video-default"),
+  prompt: "A serene mountain landscape at sunset",
+  aspectRatio: "16:9",
+  duration: 8,
+  providerOptions: { boelabsGateway: { resolution: "720p" } },
+});
+```
+
+El AI SDK envía el trabajo y consulta su estado; el proveedor descarga los bytes terminados con tu key, porque la URL del contenido no es pública. `image`, `frameImages` e `inputReferences` se convierten en las referencias y frames del gateway. Opciones: `task`, `resolution`, `quality` y `user`. Un `resolution` del AI SDK (`1280x720`) se envía como un `size` exacto en lugar de `aspectRatio` y un nivel de resolución. Un video por trabajo: `n` mayor que 1 y `fps` generan avisos.
+
+## Catálogo de modelos [#model-catalog]
+
+```ts
+import { boelabsGateway } from "@boelabs/ai-sdk-provider";
+
+const videoModels = await boelabsGateway.models.list({ operation: "video.generate" });
+const general = await boelabsGateway.models.get("general");
+console.log(general.text_capabilities?.reasoning_efforts);
+
+const deployments = await boelabsGateway.models.deployments("general");
+```
+
+`list` y `get` son públicos y funcionan sin key. Su forma es la descrita en [Descubrimiento de modelos](/docs/models-discovery).
+
+## No soportado [#not-supported]
+
+- Tools que ejecuta el proveedor (búsqueda web, búsqueda en archivos, intérprete de código, generación de imágenes).
+- Voz en tiempo real, sesiones live, decisions y `/v1/messages`: el proveedor no los cubre.
+- Transcripción y voz en streaming.
+- Imágenes parciales durante la generación y el modo WebSocket de Responses.
+- AI SDK 6 y versiones anteriores.
+
+## Siguientes pasos [#next-steps]
+
+- [Chat completions](/docs/chat-completions) y [Responses](/docs/responses): los dos wires detrás de los modelos de texto.
+- [Política de parámetros](/docs/parameter-policy): qué pasa con un ajuste que un deployment no admite.
+- [Virtual keys](/docs/virtual-keys): emite la key que usa tu aplicación.

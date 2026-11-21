@@ -4,6 +4,7 @@
 	"pages": [
 		"quickstart",
 		"first-deployment",
+		"ai-sdk",
 		"concepts",
 		"setup",
 		"architecture"

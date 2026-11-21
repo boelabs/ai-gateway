@@ -86,7 +86,11 @@ apps/api      the AI Gateway service (@boelabs/ai-gateway-api)
 apps/dashboard    optional operator dashboard (@boelabs/dashboard, Next.js App Router)
 docs              documentation (MDX), served by the gateway for boelabs.com
 packages/tsconfig shared strict TypeScript config (@boelabs/tsconfig)
+packages/ai-sdk-provider  AI SDK provider for the gateway, published to npm (@boelabs/ai-sdk-provider)
 ```
+
+From TypeScript, connect through the AI SDK with
+[`@boelabs/ai-sdk-provider`](docs/(docs)/(get-started)/ai-sdk.mdx).
 
 ## Quickstart
 
