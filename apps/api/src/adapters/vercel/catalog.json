@@ -7549,8 +7549,8 @@
 						"reasoning": true,
 						"structuredOutputs": false
 					},
-					"maxInputTokens": 196608,
-					"maxOutputTokens": 196608,
+					"maxInputTokens": 204800,
+					"maxOutputTokens": 131072,
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -7573,9 +7573,9 @@
 				}
 			},
 			"pricing": {
-				"inputCentsPerMTokens": 21,
-				"outputCentsPerMTokens": 84,
-				"cacheReadCentsPerMTokens": 4.2
+				"inputCentsPerMTokens": 30,
+				"outputCentsPerMTokens": 120,
+				"cacheReadCentsPerMTokens": 6
 			}
 		},
 		"minimax/minimax-m3": {
