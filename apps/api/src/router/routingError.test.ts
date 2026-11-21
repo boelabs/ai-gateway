@@ -133,3 +133,30 @@ test("no upstream reached at all reads as an unavailable model", () => {
 	assert.equal(error.httpStatus, 503);
 	assert.equal(error.code, "model_unavailable");
 });
+
+test("a pool held down only by retired models says so", () => {
+	const retired = (id: string): [string, CooldownCause] => [
+		`deployment:${id}`,
+		{
+			class: "not_found",
+			code: "model_retired",
+			message: "Upstream not_found failure",
+		},
+	];
+	const error = buildRoutingError({
+		...base(),
+		reason: "cooldown",
+		cooldownCauses: new Map([retired("a"), retired("b")]),
+	});
+	assert.equal(error.httpStatus, 404);
+	assert.equal(error.code, "model_retired");
+	assert.match(error.publicMessage, /retired the model behind `blink-0826`/u);
+
+	// One deployment merely misconfigured keeps the generic answer: it is the operator's to fix.
+	const mixed = buildRoutingError({
+		...base(),
+		reason: "cooldown",
+		cooldownCauses: new Map([retired("a"), ...causes(["b", "auth"])]),
+	});
+	assert.equal(mixed.code, "model_unavailable");
+});

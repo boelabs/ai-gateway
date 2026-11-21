@@ -145,7 +145,7 @@ Además de `operations` y `pricing`, cada entrada en `models` acepta:
 | Campo | Propósito |
 |---|---|
 | `deprecated` | Marca un modelo como no recomendado; informativo, nunca cambia el comportamiento. |
-| `retiresOn` | El día (`YYYY-MM-DD`, UTC) en que el proveedor deja de servir el modelo, según lo anunció. Requiere `deprecated`; el dashboard lo muestra al elegir un modelo y el ruteo lo ignora. |
+| `retiresOn` | El día (`YYYY-MM-DD`, UTC) en que el proveedor deja de servir el modelo, según lo anunció. Requiere `deprecated`. El dashboard lo muestra al elegir un modelo y en la lista de modelos. El ruteo lo ignora, porque un proveedor puede seguir sirviendo un modelo después de esa fecha. Desde ese día la admin API rechaza deployments nuevos del modelo (`400 model_retired`), y un "modelo no encontrado" del proveedor se responde como `404 model_retired`. |
 | `notes` | Notas humanas de formato libre (por ejemplo, por qué un modelo está obsoleto). |
 | `needsHumanReview` | Rutas de puntos redactadas automáticamente por la sincronización del catálogo; `catalog:validate` falla cuando no está vacío. |
 

@@ -36,8 +36,9 @@ export interface CatalogEntry {
 	deprecated?: boolean;
 	/**
 	 * The day the provider stops serving the model (`YYYY-MM-DD`, UTC), as the provider announced it.
-	 * Information for operators only: routing ignores it, because a provider may keep a model up past
-	 * its date and a dead one fails on its own. Only a deprecated model has one.
+	 * Routing ignores it, because a provider may keep a model up past its date and a dead one fails on
+	 * its own; from that day new deployments of the model are refused and a provider's "model not
+	 * found" is answered as `model_retired` (`catalog/retirement.ts`). Only a deprecated model has one.
 	 */
 	retiresOn?: string;
 	/**

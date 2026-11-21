@@ -1,4 +1,5 @@
 import { resolveModelMetadata, getCatalogEntry } from "#catalog/index.ts";
+import { retiredModelRefusal } from "#catalog/retirement.ts";
 import type { ExecutionPolicyOverrides } from "#core/executionPolicy.ts";
 import { invalidatePublicModelGroups } from "#catalog/publicModels.ts";
 import { validateRequiredCredentials } from "#credentials/validate.ts";
@@ -301,6 +302,13 @@ export async function createDeployment(
 	input: CreateDeploymentInput,
 ): Promise<{ row: DeploymentRow; preview: DeploymentPreview }> {
 	const preview = await previewDeployment(input);
+	const retired =
+		preview.source === "catalog"
+			? retiredModelRefusal(input.adapterKey, input.upstreamModel)
+			: undefined;
+	if (retired) {
+		throw retired;
+	}
 	const adapter = getAdapter(input.adapterKey);
 	if (!adapter) {
 		throw new GatewayError({
@@ -364,6 +372,16 @@ export async function updateDeployment(
 		...pricingField(patch.pricing, existing.pricing),
 	};
 	const preview = await previewDeployment(input);
+	// A deployment already on a retired model can still be edited, disabled or deleted; it cannot be
+	// moved onto one.
+	const retired =
+		preview.source === "catalog" &&
+		input.upstreamModel !== existing.upstreamModel
+			? retiredModelRefusal(input.adapterKey, input.upstreamModel)
+			: undefined;
+	if (retired) {
+		throw retired;
+	}
 	const adapter = getAdapter(input.adapterKey);
 	if (!adapter) {
 		throw new GatewayError({

@@ -49,6 +49,8 @@ export interface SuccessTelemetry {
 /** Detail of the error that put a deployment into cooldown. Raw provider data is never persisted. */
 export interface CooldownCause {
 	class: string;
+	/** Set only for a cause the caller can be told about: `model_retired`. */
+	code?: string;
 	message: string;
 	status?: number;
 	/** Stable correlation value for the original message/body, without retaining either one. */
