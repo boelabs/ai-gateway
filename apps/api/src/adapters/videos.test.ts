@@ -687,6 +687,54 @@ test("google interactions polls and downloads inline output without persisting i
 	assert.equal(requests, 2);
 });
 
+test("google interactions streams a large inline video without keeping it in the polled job", async () => {
+	// Larger than the lift threshold, as a 1080p or 4K output is.
+	const video = Buffer.alloc(1_200_000);
+	for (let i = 0; i < video.length; i += 1) {
+		video[i] = (i * 31) % 251;
+	}
+	await withStubbedFetch(
+		() =>
+			jsonResponse({
+				id: "interaction-5",
+				status: "completed",
+				steps: [
+					{
+						type: "model_output",
+						content: [
+							{
+								type: "video",
+								mime_type: "video/mp4",
+								data: video.toString("base64"),
+							},
+						],
+					},
+				],
+			}),
+		async () => {
+			const interactionContext = {
+				...ctx("interactions"),
+				upstreamModel: "gemini-omni-1.2-flash",
+			};
+			const job = await must(googleAdapter, "videoGeneration").refresh(
+				{ upstreamJobId: "interaction-5" },
+				interactionContext,
+			);
+			assert.equal(job.status, "completed");
+			assert.deepEqual(job.providerState, { videoMimeType: "video/mp4" });
+
+			const content = await must(googleAdapter, "videoGeneration").download(
+				{ upstreamJobId: "interaction-5", providerState: job.providerState },
+				"video",
+				interactionContext,
+			);
+			assert.equal(content.contentLength, video.length);
+			const bytes = Buffer.from(await new Response(content.body).arrayBuffer());
+			assert.ok(bytes.equals(video));
+		},
+	);
+});
+
 test("google interactions cancels before deleting a job", async () => {
 	const calls: Array<{ url: string; method: string }> = [];
 	await withStubbedFetch(

@@ -78,7 +78,7 @@ use `transportOverrides` when a model needs another transport.
 
 ### Gemini Omni Flash
 
-`gemini-omni-1.1-flash` uses the Google `interactions` transport. Configure its deployment with
+`gemini-omni-1.2-flash` and `gemini-omni-1.1-flash` use the Google `interactions` transport. Configure its deployment with
 `transportOverrides: { "video.generate": "interactions" }`.
 
 - Text-to-video may omit `task` or set `text_to_video`.
@@ -90,16 +90,17 @@ use `transportOverrides` when a model needs another transport.
 
 The integration intentionally does not use Google's Files API. Inputs are materialized as validated
 inline data, and completed output is fetched inline directly into AI Gateway object storage without
-being persisted in Postgres. Consequently, the stock profile exposes 360p and 720p only, rejects
-`file_id`, and limits each input asset to 20 MB. Uploaded videos for edit/extend remain subject to
-Google's 10-second and regional restrictions.
+being persisted in Postgres. The stock profile exposes 360p, 720p, 1080p and 4K; a 15-second 4K
+video is tens of megabytes of inline base64, which the gateway streams into object storage without
+holding the whole response in memory. It rejects `file_id` and limits each input asset to 20 MB.
+Uploaded videos for edit/extend remain subject to Google's 10-second and regional restrictions.
 
 Stateful continuation is also intentionally unavailable. `previous_interaction_id` is blocked in
 `extra_body`; accepting a raw provider id would bypass AI Gateway ownership and deployment-affinity
 checks. A future implementation should expose a local source video id instead.
 
-Omni bills video output by token (`videoOutputCentsPerMTokens`; 360p is 1,931 and 720p is 5,792 tokens
-per second). A virtual key with a token or budget limit reserves an upper bound at submit, from the
+Omni bills video output by token (`videoOutputCentsPerMTokens`; per second, 360p is 1,931, 720p is
+5,792, 1080p is 8,688 and 4K is 17,376 tokens). A virtual key with a token or budget limit reserves an upper bound at submit, from the
 requested duration and size (the longest duration and densest size when omitted). When the job
 reaches a terminal state the reservation is settled to the usage Google reports, or released if the
 job failed. A completed job whose provider reports no usage is charged the estimate for its duration
