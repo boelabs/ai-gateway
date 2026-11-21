@@ -825,7 +825,7 @@
 			},
 			"pricing": {
 				"inputCentsPerMTokens": 6,
-				"outputCentsPerMTokens": 220,
+				"outputCentsPerMTokens": 196,
 				"cacheReadCentsPerMTokens": 5.9
 			}
 		},
@@ -3402,8 +3402,8 @@
 						"reasoning": true,
 						"structuredOutputs": true
 					},
-					"maxInputTokens": 1000000,
-					"maxOutputTokens": 384000,
+					"maxInputTokens": 1048600,
+					"maxOutputTokens": 1048600,
 					"modalities": {
 						"input": ["text"],
 						"output": ["text"]
@@ -3428,9 +3428,9 @@
 				}
 			},
 			"pricing": {
-				"inputCentsPerMTokens": 66,
-				"outputCentsPerMTokens": 198,
-				"cacheReadCentsPerMTokens": 6.6
+				"inputCentsPerMTokens": 132,
+				"outputCentsPerMTokens": 396,
+				"cacheReadCentsPerMTokens": 13.2
 			}
 		},
 		"deepseek/deepseek-v4.1-flash": {
@@ -5721,6 +5721,46 @@
 				"inputCentsPerMTokens": 150,
 				"outputCentsPerMTokens": 750,
 				"cacheReadCentsPerMTokens": 7.5
+			}
+		},
+		"google/gemini-4-neon": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 1000000,
+					"modalities": {
+						"input": ["image", "pdf", "text", "video"],
+						"output": ["text"]
+					},
+					"contracts": ["chat.completions", "responses"],
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"reasoning_effort": true,
+						"response_format": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high", "xhigh"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 300,
+				"outputCentsPerMTokens": 1500,
+				"cacheReadCentsPerMTokens": 15
 			}
 		},
 		"google/gemini-embedding-001": {
@@ -12774,17 +12814,6 @@
 				"cacheWriteCentsPerMTokens": 6.25
 			}
 		},
-		"prodia/flux-fast-schnell": {
-			"operations": {
-				"image.generate": {
-					"outputFormats": ["png", "jpeg", "webp"],
-					"responseFormats": ["b64_json"],
-					"autoSize": {},
-					"nativeOutputFormat": false,
-					"nativeOutputCompression": false
-				}
-			}
-		},
 		"quiverai/arrow-2": {
 			"operations": {
 				"text.generate": {
@@ -14020,53 +14049,6 @@
 						"inputCentsPerMTokens": 400,
 						"outputCentsPerMTokens": 1200,
 						"cacheReadCentsPerMTokens": 100
-					}
-				]
-			}
-		},
-		"spacexai/grok-build-0.1": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": true,
-						"reasoning": true,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 256000,
-					"maxOutputTokens": 256000,
-					"modalities": {
-						"input": ["image", "text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					},
-					"reasoning": {
-						"kind": "fixed",
-						"levels": ["high"]
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 100,
-				"outputCentsPerMTokens": 200,
-				"cacheReadCentsPerMTokens": 20,
-				"tiers": [
-					{
-						"aboveInputTokens": 200001,
-						"inputCentsPerMTokens": 200,
-						"outputCentsPerMTokens": 400,
-						"cacheReadCentsPerMTokens": 40
 					}
 				]
 			}
