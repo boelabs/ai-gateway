@@ -1482,7 +1482,10 @@
 				"outputCentsPerMTokens": 1000,
 				"cacheReadCentsPerMTokens": 12.5,
 				"cacheWriteCentsPerMTokens": 0
-			}
+			},
+			"deprecated": true,
+			"retiresOn": "2027-02-09",
+			"notes": "Microsoft lists Azure OpenAI gpt-5 (version 2025-08-07) as GA with a retirement date of 2027-02-09; it retires on 2027-02-09 with no replacement listed yet."
 		},
 		"gpt-5-mini": {
 			"operations": {
@@ -1562,7 +1565,10 @@
 				"outputCentsPerMTokens": 40,
 				"cacheReadCentsPerMTokens": 0.5,
 				"cacheWriteCentsPerMTokens": 0
-			}
+			},
+			"deprecated": true,
+			"retiresOn": "2027-02-09",
+			"notes": "Microsoft lists Azure OpenAI gpt-5-nano (version 2025-08-07) as GA with a retirement date of 2027-02-09; it retires on 2027-02-09 with no replacement listed yet."
 		},
 		"gpt-5-chat": {
 			"operations": {

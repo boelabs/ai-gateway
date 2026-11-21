@@ -83,14 +83,20 @@
 						"max_tokens": true,
 						"reasoning": true,
 						"response_format": false,
-						"temperature": true,
+						"temperature": {
+							"mode": "ignored",
+							"notes": "MiniMax does not support temperature yet; any value has no effect."
+						},
 						"tool_choice": {
 							"mode": "supported",
 							"values": ["none", "auto"],
 							"notes": "Documented on MiniMax's native text API (none or auto); the OpenAI-compatible reference does not list it."
 						},
 						"tools": true,
-						"top_p": true,
+						"top_p": {
+							"mode": "ignored",
+							"notes": "Fixed at 0.95 upstream; values outside (0, 1] are still rejected."
+						},
 						"stop": false,
 						"top_k": false,
 						"repetition_penalty": false,
