@@ -8104,7 +8104,7 @@ components:
             - $ref: "#/components/schemas/CatalogEntry"
             - type: "null"
         retiresOn:
-          description: "For a catalog model the provider has scheduled for retirement: the first day it no longer serves it (UTC). Past that day the admin API refuses new deployments of the model, and a provider's \"model not found\" is answered as `model_retired`; routing still tries the deployment."
+          description: "For a catalog model the provider has scheduled for retirement: the first day it no longer serves it (UTC). Past that day the admin API refuses new deployments of the model, and the provider answering that it does not know the model becomes `model_retired`; routing still tries the deployment."
           type: string
           format: date
           pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
