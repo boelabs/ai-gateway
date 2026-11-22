@@ -11,8 +11,8 @@ import {
 	type DecisionContentPart,
 	type DecisionQuestion,
 	questionCriteriaParts,
-	inputItemParts,
 	decisionProtocolError,
+	inputItemParts,
 	optionKey,
 } from "#core/decisions.ts";
 

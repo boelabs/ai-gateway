@@ -12,8 +12,8 @@ import type { AuditEntry } from "./api.ts";
 import { splitAction } from "./common.ts";
 
 import {
-	ShieldCheckIcon as IconShieldCheck,
 	MagnifyingGlassMinusIcon as IconSearchX,
+	ShieldCheckIcon as IconShieldCheck,
 } from "@phosphor-icons/react/dist/ssr";
 
 function statusTone(status: number | null) {

@@ -1,5 +1,4 @@
 import { estimateMessagesInputTokens } from "#contracts/anthropic/messagesTokenCount.ts";
-import { parseServiceMode } from "#core/serviceMode.ts";
 import { messagesRequestToCanonical } from "#contracts/anthropic/messagesRender.ts";
 import { listDeploymentCandidates } from "#gateway/deploymentCandidates.ts";
 import type { MessageTokenCountResponse } from "#adapters/types.ts";
@@ -9,6 +8,7 @@ import { completedTerminal } from "#gateway/streamLifecycle.ts";
 import { messageStateCodec } from "./runtime/messageState.ts";
 import { OperationLogDraft } from "./runtime/operationLog.ts";
 import { route, type RouteResult } from "#router/index.ts";
+import { parseServiceMode } from "#core/serviceMode.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { AppEnv } from "#auth/types.ts";
 import type { Context } from "hono";

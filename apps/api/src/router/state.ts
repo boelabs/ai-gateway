@@ -1,8 +1,8 @@
 import { EXECUTION_POLICY_MAX_TOTAL_MS } from "#core/executionPolicy.ts";
 import { releaseCircuitPermit, closeCircuits } from "./circuit.ts";
+import { redis, runScript } from "#cache/redis.ts";
 import type { CircuitPermit } from "./circuit.ts";
 import { randomUUID } from "node:crypto";
-import { redis, runScript } from "#cache/redis.ts";
 
 /**
  * Router state in Redis. Keys per model (deployment):

@@ -1,20 +1,18 @@
 "use client";
 
-import { Slider as SliderPrimitive } from "@base-ui/react/slider";
 import { PopoverRoot, PopoverTrigger, Popover } from "#/components/ui/popover";
-import type { Capability } from "./capabilities";
 import { ScrollArea } from "#/components/ui/primitives/scroll-area";
+import { Slider as SliderPrimitive } from "@base-ui/react/slider";
 import { GhostSkeleton } from "#/shared/components/Skeleton";
+import type { Capability } from "./capabilities";
 import { cn } from "#/shared/lib/classes";
 
 import {
-	type ReactNode,
-	type Ref,
-	useLayoutEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
+	MagnifyingGlassIcon as IconSearch,
+	CaretRightIcon as IconCaretRight,
+	CaretDownIcon as IconCaretDown,
+	CheckIcon as IconCheck,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	type CapabilityGroup,
@@ -26,11 +24,13 @@ import {
 } from "./models";
 
 import {
-	MagnifyingGlassIcon as IconSearch,
-	CaretRightIcon as IconCaretRight,
-	CaretDownIcon as IconCaretDown,
-	CheckIcon as IconCheck,
-} from "@phosphor-icons/react/dist/ssr";
+	useLayoutEffect,
+	type ReactNode,
+	type Ref,
+	useState,
+	useMemo,
+	useRef,
+} from "react";
 
 export const EFFORT_LABELS: Record<ReasoningEffort, string> = {
 	none: "None",

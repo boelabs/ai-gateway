@@ -1,8 +1,8 @@
 "use client";
 
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import type { Permission } from "#/features/auth/common.ts";
 import { useSession } from "#/features/auth/session.tsx";
-import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import Link from "next/link";

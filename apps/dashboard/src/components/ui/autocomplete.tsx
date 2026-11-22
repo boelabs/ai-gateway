@@ -1,11 +1,7 @@
 "use client";
 
-import { ScrollArea } from "./primitives/scroll-area";
 import { Autocomplete as BaseAutocomplete } from "@base-ui/react/autocomplete";
-import {
-	CaretUpDownIcon as IconSelector,
-	XIcon as IconX,
-} from "@phosphor-icons/react/dist/ssr";
+import { ScrollArea } from "./primitives/scroll-area";
 
 import {
 	type AppearanceProps,
@@ -18,6 +14,11 @@ import {
 	mergeStyle,
 	focusRing,
 } from "./appearance";
+
+import {
+	CaretUpDownIcon as IconSelector,
+	XIcon as IconX,
+} from "@phosphor-icons/react/dist/ssr";
 
 function Input({
 	className,

@@ -1,5 +1,5 @@
-import { anthropicAdapter } from "#adapters/anthropic/index.ts";
 import { messagesRequestToCanonical } from "./messagesRender.ts";
+import { anthropicAdapter } from "#adapters/anthropic/index.ts";
 import { jsonBody, must } from "#test-support/adapters.ts";
 import type { AdapterContext } from "#adapters/types.ts";
 import { messagesRequestSchema } from "./messages.ts";
@@ -74,6 +74,28 @@ test("client betas reach Anthropic beside the adapter's own", () => {
 	assert.ok(betas.includes("interleaved-thinking-2025-05-14"));
 	assert.ok(betas.includes("fast-mode-2026-02-01"));
 	assert.equal(req.requiresNativeWire, undefined);
+});
+
+test("thinking.block_binding travels without pinning the request to Anthropic", () => {
+	const binding = { prefix_mismatch_behavior: "drop_block" };
+	const req = canonical({
+		thinking: { type: "adaptive", block_binding: binding },
+	});
+	assert.deepEqual(req.messagesTransport?.thinkingBlockBinding, binding);
+	assert.equal(req.requiresNativeWire, undefined);
+});
+
+test("a thinking.block_binding that is not an object is rejected", () => {
+	for (const blockBinding of ["drop_block", null, ["drop_block"]]) {
+		assert.throws(
+			() =>
+				canonical({
+					thinking: { type: "adaptive", block_binding: blockBinding },
+				}),
+			(error) =>
+				GatewayError.is(error) && error.param === "thinking.block_binding",
+		);
+	}
 });
 
 test("a malformed beta name is rejected", () => {

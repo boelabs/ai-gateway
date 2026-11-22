@@ -11,6 +11,16 @@ import { Workspace } from "./Workspace";
 import { Composer } from "./Composer";
 
 import {
+	type EmbeddingSettings,
+	emptyEmbeddingSettings,
+	fitEmbeddingSettings,
+	type EmbeddingRun,
+	embeddingChoices,
+	runEmbeddings,
+	vectorsFrom,
+} from "./embeddings";
+
+import {
 	DialogDescription,
 	DialogContent,
 	DialogFooter,
@@ -20,16 +30,6 @@ import {
 	DialogBody,
 	DialogRoot,
 } from "#/components/ui/dialog";
-
-import {
-	type EmbeddingSettings,
-	emptyEmbeddingSettings,
-	fitEmbeddingSettings,
-	embeddingChoices,
-	type EmbeddingRun,
-	runEmbeddings,
-	vectorsFrom,
-} from "./embeddings";
 
 /** One text per line, which is also how a batch is written into the box. */
 export function inputsFrom(draft: string): string[] {

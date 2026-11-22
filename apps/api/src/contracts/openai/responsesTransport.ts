@@ -11,8 +11,8 @@
  * reasoning content for unstored responses.
  */
 
-import { chatAnnotationFromResponses, chatLogprobs } from "./outputText.ts";
 import { writePromptCachePolicy, writeCacheBreakpoint } from "./promptCache.ts";
+import { chatAnnotationFromResponses, chatLogprobs } from "./outputText.ts";
 import { completionTokensWithReasoning } from "./chatTransport.ts";
 import { mergeExtraBody } from "#core/extraBody.ts";
 import { GatewayError } from "#core/errors.ts";

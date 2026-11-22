@@ -1,7 +1,7 @@
 import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
 import type { RoutingStrategy } from "./settings.ts";
-import { pricingAt } from "#catalog/pricing.ts";
 import type { DeploymentMetrics } from "./state.ts";
+import { pricingAt } from "#catalog/pricing.ts";
 
 // healthScore: 0.5 (neutral), matching fetchMetrics' default for a deployment with no recorded
 // attempts - see NEUTRAL_HEALTH_SCORE in router/state.ts for why this isn't 1 (perfect).

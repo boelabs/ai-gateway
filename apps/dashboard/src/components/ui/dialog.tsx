@@ -1,9 +1,9 @@
 "use client";
 
-import { ScrollArea } from "./primitives/scroll-area";
-import { Dialog as BaseDialog } from "@base-ui/react/dialog";
-import type { ComponentProps } from "react";
 import { XIcon as IconX } from "@phosphor-icons/react/dist/ssr";
+import { Dialog as BaseDialog } from "@base-ui/react/dialog";
+import { ScrollArea } from "./primitives/scroll-area";
+import type { ComponentProps } from "react";
 import { cn } from "#/shared/lib/classes";
 import { Button } from "./button";
 

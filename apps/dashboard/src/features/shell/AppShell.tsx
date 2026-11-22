@@ -1,19 +1,19 @@
 "use client";
 
 import { CommandPalette, CommandPaletteTrigger } from "./CommandPalette";
+import { ListIcon as MenuIcon } from "@phosphor-icons/react/dist/ssr";
 import { ScrollArea } from "#/components/ui/primitives/scroll-area";
-import { SIDE_PANEL_SLOT } from "#/shared/lib/sidePanel";
 import { AiGatewayLogo } from "#/shared/components/AiGatewayLogo";
 import type { OperatorIdentity } from "#/features/auth/common";
 import { SidebarNav, SidebarNavFallback } from "./SidebarNav";
 import { SessionProvider } from "#/features/auth/session";
+import { SIDE_PANEL_SLOT } from "#/shared/lib/sidePanel";
 import { DocsLink, DocsProvider } from "./Documentation";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { UserMenu, UserMenuFallback } from "./UserMenu";
 import { Button } from "#/components/ui/button";
 import { Suspense, useState } from "react";
 import { CreateMenu } from "./CreateMenu";
-import { ListIcon as MenuIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 
 import {

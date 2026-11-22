@@ -1,36 +1,13 @@
 "use client";
 
-import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { ThinkingIndicator } from "#/components/ui/thinking-indicator";
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
+import { SIDE_PANEL_SLOT } from "#/shared/lib/sidePanel";
 import type { PlaygroundMessage } from "./transport";
 import { Button } from "#/components/ui/button";
 import { cn } from "#/shared/lib/classes";
-import { SIDE_PANEL_SLOT } from "#/shared/lib/sidePanel";
 import { createPortal } from "react-dom";
 import { Markdown } from "./Markdown";
-
-import {
-	type ReactNode,
-	createContext,
-	useCallback,
-	useContext,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-	useSyncExternalStore,
-} from "react";
-
-import {
-	type Step,
-	type StepBlock,
-	runningStep,
-	settleSteps,
-	stepPhrases,
-	stepTitle,
-	stepsOf,
-	WAITING_PHRASES,
-} from "./steps";
 
 import {
 	TraceCollapsibleContent,
@@ -41,6 +18,29 @@ import {
 	TraceLine,
 	Trace,
 } from "#/components/ui/trace";
+
+import {
+	useSyncExternalStore,
+	type ReactNode,
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useState,
+	useMemo,
+	useRef,
+} from "react";
+
+import {
+	WAITING_PHRASES,
+	type StepBlock,
+	runningStep,
+	settleSteps,
+	stepPhrases,
+	type Step,
+	stepTitle,
+	stepsOf,
+} from "./steps";
 
 import {
 	SheetDescription,

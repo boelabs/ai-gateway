@@ -9,13 +9,13 @@ import { completedTerminal } from "#gateway/streamLifecycle.ts";
 import { OperationLogDraft } from "./runtime/operationLog.ts";
 import { route, type RouteResult } from "#router/index.ts";
 import { upgradeWebSocket } from "#http/bunServer.ts";
-import { GatewayError } from "#core/errors.ts";
+import type { RawSocket } from "#http/bunServer.ts";
 import { pricingAt } from "#catalog/pricing.ts";
-import type { Usage } from "#core/usage.ts";
+import { GatewayError } from "#core/errors.ts";
 import { getAuth } from "#auth/middleware.ts";
 import type { AppEnv } from "#auth/types.ts";
+import type { Usage } from "#core/usage.ts";
 import { randomUUID } from "node:crypto";
-import type { RawSocket } from "#http/bunServer.ts";
 import type { WSEvents } from "hono/ws";
 import type { Context } from "hono";
 import { z } from "zod/v4";
@@ -35,9 +35,9 @@ import {
 	MAX_QUEUED_EVENTS,
 	admitQueuedBytes,
 	queuedBytesError,
-	messageBytes,
 	REALTIME_MAX_MS,
 	watchCredential,
+	messageBytes,
 } from "./realtimeSockets.ts";
 
 import {

@@ -1,8 +1,8 @@
 import { periodSeconds, secondsUntilReset } from "./period.ts";
 import type { VirtualKeyAuth } from "#auth/types.ts";
+import { redis, runScript } from "#cache/redis.ts";
 import { GatewayError } from "#core/errors.ts";
 import { randomUUID } from "node:crypto";
-import { redis, runScript } from "#cache/redis.ts";
 import { log } from "#logging/log.ts";
 
 import {

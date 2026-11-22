@@ -30,6 +30,11 @@ import type {
 } from "#core/videos.ts";
 
 import type {
+	CanonicalRealtimeTranslationConfig,
+	CanonicalRealtimeTranslationEvent,
+} from "#core/realtimeTranslation.ts";
+
+import type {
 	CanonicalChatStreamChunk,
 	CanonicalChatResponse,
 	CanonicalChatRequest,
@@ -55,10 +60,7 @@ import type {
 	CanonicalRerankResponse,
 	CanonicalRerankRequest,
 } from "#core/rerank.ts";
-import type {
-	CanonicalRealtimeTranslationConfig,
-	CanonicalRealtimeTranslationEvent,
-} from "#core/realtimeTranslation.ts";
+
 import type {
 	CanonicalSpeechResponse,
 	CanonicalSpeechRequest,

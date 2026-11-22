@@ -1,13 +1,9 @@
 "use client";
 
+import { SEARCH_WIDTH, SearchField } from "#/shared/components/SearchField.tsx";
 import { ListToolbar, ListSelect } from "#/shared/components/ListToolbar.tsx";
 import { ALL, AUDIT_PERIODS, DEFAULT_PERIOD, KINDS } from "./filters.ts";
-import {
-	RangeFilterSkeleton,
-	RangeFilter,
-} from "#/shared/components/RangeFilter.tsx";
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
-import { SEARCH_WIDTH, SearchField } from "#/shared/components/SearchField.tsx";
 import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
 import { type AuditFilters, isFiltered } from "./filters.ts";
 import { createTableRows } from "#/shared/lib/tableRows.tsx";
@@ -17,9 +13,14 @@ import type { AuditEntry } from "./api.ts";
 import type { ReactNode } from "react";
 
 import {
-	FunnelXIcon as IconFilterOff,
 	DownloadSimpleIcon as IconDownload,
+	FunnelXIcon as IconFilterOff,
 } from "@phosphor-icons/react/dist/ssr";
+
+import {
+	RangeFilterSkeleton,
+	RangeFilter,
+} from "#/shared/components/RangeFilter.tsx";
 
 const KIND_OPTIONS = [
 	{ value: ALL, label: "All entries" },

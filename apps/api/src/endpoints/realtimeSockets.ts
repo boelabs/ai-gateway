@@ -1,11 +1,11 @@
-import { MAX_BUFFERED_SEND_BYTES } from "./socketServer.ts";
 import { RealtimeClientEventError } from "#contracts/openai/realtime.ts";
 import type { DownstreamWriteObservation } from "./runtime/sse.ts";
 import { getAuth, revalidateAuth } from "#auth/middleware.ts";
+import { MAX_BUFFERED_SEND_BYTES } from "./socketServer.ts";
 import { toGatewayError } from "./runtime/pipeline.ts";
+import type { RawSocket } from "#http/bunServer.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { AppEnv } from "#auth/types.ts";
-import type { RawSocket } from "#http/bunServer.ts";
 import type { WSContext } from "hono/ws";
 import { env } from "#config/env.ts";
 import type { Context } from "hono";

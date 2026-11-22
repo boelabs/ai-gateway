@@ -5,12 +5,13 @@ import { controlRadiusVariants } from "#/components/ui/primitives/control-radius
 import { Input, type InputProps } from "#/components/ui/primitives/input";
 import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "#/shared/lib/classes";
+import type React from "react";
+
 import {
 	CaretUpDownIcon as ChevronsUpDownIcon,
 	XIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { cn } from "#/shared/lib/classes";
-import type React from "react";
 
 export const autocompletePopupVariants = cva(
 	"relative flex max-h-full max-w-(--available-width) min-w-(--anchor-width) origin-(--transform-origin) border bg-popover shadow-lg/5 transition-[scale,opacity] not-dark:bg-clip-padding before:pointer-events-none before:absolute before:inset-0 before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",

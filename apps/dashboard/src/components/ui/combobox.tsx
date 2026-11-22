@@ -1,9 +1,9 @@
 "use client";
 
-import { ScrollArea } from "./primitives/scroll-area";
 import { Combobox as BaseCombobox } from "@base-ui/react/combobox";
 import { selectTriggerVariants } from "./primitives/select";
 import { inputControlVariants } from "./primitives/input";
+import { ScrollArea } from "./primitives/scroll-area";
 
 import {
 	type AppearanceProps,
@@ -18,8 +18,8 @@ import {
 } from "./appearance";
 
 import {
-	CaretUpDownIcon as IconSelector,
 	MagnifyingGlassIcon as IconSearch,
+	CaretUpDownIcon as IconSelector,
 	CheckIcon as IconCheck,
 	XIcon as IconX,
 } from "@phosphor-icons/react/dist/ssr";

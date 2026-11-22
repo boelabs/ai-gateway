@@ -1,10 +1,10 @@
 "use client";
 
-import { ScrollArea } from "#/components/ui/primitives/scroll-area";
+import { CaretRightIcon as ChevronRightIcon } from "@phosphor-icons/react/dist/ssr";
 import { controlRadiusVariants } from "#/components/ui/primitives/control-radius";
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
-import { CaretRightIcon as ChevronRightIcon } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "#/shared/lib/classes";
 import type * as React from "react";
 

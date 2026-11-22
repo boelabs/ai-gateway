@@ -4,13 +4,13 @@ import { Block, Streamdown } from "streamdown";
 import { math } from "@streamdown/math";
 
 import {
-	ArrowSquareOutIcon as IconExternalLink,
-	SpinnerGapIcon as IconLoader2,
-	DownloadSimpleIcon as IconDownload,
-	ArrowsOutIcon as IconMaximize,
 	ArrowCounterClockwiseIcon as IconRotate2,
 	MagnifyingGlassMinusIcon as IconZoomOut,
+	ArrowSquareOutIcon as IconExternalLink,
 	MagnifyingGlassPlusIcon as IconZoomIn,
+	DownloadSimpleIcon as IconDownload,
+	SpinnerGapIcon as IconLoader2,
+	ArrowsOutIcon as IconMaximize,
 	CheckIcon as IconCheck,
 	CopyIcon as IconCopy,
 	XIcon as IconX,

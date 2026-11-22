@@ -1,11 +1,11 @@
 import { realtimeClientSecretsHandler } from "#endpoints/realtimeClientSecrets.ts";
 import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
-import { startServer } from "#http/bunServer.ts";
 import { realtimeWebSocketHandler } from "#endpoints/realtime.ts";
 import { makeOpenAIContractTestApp } from "#test-support/app.ts";
 import { deleteDeployment } from "#db/repos/deployments.ts";
 import { createDeployment } from "#deployments/service.ts";
 import { eventually } from "#test-support/wait.ts";
+import { startServer } from "#http/bunServer.ts";
 import { WebSocket, WebSocketServer } from "ws";
 import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";

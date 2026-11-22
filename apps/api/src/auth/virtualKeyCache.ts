@@ -1,5 +1,5 @@
-import type { VirtualKeyAuth } from "./types.ts";
 import { redis, runScript } from "#cache/redis.ts";
+import type { VirtualKeyAuth } from "./types.ts";
 
 import {
 	getVirtualKeyByHash,

@@ -7,8 +7,8 @@ import { Status } from "#/components/ui/status";
 import type { ImageRun } from "./images";
 
 import {
-	DownloadSimpleIcon as IconDownload,
 	ArrowCounterClockwiseIcon as IconRotate2,
+	DownloadSimpleIcon as IconDownload,
 } from "@phosphor-icons/react/dist/ssr";
 
 import {

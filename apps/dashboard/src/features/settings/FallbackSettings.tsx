@@ -2,10 +2,6 @@
 
 import { ButtonSkeleton, TableSkeleton } from "#/shared/components/Skeleton";
 import { type Column, DataTable, Mono } from "#/components/ui/datatable";
-import {
-	PlusIcon as IconPlus,
-	TrashIcon as IconTrash,
-} from "@phosphor-icons/react/dist/ssr";
 import { type FallbackPolicy, FALLBACK_KINDS } from "./common.ts";
 import { useNotify } from "#/shared/feedback/notifications.tsx";
 import { RowActions } from "#/shared/components/RowActions.tsx";
@@ -20,6 +16,11 @@ import { deleteFallbackAction } from "./actions.ts";
 import { EmptyState } from "#/components/ui/page";
 import { Button } from "#/components/ui/button";
 import { useState } from "react";
+
+import {
+	TrashIcon as IconTrash,
+	PlusIcon as IconPlus,
+} from "@phosphor-icons/react/dist/ssr";
 
 const HEADERS = ["Primary model", "Chain", ""] as const;
 

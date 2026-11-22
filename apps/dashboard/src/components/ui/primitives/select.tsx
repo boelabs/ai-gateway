@@ -1,7 +1,7 @@
 "use client";
 
-import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { controlRadiusVariants } from "#/components/ui/primitives/control-radius";
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { cva, type VariantProps } from "class-variance-authority";
 import { mergeProps } from "@base-ui/react/merge-props";

@@ -1,8 +1,9 @@
 "use client";
 
+import { SEARCH_WIDTH, SearchField } from "#/shared/components/SearchField.tsx";
 import { type Role, ROLE_LABELS, ROLE_SUMMARY, ROLES } from "./common.ts";
 import { useIdempotencyKey } from "#/shared/lib/useIdempotencyKey.ts";
-import { SEARCH_WIDTH, SearchField } from "#/shared/components/SearchField.tsx";
+import { PlusIcon as IconPlus } from "@phosphor-icons/react/dist/ssr";
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
 import { ListToolbar } from "#/shared/components/ListToolbar.tsx";
 import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
@@ -12,7 +13,6 @@ import type { UsersFilters } from "./filters.ts";
 import { ErrorNote } from "#/components/ui/page";
 import { createUserAction } from "./actions.ts";
 import { Button } from "#/components/ui/button";
-import { PlusIcon as IconPlus } from "@phosphor-icons/react/dist/ssr";
 import { Input } from "#/components/ui/input";
 import { Form } from "#/components/ui/form";
 import { useState } from "react";

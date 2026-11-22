@@ -97,6 +97,10 @@ with only what the provider produced — its id, `encrypted_content`, and summar
 schemas accept `content` on a reasoning item solely as an empty array. Clients may send the mirrored
 item back untouched; the extra half is dropped for them.
 
+`extra_body: { "thinking": { "block_binding": { ... } } }` is Anthropic's control for replayed
+thinking blocks whose conversation changed. It reaches Anthropic with adaptive thinking (set
+`reasoning.effort`) and never reaches another provider. See [Messages](/docs/messages#reasoning).
+
 ## `responsesTransport` passthrough
 
 Fields specific to the Responses wire contract that don't have a Chat Completions equivalent —

@@ -19,10 +19,10 @@ import { Status } from "#/components/ui/status";
 import {
 	ArrowsClockwiseIcon as IconRefresh,
 	StackSimpleIcon as IconVersions,
-	NotePencilIcon as IconEdit,
 	UploadSimpleIcon as IconUpload,
-	FileCodeIcon as IconCode,
 	PuzzlePieceIcon as IconPuzzle,
+	NotePencilIcon as IconEdit,
+	FileCodeIcon as IconCode,
 	TrashIcon as IconTrash,
 	PlusIcon as IconPlus,
 } from "@phosphor-icons/react/dist/ssr";

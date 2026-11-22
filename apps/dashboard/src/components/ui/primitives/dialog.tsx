@@ -4,9 +4,9 @@ import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Button } from "#/components/ui/primitives/button";
 import { mergeProps } from "@base-ui/react/merge-props";
+import { XIcon } from "@phosphor-icons/react/dist/ssr";
 import { useRender } from "@base-ui/react/use-render";
 import { cn } from "#/shared/lib/classes";
-import { XIcon } from "@phosphor-icons/react/dist/ssr";
 import type React from "react";
 
 export const DialogCreateHandle: typeof DialogPrimitive.createHandle =

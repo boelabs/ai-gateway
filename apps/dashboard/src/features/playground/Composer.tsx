@@ -1,8 +1,8 @@
+import { GhostSkeleton } from "#/shared/components/Skeleton";
 import { useComposerTextarea } from "./useComposerTextarea";
 import { ComposerAttachments } from "./ComposerAttachments";
 import { type ReactNode, useRef, useState } from "react";
 import { useMobileComposer } from "./useMobileComposer";
-import { GhostSkeleton } from "#/shared/components/Skeleton";
 import { Button } from "#/components/ui/button";
 import { ComposerView } from "./ComposerView";
 import type { FileUIPart } from "ai";
@@ -11,8 +11,8 @@ import {
 	SlidersHorizontalIcon as IconAdjustmentsHorizontal,
 	SpinnerGapIcon as IconLoader2,
 	SquareIcon as IconPlayerStop,
-	BroomIcon as IconClear,
 	ArrowUpIcon as IconArrowUp,
+	BroomIcon as IconClear,
 	PlusIcon as IconPlus,
 } from "@phosphor-icons/react/dist/ssr";
 

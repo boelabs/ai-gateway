@@ -1,15 +1,11 @@
 "use client";
 
 import { PopoverRoot, PopoverTrigger, Popover } from "#/components/ui/popover";
-import {
-	CalendarBlankIcon as IconCalendar,
-	CaretDownIcon as ChevronDown,
-} from "@phosphor-icons/react/dist/ssr";
+import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
 import type { Query } from "#/shared/lib/useSearchWriter.ts";
 import { Calendar } from "#/components/ui/calendar";
-import { Button } from "#/components/ui/button";
 import type { DateRange } from "react-day-picker";
-import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
+import { Button } from "#/components/ui/button";
 import { cn } from "#/shared/lib/classes";
 import { useState } from "react";
 
@@ -21,6 +17,11 @@ import {
 	RANGES,
 	DAY,
 } from "#/shared/lib/range.ts";
+
+import {
+	CalendarBlankIcon as IconCalendar,
+	CaretDownIcon as ChevronDown,
+} from "@phosphor-icons/react/dist/ssr";
 
 const day = new Intl.DateTimeFormat("en-US", {
 	month: "short",

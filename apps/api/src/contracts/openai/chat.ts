@@ -1,3 +1,4 @@
+import { liftThinkingBlockBinding } from "#contracts/thinkingBlockBinding.ts";
 import { fileParserOptionsFromPlugins } from "#contracts/fileParser.ts";
 import { EFFORT_ORDER, summaryForEffort } from "#core/reasoning.ts";
 import { assertNoManagedExtraBodyKeys } from "#core/extraBody.ts";
@@ -757,10 +758,15 @@ export function toCanonicalChatRequest(
 	if (req.top_k !== undefined) {
 		u.topK = req.top_k;
 	}
-	const extraBody = unmappedTopLevelFields(req);
+	const { extraBody, blockBinding } = liftThinkingBlockBinding(
+		unmappedTopLevelFields(req),
+	);
 	if (extraBody !== undefined) {
 		assertNoManagedExtraBodyKeys(extraBody, CHAT_EXTRA_BODY_MANAGED_KEYS);
 		u.extraBody = extraBody;
+	}
+	if (blockBinding !== undefined) {
+		u.messagesTransport = { thinkingBlockBinding: blockBinding };
 	}
 	if (req.tools !== undefined) {
 		u.tools = req.tools.map((t) => {

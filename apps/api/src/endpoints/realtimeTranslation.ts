@@ -7,28 +7,16 @@ import { OperationLogDraft } from "./runtime/operationLog.ts";
 import { route, type RouteResult } from "#router/index.ts";
 import { resolveModelMetadata } from "#catalog/index.ts";
 import { upgradeWebSocket } from "#http/bunServer.ts";
+import type { RawSocket } from "#http/bunServer.ts";
 import { pricingAt } from "#catalog/pricing.ts";
 import { computeCost } from "#logging/cost.ts";
 import { GatewayError } from "#core/errors.ts";
 import { getAuth } from "#auth/middleware.ts";
-import type { RawSocket } from "#http/bunServer.ts";
 import type { AppEnv } from "#auth/types.ts";
 import type { Usage } from "#core/usage.ts";
 import { randomUUID } from "node:crypto";
 import type { WSEvents } from "hono/ws";
 import type { Context } from "hono";
-
-import {
-	type CanonicalRealtimeTranslationConfig,
-	type CanonicalRealtimeTranslationEvent,
-	TRANSLATION_AUDIO_RATE,
-} from "#core/realtimeTranslation.ts";
-
-import {
-	addRealtimeUsage,
-	realtimeUsageToCore,
-	type RealtimeUsage,
-} from "#core/realtime.ts";
 
 import {
 	assertRealtimeSocketCapacity,
@@ -51,6 +39,16 @@ import {
 } from "./realtimeSockets.ts";
 
 import {
+	applyTranslationSessionUpdate,
+	type TranslationSessionState,
+	translationClientEventSchema,
+	newTranslationSessionState,
+	renderTranslationSession,
+	translationConfigOf,
+	translationEventId,
+} from "#contracts/openai/realtimeTranslation.ts";
+
+import {
 	assertRealtimeExtensionsSupported,
 	assertFinalModelAllowed,
 	usageQuotaForRequest,
@@ -60,14 +58,16 @@ import {
 } from "./runtime/pipeline.ts";
 
 import {
-	type TranslationSessionState,
-	applyTranslationSessionUpdate,
-	translationClientEventSchema,
-	newTranslationSessionState,
-	renderTranslationSession,
-	translationConfigOf,
-	translationEventId,
-} from "#contracts/openai/realtimeTranslation.ts";
+	type CanonicalRealtimeTranslationConfig,
+	type CanonicalRealtimeTranslationEvent,
+	TRANSLATION_AUDIO_RATE,
+} from "#core/realtimeTranslation.ts";
+
+import {
+	realtimeUsageToCore,
+	type RealtimeUsage,
+	addRealtimeUsage,
+} from "#core/realtime.ts";
 
 /**
  * GET /v1/realtime/translations?model=… (WebSocket): OpenAI's realtime speech translation, served

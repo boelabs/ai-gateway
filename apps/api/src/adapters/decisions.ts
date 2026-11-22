@@ -6,8 +6,8 @@ import { mapUpstreamHttpError } from "#adapters/upstreamError.ts";
 import { GatewayError, type ErrorClass } from "#core/errors.ts";
 
 import {
-	type OpenAIDecisionDialect,
 	parseOpenAIDecisionResponse,
+	type OpenAIDecisionDialect,
 	buildOpenAIDecisionBody,
 } from "#contracts/openai/decisionsTransport.ts";
 

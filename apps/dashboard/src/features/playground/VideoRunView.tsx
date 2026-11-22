@@ -7,9 +7,9 @@ import { Button } from "#/components/ui/button";
 import { Status } from "#/components/ui/status";
 
 import {
+	ArrowCounterClockwiseIcon as IconRotate2,
 	DownloadSimpleIcon as IconDownload,
 	ArrowsClockwiseIcon as IconRefresh,
-	ArrowCounterClockwiseIcon as IconRotate2,
 	PlayIcon as IconPlayerPlay,
 } from "@phosphor-icons/react/dist/ssr";
 

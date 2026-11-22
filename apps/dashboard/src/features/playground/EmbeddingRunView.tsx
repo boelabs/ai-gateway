@@ -1,9 +1,9 @@
 "use client";
 
-import { ScrollArea } from "#/components/ui/primitives/scroll-area";
-import { MESSAGE_ACTION, MESSAGE_ACTION_ICON } from "./MessageParts";
-import { cosineSimilarity, type EmbeddingRun } from "./embeddings";
 import { ArrowCounterClockwiseIcon as IconRotate2 } from "@phosphor-icons/react/dist/ssr";
+import { MESSAGE_ACTION, MESSAGE_ACTION_ICON } from "./MessageParts";
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
+import { cosineSimilarity, type EmbeddingRun } from "./embeddings";
 import { ResponseLoader } from "./ResponseLoader";
 import { ErrorNote } from "#/components/ui/page";
 import { Button } from "#/components/ui/button";

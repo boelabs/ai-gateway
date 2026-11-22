@@ -419,6 +419,78 @@ test("anthropic.buildRequest: native /v1/messages requests keep their own cache 
 	}
 });
 
+test("anthropic.buildRequest: thinking.block_binding reaches adaptive thinking with its beta", () => {
+	const binding = { prefix_mismatch_behavior: "drop_block" };
+	const canonicalFor = (betas?: string[]) =>
+		messagesRequestToCanonical(
+			messagesRequestSchema.parse({
+				model: "claude",
+				max_tokens: 4000,
+				thinking: { type: "adaptive", block_binding: binding },
+				messages: [{ role: "user", content: "Hello" }],
+			}),
+			betas === undefined ? {} : { betas },
+		);
+
+	const built = must(anthropicAdapter, "chat").buildRequest(
+		canonicalFor(),
+		adaptiveCtx,
+	);
+	assert.deepEqual(jsonBody(built).thinking, {
+		type: "adaptive",
+		display: "summarized",
+		block_binding: binding,
+	});
+	assert.equal(
+		built.headers["anthropic-beta"],
+		"thinking-binding-controls-2026-08-01",
+	);
+
+	// The client's own copy of the beta is not repeated.
+	const withBeta = must(anthropicAdapter, "chat").buildRequest(
+		canonicalFor(["feature-2026-01-01,thinking-binding-controls-2026-08-01"]),
+		adaptiveCtx,
+	);
+	assert.equal(
+		withBeta.headers["anthropic-beta"],
+		"feature-2026-01-01,thinking-binding-controls-2026-08-01",
+	);
+
+	// Budget thinking does not take the field: it is left out, and so is the beta.
+	const budget = must(anthropicAdapter, "chat").buildRequest(
+		canonicalFor(),
+		budgetCtx,
+	);
+	assert.equal(jsonBody(budget).thinking.type, "enabled");
+	assert.equal(jsonBody(budget).thinking.block_binding, undefined);
+	assert.equal(budget.headers["anthropic-beta"], undefined);
+});
+
+test("anthropic token count sends the binding beta with thinking.block_binding", () => {
+	const handler = anthropicAdapter.messageTokenCount;
+	assert.ok(handler);
+	const thinking = {
+		type: "adaptive",
+		block_binding: { prefix_mismatch_behavior: "drop_block" },
+	};
+	const built = handler.buildRequest(
+		{
+			canonical: req,
+			rawBody: {
+				model: "claude",
+				messages: [{ role: "user", content: "Hello" }],
+				thinking,
+			},
+		},
+		ctx,
+	);
+	assert.deepEqual(jsonBody(built).thinking, thinking);
+	assert.equal(
+		built.headers["anthropic-beta"],
+		"thinking-binding-controls-2026-08-01",
+	);
+});
+
 test("anthropic.buildRequest: explicit breakpoints suppress automatic caching", () => {
 	const marker = { type: "ephemeral" };
 	const requests: CanonicalChatRequest[] = [

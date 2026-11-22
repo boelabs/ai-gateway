@@ -2,9 +2,9 @@
 
 import { Select, SelectItem } from "#/components/ui/select";
 import { NumberField } from "#/components/ui/number-field";
+import { defaultEffort, ModelSelect } from "./ModelSelect";
 import { buttonStyles } from "#/components/ui/button";
 import { Textarea } from "#/components/ui/textarea";
-import { defaultEffort, ModelSelect } from "./ModelSelect";
 import { ChatSession } from "./ChatSession";
 import { Tabs } from "#/components/ui/tabs";
 

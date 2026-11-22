@@ -1,25 +1,25 @@
 "use client";
 
-import { ActorUsage } from "./ActorUsage.tsx";
-import type { UsageRow } from "./api.ts";
 import { SearchableSelect, Select, SelectItem } from "#/components/ui/select";
 import { type Column, DataTable } from "#/components/ui/datatable";
+import { RangeFilter } from "#/shared/components/RangeFilter.tsx";
 import { cacheReuseRate, tokenCount } from "./cache-usage";
 import { Section } from "#/shared/components/Section";
 import { phaseLabel, kindLabel } from "./trace.ts";
 import { Panel } from "#/shared/components/Panel";
 import { EmptyState } from "#/components/ui/page";
 import { Button } from "#/components/ui/button";
+import { ActorUsage } from "./ActorUsage.tsx";
 import { MetricsChart } from "./MetricsChart";
-import { RangeFilter } from "#/shared/components/RangeFilter.tsx";
 import type { DetailedMetrics } from "./api";
 import { CacheUsage } from "./CacheUsage";
+import type { UsageRow } from "./api.ts";
 import { StatCard } from "./StatCard";
 
 import {
+	MagnifyingGlassMinusIcon as IconSearchX,
 	CheckCircleIcon as IconCircleCheck,
 	PulseIcon as IconActivity,
-	MagnifyingGlassMinusIcon as IconSearchX,
 	CubeIcon as IconBoxes,
 	PathIcon as IconRoute,
 	XIcon as IconX,

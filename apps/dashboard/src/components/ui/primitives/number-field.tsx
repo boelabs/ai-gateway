@@ -2,10 +2,10 @@
 
 import { NumberField as NumberFieldPrimitive } from "@base-ui/react/number-field";
 import { controlRadiusVariants } from "#/components/ui/primitives/control-radius";
+import { MinusIcon, PlusIcon } from "@phosphor-icons/react/dist/ssr";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Label } from "#/components/ui/primitives/label";
 import { createContext, useId, useContext } from "react";
-import { MinusIcon, PlusIcon } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "#/shared/lib/classes";
 import type * as React from "react";
 

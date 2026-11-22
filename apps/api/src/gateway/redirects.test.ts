@@ -1,6 +1,6 @@
+import { upstreamFetch } from "./instrumentedTransport.ts";
 import { withStubbedFetch } from "#test-support/fetch.ts";
 import type { AdapterContext } from "#adapters/types.ts";
-import { upstreamFetch } from "./instrumentedTransport.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

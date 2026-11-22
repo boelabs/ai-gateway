@@ -2,10 +2,6 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useSession } from "#/features/auth/session.tsx";
-import {
-	PushPinIcon as PinIcon,
-	PushPinSlashIcon as PinOffIcon,
-} from "@phosphor-icons/react/dist/ssr";
 import { Button } from "#/components/ui/button";
 import { usePathname } from "next/navigation";
 import { cn } from "#/shared/lib/classes";
@@ -24,6 +20,11 @@ import {
 	isPinned,
 	areaOf,
 } from "./recents.ts";
+
+import {
+	PushPinSlashIcon as PinOffIcon,
+	PushPinIcon as PinIcon,
+} from "@phosphor-icons/react/dist/ssr";
 
 /**
  * This browser's remembered records for the operator signed in. Read only after hydration: the

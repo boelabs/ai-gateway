@@ -1,10 +1,10 @@
-import { ProcessPanel, ProcessProvider } from "./Process";
-import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { createPlaygroundTransport, type PlaygroundMessage } from "./transport";
+import { ArrowDownIcon as IconArrowDown } from "@phosphor-icons/react/dist/ssr";
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { attachmentTypes, readAttachments } from "./attachments";
 import type { PlaygroundSettings, PublicEndpoint } from "./api";
-import { ArrowDownIcon as IconArrowDown } from "@phosphor-icons/react/dist/ssr";
+import { ProcessPanel, ProcessProvider } from "./Process";
 import { ErrorNote } from "#/components/ui/page";
 import { Button } from "#/components/ui/button";
 import { Conversation } from "./Conversation";

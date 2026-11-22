@@ -82,6 +82,13 @@ Signed thinking and redacted thinking blocks are opaque provider state. The gate
 replays the complete blocks, including signatures and redacted data, but does not fabricate signed
 blocks when a different provider only returns a visible reasoning summary.
 
+Anthropic binds a thinking block to the conversation that produced it: if `system`, `tools` or an
+earlier message changed since, replaying the block fails with `400`. `thinking.block_binding`
+(for example `{ "prefix_mismatch_behavior": "drop_block" }`) reaches Anthropic with adaptive thinking
+together with the `thinking-binding-controls-2026-08-01` beta, which the gateway adds itself. Budget
+thinking does not take the field, so it is left out there; other providers never receive thinking
+blocks, so it does not restrict routing.
+
 ## Error shape
 
 Errors follow Anthropic's own envelope (`{"type": "error", "error": {"type": "...", "message": "..."}}`)

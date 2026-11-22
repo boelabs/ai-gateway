@@ -1,8 +1,8 @@
-import { OPENAI_SERVICE_MODES } from "../openaiServiceMode.ts";
 import { makeOpenAIDecisionsHandler } from "#adapters/decisions.ts";
 import { makeOpenAIStyleAdapter } from "#adapters/openaiStyle.ts";
 import type { Adapter, ProviderModule } from "#adapters/types.ts";
 import { looksLikeContextWindowError } from "#core/httpError.ts";
+import { OPENAI_SERVICE_MODES } from "../openaiServiceMode.ts";
 import type { ErrorClass } from "#core/errors.ts";
 
 /** Refines a 400 based on OpenAI's code (context window / content policy). */

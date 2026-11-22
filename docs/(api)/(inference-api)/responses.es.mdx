@@ -53,6 +53,8 @@ Los proveedores pueden mostrar razonamientos visibles como `summary[].summary_te
 
 El reflejo da forma a lo que AI Gateway **devuelve**. Un elemento `reasoning` reproducido en la entrada se envía en sentido upstream solo con lo que produjo el proveedor (su identificación, `encrypted_content` y un resumen) porque los esquemas de solicitud aceptan `content` en un elemento de reasoning únicamente como una matriz vacía. Los clientes pueden devolver el artículo reflejado sin tocar; la mitad extra se les cae.
 
+`extra_body: { "thinking": { "block_binding": { ... } } }` es el control de Anthropic para bloques de thinking reenviados cuya conversación cambió. Llega a Anthropic con thinking adaptativo (define `reasoning.effort`) y nunca llega a otro proveedor. Consulta [Messages](/docs/messages#reasoning).
+
 ## `responsesTransport` paso a través [#responsestransport-passthrough]
 
 Campos específicos del contrato de transferencia Responses que no tienen un equivalente Chat Completions: `include`, `metadata`, `service_tier`, `safety_identifier`, `prompt_cache_key`, `top_logprobs`, `max_tool_calls`, `truncation`, `context_management`, y `user`: se conectan tal cual a proveedores que admiten el transport Responses de forma nativa. Los recursos de respuesta incluyen el conjunto completo de campos anulables y predeterminados requeridos por el esquema de recursos actual de OpenResponses.

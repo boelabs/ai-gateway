@@ -1,10 +1,6 @@
-import {
-	upstreamFetch,
-	upstreamWebSocket,
-} from "#gateway/instrumentedTransport.ts";
 import { EventQueue, closeStatus, rawText } from "./google/live.ts";
-import { abortGatewayError } from "#gateway/abortReason.ts";
 import type { OpenAIRealtimeDeps } from "./openaiRealtime.ts";
+import { abortGatewayError } from "#gateway/abortReason.ts";
 import { GatewayError } from "#core/errors.ts";
 
 import type {
@@ -13,6 +9,11 @@ import type {
 	AdapterContext,
 	LiveUpstream,
 } from "./types.ts";
+
+import {
+	upstreamWebSocket,
+	upstreamFetch,
+} from "#gateway/instrumentedTransport.ts";
 
 /**
  * OpenAI's GPT-Live API (`/v1/live/sessions`) as a live upstream, on OpenAI or on Azure's v1 surface.

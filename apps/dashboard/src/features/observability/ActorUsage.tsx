@@ -1,9 +1,5 @@
 "use client";
 
-import {
-	DownloadSimpleIcon as IconDownload,
-	UsersIcon as IconUsers,
-} from "@phosphor-icons/react/dist/ssr";
 import { type Column, DataTable } from "#/components/ui/datatable";
 import { Section } from "#/shared/components/Section";
 import { actorName, isKeyActor } from "./actors.ts";
@@ -12,6 +8,11 @@ import { downloadCsv } from "#/shared/lib/csv.ts";
 import { Button } from "#/components/ui/button";
 import { cacheReuseRate } from "./cache-usage";
 import type { UsageRow } from "./api";
+
+import {
+	DownloadSimpleIcon as IconDownload,
+	UsersIcon as IconUsers,
+} from "@phosphor-icons/react/dist/ssr";
 
 const count = new Intl.NumberFormat("en-US");
 const compact = new Intl.NumberFormat("en-US", {

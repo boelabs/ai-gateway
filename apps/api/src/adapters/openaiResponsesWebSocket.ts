@@ -1,5 +1,5 @@
-import { withOpenAIServiceMode } from "./openaiServiceMode.ts";
 import { upstreamWebSocket } from "#gateway/instrumentedTransport.ts";
+import { withOpenAIServiceMode } from "./openaiServiceMode.ts";
 import { abortGatewayError } from "#gateway/abortReason.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { SSEEvent } from "#core/sse.ts";

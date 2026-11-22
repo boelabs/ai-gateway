@@ -1,12 +1,13 @@
 "use client";
 
 import { OVERVIEW_PERIODS, DEFAULT_PERIOD } from "./overviewFilters.ts";
+import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
+import type { OverviewFilters } from "./overviewFilters.ts";
+
 import {
 	RangeFilterSkeleton,
 	RangeFilter,
 } from "#/shared/components/RangeFilter.tsx";
-import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
-import type { OverviewFilters } from "./overviewFilters.ts";
 
 /**
  * The overview's range control, Billete's: the action of the "Summary" section above the tiles.

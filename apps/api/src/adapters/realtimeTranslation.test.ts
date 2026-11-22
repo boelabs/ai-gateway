@@ -1,7 +1,8 @@
 import type { CanonicalRealtimeTranslationEvent } from "#core/realtimeTranslation.ts";
+import { makeGeminiRealtimeTranslationHandler } from "./google/liveTranslation.ts";
+import type { RealtimeConversationHandler, AdapterContext } from "./types.ts";
 import type { CanonicalRealtimeConversationEvent } from "#core/realtime.ts";
 import { geminiTranslationConversation } from "./google/liveTranslation.ts";
-import { makeGeminiRealtimeTranslationHandler } from "./google/liveTranslation.ts";
 import { resolveModelMetadata } from "#catalog/index.ts";
 import { type WebSocket, WebSocketServer } from "ws";
 import { openaiAdapter } from "./openai/index.ts";
@@ -11,13 +12,6 @@ import type { AddressInfo } from "node:net";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { RealtimeConversationHandler, AdapterContext } from "./types.ts";
-
-import {
-	openAIRealtimeTranslationUrl,
-	openAITranslationSession,
-} from "./openaiRealtime.ts";
-
 import {
 	applyTranslationSessionUpdate,
 	translationClientEventSchema,
@@ -25,6 +19,11 @@ import {
 	renderTranslationSession,
 	translationConfigOf,
 } from "#contracts/openai/realtimeTranslation.ts";
+
+import {
+	openAIRealtimeTranslationUrl,
+	openAITranslationSession,
+} from "./openaiRealtime.ts";
 
 test("translation contract: session.update merges, keeps noise strength, and renders OpenAI's session", () => {
 	let state = newTranslationSessionState("translate", 1000);

@@ -1,5 +1,5 @@
-import { type Auth, actorOf } from "./types.ts";
 import { parseServiceMode } from "#core/serviceMode.ts";
+import { type Auth, actorOf } from "./types.ts";
 import { GatewayError } from "#core/errors.ts";
 
 /**

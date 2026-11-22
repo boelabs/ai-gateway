@@ -1,5 +1,5 @@
-import { mapUpstreamHttpError } from "#adapters/upstreamError.ts";
 import { normalizeExecutionPolicies } from "#core/executionPolicy.ts";
+import { mapUpstreamHttpError } from "#adapters/upstreamError.ts";
 import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";

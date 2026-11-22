@@ -1,5 +1,5 @@
-import { jsonBody, must } from "#test-support/adapters.ts";
 import type { CanonicalSpeechRequest } from "#core/speech.ts";
+import { jsonBody, must } from "#test-support/adapters.ts";
 import type { AdapterContext } from "#adapters/types.ts";
 import { pcmToWav, readWav } from "#core/speech.ts";
 import { GatewayError } from "#core/errors.ts";

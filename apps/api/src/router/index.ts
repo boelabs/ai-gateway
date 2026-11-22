@@ -1,25 +1,19 @@
-import type { UpstreamTransport } from "#core/transport.ts";
 import { getEffectiveSettings, type EffectiveSettings } from "./settings.ts";
 import type { AdapterContext, AdapterDiagnostics } from "#adapters/types.ts";
-import { buildRoutingError, type FailReason } from "./routingError.ts";
 import { explainRetiredModel, MODEL_RETIRED } from "#catalog/retirement.ts";
+import { buildRoutingError, type FailReason } from "./routingError.ts";
 import type { CanonicalTerminal } from "#gateway/streamLifecycle.ts";
 import { listFallbackPoliciesFor } from "#db/repos/deployments.ts";
 import { startAttemptWatchdog } from "#gateway/attemptWatchdog.ts";
 import { resolveExecutionPolicy } from "#core/executionPolicy.ts";
 import { type FailurePhase, GatewayError } from "#core/errors.ts";
 import { beginUpstreamAttempt } from "#logging/operations.ts";
+import type { UpstreamTransport } from "#core/transport.ts";
+import { getAdapter } from "#adapters/registry.ts";
 import type { CallType } from "#core/callType.ts";
-import {
-	type ServiceMode,
-	parseServiceMode,
-	supportsServiceMode,
-	unsupportedServiceMode,
-} from "#core/serviceMode.ts";
 import { resolveTransport } from "./transport.ts";
 import { pickDeployment } from "./strategies.ts";
 import { computeCost } from "#logging/cost.ts";
-import { getAdapter } from "#adapters/registry.ts";
 import type { Usage } from "#core/usage.ts";
 import { log } from "#logging/log.ts";
 
@@ -41,13 +35,13 @@ import {
 
 import {
 	onAttemptGatewayFinish,
+	type DeploymentMetrics,
 	type CooldownCause,
 	type AttemptLease,
 	onAttemptFailure,
 	onAttemptCancel,
 	onSuccessFinish,
 	onAttemptStart,
-	type DeploymentMetrics,
 	fetchMetrics,
 } from "./state.ts";
 
@@ -65,6 +59,19 @@ import {
 } from "#gateway/deploymentCandidates.ts";
 
 import {
+	unsupportedServiceMode,
+	supportsServiceMode,
+	type ServiceMode,
+	parseServiceMode,
+} from "#core/serviceMode.ts";
+
+import {
+	clientClosedRequestError,
+	type GatewayAbortReason,
+	isClientAbortSignal,
+} from "#gateway/abortReason.ts";
+
+import {
 	finishDownstreamWriteObservation,
 	type DownstreamWriteObservation,
 } from "#endpoints/runtime/sse.ts";
@@ -74,12 +81,6 @@ import {
 	type TokenReservation,
 	reservedTotal,
 } from "./tokenReservation.ts";
-
-import {
-	type GatewayAbortReason,
-	isClientAbortSignal,
-	clientClosedRequestError,
-} from "#gateway/abortReason.ts";
 
 export interface RouteOptions {
 	clientSignal: AbortSignal;

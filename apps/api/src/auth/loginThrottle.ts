@@ -1,6 +1,6 @@
 import { getDashboardSettings } from "#db/repos/dashboardSettings.ts";
-import { GatewayError } from "#core/errors.ts";
 import { redis, runScript } from "#cache/redis.ts";
+import { GatewayError } from "#core/errors.ts";
 
 /**
  * Failed-login lockout. Three counters, all reserved atomically before the password is checked:

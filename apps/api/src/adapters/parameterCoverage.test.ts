@@ -1,11 +1,11 @@
 import type { CanonicalChatRequest } from "#core/canonical.ts";
 import { withAdapterParameters } from "#catalog/parameters.ts";
-import { resolveModelMetadata } from "#catalog/index.ts";
 import type { UpstreamTransport } from "#core/transport.ts";
+import { resolveModelMetadata } from "#catalog/index.ts";
 import type { AdapterContext } from "./types.ts";
 import { GatewayError } from "#core/errors.ts";
-import { MODEL_CATALOG } from "./index.ts";
 import { listAdapters } from "./registry.ts";
+import { MODEL_CATALOG } from "./index.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

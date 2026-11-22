@@ -1,8 +1,8 @@
-import { resolveModelMetadata } from "#catalog/index.ts";
 import type { CanonicalEmbeddingsRequest } from "#core/embeddings.ts";
 import { jsonBody, must, streamOf } from "#test-support/adapters.ts";
 import { observeChatStream } from "#gateway/streamLifecycle.ts";
 import { adapterDiagnostics } from "#adapters/diagnostics.ts";
+import { resolveModelMetadata } from "#catalog/index.ts";
 import type { AdapterContext } from "#adapters/types.ts";
 import { isUsageConsistent } from "#core/usage.ts";
 import { GatewayError } from "#core/errors.ts";
