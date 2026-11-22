@@ -1,10 +1,10 @@
+import { ArrowCounterClockwiseIcon as IconRotate2 } from "@phosphor-icons/react/dist/ssr";
 import { MessageAttachments } from "./MessageAttachments";
 import { MessageLoading, ProcessRow } from "./Process";
-import { answerOf, settleSteps } from "./steps";
-import { ArrowCounterClockwiseIcon as IconRotate2 } from "@phosphor-icons/react/dist/ssr";
 import type { PlaygroundMessage } from "./transport";
 import { ResponseDetails } from "./ResponseDetails";
 import { ErrorNote } from "#/components/ui/page";
+import { answerOf, settleSteps } from "./steps";
 import { Button } from "#/components/ui/button";
 import { Status } from "#/components/ui/status";
 import { Markdown } from "./Markdown";

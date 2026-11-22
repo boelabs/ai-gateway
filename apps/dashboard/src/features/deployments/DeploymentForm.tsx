@@ -3,8 +3,8 @@
 import { ArrowCounterClockwiseIcon as IconReset } from "@phosphor-icons/react/dist/ssr";
 import { CredentialFields } from "#/features/credentials/CredentialFields.tsx";
 import { useIdempotencyKey } from "#/shared/lib/useIdempotencyKey.ts";
-import { useToday } from "#/shared/lib/useToday.ts";
 import { ModelInput } from "#/shared/components/ModelPicker.tsx";
+import { useTransition, useState, useMemo, useRef } from "react";
 import { FormSkeleton } from "#/shared/components/Skeleton.tsx";
 import { useNotify } from "#/shared/feedback/notifications.tsx";
 import { LimitField } from "#/shared/components/LimitField.tsx";
@@ -13,6 +13,7 @@ import { SearchableSelect } from "#/components/ui/select";
 import { CustomModelEditor } from "./CustomModelEditor";
 import { parsePricing, type Pricing } from "./pricing";
 import { Panel } from "#/shared/components/Panel.tsx";
+import { useToday } from "#/shared/lib/useToday.ts";
 import { Textarea } from "#/components/ui/textarea";
 import { saveDeploymentAction } from "./actions.ts";
 import { Button } from "#/components/ui/button";
@@ -46,8 +47,6 @@ import {
 	parseCustomEntry,
 	parseObject,
 } from "./custom-model";
-
-import { useTransition, useState, useMemo, useRef } from "react";
 
 const LIST = "/models";
 

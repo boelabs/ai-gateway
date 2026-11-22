@@ -1,9 +1,9 @@
+import { createDeployment, deleteDeployment } from "#db/repos/deployments.ts";
 import { jsonResponse, withStubbedFetch } from "#test-support/fetch.ts";
 import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
 import { makeOpenAIContractTestApp } from "#test-support/app.ts";
-import { createDeployment, deleteDeployment } from "#db/repos/deployments.ts";
-import { pcmToWav, readWav } from "#core/speech.ts";
 import { speechHandler } from "#endpoints/speech.ts";
+import { pcmToWav, readWav } from "#core/speech.ts";
 import { eventually } from "#test-support/wait.ts";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";

@@ -20,13 +20,20 @@ import {
 	type TranscriptionSettings,
 	emptyTranscriptionSettings,
 	fitTranscriptionSettings,
-	transcriptionChoices,
 	type TranscriptionRun,
+	transcriptionChoices,
 	type ResponseFormat,
 	runTranscription,
 	AUDIO_TYPES,
 	timestamp,
 } from "./transcription";
+
+import {
+	ArrowCounterClockwiseIcon as IconRotate2,
+	FileTextIcon as IconFileText,
+	PlayIcon as IconPlayerPlay,
+	XIcon as IconX,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	DialogDescription,
@@ -38,13 +45,6 @@ import {
 	DialogBody,
 	DialogRoot,
 } from "#/components/ui/dialog";
-
-import {
-	FileTextIcon as IconFileText,
-	ArrowCounterClockwiseIcon as IconRotate2,
-	PlayIcon as IconPlayerPlay,
-	XIcon as IconX,
-} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	MESSAGE_ACTION_ICON,

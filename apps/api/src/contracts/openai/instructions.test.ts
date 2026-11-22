@@ -1,6 +1,6 @@
-import type { CanonicalChatRequest } from "#core/canonical.ts";
 import { buildResponsesRequestBody } from "./responsesTransport.ts";
 import { responsesRequestToCanonical } from "./responsesRender.ts";
+import type { CanonicalChatRequest } from "#core/canonical.ts";
 import { responsesRequestSchema } from "./responses.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";

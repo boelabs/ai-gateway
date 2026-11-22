@@ -1,14 +1,15 @@
 "use client";
 
 import { useDebouncedValue } from "#/shared/lib/useDebouncedValue.ts";
-import {
-	MagnifyingGlassIcon as IconSearch,
-	XIcon as IconX,
-} from "@phosphor-icons/react/dist/ssr";
 import { useEffect, useEffectEvent, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import { cn } from "#/shared/lib/classes";
+
+import {
+	MagnifyingGlassIcon as IconSearch,
+	XIcon as IconX,
+} from "@phosphor-icons/react/dist/ssr";
 
 /**
  * A search's share of a list toolbar: a 9rem start on a phone and 12rem from 40rem up, growing

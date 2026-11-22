@@ -7,10 +7,10 @@ import { candidateMetadata } from "#gateway/candidateMetadata.ts";
 import { completedTerminal } from "#gateway/streamLifecycle.ts";
 import { OperationLogDraft } from "./runtime/operationLog.ts";
 import { route, type RouteResult } from "#router/index.ts";
+import type { RawSocket } from "#http/bunServer.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { AppEnv } from "#auth/types.ts";
 import { randomUUID } from "node:crypto";
-import type { RawSocket } from "#http/bunServer.ts";
 import type { WSEvents } from "hono/ws";
 import type { Context } from "hono";
 
@@ -28,9 +28,9 @@ import {
 	MAX_QUEUED_EVENTS,
 	admitQueuedBytes,
 	queuedBytesError,
-	messageBytes,
 	REALTIME_MAX_MS,
 	watchCredential,
+	messageBytes,
 } from "./realtimeSockets.ts";
 
 import {

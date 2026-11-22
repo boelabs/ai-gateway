@@ -1,12 +1,13 @@
-import {
-	chatRequestSchema,
-	toCanonicalChatRequest,
-} from "#contracts/openai/chat.ts";
 import { jsonBody, must } from "#test-support/adapters.ts";
 import type { AdapterContext } from "./types.ts";
 import { getAdapter } from "./registry.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
+
+import {
+	toCanonicalChatRequest,
+	chatRequestSchema,
+} from "#contracts/openai/chat.ts";
 
 import "./index.ts";
 

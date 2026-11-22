@@ -18,13 +18,13 @@ import { useCopyKey } from "./useCopyKey.ts";
 import { useRouter } from "next/navigation";
 
 import {
-	KeyIcon as IconKeyRound,
 	MagnifyingGlassMinusIcon as IconSearchX,
 	PencilSimpleIcon as IconPencil,
+	KeyIcon as IconKeyRound,
+	ProhibitIcon as IconBan,
 	TrashIcon as IconTrash,
 	CheckIcon as IconCheck,
 	CopyIcon as IconCopy,
-	ProhibitIcon as IconBan,
 } from "@phosphor-icons/react/dist/ssr";
 
 /**

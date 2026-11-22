@@ -1,5 +1,5 @@
-import type { CanonicalChatStreamChunk } from "#core/canonical.ts";
 import { estimateMessagesInputTokens } from "./messagesTokenCount.ts";
+import type { CanonicalChatStreamChunk } from "#core/canonical.ts";
 import { anthropicAdapter } from "#adapters/anthropic/index.ts";
 import { jsonBody, must } from "#test-support/adapters.ts";
 import { resolveModelMetadata } from "#catalog/index.ts";

@@ -1,4 +1,3 @@
-import type { ServiceMode } from "#core/serviceMode.ts";
 import { makeGeminiRealtimeConversationHandler } from "./liveConversation.ts";
 import { makeGeminiRealtimeTranslationHandler } from "./liveTranslation.ts";
 import { mergeExtraBody, mergeExtraBodyDeep } from "#core/extraBody.ts";
@@ -12,17 +11,24 @@ import { looksLikeContextWindowError } from "#core/httpError.ts";
 import { resolveAdapterReasoning } from "#adapters/reasoning.ts";
 import { toGeminiSchema, toGeminiJsonSchema } from "./schema.ts";
 import type { ReasoningControlKind } from "#core/reasoning.ts";
+import type { ServiceMode } from "#core/serviceMode.ts";
 import { GatewayError } from "#core/errors.ts";
 import { readFile } from "node:fs/promises";
 import type { Usage } from "#core/usage.ts";
 import { randomUUID } from "node:crypto";
 import { parseSSE } from "#core/sse.ts";
-import {
-	base64LiftedSink,
-	type LiftedSink,
-	liftedIndex,
-	parseJsonLifting,
-} from "./liftedJson.ts";
+
+import type {
+	TranscriptionHandler,
+	EmbeddingsHandler,
+	AdapterContext,
+	ProviderModule,
+	SpeechHandler,
+	VideoHandler,
+	ImageHandler,
+	ChatHandler,
+	Adapter,
+} from "#adapters/types.ts";
 
 import {
 	type CanonicalVideoProviderJob,
@@ -49,17 +55,14 @@ import {
 	googleVisibleText,
 } from "#core/providerSpecificFields.ts";
 
-import type {
-	TranscriptionHandler,
-	EmbeddingsHandler,
-	SpeechHandler,
-	AdapterContext,
-	ProviderModule,
-	VideoHandler,
-	ImageHandler,
-	ChatHandler,
-	Adapter,
-} from "#adapters/types.ts";
+import {
+	type CanonicalSpeechResponse,
+	type CanonicalSpeechRequest,
+	type SpeechResponseFormat,
+	speechFormatFor,
+	pcmToWav,
+	readWav,
+} from "#core/speech.ts";
 
 import type {
 	CanonicalEmbeddingsResponse,
@@ -68,10 +71,24 @@ import type {
 } from "#core/embeddings.ts";
 
 import {
+	transcriptionProfileFor,
+	speechProfileFor,
+	imageProfileFor,
+	videoProfileFor,
+} from "#catalog/types.ts";
+
+import {
 	type CanonicalImageResponse,
 	type CanonicalImageRequest,
 	resolveImageSize,
 } from "#core/images.ts";
+
+import {
+	base64LiftedSink,
+	parseJsonLifting,
+	type LiftedSink,
+	liftedIndex,
+} from "./liftedJson.ts";
 
 import {
 	toUpstreamReasoningEffort,
@@ -83,22 +100,6 @@ import {
 	adapterContextDiagnostics,
 	attachAdapterDiagnostics,
 } from "#adapters/diagnostics.ts";
-
-import {
-	transcriptionProfileFor,
-	speechProfileFor,
-	imageProfileFor,
-	videoProfileFor,
-} from "#catalog/types.ts";
-
-import {
-	type CanonicalSpeechResponse,
-	type CanonicalSpeechRequest,
-	type SpeechResponseFormat,
-	speechFormatFor,
-	readWav,
-	pcmToWav,
-} from "#core/speech.ts";
 
 import {
 	parseGeminiTranscription,

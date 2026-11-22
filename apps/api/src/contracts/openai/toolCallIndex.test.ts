@@ -1,5 +1,5 @@
-import type { CanonicalChatStreamChunk } from "#core/canonical.ts";
 import { responsesEventsToCanonicalChunks } from "./responsesTransport.ts";
+import type { CanonicalChatStreamChunk } from "#core/canonical.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

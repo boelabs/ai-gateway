@@ -1,13 +1,14 @@
 "use client";
 
-import {
-	CaretRightIcon as ChevronRight,
-	DotsThreeIcon as MoreHorizontal,
-} from "@phosphor-icons/react/dist/ssr";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cn } from "#/shared/lib/classes";
 import type * as React from "react";
+
+import {
+	DotsThreeIcon as MoreHorizontal,
+	CaretRightIcon as ChevronRight,
+} from "@phosphor-icons/react/dist/ssr";
 
 export function Breadcrumb({
 	...props

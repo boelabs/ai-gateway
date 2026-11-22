@@ -11,16 +11,16 @@ import { Button } from "#/components/ui/button";
 import type { OperationRow } from "./api.ts";
 
 import {
+	MagnifyingGlassMinusIcon as IconSearchX,
+	ScrollIcon as IconScrollText,
+} from "@phosphor-icons/react/dist/ssr";
+
+import {
 	type LogsFilters,
 	DEFAULT_PERIOD,
 	isFiltered,
 	PAGE_SIZE,
 } from "./logFilters.ts";
-
-import {
-	ScrollIcon as IconScrollText,
-	MagnifyingGlassMinusIcon as IconSearchX,
-} from "@phosphor-icons/react/dist/ssr";
 
 function errorCode(row: OperationRow): string | null {
 	const { error } = row as {

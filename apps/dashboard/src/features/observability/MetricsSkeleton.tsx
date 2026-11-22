@@ -1,7 +1,7 @@
+import { RangeFilterSkeleton } from "#/shared/components/RangeFilter.tsx";
 import { ActivitySkeleton, BreakdownSkeleton } from "./ChartSkeleton";
 import { CacheUsageSkeleton } from "./OverviewSkeleton";
 import { Section } from "#/shared/components/Section";
-import { RangeFilterSkeleton } from "#/shared/components/RangeFilter.tsx";
 
 import {
 	StatGridSkeleton,

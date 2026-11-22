@@ -3,8 +3,8 @@ import { test } from "node:test";
 
 import {
 	assertServiceTierAgrees,
-	parseServiceMode,
 	supportsServiceMode,
+	parseServiceMode,
 } from "./serviceMode.ts";
 
 test("only a known mode is split off the model slug", () => {

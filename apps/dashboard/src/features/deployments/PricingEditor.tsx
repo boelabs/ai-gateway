@@ -1,10 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import {
-	PlusIcon as IconPlus,
-	TrashIcon as IconTrash,
-} from "@phosphor-icons/react/dist/ssr";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 
@@ -14,6 +10,11 @@ import {
 	type PricingTier,
 	type Pricing,
 } from "./pricing";
+
+import {
+	TrashIcon as IconTrash,
+	PlusIcon as IconPlus,
+} from "@phosphor-icons/react/dist/ssr";
 
 /** The unit is said once, in the panel's description; each label names only the rate. */
 const RATE_LABELS: Record<PricingRateField, string> = {

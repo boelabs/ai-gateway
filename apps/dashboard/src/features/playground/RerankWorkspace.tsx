@@ -25,17 +25,17 @@ import {
 } from "#/components/ui/dialog";
 
 import {
+	ArrowCounterClockwiseIcon as IconRotate2,
+	CaretDownIcon as IconChevronDown,
+} from "@phosphor-icons/react/dist/ssr";
+
+import {
 	type RerankSettings,
 	emptyRerankSettings,
 	type RerankRun,
 	rankingFrom,
 	runRerank,
 } from "./rerank";
-
-import {
-	CaretDownIcon as IconChevronDown,
-	ArrowCounterClockwiseIcon as IconRotate2,
-} from "@phosphor-icons/react/dist/ssr";
 
 /** One document per line, the same rule the embedding batch uses. */
 export function documentsFrom(draft: string): string[] {

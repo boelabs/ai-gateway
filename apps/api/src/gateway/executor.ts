@@ -1,6 +1,6 @@
 import { assertRerankResponseValid } from "./rerankResponseValidation.ts";
-import { assertDecisionResponseValid } from "./decisionValidation.ts";
 import { assertTextRequestSupported } from "./textRequestValidation.ts";
+import { assertDecisionResponseValid } from "./decisionValidation.ts";
 import type { AdapterDiagnostics } from "#adapters/types.ts";
 import { upstreamFetch } from "./instrumentedTransport.ts";
 import { abortGatewayError } from "./abortReason.ts";
@@ -54,6 +54,11 @@ import {
 	startOperationChildTelemetry,
 } from "#telemetry/index.ts";
 
+import type {
+	CanonicalDecisionResponse,
+	CanonicalDecisionRequest,
+} from "#core/decisions.ts";
+
 import {
 	adapterContextDiagnostics,
 	adapterDiagnostics,
@@ -68,11 +73,6 @@ import type {
 	CanonicalSpeechResponse,
 	CanonicalSpeechRequest,
 } from "#core/speech.ts";
-
-import type {
-	CanonicalDecisionResponse,
-	CanonicalDecisionRequest,
-} from "#core/decisions.ts";
 
 export type ChatExecResult =
 	| {

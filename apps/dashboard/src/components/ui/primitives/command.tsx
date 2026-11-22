@@ -1,7 +1,7 @@
 "use client";
 
-import { Dialog as CommandDialogPrimitive } from "@base-ui/react/dialog";
 import { MagnifyingGlassIcon as SearchIcon } from "@phosphor-icons/react/dist/ssr";
+import { Dialog as CommandDialogPrimitive } from "@base-ui/react/dialog";
 import { cn } from "#/shared/lib/classes";
 import type * as React from "react";
 

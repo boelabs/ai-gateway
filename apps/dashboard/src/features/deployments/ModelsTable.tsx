@@ -1,27 +1,25 @@
 "use client";
 
 import { Select, SelectItem, SearchableSelect } from "#/components/ui/select";
-import {
-	SegmentIcon,
-	ListToolbar,
-	ListSelect,
-} from "#/shared/components/ListToolbar";
 import { SEARCH_WIDTH, SearchField } from "#/shared/components/SearchField";
 import { RowActions } from "#/shared/components/RowActions";
 import { Frame, FrameFooter } from "#/components/ui/frame";
+import { useToday } from "#/shared/lib/useToday.ts";
 import { useState, type ReactNode } from "react";
 import { Button } from "#/components/ui/button";
 import { Status } from "#/components/ui/status";
-import {
-	type AdapterLabels,
-	type Deployment,
-	adapterLabel,
-	retirementLabel,
-	retirementNotice,
-	retirementOf,
-} from "./common";
-import { useToday } from "#/shared/lib/useToday.ts";
 import Link from "next/link";
+
+import {
+	CaretRightIcon as ChevronRight,
+	CaretLeftIcon as ChevronLeft,
+	PencilSimpleIcon as Pencil,
+	ColumnsIcon as Columns3,
+	FunnelXIcon as FilterX,
+	TrashIcon as Trash2,
+	ProhibitIcon as Ban,
+	CheckIcon as Check,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	MenuCheckboxItemIndicator,
@@ -34,6 +32,15 @@ import {
 } from "#/components/ui/menu";
 
 import {
+	type AdapterLabels,
+	retirementNotice,
+	type Deployment,
+	retirementLabel,
+	adapterLabel,
+	retirementOf,
+} from "./common";
+
+import {
 	type ModelOrder,
 	filterModelRows,
 	sortModelRows,
@@ -43,17 +50,6 @@ import {
 } from "./modelTableState";
 
 import {
-	CaretRightIcon as ChevronRight,
-	CaretLeftIcon as ChevronLeft,
-	ColumnsIcon as Columns3,
-	FunnelXIcon as FilterX,
-	PencilSimpleIcon as Pencil,
-	TrashIcon as Trash2,
-	CheckIcon as Check,
-	ProhibitIcon as Ban,
-} from "@phosphor-icons/react/dist/ssr";
-
-import {
 	TableHeader,
 	TableBody,
 	TableHead,
@@ -61,6 +57,12 @@ import {
 	TableRow,
 	Table,
 } from "#/components/ui/table";
+
+import {
+	SegmentIcon,
+	ListToolbar,
+	ListSelect,
+} from "#/shared/components/ListToolbar";
 
 import {
 	ButtonSkeleton,

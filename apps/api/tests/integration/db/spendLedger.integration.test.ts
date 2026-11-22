@@ -2,12 +2,20 @@ import { createVideoJob, purgeFinishedVideoRows } from "#db/repos/videos.ts";
 import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
 import { reserveVirtualKeyUsage } from "#ratelimit/index.ts";
 import { spendLedger, videoJobs } from "#db/schema.ts";
+import { eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { redis } from "#cache/redis.ts";
 import { db } from "#db/client.ts";
-import { eq, inArray } from "drizzle-orm";
 import { test } from "node:test";
+
+import {
+	recordVirtualKeySpend,
+	getVirtualKeyById,
+	pruneSpendLedger,
+	createVirtualKey,
+	deleteVirtualKey,
+} from "#db/repos/virtualKeys.ts";
 
 import {
 	STALE_BILLING_CLAIM_MS,
@@ -15,14 +23,6 @@ import {
 	reconcileVideoBilling,
 	reservedBilling,
 } from "#videos/billing.ts";
-
-import {
-	recordVirtualKeySpend,
-	pruneSpendLedger,
-	getVirtualKeyById,
-	createVirtualKey,
-	deleteVirtualKey,
-} from "#db/repos/virtualKeys.ts";
 
 const skip = (await Promise.all([pgAvailable(), redisAvailable()])).every(
 	Boolean,

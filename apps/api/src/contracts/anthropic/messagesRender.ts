@@ -1,5 +1,6 @@
-import { assertNoManagedExtraBodyKeys } from "#core/extraBody.ts";
 import { type MessagesRequest, messagesRequestSchema } from "./messages.ts";
+import { thinkingBlockBinding } from "#contracts/thinkingBlockBinding.ts";
+import { assertNoManagedExtraBodyKeys } from "#core/extraBody.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { SSEEvent } from "#core/sse.ts";
 import type { Usage } from "#core/usage.ts";
@@ -10,13 +11,13 @@ import {
 	providerFieldsWithAnthropicContentBlocks,
 	anthropicStreamBlockFromProviderFields,
 	anthropicStopReasonFromProviderFields,
-	hasNonCanonicalAnthropicContent,
 	googleContentPartsFromProviderFields,
 	providerFieldsWithGoogleContentParts,
 	providerFieldsWithAnthropicThinking,
 	anthropicThinkingFromProviderFields,
 	openaiReasoningFromProviderFields,
 	providerFieldsWithOpenAIReasoning,
+	hasNonCanonicalAnthropicContent,
 	messageStateFromProviderFields,
 	providerFieldsWithMessageState,
 	type OpenAIReasoningStateItem,
@@ -669,6 +670,16 @@ export function messagesRequestToCanonical(
 	const betas = betaNames(options.betas ?? []);
 	if (betas.length > 0) {
 		u.messagesTransport = { ...u.messagesTransport, betas };
+	}
+	const blockBinding = thinkingBlockBinding(
+		req.thinking,
+		"thinking.block_binding",
+	);
+	if (blockBinding !== undefined) {
+		u.messagesTransport = {
+			...u.messagesTransport,
+			thinkingBlockBinding: blockBinding,
+		};
 	}
 	const effort = reasoningEffortFromMessages(req);
 	const display = displayFromThinking(req.thinking);

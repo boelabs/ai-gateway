@@ -19,11 +19,11 @@ import { useState } from "react";
 
 import {
 	MagnifyingGlassMinusIcon as IconSearchX,
+	ProhibitIcon as IconBan,
 	TrashIcon as IconTrash,
-	KeyIcon as IconKey,
 	CheckIcon as IconCheck,
 	UsersIcon as IconUsers,
-	ProhibitIcon as IconBan,
+	KeyIcon as IconKey,
 } from "@phosphor-icons/react/dist/ssr";
 
 import {

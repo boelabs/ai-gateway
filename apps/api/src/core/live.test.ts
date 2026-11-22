@@ -1,10 +1,11 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
 import {
 	liveDelegatedModels,
 	liveDelegationType,
 	LiveUsageMeter,
 } from "./live.ts";
-import assert from "node:assert/strict";
-import { test } from "node:test";
 
 test("live: delegation type defaults to client, and both backend models are found", () => {
 	assert.equal(liveDelegationType({}), "client");

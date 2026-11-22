@@ -1,8 +1,8 @@
 "use client";
 
+import { ArrowsClockwiseIcon as IconRefresh } from "@phosphor-icons/react/dist/ssr";
 import { useAutoRefresh } from "#/shared/lib/useAutoRefresh.ts";
 import { useRefresh } from "#/shared/lib/useRefresh.ts";
-import { ArrowsClockwiseIcon as IconRefresh } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "#/components/ui/button";
 
 /**

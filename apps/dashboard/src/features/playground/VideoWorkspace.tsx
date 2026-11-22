@@ -1,6 +1,7 @@
 "use client";
 
 import { ScrollArea } from "#/components/ui/primitives/scroll-area";
+import { XIcon as IconX } from "@phosphor-icons/react/dist/ssr";
 import type { ModelChoice, PlaygroundModel } from "./models";
 import { Select, SelectItem } from "#/components/ui/select";
 import { VideoSettingsDialog } from "./VideoSettings";
@@ -8,7 +9,6 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { VideoRunView } from "./VideoRunView";
 import { ModelSelect } from "./ModelSelect";
-import { XIcon as IconX } from "@phosphor-icons/react/dist/ssr";
 import { Workspace } from "./Workspace";
 import { Composer } from "./Composer";
 

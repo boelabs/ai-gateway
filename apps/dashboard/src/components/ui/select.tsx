@@ -1,8 +1,8 @@
 "use client";
 
-import { ScrollArea } from "./primitives/scroll-area";
 import { Children, isValidElement, type ReactNode, useState } from "react";
 import { Select as BaseSelect } from "@base-ui/react/select";
+import { ScrollArea } from "./primitives/scroll-area";
 import { Combobox } from "./combobox";
 import { Field } from "./field";
 
@@ -15,15 +15,15 @@ import {
 } from "./appearance";
 
 import {
-	CaretUpDownIcon as IconSelector,
-	CheckIcon as IconCheck,
-} from "@phosphor-icons/react/dist/ssr";
-
-import {
 	selectTriggerIconClassName,
 	selectTriggerVariants,
 	selectPopupVariants,
 } from "./primitives/select";
+
+import {
+	CaretUpDownIcon as IconSelector,
+	CheckIcon as IconCheck,
+} from "@phosphor-icons/react/dist/ssr";
 
 function Trigger({
 	className,

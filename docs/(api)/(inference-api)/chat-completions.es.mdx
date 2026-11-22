@@ -49,6 +49,8 @@ Algunos proveedores devuelven un estado de llamada de herramienta opaco que debe
 
 Campos específicos del proveedor que el gateway no administra directamente (por ejemplo, `top_k`, `repetition_penalty`, `guided_json` de vLLM). Se fusionó en último lugar con el cuerpo upstream, sin sobrescribir ningún campo que administre el propio gateway; no puede usar `extra_body` para pasar de contrabando una anulación de `temperature` o `tools`, por ejemplo. El contenido está configurado por el proveedor y es responsabilidad del cliente.
 
+Una excepción: `extra_body.thinking` con solo `block_binding` (o el mismo `thinking` en el nivel superior) es el control de Anthropic para bloques de thinking reenviados cuya conversación cambió. Sale de `extra_body`, llega a Anthropic con thinking adaptativo (define `reasoning_effort`) y nunca llega a otro proveedor. Consulta [Messages](/docs/messages#reasoning).
+
 ## Entrada de visión, audio y archivos [#vision-audio-and-file-input]
 
 `content` acepta matrices de varias partes: `{"type": "image_url", "image_url": {"url": "..."}}` (URL o URL de datos base64) en modelos `vision: true`, además de piezas de audio y archivos en modelos cuyo perfil de catálogo declara compatibilidad. La generación de video se expone a través de la API dedicada `/v1/videos`, no a través de una parte de chat `video_url`.

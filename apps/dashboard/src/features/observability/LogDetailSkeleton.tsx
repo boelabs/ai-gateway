@@ -1,3 +1,5 @@
+import { GhostSkeleton, Skeleton } from "#/shared/components/Skeleton.tsx";
+import { TextSkeleton } from "#/shared/components/TextSkeleton.tsx";
 import { Frame, FramePanel } from "#/components/ui/frame";
 import { Panel } from "#/shared/components/Panel.tsx";
 import { PageHeader } from "#/components/ui/page";
@@ -12,10 +14,6 @@ import {
 	BreadcrumbPage,
 	Breadcrumb,
 } from "#/components/ui/breadcrumb";
-
-import { GhostSkeleton, Skeleton } from "#/shared/components/Skeleton.tsx";
-
-import { TextSkeleton } from "#/shared/components/TextSkeleton.tsx";
 
 /**
  * The operation's page while the gateway answers: the same breadcrumb, header, panels and lists,

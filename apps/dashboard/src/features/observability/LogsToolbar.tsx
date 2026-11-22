@@ -1,25 +1,21 @@
 "use client";
 
-import {
-	SegmentIcon,
-	ListToolbar,
-	ListSelect,
-} from "#/shared/components/ListToolbar.tsx";
-import { SearchableSelect } from "#/components/ui/select";
-import { RefreshControls } from "#/shared/components/RefreshControls.tsx";
-import {
-	RangeFilterSkeleton,
-	RangeFilter,
-} from "#/shared/components/RangeFilter.tsx";
 import { SEARCH_WIDTH, SearchField } from "#/shared/components/SearchField.tsx";
+import { RefreshControls } from "#/shared/components/RefreshControls.tsx";
 import { useSearchWriter } from "#/shared/lib/useSearchWriter.ts";
 import { GhostSkeleton } from "#/shared/components/Skeleton.tsx";
 import { createTableRows } from "#/shared/lib/tableRows.tsx";
+import { SearchableSelect } from "#/components/ui/select";
 import { causeLabel, FAILURE_OWNERS } from "./trace.ts";
 import { downloadCsv } from "#/shared/lib/csv.ts";
 import { Button } from "#/components/ui/button";
 import type { OperationRow } from "./api.ts";
 import type { ReactNode } from "react";
+
+import {
+	DownloadSimpleIcon as IconDownload,
+	FunnelXIcon as IconFilterOff,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	type LogsFilters,
@@ -31,9 +27,15 @@ import {
 } from "./logFilters.ts";
 
 import {
-	FunnelXIcon as IconFilterOff,
-	DownloadSimpleIcon as IconDownload,
-} from "@phosphor-icons/react/dist/ssr";
+	SegmentIcon,
+	ListToolbar,
+	ListSelect,
+} from "#/shared/components/ListToolbar.tsx";
+
+import {
+	RangeFilterSkeleton,
+	RangeFilter,
+} from "#/shared/components/RangeFilter.tsx";
 
 const OUTCOME_LABELS: Record<string, string> = {
 	success: "Success",

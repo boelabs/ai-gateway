@@ -1,11 +1,6 @@
-import {
-	type ServiceMode,
-	SERVICE_MODES,
-	supportsServiceMode,
-} from "#core/serviceMode.ts";
-import type { OperationProfiles, TransportOverrides } from "#profiles/types.ts";
 import { publicTranscriptionCapabilities } from "#catalog/publicTranscriptionCapabilities.ts";
 import { publicEmbeddingCapabilities } from "#catalog/publicEmbeddingCapabilities.ts";
+import type { OperationProfiles, TransportOverrides } from "#profiles/types.ts";
 import { publicImageCapabilities } from "#catalog/publicImageCapabilities.ts";
 import { publicVideoCapabilities } from "#catalog/publicVideoCapabilities.ts";
 import { publicTextCapabilities } from "#catalog/publicTextCapabilities.ts";
@@ -20,9 +15,9 @@ import { OPERATIONS } from "#operations/registry.ts";
 import { assertModelAllowed } from "#auth/scope.ts";
 import { getAdapter } from "#adapters/registry.ts";
 import { fetchMetrics } from "#router/state.ts";
+import { pricingAt } from "#catalog/pricing.ts";
 import { GatewayError } from "#core/errors.ts";
 import type { AppEnv } from "#auth/types.ts";
-import { pricingAt } from "#catalog/pricing.ts";
 import { createHash } from "node:crypto";
 import type { Context } from "hono";
 
@@ -31,6 +26,12 @@ import {
 	deploymentSubject,
 	capacitySubject,
 } from "#router/circuit.ts";
+
+import {
+	supportsServiceMode,
+	type ServiceMode,
+	SERVICE_MODES,
+} from "#core/serviceMode.ts";
 
 import {
 	supportedParameterNames,

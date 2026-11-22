@@ -9,6 +9,13 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 
 import {
+	CaretUpDownIcon as ChevronsUpDownIcon,
+	GearSixIcon as SettingsIcon,
+	SignOutIcon as LogOutIcon,
+	KeyboardIcon,
+} from "@phosphor-icons/react/dist/ssr";
+
+import {
 	MenuRadioGroup,
 	MenuSeparator,
 	MenuRadioItem,
@@ -18,13 +25,6 @@ import {
 	MenuItem,
 	Menu,
 } from "#/components/ui/primitives/menu";
-
-import {
-	CaretUpDownIcon as ChevronsUpDownIcon,
-	GearSixIcon as SettingsIcon,
-	KeyboardIcon,
-	SignOutIcon as LogOutIcon,
-} from "@phosphor-icons/react/dist/ssr";
 
 /**
  * The foot while the gateway says who is signed in: the trigger's own row, so nothing moves when

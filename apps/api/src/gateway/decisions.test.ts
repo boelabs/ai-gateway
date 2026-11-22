@@ -1,21 +1,22 @@
+import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
+import { assertDecisionRequestSupported } from "./decisionValidation.ts";
+import { jsonResponse, withStubbedFetch } from "#test-support/fetch.ts";
+import { azureopenaiAdapter } from "#adapters/azureopenai/index.ts";
+import { openrouterAdapter } from "#adapters/openrouter/index.ts";
+import type { Adapter, AdapterContext } from "#adapters/types.ts";
+import { typesafeAdapter } from "#adapters/typesafe/index.ts";
+import type { UpstreamTransport } from "#core/transport.ts";
+import { openaiAdapter } from "#adapters/openai/index.ts";
+import { googleAdapter } from "#adapters/google/index.ts";
+import { resolveModelMetadata } from "#catalog/index.ts";
+import { executeDecisions } from "./executor.ts";
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
 import type {
 	CanonicalDecisionRequest,
 	DecisionQuestion,
 } from "#core/decisions.ts";
-import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
-import { jsonResponse, withStubbedFetch } from "#test-support/fetch.ts";
-import { azureopenaiAdapter } from "#adapters/azureopenai/index.ts";
-import { openrouterAdapter } from "#adapters/openrouter/index.ts";
-import { assertDecisionRequestSupported } from "./decisionValidation.ts";
-import type { Adapter, AdapterContext } from "#adapters/types.ts";
-import { typesafeAdapter } from "#adapters/typesafe/index.ts";
-import { resolveModelMetadata } from "#catalog/index.ts";
-import { openaiAdapter } from "#adapters/openai/index.ts";
-import { googleAdapter } from "#adapters/google/index.ts";
-import type { UpstreamTransport } from "#core/transport.ts";
-import { executeDecisions } from "./executor.ts";
-import assert from "node:assert/strict";
-import { test } from "node:test";
 
 const PNG =
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";

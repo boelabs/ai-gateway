@@ -1,9 +1,9 @@
 "use client";
 
 import { type AppearanceProps, appearanceStyle } from "./appearance.ts";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { Alert, AlertDescription } from "./primitives/alert";
 import type { CSSProperties, ReactNode } from "react";
-import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { ContentPanel } from "./card";
 
 import {

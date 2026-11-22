@@ -1,15 +1,11 @@
-import type { ServiceMode } from "#core/serviceMode.ts";
-import {
-	toUpstreamReasoningEffort,
-	summaryVisible,
-	thinkingBudget,
-} from "#core/reasoning.ts";
 import { type BaseCreds, requireApiKeyCreds } from "#adapters/creds.ts";
 import { mapUpstreamHttpError } from "#adapters/upstreamError.ts";
+import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import { assertNoPrefixCachePolicy } from "#core/promptCache.ts";
 import { looksLikeContextWindowError } from "#core/httpError.ts";
 import { resolveAdapterReasoning } from "#adapters/reasoning.ts";
 import type { ReasoningControlKind } from "#core/reasoning.ts";
+import type { ServiceMode } from "#core/serviceMode.ts";
 import { toAnthropicStrictSchema } from "./schema.ts";
 import { mergeExtraBody } from "#core/extraBody.ts";
 import { GatewayError } from "#core/errors.ts";
@@ -20,15 +16,15 @@ import { parseSSE } from "#core/sse.ts";
 import {
 	anthropicContentBlocksFromProviderFields,
 	providerFieldsWithAnthropicContentBlocks,
-	providerFieldsWithAnthropicThinking,
-	anthropicThinkingFromProviderFields,
-	type AnthropicThinkingBlock,
 	providerFieldsWithAnthropicStreamBlock,
 	providerFieldsWithAnthropicStopReason,
+	providerFieldsWithAnthropicThinking,
+	anthropicThinkingFromProviderFields,
 	hasNonCanonicalAnthropicContent,
+	type AnthropicThinkingBlock,
 	anthropicContentMatches,
-	isGatewayState,
 	mergeProviderFields,
+	isGatewayState,
 } from "#core/providerSpecificFields.ts";
 
 import type {
@@ -39,8 +35,6 @@ import type {
 	CanonicalContentPart,
 	CanonicalMessage,
 } from "#core/canonical.ts";
-
-import type { ParameterSupportMap } from "#catalog/parameters.ts";
 
 import type {
 	MessageTokenCountRequest,
@@ -57,6 +51,12 @@ import {
 	adapterContextDiagnostics,
 	attachAdapterDiagnostics,
 } from "#adapters/diagnostics.ts";
+
+import {
+	toUpstreamReasoningEffort,
+	summaryVisible,
+	thinkingBudget,
+} from "#core/reasoning.ts";
 
 interface AnthropicCreds extends BaseCreds {
 	version?: string;
@@ -121,6 +121,7 @@ const DEFAULT_BASE = "https://api.anthropic.com/v1";
 const DEFAULT_VERSION = "2023-06-01";
 const DEFAULT_MAX_TOKENS = 4096;
 const FAST_MODE_BETA = "fast-mode-2026-02-01";
+const THINKING_BINDING_BETA = "thinking-binding-controls-2026-08-01";
 /**
  * Fast mode is `speed: "fast"` on the standard model id, chosen with a `model:fast` slug. Which models
  * have it is the catalog's `pricing.serviceTiers.fast`; the response's `usage.speed` says whether it
@@ -533,6 +534,28 @@ function applyReasoning(
 	};
 }
 
+/**
+ * The client's `thinking.block_binding`. Anthropic takes it only with adaptive thinking; models
+ * thinking on a budget or not at all do not bind blocks to the conversation, so it is left out.
+ */
+function applyBlockBinding(
+	body: Record<string, unknown>,
+	req: CanonicalChatRequest,
+): void {
+	const binding = req.messagesTransport?.thinkingBlockBinding;
+	const thinking = body.thinking as Record<string, unknown> | undefined;
+	if (binding === undefined || thinking?.type !== "adaptive") {
+		return;
+	}
+	body.thinking = { ...thinking, block_binding: structuredClone(binding) };
+}
+
+/** Whether the body sends `thinking.block_binding`, which Anthropic rejects without its beta. */
+function hasBlockBinding(body: Record<string, unknown>): boolean {
+	const thinking = body.thinking as Record<string, unknown> | undefined;
+	return thinking?.block_binding !== undefined;
+}
+
 /** Whether the request forces a tool call, which `tool_choice` any or tool means on Anthropic. */
 function forcesToolUse(choice: CanonicalChatRequest["toolChoice"]): boolean {
 	if (choice === undefined || typeof choice === "string") {
@@ -788,6 +811,7 @@ function buildBody(
 		}
 	}
 	applyReasoning(body, req, ctx);
+	applyBlockBinding(body, req);
 	applyResponseFormat(body, req);
 	for (const [key, value] of Object.entries(
 		req.messagesTransport?.nativeFields ?? {},
@@ -1704,18 +1728,21 @@ function buildTokenCountBody(
 
 const chat: ChatHandler = {
 	buildRequest(req, ctx) {
+		const body = buildBody(req, ctx);
+		const betas = [...(req.messagesTransport?.betas ?? [])];
+		if (hasBlockBinding(body)) {
+			betas.push(THINKING_BINDING_BETA);
+		}
 		const { base, headers } = requestHeaders(ctx, {
 			fastMode: ctx.serviceMode === "fast",
 			providerFileId: requestUsesProviderFileId(req),
-			...(req.messagesTransport?.betas
-				? { betas: req.messagesTransport.betas }
-				: {}),
+			...(betas.length > 0 ? { betas } : {}),
 		});
 		return {
 			method: "POST",
 			url: `${base}/messages`,
 			headers,
-			body: JSON.stringify(buildBody(req, ctx)),
+			body: JSON.stringify(body),
 		};
 	},
 	parseResponse,
@@ -1725,14 +1752,16 @@ const chat: ChatHandler = {
 
 const messageTokenCount: MessageTokenCountHandler = {
 	buildRequest(req, ctx) {
+		const body = buildTokenCountBody(req, ctx);
 		const { base, headers } = requestHeaders(ctx, {
 			providerFileId: requestUsesProviderFileId(req.canonical),
+			...(hasBlockBinding(body) ? { betas: [THINKING_BINDING_BETA] } : {}),
 		});
 		return {
 			method: "POST",
 			url: `${base}/messages/count_tokens`,
 			headers,
-			body: JSON.stringify(buildTokenCountBody(req, ctx)),
+			body: JSON.stringify(body),
 		};
 	},
 	parseResponse(raw) {

@@ -1,5 +1,5 @@
-import type { ParameterSupportEntry } from "./parameters.ts";
 import { resolveModelMetadata, getCatalogEntry } from "./index.ts";
+import type { ParameterSupportEntry } from "./parameters.ts";
 import { reasoningLogInfo } from "../core/reasoning.ts";
 import { MODEL_CATALOG } from "#adapters/index.ts";
 import assert from "node:assert/strict";

@@ -1,23 +1,17 @@
-import { withOpenAIServiceMode } from "./openaiServiceMode.ts";
-import type { ServiceMode } from "#core/serviceMode.ts";
-import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { makeOpenAIResponsesWebSocketHandler } from "./openaiResponsesWebSocket.ts";
-import { makeOpenAILiveHandler } from "./openaiLive.ts";
-import {
-	makeOpenAIRealtimeTranscriptionHandler,
-	makeOpenAIRealtimeConversationHandler,
-	makeOpenAIRealtimeTranslationHandler,
-	type OpenAIRealtimeDeps,
-} from "./openaiRealtime.ts";
+import { mapUpstreamStreamError } from "#adapters/upstreamError.ts";
 import { upstreamFetch } from "#gateway/instrumentedTransport.ts";
+import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import { looksLikeContextWindowError } from "#core/httpError.ts";
 import { GatewayError, type ErrorClass } from "#core/errors.ts";
 import { type BaseCreds, requireApiKeyCreds } from "./creds.ts";
+import { withOpenAIServiceMode } from "./openaiServiceMode.ts";
 import type { CanonicalChatRequest } from "#core/canonical.ts";
 import type { ReasoningControlKind } from "#core/reasoning.ts";
 import type { UpstreamTransport } from "#core/transport.ts";
-import type { ParameterSupportMap } from "#catalog/parameters.ts";
 import { mapUpstreamHttpError } from "./upstreamError.ts";
+import type { ServiceMode } from "#core/serviceMode.ts";
+import { makeOpenAILiveHandler } from "./openaiLive.ts";
 import type { ImageOperation } from "#core/images.ts";
 import { mergeExtraBody } from "#core/extraBody.ts";
 import { parseSSE } from "#core/sse.ts";
@@ -42,10 +36,11 @@ import {
 } from "#core/videos.ts";
 
 import {
-	responsesEventsToCanonicalChunks,
-	buildResponsesRequestBody,
-	parseResponsesResponse,
-} from "#contracts/openai/responsesTransport.ts";
+	makeOpenAIRealtimeTranscriptionHandler,
+	makeOpenAIRealtimeConversationHandler,
+	makeOpenAIRealtimeTranslationHandler,
+	type OpenAIRealtimeDeps,
+} from "./openaiRealtime.ts";
 
 import type {
 	TranscriptionHandler,
@@ -60,6 +55,19 @@ import type {
 } from "./types.ts";
 
 import {
+	type BuildChatBodyOptions,
+	parseOpenAIChatResponse,
+	parseOpenAIChatChunk,
+	buildOpenAIChatBody,
+} from "#contracts/openai/chatTransport.ts";
+
+import {
+	responsesEventsToCanonicalChunks,
+	buildResponsesRequestBody,
+	parseResponsesResponse,
+} from "#contracts/openai/responsesTransport.ts";
+
+import {
 	recordUnknownAdapterEvent,
 	adapterContextDiagnostics,
 	attachAdapterDiagnostics,
@@ -71,13 +79,6 @@ import {
 	parseTranscriptionStream,
 	buildTranscriptionForm,
 } from "#contracts/openai/audioTransport.ts";
-
-import {
-	type BuildChatBodyOptions,
-	parseOpenAIChatResponse,
-	parseOpenAIChatChunk,
-	buildOpenAIChatBody,
-} from "#contracts/openai/chatTransport.ts";
 
 import {
 	parseEmbeddingsResponse,

@@ -4,8 +4,8 @@ import { ToggleGroup } from "#/components/ui/toggle-group";
 import { ChartTooltip } from "#/components/ui/chart";
 import { Panel } from "#/shared/components/Panel";
 import { Toggle } from "#/components/ui/toggle";
-import { compact } from "./metrics-data";
 import { cn } from "#/shared/lib/classes";
+import { compact } from "./metrics-data";
 import { useState } from "react";
 
 import {

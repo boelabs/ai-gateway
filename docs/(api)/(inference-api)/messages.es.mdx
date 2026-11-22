@@ -47,6 +47,8 @@ Un `thinking.budget_tokens` que envíes se conserva tal cual: los modelos basado
 
 Los bloques de thinking firmados y los bloques ocultos son estado opaco del proveedor. El gateway conserva y reenvía los bloques completos, incluidas las firmas y los datos ocultos. Si otro proveedor solo devuelve un resumen visible de reasoning, AI Gateway no fabrica bloques firmados.
 
+Anthropic ata cada bloque de thinking a la conversación que lo produjo: si `system`, `tools` o un mensaje anterior cambiaron desde entonces, reenviar el bloque falla con `400`. `thinking.block_binding` (por ejemplo `{ "prefix_mismatch_behavior": "drop_block" }`) llega a Anthropic con thinking adaptativo junto con el beta `thinking-binding-controls-2026-08-01`, que el gateway agrega por su cuenta. El thinking por presupuesto no acepta el campo, así que ahí se omite; los demás proveedores nunca reciben bloques de thinking, así que no restringe el enrutamiento.
+
 ## Formato de los errores [#error-shape]
 
 Los errores siguen el propio formato de Anthropic (`{"type": "error", "error": {"type": "...", "message": "..."}}`) específicamente en este endpoint, aunque la clasificación interna del gateway es idéntica en los tres contratos de texto; consulta [Solución de problemas](/docs/troubleshooting) para conocer la asignación de clase a tipo.

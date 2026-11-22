@@ -1,8 +1,3 @@
-import {
-	admitQueuedBytes,
-	queuedBytesError,
-	messageBytes,
-} from "./realtimeSockets.ts";
 import { ResponsesWebSocketUpstreams } from "#gateway/responsesWebSocketSessions.ts";
 import type { GatewayError as GatewayErrorType } from "#core/errors.ts";
 import { authenticateRequest, getAuth } from "#auth/middleware.ts";
@@ -18,6 +13,7 @@ import { getEffectiveSettings } from "#router/settings.ts";
 import type { ChatExecResult } from "#gateway/executor.ts";
 import { reasoningLogInfo } from "#core/reasoning.ts";
 import { upgradeWebSocket } from "#http/bunServer.ts";
+import type { RawSocket } from "#http/bunServer.ts";
 import { tapFirstToken } from "#gateway/ttft.ts";
 import { GatewayError } from "#core/errors.ts";
 import { stateScopeOf } from "#auth/scope.ts";
@@ -26,7 +22,6 @@ import type { Usage } from "#core/usage.ts";
 import { streamSSE } from "hono/streaming";
 import type { Auth } from "#auth/types.ts";
 import { randomUUID } from "node:crypto";
-import type { RawSocket } from "#http/bunServer.ts";
 import type { WSContext } from "hono/ws";
 import { env } from "#config/env.ts";
 import type { Context } from "hono";
@@ -37,10 +32,10 @@ import {
 	responsesRequestToCanonical,
 	withoutGatewayStateItems,
 	responseEventForClient,
-	isGatewayStateEvent,
 	normalizeResponseInput,
 	type ResponseInputItem,
 	expandInputReferences,
+	isGatewayStateEvent,
 	type RenderOptions,
 	responseForClient,
 	toResponsesUsage,
@@ -111,6 +106,12 @@ import {
 	expandLocalCompactionItems,
 	encodeCompactionSummary,
 } from "./runtime/responseCompaction.ts";
+
+import {
+	admitQueuedBytes,
+	queuedBytesError,
+	messageBytes,
+} from "./realtimeSockets.ts";
 
 interface PreparedResponsesRequest {
 	req: ResponsesRequest;

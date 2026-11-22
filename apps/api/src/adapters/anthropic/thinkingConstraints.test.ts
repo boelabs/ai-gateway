@@ -1,5 +1,5 @@
-import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
 import { candidateParameterMeta } from "#endpoints/runtime/parameterPolicy.ts";
+import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
 import { applyUnsupportedParameterPolicy } from "#catalog/parameters.ts";
 import type { CanonicalChatRequest } from "#core/canonical.ts";
 import { resolveModelMetadata } from "#catalog/index.ts";

@@ -1,20 +1,19 @@
+import { toOpenAIChatChunk, toOpenAIChatResponse } from "./chat.ts";
 import type { CanonicalChatStreamChunk } from "#core/canonical.ts";
+import { parseOpenAIChatResponse } from "./chatTransport.ts";
 import { responsesRequestSchema } from "./responses.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-
-import {
-	responsesEventsToCanonicalChunks,
-	parseResponsesResponse,
-} from "./responsesTransport.ts";
 
 import {
 	canonicalChunksToResponsesEvents,
 	canonicalToResponsesResponse,
 } from "./responsesRender.ts";
 
-import { toOpenAIChatChunk, toOpenAIChatResponse } from "./chat.ts";
-import { parseOpenAIChatResponse } from "./chatTransport.ts";
+import {
+	responsesEventsToCanonicalChunks,
+	parseResponsesResponse,
+} from "./responsesTransport.ts";
 
 const citation = {
 	type: "url_citation",

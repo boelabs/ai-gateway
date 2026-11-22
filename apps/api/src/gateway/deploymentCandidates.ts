@@ -6,15 +6,15 @@ import { decryptRecord } from "#db/crypto.ts";
 import {
 	realtimeTranscriptionProfileFor,
 	realtimeConversationProfileFor,
+	realtimeTranslationProfileFor,
 	transcriptionProfileFor,
 	embeddingProfileFor,
 	decisionProfileFor,
 	rerankProfileFor,
 	speechProfileFor,
-	liveProfileFor,
-	realtimeTranslationProfileFor,
 	imageProfileFor,
 	videoProfileFor,
+	liveProfileFor,
 } from "#catalog/types.ts";
 
 import {

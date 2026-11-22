@@ -1,6 +1,6 @@
 import { publicImageCapabilities } from "./publicImageCapabilities.ts";
-import { resolveModelMetadata } from "./index.ts";
 import type { ImageModelProfile } from "#core/images.ts";
+import { resolveModelMetadata } from "./index.ts";
 import type { CatalogEntry } from "./types.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";

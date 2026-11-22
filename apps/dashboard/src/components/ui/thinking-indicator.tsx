@@ -7,15 +7,15 @@ import {
 	type ComponentProps,
 	type CSSProperties,
 	useEffect,
-	useId,
-	useRef,
 	useState,
+	useRef,
+	useId,
 } from "react";
 
 import {
-	glyphFrame,
 	SPARKLE_PATH,
 	TWINKLE_PATH,
+	glyphFrame,
 } from "#/shared/lib/thinkingGlyph";
 
 /** How long each word stays on screen. */

@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { CooldownCause } from "./state.ts";
 import { redis, runScript } from "#cache/redis.ts";
+import type { CooldownCause } from "./state.ts";
 
 export interface CircuitSubject {
 	kind: "deployment" | "capacity";

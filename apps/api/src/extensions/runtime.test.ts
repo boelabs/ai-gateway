@@ -2,11 +2,11 @@ import type { ExtensionCanonicalRequest, ExtensionImageOutput } from "./sdk.ts";
 import type { ExtensionInstanceSource, ExtensionScope } from "./runtime.ts";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { extensionRuntime } from "./runtime.ts";
-import assert from "node:assert/strict";
-import { tmpdir } from "node:os";
+import { GatewayError } from "#core/errors.ts";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { GatewayError } from "#core/errors.ts";
+import assert from "node:assert/strict";
+import { tmpdir } from "node:os";
 import { test } from "node:test";
 
 type Instances = Awaited<

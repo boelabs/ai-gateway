@@ -8,10 +8,10 @@ import { cn } from "#/shared/lib/classes";
 import type React from "react";
 
 import {
-	WarningIcon as TriangleAlertIcon,
-	SpinnerGapIcon as LoaderCircleIcon,
 	WarningCircleIcon as CircleAlertIcon,
+	SpinnerGapIcon as LoaderCircleIcon,
 	CheckCircleIcon as CircleCheckIcon,
+	WarningIcon as TriangleAlertIcon,
 	InfoIcon,
 } from "@phosphor-icons/react/dist/ssr";
 

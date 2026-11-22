@@ -1,40 +1,28 @@
 import type { DeploymentCandidate } from "#gateway/deploymentCandidates.ts";
+import { liveSessionRecord, rememberLiveSession } from "#live/sessions.ts";
 import { candidateMetadata } from "#gateway/candidateMetadata.ts";
 import { completedTerminal } from "#gateway/streamLifecycle.ts";
-import { liveSessionRecord, rememberLiveSession } from "#live/sessions.ts";
-import type { LiveSessionRecord } from "#live/sessions.ts";
 import { OperationLogDraft } from "./runtime/operationLog.ts";
-import { route, type RouteResult } from "#router/index.ts";
 import { getDeploymentById } from "#db/repos/deployments.ts";
+import { MAX_BUFFERED_SEND_BYTES } from "./socketServer.ts";
+import type { LiveSessionRecord } from "#live/sessions.ts";
+import { route, type RouteResult } from "#router/index.ts";
 import { resolveModelMetadata } from "#catalog/index.ts";
 import { resolveTransport } from "#router/transport.ts";
 import { upgradeWebSocket } from "#http/bunServer.ts";
+import type { RawSocket } from "#http/bunServer.ts";
 import { getAdapter } from "#adapters/registry.ts";
 import { liveProfileFor } from "#catalog/types.ts";
+import type { WSContext, WSEvents } from "hono/ws";
+import { log as logger } from "#logging/log.ts";
 import { computeCost } from "#logging/cost.ts";
 import { GatewayError } from "#core/errors.ts";
 import { decryptRecord } from "#db/crypto.ts";
 import { getAuth } from "#auth/middleware.ts";
-import type { RawSocket } from "#http/bunServer.ts";
 import type { AppEnv } from "#auth/types.ts";
 import type { Usage } from "#core/usage.ts";
 import { randomUUID } from "node:crypto";
-import { log as logger } from "#logging/log.ts";
-import type { WSContext, WSEvents } from "hono/ws";
 import type { Context } from "hono";
-
-import type {
-	LiveServerFrame,
-	AdapterContext,
-	LiveUpstream,
-} from "#adapters/types.ts";
-
-import {
-	type LiveTransport,
-	liveDelegatedModels,
-	liveDelegationType,
-	LiveUsageMeter,
-} from "#core/live.ts";
 
 import {
 	assertRealtimeSocketCapacity,
@@ -43,13 +31,13 @@ import {
 	assertWebSocketUpgrade,
 	registerRealtimeSocket,
 	revalidateConnection,
-	MAX_MESSAGE_BYTES,
 	capacityLimitError,
+	MAX_MESSAGE_BYTES,
 	MAX_QUEUED_EVENTS,
 	admitQueuedBytes,
 	queuedBytesError,
-	messageBytes,
 	watchCredential,
+	messageBytes,
 } from "./realtimeSockets.ts";
 
 import {
@@ -62,7 +50,18 @@ import {
 	preflight,
 } from "./runtime/pipeline.ts";
 
-import { MAX_BUFFERED_SEND_BYTES } from "./socketServer.ts";
+import {
+	liveDelegatedModels,
+	type LiveTransport,
+	liveDelegationType,
+	LiveUsageMeter,
+} from "#core/live.ts";
+
+import type {
+	LiveServerFrame,
+	AdapterContext,
+	LiveUpstream,
+} from "#adapters/types.ts";
 
 /**
  * OpenAI's GPT-Live API, relayed: `/v1/live/sessions` (WebSocket session, or `POST` for WebRTC and

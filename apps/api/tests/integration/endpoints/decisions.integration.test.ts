@@ -1,11 +1,11 @@
 import { listDeploymentCandidates } from "#gateway/deploymentCandidates.ts";
 import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
+import { requestContextMiddleware } from "#http/requestContext.ts";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { invalidateVirtualKey } from "#auth/virtualKeyCache.ts";
 import { deleteDeployment } from "#db/repos/deployments.ts";
 import { createDeployment } from "#deployments/service.ts";
-import { requestContextMiddleware } from "#http/requestContext.ts";
 import { withStubbedFetch } from "#test-support/fetch.ts";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { authMiddleware } from "#auth/middleware.ts";
 import { eventually } from "#test-support/wait.ts";
 import { GatewayError } from "#core/errors.ts";
@@ -16,16 +16,16 @@ import { test } from "node:test";
 import { Hono } from "hono";
 
 import {
-	type CreatedVirtualKey,
-	createVirtualKey,
-	deleteVirtualKey,
-} from "#db/repos/virtualKeys.ts";
-
-import {
 	systemOneDecisionsHandler,
 	geminiDecisionsHandler,
 	openAIDecisionsHandler,
 } from "#endpoints/decisions.ts";
+
+import {
+	type CreatedVirtualKey,
+	createVirtualKey,
+	deleteVirtualKey,
+} from "#db/repos/virtualKeys.ts";
 
 import {
 	listOperationsPage,

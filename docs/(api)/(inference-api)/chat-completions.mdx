@@ -93,6 +93,11 @@ Provider-specific fields the gateway doesn't manage directly (e.g. vLLM's `top_k
 the gateway itself manages — you can't use `extra_body` to smuggle in an override of `temperature` or
 `tools`, for instance. Content is provider-shaped and is the client's responsibility.
 
+One exception: `extra_body.thinking` holding only `block_binding` (or the same `thinking` at the top
+level) is Anthropic's control for replayed thinking blocks whose conversation changed. It leaves
+`extra_body`, reaches Anthropic with adaptive thinking (set `reasoning_effort`) and never reaches
+another provider. See [Messages](/docs/messages#reasoning).
+
 ## Vision, audio, and file input
 
 `content` accepts multi-part arrays: `{"type": "image_url", "image_url": {"url": "..."}}` (URL or

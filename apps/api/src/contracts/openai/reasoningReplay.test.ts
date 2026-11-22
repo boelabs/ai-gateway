@@ -1,9 +1,10 @@
-import {
-	responseForClient,
-	withoutGatewayStateItems,
-} from "./responsesRender.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
+
+import {
+	withoutGatewayStateItems,
+	responseForClient,
+} from "./responsesRender.ts";
 
 test("raw input drops reasoning items a stateless upstream cannot resolve", () => {
 	const items = withoutGatewayStateItems([

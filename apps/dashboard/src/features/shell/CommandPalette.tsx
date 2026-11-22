@@ -1,6 +1,7 @@
 "use client";
 
 import { visibleCreateActions, visibleNavigation } from "./navigation.ts";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { useSession } from "#/features/auth/session.tsx";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -29,12 +30,11 @@ import {
 } from "#/components/ui/command";
 
 import {
-	BookOpenIcon,
 	ClockCounterClockwiseIcon as HistoryIcon,
 	MagnifyingGlassIcon as SearchIcon,
 	PushPinIcon as PinIcon,
+	BookOpenIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 /**
  * Ties the search buttons (sidebar, mobile bar) to the palette without the palette's root wrapping

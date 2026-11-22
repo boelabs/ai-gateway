@@ -8,10 +8,10 @@ import {
 	type DecisionContentPart,
 	type DecisionInputItem,
 	type DecisionQuestion,
-	requireAnswer,
-	partsAsText,
 	flattenDecisionInput,
 	mergeTextParts,
+	requireAnswer,
+	partsAsText,
 } from "#core/decisions.ts";
 
 /** Canonical decisions to OpenAI `POST /decisions` and back. */

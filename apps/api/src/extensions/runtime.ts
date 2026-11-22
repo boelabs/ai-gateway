@@ -1,7 +1,7 @@
+import { ExtensionRejection, type ExtensionRejectionStatus } from "./sdk.ts";
+import { GatewayError, type ErrorClass } from "#core/errors.ts";
 import { getRegistryVersion } from "#db/repos/extensions.ts";
 import type { CallType } from "#core/callType.ts";
-import { GatewayError, type ErrorClass } from "#core/errors.ts";
-import { ExtensionRejection, type ExtensionRejectionStatus } from "./sdk.ts";
 import { pathToFileURL } from "node:url";
 import { log } from "#logging/log.ts";
 import { env } from "#config/env.ts";

@@ -1,28 +1,30 @@
-import {
-	systemOneDecisionsHandler,
-	geminiDecisionsHandler,
-	openAIDecisionsHandler,
-} from "./endpoints/decisions.ts";
 import { realtimeClientSecretsHandler } from "./endpoints/realtimeClientSecrets.ts";
 import { realtimeTranslationsHandler } from "./endpoints/realtimeTranslation.ts";
-import {
-	liveAttachSocketHandler,
-	liveSessionsSocketHandler,
-	liveForkSocketHandler,
-	liveContentHandler,
-	liveCreateHandler,
-	liveForkHandler,
-} from "./endpoints/live.ts";
-import { PUBLIC_JSON_BODY_MAX_BYTES } from "./http/body.ts";
-import { startServer } from "./http/bunServer.ts";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { PUBLIC_JSON_BODY_MAX_BYTES } from "./http/body.ts";
 import { startHeartbeat } from "#endpoints/socketServer.ts";
+import { startServer } from "./http/bunServer.ts";
 import { GatewayError } from "./core/errors.ts";
 import { pingRedis } from "./cache/redis.ts";
 import { Hono, type Context } from "hono";
 import { pingDb } from "./db/client.ts";
 import { log } from "./logging/log.ts";
 import { env } from "./config/env.ts";
+
+import {
+	liveSessionsSocketHandler,
+	liveAttachSocketHandler,
+	liveForkSocketHandler,
+	liveContentHandler,
+	liveCreateHandler,
+	liveForkHandler,
+} from "./endpoints/live.ts";
+
+import {
+	systemOneDecisionsHandler,
+	geminiDecisionsHandler,
+	openAIDecisionsHandler,
+} from "./endpoints/decisions.ts";
 
 import {
 	DEPENDENCY_RETRY_AFTER_SECONDS,
@@ -48,10 +50,10 @@ import { installGracefulShutdown } from "./runtime/shutdown.ts";
 import { embeddingsHandler } from "./endpoints/embeddings.ts";
 import { chatCompletionsHandler } from "./endpoints/chat.ts";
 import { transcriptionsHandler } from "./endpoints/audio.ts";
-import { speechHandler } from "./endpoints/speech.ts";
 import { messagesHandler } from "./endpoints/messages.ts";
 import { docsExportHandler } from "./endpoints/docs.ts";
 import { getRequestId } from "./http/requestContext.ts";
+import { speechHandler } from "./endpoints/speech.ts";
 import { rerankHandler } from "./endpoints/rerank.ts";
 import { startTelemetry } from "./telemetry/index.ts";
 import { runMigrations } from "./db/migrations.ts";

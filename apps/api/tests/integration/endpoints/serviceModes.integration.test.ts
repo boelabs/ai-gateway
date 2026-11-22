@@ -1,18 +1,19 @@
-import { jsonResponse, withStubbedFetch } from "#test-support/fetch.ts";
-import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
-import {
-	makeOpenAIContractTestApp,
-	makeGatewayTestApp,
-} from "#test-support/app.ts";
-import { createDeployment, deleteDeployment } from "#db/repos/deployments.ts";
 import { modelsWildcardHandler, listModelsHandler } from "#endpoints/models.ts";
+import { createDeployment, deleteDeployment } from "#db/repos/deployments.ts";
+import { jsonResponse, withStubbedFetch } from "#test-support/fetch.ts";
 import { invalidatePublicModelGroups } from "#catalog/publicModels.ts";
+import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
 import { chatCompletionsHandler } from "#endpoints/chat.ts";
 import { eventually } from "#test-support/wait.ts";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { env } from "#config/env.ts";
 import { test } from "node:test";
+
+import {
+	makeOpenAIContractTestApp,
+	makeGatewayTestApp,
+} from "#test-support/app.ts";
 
 import {
 	listOperationsPage,

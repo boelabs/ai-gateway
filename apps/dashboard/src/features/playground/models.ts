@@ -1,5 +1,5 @@
-import { SERVICE_MODES, type ServiceMode } from "./api";
 import { type Capability, CAPABILITIES } from "./capabilities.ts";
+import { SERVICE_MODES, type ServiceMode } from "./api";
 import type { PublicEndpoint } from "./api.ts";
 import { z } from "zod";
 

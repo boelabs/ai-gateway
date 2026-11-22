@@ -1,8 +1,10 @@
 "use client";
 
 import { Select, SelectItem } from "#/components/ui/select";
+import { type ImageSettings, imageChoices } from "./images";
 import { NumberField } from "#/components/ui/number-field";
 import { buttonStyles } from "#/components/ui/button";
+import type { ImageOptions } from "./models";
 
 import {
 	DialogDescription,
@@ -14,9 +16,6 @@ import {
 	DialogBody,
 	DialogRoot,
 } from "#/components/ui/dialog";
-
-import { type ImageSettings, imageChoices } from "./images";
-import type { ImageOptions } from "./models";
 
 const DEFAULT = "default";
 

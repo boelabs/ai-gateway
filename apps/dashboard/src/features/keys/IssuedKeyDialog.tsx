@@ -1,9 +1,9 @@
 "use client";
 
+import { CopyIcon as IconCopy } from "@phosphor-icons/react/dist/ssr";
 import { ScrollArea } from "#/components/ui/primitives/scroll-area";
 import { type CreatedVirtualKey, secretState } from "./common.ts";
 import { Button } from "#/components/ui/button";
-import { CopyIcon as IconCopy } from "@phosphor-icons/react/dist/ssr";
 import { useState } from "react";
 
 import {

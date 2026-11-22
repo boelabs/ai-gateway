@@ -1,12 +1,13 @@
-import {
-	catalogRetiredOn,
-	explainRetiredModel,
-	retiredModelRefusal,
-	utcToday,
-} from "./retirement.ts";
 import { GatewayError } from "#core/errors.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
+
+import {
+	explainRetiredModel,
+	retiredModelRefusal,
+	catalogRetiredOn,
+	utcToday,
+} from "./retirement.ts";
 
 // veo-3.1-generate-preview: retiresOn 2026-10-22 in the Google AI Studio catalog.
 const veo = {

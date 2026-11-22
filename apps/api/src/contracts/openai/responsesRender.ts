@@ -1,4 +1,5 @@
 import { responsesAnnotationFromChat, logprobTokens } from "./outputText.ts";
+import { liftThinkingBlockBinding } from "#contracts/thinkingBlockBinding.ts";
 import { fileParserOptionsFromPlugins } from "#contracts/fileParser.ts";
 import { assertNoManagedExtraBodyKeys } from "#core/extraBody.ts";
 import type { ResponsesRequest } from "./responses.ts";
@@ -896,12 +897,13 @@ export function responsesRequestToCanonical(
 			};
 		}
 	}
-	if (req.extra_body !== undefined) {
-		assertNoManagedExtraBodyKeys(
-			req.extra_body,
-			RESPONSES_EXTRA_BODY_MANAGED_KEYS,
-		);
-		u.extraBody = req.extra_body;
+	const { extraBody, blockBinding } = liftThinkingBlockBinding(req.extra_body);
+	if (extraBody !== undefined) {
+		assertNoManagedExtraBodyKeys(extraBody, RESPONSES_EXTRA_BODY_MANAGED_KEYS);
+		u.extraBody = extraBody;
+	}
+	if (blockBinding !== undefined) {
+		u.messagesTransport = { thinkingBlockBinding: blockBinding };
 	}
 	const textTransport =
 		req.text === undefined

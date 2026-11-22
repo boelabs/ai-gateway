@@ -1,10 +1,10 @@
 import { resolveModelMetadata, getCatalogEntry } from "#catalog/index.ts";
-import { retiredModelRefusal } from "#catalog/retirement.ts";
 import type { ExecutionPolicyOverrides } from "#core/executionPolicy.ts";
 import { invalidatePublicModelGroups } from "#catalog/publicModels.ts";
 import { validateRequiredCredentials } from "#credentials/validate.ts";
 import { invalidatingResponseCache } from "#cache/responseCache.ts";
 import { savedCredentialFields } from "#credentials/service.ts";
+import { retiredModelRefusal } from "#catalog/retirement.ts";
 import type { TransportOverrides } from "#profiles/types.ts";
 import type { RuntimeModelMetadata } from "#db/schema.ts";
 import { declaredTransportFor } from "#catalog/types.ts";

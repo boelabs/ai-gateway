@@ -1,21 +1,21 @@
 import type { CanonicalChatStreamChunk } from "#core/canonical.ts";
-import { responsesRequestSchema } from "./responses.ts";
 import { buildOpenAIChatBody } from "./chatTransport.ts";
+import { responsesRequestSchema } from "./responses.ts";
 import { GatewayError } from "#core/errors.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-
-import {
-	responsesEventsToCanonicalChunks,
-	buildResponsesRequestBody,
-	parseResponsesResponse,
-} from "./responsesTransport.ts";
 
 import {
 	canonicalChunksToResponsesEvents,
 	canonicalToResponsesResponse,
 	responsesRequestToCanonical,
 } from "./responsesRender.ts";
+
+import {
+	responsesEventsToCanonicalChunks,
+	buildResponsesRequestBody,
+	parseResponsesResponse,
+} from "./responsesTransport.ts";
 
 import {
 	toCanonicalChatRequest,

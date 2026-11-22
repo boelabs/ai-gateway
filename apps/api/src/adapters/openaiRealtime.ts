@@ -2,38 +2,40 @@ import { upstreamWebSocket } from "#gateway/instrumentedTransport.ts";
 import { EventQueue, closeStatus, rawText } from "./google/live.ts";
 import { abortGatewayError } from "#gateway/abortReason.ts";
 import { createPcmResampler } from "#audio/pcm.ts";
-import {
-	realtimeTranscriptionProfileFor,
-	realtimeTranslationProfileFor,
-} from "#catalog/types.ts";
-import {
-	type CanonicalRealtimeTranslationConfig,
-	type CanonicalRealtimeTranslationEvent,
-	type RealtimeTranslationProfile,
-	TRANSLATION_AUDIO_RATE,
-} from "#core/realtimeTranslation.ts";
 import { GatewayError } from "#core/errors.ts";
 
 import type {
 	CanonicalRealtimeTranscriptionConfig,
 	CanonicalRealtimeTranscriptionEvent,
-	RealtimeTranscriptionProfile,
 	CanonicalRealtimeConversationConfig,
 	CanonicalRealtimeConversationEvent,
+	RealtimeTranscriptionProfile,
 	RealtimeFunctionCall,
 	RealtimeUsage,
 	RealtimeTurn,
 } from "#core/realtime.ts";
 
 import type {
-	RealtimeTranslationSession,
-	RealtimeTranslationHandler,
 	RealtimeTranscriptionHandler,
 	RealtimeTranscriptionSession,
 	RealtimeConversationHandler,
 	RealtimeConversationSession,
+	RealtimeTranslationSession,
+	RealtimeTranslationHandler,
 	AdapterContext,
 } from "./types.ts";
+
+import {
+	type CanonicalRealtimeTranslationConfig,
+	type CanonicalRealtimeTranslationEvent,
+	type RealtimeTranslationProfile,
+	TRANSLATION_AUDIO_RATE,
+} from "#core/realtimeTranslation.ts";
+
+import {
+	realtimeTranscriptionProfileFor,
+	realtimeTranslationProfileFor,
+} from "#catalog/types.ts";
 
 /**
  * OpenAI's Realtime API (`wss://…/v1/realtime?model=`) as a realtime conversation upstream.

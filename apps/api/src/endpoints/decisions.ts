@@ -2,8 +2,8 @@ import { assertDecisionRequestSupported } from "#gateway/decisionValidation.ts";
 import { assertDecisionResponseValid } from "#gateway/decisionValidation.ts";
 import { estimateTokenReservation } from "#router/tokenReservation.ts";
 import { candidateMetadata } from "#gateway/candidateMetadata.ts";
-import { OperationLogDraft } from "./runtime/operationLog.ts";
 import type { DecisionsExecResult } from "#gateway/executor.ts";
+import { OperationLogDraft } from "./runtime/operationLog.ts";
 import { route, type RouteResult } from "#router/index.ts";
 import { executeDecisions } from "#gateway/executor.ts";
 import type { CostBreakdown } from "#logging/cost.ts";
@@ -27,6 +27,14 @@ import {
 } from "./runtime/pipeline.ts";
 
 import {
+	systemOneRequestToCanonical,
+	systemOneRequestSchema,
+	toSystemOneResponse,
+	parseSystemOneBody,
+	isMultipart,
+} from "#contracts/typesafe/systemone.ts";
+
+import {
 	openAIDecisionRequestToCanonical,
 	openAIDecisionRequestSchema,
 	toOpenAIDecisionResponse,
@@ -38,23 +46,15 @@ import {
 	toGeminiDecisionResponse,
 } from "#contracts/google/decisions.ts";
 
-import {
-	systemOneRequestToCanonical,
-	systemOneRequestSchema,
-	toSystemOneResponse,
-	parseSystemOneBody,
-	isMultipart,
-} from "#contracts/typesafe/systemone.ts";
+import type {
+	CanonicalDecisionResponse,
+	CanonicalDecisionRequest,
+} from "#core/decisions.ts";
 
 import {
 	decisionResponseSummary,
 	decisionRequestSummary,
 } from "#decisions/logging.ts";
-
-import type {
-	CanonicalDecisionResponse,
-	CanonicalDecisionRequest,
-} from "#core/decisions.ts";
 
 /** TypeSafe's own request limit; JSON and multipart alike. */
 export const MAX_SYSTEMONE_BODY_BYTES = 32 * 1024 * 1024;

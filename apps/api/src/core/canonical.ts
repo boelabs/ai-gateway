@@ -196,6 +196,11 @@ interface CanonicalMessagesTransportOptions {
 	/** The client's `anthropic-beta` features, sent to a Messages upstream with the adapter's own. */
 	betas?: string[];
 	/**
+	 * `thinking.block_binding` as the client sent it: what Anthropic does with a replayed thinking
+	 * block whose conversation changed. Sent only with adaptive thinking, the one mode that takes it.
+	 */
+	thinkingBlockBinding?: Record<string, unknown>;
+	/**
 	 * Top-level Messages fields with no canonical form (`container`, `mcp_servers`,
 	 * `context_management`, `inference_geo`, `service_tier`, `speed`, `diagnostics`), sent as given.
 	 * A request carrying them requires the native wire.

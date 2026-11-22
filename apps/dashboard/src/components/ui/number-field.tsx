@@ -2,10 +2,6 @@
 
 import { NumberField as BaseNumberField } from "@base-ui/react/number-field";
 import { numberFieldGroupVariants } from "./primitives/number-field";
-import {
-	MinusIcon as IconMinus,
-	PlusIcon as IconPlus,
-} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	type AppearanceProps,
@@ -14,6 +10,11 @@ import {
 	mergeStyle,
 	focusRing,
 } from "./appearance";
+
+import {
+	MinusIcon as IconMinus,
+	PlusIcon as IconPlus,
+} from "@phosphor-icons/react/dist/ssr";
 
 function Root({
 	className,

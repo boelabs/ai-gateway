@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+	offeredProtocols,
 	chooseProtocol,
+	untrackSocket,
+	trackSocket,
 	heartbeat,
 	notePong,
-	offeredProtocols,
-	trackSocket,
-	untrackSocket,
 } from "./socketServer.ts";
 
 test("the handshake never echoes a credential subprotocol", () => {

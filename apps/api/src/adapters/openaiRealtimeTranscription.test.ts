@@ -1,20 +1,20 @@
 import type { CanonicalRealtimeTranscriptionEvent } from "#core/realtime.ts";
-import { resolveModelMetadata } from "#catalog/index.ts";
-import { type WebSocket, WebSocketServer } from "ws";
 import { azureopenaiAdapter } from "./azureopenai/index.ts";
+import { resolveModelMetadata } from "#catalog/index.ts";
 import { normalizeAzurev1BaseUrl } from "./azurev1.ts";
-import { openAILiveUrl } from "./openaiLive.ts";
+import { type WebSocket, WebSocketServer } from "ws";
 import { openaiAdapter } from "./openai/index.ts";
 import type { AdapterContext } from "./types.ts";
+import { openAILiveUrl } from "./openaiLive.ts";
 import type { AddressInfo } from "node:net";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
 	openAIRealtimeTranscriptionUrl,
-	openAIRealtimeUrl,
 	openAITranscriptionSession,
 	OpenAITranscriptOrder,
+	openAIRealtimeUrl,
 } from "./openaiRealtime.ts";
 
 const MODEL = "gpt-live-transcribe";

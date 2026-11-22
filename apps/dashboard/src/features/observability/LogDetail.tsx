@@ -1,15 +1,11 @@
 "use client";
 
-import { ScrollArea } from "#/components/ui/primitives/scroll-area";
-import {
-	CheckIcon as IconCheck,
-	CopyIcon as IconCopy,
-} from "@phosphor-icons/react/dist/ssr";
-import { Breadcrumbs } from "#/shared/components/Breadcrumbs.tsx";
 import { type ReactNode, Suspense, useEffect, useState } from "react";
-import { Frame, FramePanel } from "#/components/ui/frame";
+import { ScrollArea } from "#/components/ui/primitives/scroll-area";
+import { Breadcrumbs } from "#/shared/components/Breadcrumbs.tsx";
 import { ErrorNote, PageHeader } from "#/components/ui/page";
 import { Status, outcomeTone } from "#/components/ui/status";
+import { Frame, FramePanel } from "#/components/ui/frame";
 import { useSession } from "#/features/auth/session.tsx";
 import { Panel } from "#/shared/components/Panel.tsx";
 import type { components } from "#/shared/api/schema";
@@ -18,6 +14,11 @@ import { Button } from "#/components/ui/button";
 import type { OperationDetail } from "./api.ts";
 import { Tabs } from "#/components/ui/tabs";
 import { cn } from "#/shared/lib/classes";
+
+import {
+	CheckIcon as IconCheck,
+	CopyIcon as IconCopy,
+} from "@phosphor-icons/react/dist/ssr";
 
 import {
 	formatDuration,

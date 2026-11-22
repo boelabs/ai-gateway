@@ -1,10 +1,11 @@
 import { assertSpeechRequestSupported } from "#gateway/speechRequestValidation.ts";
 import { estimateTokenReservation } from "#router/tokenReservation.ts";
 import { candidateMetadata } from "#gateway/candidateMetadata.ts";
-import { speechProfileFor } from "#catalog/types.ts";
 import { OperationLogDraft } from "./runtime/operationLog.ts";
 import type { SpeechExecResult } from "#gateway/executor.ts";
 import { route, type RouteResult } from "#router/index.ts";
+import { SPEECH_CONTENT_TYPES } from "#core/speech.ts";
+import { speechProfileFor } from "#catalog/types.ts";
 import { executeSpeech } from "#gateway/executor.ts";
 import type { AppEnv } from "#auth/types.ts";
 import type { Usage } from "#core/usage.ts";
@@ -27,8 +28,6 @@ import {
 	speechRequestToCanonical,
 	speechRequestSchema,
 } from "#contracts/openai/speech.ts";
-
-import { SPEECH_CONTENT_TYPES } from "#core/speech.ts";
 
 /** POST /v1/audio/speech - OpenAI-compatible contract; the audio comes back whole, never cached. */
 export async function speechHandler(c: Context<AppEnv>): Promise<Response> {

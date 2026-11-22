@@ -1,12 +1,13 @@
 "use client";
 
-import {
-	CaretLeftIcon as ChevronLeft,
-	CaretRightIcon as ChevronRight,
-} from "@phosphor-icons/react/dist/ssr";
 import { DayPicker } from "react-day-picker";
 import { cn } from "#/shared/lib/classes";
 import type * as React from "react";
+
+import {
+	CaretRightIcon as ChevronRight,
+	CaretLeftIcon as ChevronLeft,
+} from "@phosphor-icons/react/dist/ssr";
 
 function CalendarChevron({
 	orientation,

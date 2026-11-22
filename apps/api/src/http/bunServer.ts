@@ -1,5 +1,5 @@
-import type { UpgradeWebSocket, WSEvents } from "hono/ws";
 import { defineWebSocketHelper, WSContext } from "hono/ws";
+import type { UpgradeWebSocket, WSEvents } from "hono/ws";
 import type { Context } from "hono";
 
 import {

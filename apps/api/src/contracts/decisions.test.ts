@@ -3,17 +3,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-	openAIDecisionRequestToCanonical,
-	openAIDecisionRequestSchema,
-	toOpenAIDecisionResponse,
-} from "./openai/decisions.ts";
-
-import {
-	parseOpenAIDecisionResponse,
-	buildOpenAIDecisionBody,
-} from "./openai/decisionsTransport.ts";
-
-import {
 	geminiDecisionRequestToCanonical,
 	geminiDecisionRequestSchema,
 	parseGeminiDecisionResponse,
@@ -29,6 +18,17 @@ import {
 	buildSystemOneBody,
 	parseSystemOneBody,
 } from "./typesafe/systemone.ts";
+
+import {
+	openAIDecisionRequestToCanonical,
+	openAIDecisionRequestSchema,
+	toOpenAIDecisionResponse,
+} from "./openai/decisions.ts";
+
+import {
+	parseOpenAIDecisionResponse,
+	buildOpenAIDecisionBody,
+} from "./openai/decisionsTransport.ts";
 
 const PNG =
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";

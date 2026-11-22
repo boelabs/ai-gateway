@@ -1,9 +1,10 @@
 import { expect, test } from "bun:test";
+
 import {
-	base64LiftedSink,
-	liftedIndex,
 	liftedPlaceholder,
+	base64LiftedSink,
 	parseJsonLifting,
+	liftedIndex,
 } from "./liftedJson.ts";
 
 /** A body delivered in pieces of `size` bytes, so tokens and escapes straddle chunk boundaries. */

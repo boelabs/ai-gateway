@@ -2,16 +2,17 @@ import { createDeployment, deleteDeployment } from "#db/repos/deployments.ts";
 import { jsonResponse, withStubbedFetch } from "#test-support/fetch.ts";
 import { redisAvailable, pgAvailable } from "#test-support/infra.ts";
 import { makeOpenAIContractTestApp } from "#test-support/app.ts";
-import {
-	listResponseInputItemsHandler,
-	retrieveResponseHandler,
-	responsesHandler,
-} from "#endpoints/responses.ts";
 import { messagesHandler } from "#endpoints/messages.ts";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { env } from "#config/env.ts";
 import { test } from "node:test";
+
+import {
+	listResponseInputItemsHandler,
+	retrieveResponseHandler,
+	responsesHandler,
+} from "#endpoints/responses.ts";
 
 import "#adapters/index.ts";
 
