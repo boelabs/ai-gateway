@@ -7,6 +7,16 @@ const EXACT_TOLERANCE = 0; // context/token limits should agree exactly when sou
 
 type NumericSourceKey = "vercel-ai-gateway" | "openrouter" | "models-dev";
 
+/**
+ * Price fields a provider never charges, so an aggregator's figure for them is derived, not published.
+ * Google bills cached reads and hourly cache storage but no per-token write; the aggregators'
+ * `input_cache_write` for Gemini comes from the storage price.
+ */
+const UNCHARGED_PRICING_FIELDS: Readonly<Record<string, ReadonlySet<string>>> =
+	{
+		googleaistudio: new Set(["cacheWriteCentsPerMTokens"]),
+	};
+
 interface NumericConflict {
 	field: string;
 	values: Partial<Record<NumericSourceKey, number>>;
@@ -282,6 +292,9 @@ export function mergeCatalogEntry(
 		"cacheReadCentsPerMTokens",
 		"cacheWriteCentsPerMTokens",
 	] as const) {
+		if (UNCHARGED_PRICING_FIELDS[candidate.adapterKey]?.has(field)) {
+			continue;
+		}
 		applyNumeric(
 			`pricing.${field}`,
 			pricingValues(candidate, modelsDevMatch, field),

@@ -76,6 +76,20 @@ Rules learned the hard way:
   field and remove the marker, or leave the model out.
 - **Dated price changes** the schema cannot express (a price that doubles on a date) go in the
   pull request, not in `notes`.
+- **Read the whole page as Markdown, never a summary.** Fetch each page as Markdown with `curl` (the
+  provider table in 3.2 gives the form for each site) and `grep` it; a fetch tool that truncates or
+  summarizes loses the footnotes and per-model rows where limits, promotions and tier rules live.
+  Before reporting a value as "not published", grep the provider's per-model page and its pricing
+  footnotes, not only the index tables. An HTML answer, a 404 or an empty table means you used the
+  wrong URL: try the forms in the table and the site's `sitemap.xml` before giving up.
+- **A version label is not an id.** The ids a provider accepts are its API reference's `model`
+  parameter (an enum, or the list it links to). A dated "model version" on a pricing page
+  (`DeepSeek-V4.1-Flash-1017` behind `deepseek-flash`) names what an alias serves today; record it in
+  the alias's `notes`, not as an entry.
+- **Cache prices exist only where the provider charges them.** A model page that marks context
+  caching unsupported has no `cacheReadCentsPerMTokens`. Google charges cached reads and hourly
+  storage but no per-token write, so Google entries carry no `cacheWriteCentsPerMTokens`; an
+  aggregator's `input_cache_write` for Gemini is derived from storage and is never copied.
 
 ## 3. Procedure
 
@@ -124,16 +138,16 @@ provider in parallel when you can:
 
 | Provider | Start from |
 |---|---|
-| anthropic | `https://platform.claude.com/docs/en/release-notes/api`, `.../about-claude/models/overview`, `.../about-claude/model-deprecations` |
-| openai | `https://developers.openai.com/api/docs/changelog`, `.../docs/models`, `.../docs/deprecations`, and `.../docs/pricing` for every price and service tier (append `.md` for Markdown). If the site refuses automated requests, say so in the report and leave prices untouched: never fill them from an aggregator |
-| azureopenai, azurefoundry | The report's Azure sections (below), `https://learn.microsoft.com/azure/foundry/openai/concepts/model-retirement-schedule`, and for each model the page's own section or how-to |
-| googleaistudio | `https://aistudio.google.com/llms.txt` (index of every page as Markdown) and `https://aistudio.google.com/docs/pricing.md` for every price and the Flex and Priority tiers, then `https://ai.google.dev/gemini-api/docs/changelog`, `.../docs/models` (its "Live API" section), `.../docs/deprecations`, `.../docs/transcribe`, `.../docs/live-api/live-transcribe`, `.../docs/live-api/capabilities`, `.../docs/live-api/tools`, `.../docs/live-api/live-translate` |
-| deepseek | `https://api-docs.deepseek.com/updates`, `.../news/`, `.../quick_start/pricing` |
-| moonshot | `https://platform.kimi.ai/docs/platform-changelog.md`, `.../docs/models.md` |
-| zai | `https://docs.z.ai/release-notes/new-released`, `.../guides/overview/pricing` |
-| minimax | `https://platform.minimax.io/docs/release-notes/models`, `.../docs/faq/models` (its "Retired Models" table) |
+| anthropic | Append `.md` to every page: `https://platform.claude.com/docs/en/release-notes/api.md` (the full notes, newest first, one `### <date>` heading per entry; read the entries since the last sync), `.../about-claude/models/overview.md`, `.../about-claude/model-deprecations.md`, `.../build-with-claude/context-windows.md`. `https://platform.claude.com/llms.txt` indexes the rest |
+| openai | Append `.md` to every page: `https://developers.openai.com/api/docs/changelog.md`, `.../docs/models.md`, `.../docs/deprecations.md` (both tables: models, and "Feature and endpoint deprecations" for tier and region changes), `.../docs/pricing.md` for every price and service tier (promotions and discounts sit in its footnotes), and `.../docs/models/<id>.md` for each model you change (cached price, limits, status). `https://developers.openai.com/llms.txt` indexes the rest. If the site refuses automated requests, say so in the report and leave prices untouched: never fill them from an aggregator |
+| azureopenai, azurefoundry | The report's Azure sections (below), `https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirement-schedule?accept=text/markdown`, and for each model the page's own section or how-to, always with `?accept=text/markdown` |
+| googleaistudio | `https://aistudio.google.com/llms.txt` (index of every page as Markdown), `https://aistudio.google.com/docs/pricing.md` for every price and its Standard, Flex and Priority tabs (a shut-down preview drops off this page), and `https://aistudio.google.com/docs/models/<id>.md` for each model you change (token limits, a badge per feature such as context caching, Flex and Priority, shutdown banners). Then `https://ai.google.dev/gemini-api/docs/changelog.md.txt`, `.../docs/models.md.txt` (its "Live API" section), `.../docs/deprecations.md.txt`, `.../docs/transcribe.md.txt`, `.../docs/live-api/live-transcribe.md.txt`, `.../docs/live-api/capabilities.md.txt`, `.../docs/live-api/tools.md.txt`, `.../docs/live-api/live-translate.md.txt`. Gemma: `https://ai.google.dev/gemma/docs/core/model_card_4?hl=en` (HTML only) |
+| deepseek | Append `.md` (content negotiation answers with HTML): `https://api-docs.deepseek.com/updates.md` (changelog), `.../quick_start/pricing.md`, `.../api/create-chat-completion.md` (the `model` enum lists the accepted ids; the max output) and `.../api/list-models.md`. There is no news index: announcements are `.../news/newsYYMMDD/`, listed in `https://api-docs.deepseek.com/sitemap.xml`. Where `/updates` and a news post disagree, `/updates` and the pricing page win |
+| moonshot | `https://platform.kimi.ai/docs/platform-changelog.md`, `.../docs/models.md`, `.../docs/api/models-overview.md` and the model guides (`.../docs/guide/<model>-quickstart.md`, "Important limits" gives `max_completion_tokens`); `https://platform.kimi.ai/docs/llms-full.txt` holds all of it in one file. Prices: the `.md` export renders the price tables empty, so read the HTML of `https://platform.kimi.ai/docs/pricing/chat`, whose rows sit in the page source as `rows:[[...]]` |
+| zai | `https://docs.z.ai/release-notes/new-released.md`, `https://docs.z.ai/guides/overview/pricing.md` (its "Other Pricing" section lists the legacy and Flash/FlashX ids), the model guides (`.../guides/llm/<model>.md`, `.../guides/vlm/<model>.md`) for context and max output, and `https://docs.z.ai/openapi.json` for the ids the API accepts. A FlashX price is not its Flash sibling's: Flash ids are free |
+| minimax | `https://platform.minimax.io/docs/release-notes/models.md`, `.../docs/faq/models.md` (its "Retired Models" table), `.../docs/guides/pricing-paygo.md` for every price, and the OpenAPI specs linked from `https://platform.minimax.io/docs/llms.txt` ("OpenAPI Specs"; `max_completion_tokens` there is the maximum output, its default is only the recommended value) |
 
-Pages move; follow redirects and the provider's own navigation. A provider you could not read is
+Pages move; follow redirects and the provider's own navigation. A retired model's page often redirects away; the provider's own page as archived by the Wayback Machine (`http://web.archive.org/web/<date>id_/<url>`) is still the provider's figure, cited with that URL. A provider you could not read is
 reported as such, never as "nothing new".
 
 **Sweep every modality, not just chat models.** Speech-to-text is the family aggregators miss most:
