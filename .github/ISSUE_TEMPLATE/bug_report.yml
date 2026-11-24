@@ -1,24 +1,33 @@
 name: Bug report
-description: Report a problem with the gateway
+description: Report a problem with the gateway or the dashboard
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for filing a bug. Please do **not** include real API keys, `.env` contents, or
-        production connection strings. For security vulnerabilities, follow SECURITY.md instead.
+        Thanks for filing a bug. Do **not** include real API keys, `.env` contents, or production
+        connection strings. Security vulnerabilities are never reported here: see SECURITY.md.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+        - label: This is not a security vulnerability (those are reported privately, see SECURITY.md).
+          required: true
   - type: textarea
     id: what-happened
     attributes:
       label: What happened?
-      description: A clear description of the bug and what you expected instead.
+      description: What you saw, and what you expected instead.
     validations:
       required: true
   - type: textarea
     id: repro
     attributes:
       label: Steps to reproduce
-      description: Include the endpoint, request body (redacted), provider/adapter, and response.
+      description: Endpoint, request body (redacted), provider or adapter, and the response.
       placeholder: |
         1. POST /v1/chat/completions with model "..."
         2. ...
@@ -27,7 +36,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Version / commit
+      label: Version or commit
       description: Git commit SHA or release tag.
     validations:
       required: false
@@ -35,12 +44,12 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Node version, Postgres/Redis versions, OS, deployment (Docker, bare metal…).
+      description: Bun version (`bun --version`), Postgres and Redis versions, OS, and how it is deployed (Docker, bare metal, …).
     validations:
       required: false
   - type: textarea
     id: logs
     attributes:
       label: Relevant logs
-      description: Structured logs or operation details (redacted). Include `x-request-id` if available.
+      description: Redacted logs or operation details. Include the `x-request-id` if you have it.
       render: shell

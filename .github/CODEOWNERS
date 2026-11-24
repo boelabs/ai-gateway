@@ -1,0 +1,9 @@
+# Default reviewers for everything not listed below.
+*                       @jhisdev @jhispd
+
+# Contribution rules, governance and the automation that enforces them.
+/.github/               @jhisdev @jhispd
+/CONTRIBUTING.md        @jhisdev @jhispd
+/GOVERNANCE.md          @jhisdev @jhispd
+/AGENTS.md              @jhisdev @jhispd
+/SECURITY.md            @jhisdev @jhispd
