@@ -8,7 +8,7 @@ contributions are accepted. The day-to-day rules for contributors are in
 
 | Role | Who | Can do |
 |---|---|---|
-| **Maintainer** | Repository admins | Everything: accept issues, review and merge pull requests, change settings, publish releases. |
+| **Maintainer** | Organization owners, repository admins and the maintain role | Everything: accept issues, review and merge pull requests, change settings, publish releases. Merge their own pull requests without a second approval once CI is green. |
 | **Collaborator** | People with write access | Push branches, review pull requests, triage issues, manage labels. Pull requests from collaborators skip the `accepted` requirement but still pass CI and the PR template. |
 | **Contributor** | Anyone | Open issues and pull requests from forks. Pull requests need an issue labeled `accepted`. |
 
@@ -39,8 +39,12 @@ lose the role; it is returned on request.
 
 ## Protecting the project
 
-- `main` is protected: changes arrive through pull requests, are squash-merged, and merge only when
-  CI is green.
+- `main` is protected by the two rulesets in [`.github/rulesets/`](.github/rulesets/):
+  - **Protect main** applies to everyone, with no bypass: changes arrive through pull requests, are
+    squash-merged, and merge only when CI is green and review threads are resolved.
+  - **Require review on main** asks for one approval from a code owner. Maintainers bypass it, so they
+    merge their own pull requests without waiting for another person, and so do agents working
+    under a maintainer's account. A contributor's pull request always needs a maintainer's approval.
 - Pull requests from people outside the maintainer team are gated on an accepted issue. Maintainers
   may close a pull request that does not follow this, or one with no activity for 30 days.
 - Security reports are handled privately through [SECURITY.md](SECURITY.md).

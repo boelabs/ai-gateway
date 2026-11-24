@@ -47,6 +47,7 @@ the check runs again.
 ### Review
 
 - All checks must pass before review: CI and the PR policy.
+- A contributor's pull request is merged only after a maintainer approves it.
 - Maintainers review on a best-effort basis; there is no fixed response time. Expect questions and
   requests for changes.
 - We squash-merge every pull request. Commit history on your branch does not matter; the

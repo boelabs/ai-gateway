@@ -33,7 +33,8 @@ You must not:
   Operators' deployments reference these ids; retirement is a flag, and only a human reverses it.
 - Add a provider, a transport, or a new operation to a model.
 - Tag, release, or touch `release.yml`. Merges go to `main` only.
-- Bypass branch protection, force-push, or merge with any check red or pending.
+- Bypass a required check, force-push, or merge with any check red or pending. Merging as an admin
+  past the approval rule is expected (3.6); nothing else is bypassed.
 
 ## 2. Sources
 
@@ -96,7 +97,7 @@ Locally, the `gh pr` commands below work as written.
 Look for an open pull request whose head branch starts with `chore/catalog-sync`. If one exists, do
 not open a second one:
 
-- If it is green, `mergeStateStatus` is `CLEAN`, and `catalog:guard` passes on it, merge it (3.6),
+- If it is green, has no conflicts, and `catalog:guard` passes on it, merge it (3.6),
   pull `main`, and continue with a fresh run.
 - Otherwise it is waiting for a human. Check out its branch, merge `origin/main` into it, and add
   this run's changes there (push to the same branch, update its description). Do not merge it.
@@ -340,11 +341,15 @@ To merge (only when `catalog:guard` exited 0):
    The required checks are *Lint, typecheck & unit tests*, *Integration tests* and *Build container
    images* from the `pull_request` run. Poll every minute, for up to 30 minutes, until all three are
    completed; locally, `gh pr checks <number> --watch`.
-2. **All three succeeded and the merge state is clean** (`mergeable_state: "clean"` over REST,
-   `mergeStateStatus: CLEAN` from `gh pr view`). Anything else: do not merge.
-3. **Squash-merge** with the pull request title as the commit title and an empty body
-   (`gh pr merge <number> --squash --delete-branch` locally). Delete the head branch if it still
-   exists. A cloud sandbox is discarded after the run: skip local cleanup.
+2. **All three succeeded and the pull request has no conflicts** (`mergeable: true` over REST,
+   `mergeable: MERGEABLE` from `gh pr view`). The merge state reads `blocked` / `BLOCKED` because
+   the *Require review on main* ruleset asks for an approval; the account this runs under is a
+   maintainer and bypasses that rule only. Any other blocker (a red or pending check, a conflict):
+   do not merge.
+3. **Squash-merge as a maintainer** with the pull request title as the commit title and an empty
+   body (`gh pr merge <number> --squash --admin --delete-branch` locally; `merge_pull_request` with
+   `merge_method: squash` in a cloud session). Delete the head branch if it still exists. A cloud
+   sandbox is discarded after the run: skip local cleanup.
 
 If a check fails, read its log. Fix it on the branch if the cause is your catalog change, then
 verify again from 3.5. If it is unrelated to your change, leave the pull request open and say so.

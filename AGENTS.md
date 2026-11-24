@@ -391,16 +391,31 @@ Agents never create a tag or a release unless a person asks for that specific re
 ### Merging — the hard rule
 
 Merging to `main` does not deploy, but `main` is what the next release ships. **Never merge to `main`
-while CI is not green.** `main` is branch-protected; auto-merge is disabled and admin bypass is
-off-limits. The required checks are the three CI jobs in
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml): *Lint, typecheck & unit tests*,
-*Integration tests*, and *Build container images*.
+while CI is not green.** Two rulesets protect `main`; their source is in
+[`.github/rulesets/`](.github/rulesets/):
+
+- **Protect main** — nobody can bypass it: pull request required, squash only, linear history,
+  review threads resolved, and the three CI jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+  green: *Lint, typecheck & unit tests*, *Integration tests*, and *Build container images*.
+- **Require review on main** — one approval from a code owner. Maintainers (organization owners,
+  repository admins, the maintain role) bypass it.
+
+**A maintainer's pull request needs no approval and no permission to merge.** When you work under a
+maintainer's account, merge the pull request you opened for their task as soon as it is green. Do not
+ask first:
 
 ```bash
-gh pr checks <number> --watch                       # wait for all checks
-gh pr view <number> --json mergeStateStatus          # must be CLEAN
-gh pr merge <number> --squash                        # only then
+gh pr checks <number> --watch                                 # wait for all checks
+gh pr view <number> --json mergeable,reviewDecision           # MERGEABLE; REVIEW_REQUIRED is fine
+gh pr merge <number> --squash --admin                         # --admin skips the approval only
 ```
+
+`--admin` skips only the approval rule. GitHub still refuses the merge while a required check is red
+or pending or a review thread is open, because *Protect main* has no bypass. Two limits:
+
+- **A contributor's pull request** (opened from outside the maintainer team) is never merged with
+  `--admin` and never approved by an agent. It waits for a maintainer's review.
+- **Auto-merge is not used.** Merge explicitly once the checks are green.
 
 If a check fails, fix the branch and push — do not re-run to get a lucky pass, do not merge around
 it, do not ask for the protection to be lifted.
