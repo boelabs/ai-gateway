@@ -7,6 +7,7 @@ import {
 	gatewayMetadata,
 	gatewayHeaders,
 	parseOptions,
+	wireModelId,
 } from "../shared/gateway-options.ts";
 
 import type {
@@ -97,7 +98,7 @@ export class BoelabsGatewayEmbeddingModel implements EmbeddingModelV4 {
 				options.headers,
 			),
 			body: compact({
-				model: this.modelId,
+				model: wireModelId(this.modelId, opts.serviceMode),
 				input: options.values,
 				encoding_format: "float",
 				dimensions: options.dimensions,

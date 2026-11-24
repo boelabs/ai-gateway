@@ -14,6 +14,7 @@ import {
 	gatewayMetadata,
 	gatewayHeaders,
 	parseOptions,
+	wireModelId,
 } from "../shared/gateway-options.ts";
 
 import {
@@ -104,7 +105,7 @@ export class BoelabsGatewayRerankingModel implements RerankingModelV4 {
 				options.headers,
 			),
 			body: compact({
-				model: this.modelId,
+				model: wireModelId(this.modelId, opts.serviceMode),
 				query: options.query,
 				documents,
 				top_n: options.topN,

@@ -91,6 +91,50 @@ describe("media models", () => {
 		expect(form?.get("model")).toBe("image-default");
 		expect(form?.get("image")).toBeInstanceOf(Blob);
 		expect(form?.get("mask")).toBeInstanceOf(Blob);
+		expect(form?.get("extra_body")).toBeNull();
+	});
+
+	test("serviceMode rides as the model suffix on media models", async () => {
+		const { provider, requests } = mockGateway([
+			json({ created: 1_760_000_000, data: [{ b64_json: "aW1n" }] }),
+			json({
+				object: "list",
+				model: "embed",
+				data: [{ object: "embedding", index: 0, embedding: [1, 0] }],
+				usage: { prompt_tokens: 1, total_tokens: 1 },
+			}),
+		]);
+		await generateImage({
+			model: provider.image("image-default"),
+			prompt: "a fox",
+			providerOptions: { boelabsGateway: { serviceMode: "flex" } },
+		});
+		await embedMany({
+			model: provider.embedding("embed"),
+			values: ["fox"],
+			providerOptions: { boelabsGateway: { serviceMode: "priority" } },
+		});
+		expect(requests[0]?.body).toMatchObject({ model: "image-default:flex" });
+		expect(requests[1]?.body).toMatchObject({ model: "embed:priority" });
+	});
+
+	test("image edits carry extra_body as a JSON field", async () => {
+		const { provider, requests } = mockGateway([
+			json({ created: 1_760_000_000, data: [{ b64_json: "ZWRpdA==" }] }),
+		]);
+		const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+		const extraBody = {
+			image_config: { aspect_ratio: "auto", image_size: "2K" },
+		};
+		await generateImage({
+			model: provider.image("image-default"),
+			prompt: { text: "add a hat", images: [png] },
+			providerOptions: { boelabsGateway: { quality: "high", extraBody } },
+		});
+		const form = requests[0]?.form;
+		expect(requests[0]?.url).toBe("https://gateway.test/v1/images/edits");
+		expect(form?.get("quality")).toBe("high");
+		expect(JSON.parse(String(form?.get("extra_body")))).toEqual(extraBody);
 	});
 
 	test("transcription asks for verbose_json when timestamps are wanted", async () => {

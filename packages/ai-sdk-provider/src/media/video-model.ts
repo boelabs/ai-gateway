@@ -26,6 +26,7 @@ import {
 	gatewayMetadata,
 	gatewayHeaders,
 	parseOptions,
+	wireModelId,
 } from "../shared/gateway-options.ts";
 
 import {
@@ -222,7 +223,7 @@ export class BoelabsGatewayVideoModel implements VideoModelV4 {
 		}));
 
 		const body = compact({
-			model: this.modelId,
+			model: wireModelId(this.modelId, opts.serviceMode),
 			prompt: options.prompt,
 			task: opts.task,
 			duration: options.duration,
