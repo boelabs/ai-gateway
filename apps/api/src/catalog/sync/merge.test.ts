@@ -303,3 +303,32 @@ test("never touches capabilities.reasoning or operations.text.generate.reasoning
 		true,
 	);
 });
+
+test("never proposes a cache write price for Google, which charges none", () => {
+	const c: MatchedCandidate = {
+		adapterKey: "googleaistudio",
+		upstreamModel: "gemini-3.1-flash-lite",
+		confirmed: true,
+		bySource: {
+			openrouter: {
+				model: {
+					source: "openrouter",
+					id: "google/gemini-3.1-flash-lite",
+					inputModalities: [],
+					outputModalities: ["text"],
+					endpoints: [],
+					pricing: {
+						inputCentsPerMTokens: 25,
+						cacheReadCentsPerMTokens: 2.5,
+						cacheWriteCentsPerMTokens: 4.17,
+					},
+				},
+				endpoint: undefined,
+			},
+		},
+	};
+	const result = mergeCatalogEntry(stub(), c, undefined);
+	assert.equal(result.entry.pricing?.cacheReadCentsPerMTokens, 2.5);
+	assert.equal(result.entry.pricing?.cacheWriteCentsPerMTokens, undefined);
+	assert.ok(!result.changes.some((change) => change.includes("cacheWrite")));
+});
