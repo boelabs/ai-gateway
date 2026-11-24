@@ -26,7 +26,21 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            const maintainer = ["OWNER", "MEMBER", "COLLABORATOR"].includes(pr.author_association);
+            // author_association hides private organization membership from this token, so a
+            // maintainer can look like a contributor. Ask for the author's repository role instead.
+            let maintainer = ["OWNER", "MEMBER", "COLLABORATOR"].includes(pr.author_association);
+            if (!maintainer) {
+              try {
+                const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  username: pr.user.login,
+                });
+                maintainer = ["admin", "maintain", "write"].includes(data.role_name);
+              } catch {
+                maintainer = false;
+              }
+            }
 
             // Drop the template's HTML comments so their hints never count as content.
             const text = (pr.body ?? "").replace(/<!--[\s\S]*?-->/g, "");
