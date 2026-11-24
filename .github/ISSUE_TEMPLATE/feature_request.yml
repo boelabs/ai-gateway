@@ -1,11 +1,25 @@
 name: Feature request
-description: Suggest an enhancement or a new provider/capability
+description: Suggest an enhancement or a new provider or capability
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you submit, read the scope rules in CONTRIBUTING.md. A maintainer accepts an issue
+        before any code is written; a pull request without an `accepted` issue is closed.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and this request is not a duplicate.
+          required: true
+        - label: I have read CONTRIBUTING.md and this fits the project's scope.
+          required: true
   - type: textarea
     id: problem
     attributes:
-      label: Problem / motivation
+      label: Problem or motivation
       description: What are you trying to do that the gateway does not support today?
     validations:
       required: true
@@ -13,7 +27,7 @@ body:
     id: proposal
     attributes:
       label: Proposed solution
-      description: How should it work? For a new provider, link the upstream API docs.
+      description: How should it work? For a new provider, link the upstream API documentation.
     validations:
       required: true
   - type: textarea
@@ -22,3 +36,10 @@ body:
       label: Alternatives considered
     validations:
       required: false
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to open a pull request for this once it is accepted.
+          required: false

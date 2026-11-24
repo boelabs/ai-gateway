@@ -2,4 +2,7 @@ blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
     url: https://github.com/boelabs/ai-gateway/security/advisories/new
-    about: Please report security issues privately. See SECURITY.md.
+    about: Report security issues privately. Never open a public issue for them. See SECURITY.md.
+  - name: Contribution guide
+    url: https://github.com/boelabs/ai-gateway/blob/main/CONTRIBUTING.md
+    about: Read how issues, pull requests and the review process work before you open one.

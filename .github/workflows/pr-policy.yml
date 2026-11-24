@@ -1,0 +1,92 @@
+name: PR policy
+
+# Checks each pull request against .github/PULL_REQUEST_TEMPLATE.md and CONTRIBUTING.md:
+# every template section is present and filled, one type is ticked, and a contributor's pull
+# request links an issue that a maintainer has labeled `accepted`.
+#
+# It runs as pull_request_target so that the rules come from the base branch: a pull request
+# cannot weaken its own check. The job checks out nothing from the pull request and only reads
+# the event payload and issues, so it needs no write permission.
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, ready_for_review]
+
+permissions:
+  issues: read
+  pull-requests: read
+
+jobs:
+  policy:
+    name: PR policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the template and the linked issue
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const maintainer = ["OWNER", "MEMBER", "COLLABORATOR"].includes(pr.author_association);
+
+            // Drop the template's HTML comments so their hints never count as content.
+            const text = (pr.body ?? "").replace(/<!--[\s\S]*?-->/g, "");
+
+            const sections = new Map();
+            for (const part of text.split(/^## /m).slice(1)) {
+              const [heading, ...rest] = part.split("\n");
+              sections.set(heading.trim().toLowerCase(), rest.join("\n"));
+            }
+
+            const errors = [];
+            for (const name of ["Summary", "Linked issue", "Type", "Checklist"]) {
+              if (!sections.has(name.toLowerCase())) {
+                errors.push(`Add the "## ${name}" section from the template.`);
+              }
+            }
+
+            if (!(sections.get("summary") ?? "").trim()) {
+              errors.push("Write a summary of the change.");
+            }
+
+            if (!/- \[x\]/i.test(sections.get("type") ?? "")) {
+              errors.push("Tick one type under Type.");
+            }
+
+            const linked = sections.get("linked issue") ?? "";
+            const numbers = [...new Set([...linked.matchAll(/#(\d+)/g)].map((m) => Number(m[1])))];
+            const notApplicable = /\bN\/A\b/i.test(linked);
+
+            if (numbers.length === 0 && !(maintainer && notApplicable)) {
+              errors.push(
+                maintainer
+                  ? "Link the issue with `Closes #<number>`, or write N/A with a reason."
+                  : "Link the issue this pull request implements with `Closes #<number>`. Contributions need an accepted issue.",
+              );
+            }
+
+            if (!maintainer) {
+              for (const number of numbers) {
+                try {
+                  const { data: issue } = await github.rest.issues.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: number,
+                  });
+                  if (issue.pull_request) {
+                    errors.push(`#${number} is a pull request. Link the issue it implements.`);
+                  } else if (!issue.labels.some((label) => (label.name ?? label) === "accepted")) {
+                    errors.push(`Issue #${number} is not accepted yet. A maintainer adds the \`accepted\` label before work starts.`);
+                  }
+                } catch (error) {
+                  errors.push(`Issue #${number} was not found in this repository.`);
+                }
+              }
+            }
+
+            if (errors.length > 0) {
+              core.setFailed(
+                ["This pull request does not follow CONTRIBUTING.md:", ...errors.map((e) => `- ${e}`)].join("\n"),
+              );
+            } else {
+              core.info("The pull request follows the template and the contribution rules.");
+            }
