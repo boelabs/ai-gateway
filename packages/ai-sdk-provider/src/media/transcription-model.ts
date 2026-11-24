@@ -22,6 +22,7 @@ import {
 	gatewayMetadata,
 	gatewayHeaders,
 	parseOptions,
+	wireModelId,
 } from "../shared/gateway-options.ts";
 
 import {
@@ -131,7 +132,7 @@ export class BoelabsGatewayTranscriptionModel implements TranscriptionModelV4 {
 			`audio.${mediaTypeToExtension(options.mediaType)}`,
 		);
 		const fields = compact({
-			model: this.modelId,
+			model: wireModelId(this.modelId, opts.serviceMode),
 			language: opts.language,
 			prompt: opts.prompt,
 			temperature: opts.temperature,

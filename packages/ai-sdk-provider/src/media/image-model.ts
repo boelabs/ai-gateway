@@ -24,6 +24,7 @@ import {
 	gatewayMetadata,
 	gatewayHeaders,
 	parseOptions,
+	wireModelId,
 } from "../shared/gateway-options.ts";
 
 import {
@@ -140,7 +141,7 @@ export class BoelabsGatewayImageModel implements ImageModelV4 {
 		}
 
 		const fields = compact({
-			model: this.modelId,
+			model: wireModelId(this.modelId, opts.serviceMode),
 			prompt: options.prompt,
 			n: options.n,
 			size: options.size,
@@ -175,7 +176,12 @@ export class BoelabsGatewayImageModel implements ImageModelV4 {
 				: await postFormDataToApi({
 						...common,
 						url: apiUrl(this.config, "/images/edits"),
-						formData: await this.editForm(fields, files, options),
+						formData: await this.editForm(
+							fields,
+							opts.extraBody,
+							files,
+							options,
+						),
 					});
 
 		// The AI SDK keeps only `images` when it aggregates calls, so the facts of the call ride on
@@ -238,12 +244,17 @@ export class BoelabsGatewayImageModel implements ImageModelV4 {
 
 	private async editForm(
 		fields: Record<string, unknown>,
+		extraBody: Record<string, unknown> | undefined,
 		files: ImageModelV4File[],
 		options: ImageModelV4CallOptions,
 	): Promise<FormData> {
 		const form = new FormData();
 		for (const [key, value] of Object.entries(fields)) {
 			form.append(key, String(value));
+		}
+		if (extraBody !== undefined) {
+			// A multipart body has no nested fields; the gateway parses `extra_body` as JSON.
+			form.append("extra_body", JSON.stringify(extraBody));
 		}
 		const field = files.length > 1 ? "image[]" : "image";
 		for (const [index, file] of files.entries()) {
