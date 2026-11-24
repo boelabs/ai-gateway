@@ -7,9 +7,12 @@ name: PR policy
 # It runs as pull_request_target so that the rules come from the base branch: a pull request
 # cannot weaken its own check. The job checks out nothing from the pull request and only reads
 # the event payload and issues, so it needs no write permission.
+#
+# It also runs on every push (`synchronize`): a required check reports on the head commit, so a push
+# without a new run would leave the pull request blocked until someone edited its body.
 on:
   pull_request_target:
-    types: [opened, edited, reopened, ready_for_review]
+    types: [opened, edited, reopened, synchronize, ready_for_review]
 
 permissions:
   issues: read
