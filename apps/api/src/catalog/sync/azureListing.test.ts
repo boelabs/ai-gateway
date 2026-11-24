@@ -4,10 +4,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+	AZURE_LISTING_MARKDOWN_URL,
 	compareAzureListing,
 	parseAzureListing,
 	checkAzureListing,
-	AZURE_LISTING_URL,
 } from "./azureListing.ts";
 
 // Trimmed from the Learn page's Markdown rendering, keeping each row shape the parser has to handle.
@@ -118,6 +118,24 @@ test("compareAzureListing: reports missing ids and retired ids still served, ski
 	);
 });
 
+test("compareAzureListing: matches the unserved list whatever Microsoft's spelling of the id", () => {
+	const findings = compareAzureListing(parseAzureListing(page), new Map(), {
+		azureopenai: {
+			"GPT-5": "x",
+			"gpt-5-mini": "x",
+			"Gpt-Chat-Latest": "x",
+			"gpt-audio": "x",
+			"GPT-AUDIO-MINI": "x",
+		},
+		azurefoundry: {
+			"Grok-4.7": "x",
+			"grok-4-20-reasoning": "x",
+			"microsoft-decision-1": "x",
+		},
+	});
+	assert.deepEqual(findings.missing, []);
+});
+
 test("checkAzureListing: asks Learn for Markdown and compares it", async () => {
 	let url: string | undefined;
 	let accept: string | null = null;
@@ -131,15 +149,28 @@ test("checkAzureListing: asks Learn for Markdown and compares it", async () => {
 		},
 		() => checkAzureListing(new Map()),
 	);
-	assert.equal(url, AZURE_LISTING_URL);
+	assert.equal(url, AZURE_LISTING_MARKDOWN_URL);
 	assert.equal(accept, "text/markdown");
 	assert.equal(findings.complete, true);
 	assert.ok(findings.missing.some((m) => m.id === "grok-4.7"));
 });
 
+test("checkAzureListing: an HTML answer is incomplete, never 'nothing new'", async () => {
+	const findings = await withStubbedFetch(
+		() =>
+			new Response(
+				"<!DOCTYPE html>\n<html>Foundry Models sold by Azure</html>",
+			),
+		() => checkAzureListing(new Map()),
+	);
+	assert.equal(findings.complete, false);
+	assert.match(findings.error ?? "", /HTML instead of Markdown/u);
+	assert.deepEqual(findings.missing, []);
+});
+
 test("checkAzureListing: a page missing a tab is incomplete, never 'nothing new'", async () => {
 	const findings = await withStubbedFetch(
-		() => new Response("<html>moved</html>"),
+		() => new Response("---\ntitle: moved\n---\n# Moved"),
 		() => checkAzureListing(new Map()),
 	);
 	assert.equal(findings.complete, false);

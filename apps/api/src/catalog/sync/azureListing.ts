@@ -3,13 +3,19 @@ import { normalizeTag } from "./providerIdentity.ts";
 import { fetchTextWithRetry } from "./fetch.ts";
 
 /**
- * Microsoft's own list of the models Azure sells. Learn serves it as Markdown on `Accept: text/markdown`,
- * with every tab of the page (`::: zone pivot="..."`) in one document. The aggregators the sync trusts
- * for existence never list Azure's deployment ids, so without this page an Azure model only reaches the
- * catalog if someone happens to read it.
+ * Microsoft's own list of the models Azure sells. Learn serves it as Markdown, with every tab of the page
+ * (`::: zone pivot="..."`) in one document. The aggregators the sync trusts for existence never list
+ * Azure's deployment ids, so without this page an Azure model only reaches the catalog if someone happens
+ * to read it.
  */
 export const AZURE_LISTING_URL =
 	"https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure";
+
+/**
+ * Learn's cache can answer the bare URL with HTML even on `Accept: text/markdown`; the `accept` query
+ * parameter asks for Markdown in a way the cache keys on.
+ */
+export const AZURE_LISTING_MARKDOWN_URL = `${AZURE_LISTING_URL}?accept=text/markdown`;
 
 /** One adapter per tab of the page. */
 const PIVOT_ADAPTERS: Readonly<Record<string, string>> = {
@@ -160,6 +166,14 @@ export function compareAzureListing(
 		missing: [],
 		retiredNotDeprecated: [],
 	};
+	// Microsoft's spelling of an id drifts (`Cohere-embed-v5-Pro` became `Cohere-Embed-V5-Pro`), so the
+	// unserved list matches the way the catalogs do: normalized.
+	const unservedByAdapter = new Map(
+		Object.entries(unserved).map(([adapterKey, ids]) => [
+			adapterKey,
+			new Set(Object.keys(ids).map(normalizeTag)),
+		]),
+	);
 	for (const model of listed) {
 		const models = catalogsByAdapter.get(model.adapterKey) ?? {};
 		const normalized = normalizeTag(model.id);
@@ -171,10 +185,8 @@ export function compareAzureListing(
 			}
 			continue;
 		}
-		if (
-			!model.retired &&
-			unserved[model.adapterKey]?.[model.id] === undefined
-		) {
+		const unservedHere = unservedByAdapter.get(model.adapterKey);
+		if (!(model.retired || unservedHere?.has(normalized))) {
 			findings.missing.push(model);
 		}
 	}
@@ -186,9 +198,12 @@ export async function checkAzureListing(
 	catalogsByAdapter: ReadonlyMap<string, Record<string, CatalogEntry>>,
 ): Promise<AzureListingFindings> {
 	try {
-		const markdown = await fetchTextWithRetry(AZURE_LISTING_URL, {
+		const markdown = await fetchTextWithRetry(AZURE_LISTING_MARKDOWN_URL, {
 			headers: { accept: "text/markdown" },
 		});
+		if (/^\s*</u.test(markdown)) {
+			throw new Error("Learn answered with HTML instead of Markdown");
+		}
 		const listed = parseAzureListing(markdown);
 		const empty = Object.values(PIVOT_ADAPTERS).filter(
 			(adapterKey) => !listed.some((m) => m.adapterKey === adapterKey),
