@@ -66,9 +66,9 @@ export const AZURE_LISTING_UNSERVED: Readonly<
 		"MAI-Image-2.5-Flash": "The azurefoundry adapter has no image transport.",
 		"MAI-Image-2.5": "The azurefoundry adapter has no image transport.",
 		"embed-v-4-0": "The azurefoundry adapter has no embeddings transport.",
-		"Cohere-embed-v5-Pro":
+		"Cohere-Embed-V5-Pro":
 			"The azurefoundry adapter has no embeddings transport.",
-		"Cohere-embed-v5-Fast":
+		"Cohere-Embed-V5-Fast":
 			"The azurefoundry adapter has no embeddings transport.",
 		"Cohere-rerank-v5-pro": "The azurefoundry adapter has no rerank transport.",
 		"Cohere-rerank-v5-fast":
