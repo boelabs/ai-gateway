@@ -395,8 +395,9 @@ while CI is not green.** Two rulesets protect `main`; their source is in
 [`.github/rulesets/`](.github/rulesets/):
 
 - **Protect main** — nobody can bypass it: pull request required, squash only, linear history,
-  review threads resolved, and the three CI jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
-  green: *Lint, typecheck & unit tests*, *Integration tests*, and *Build container images*.
+  review threads resolved, the three CI jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+  green (*Lint, typecheck & unit tests*, *Integration tests*, *Build container images*), and *PR
+  policy* green ([`.github/workflows/pr-policy.yml`](.github/workflows/pr-policy.yml)).
 - **Require review on main** — one approval from a code owner. Maintainers (organization owners,
   repository admins, the maintain role) bypass it.
 
