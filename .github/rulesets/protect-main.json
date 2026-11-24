@@ -36,7 +36,8 @@
 						"integration_id": 15368
 					},
 					{ "context": "Integration tests", "integration_id": 15368 },
-					{ "context": "Build container images", "integration_id": 15368 }
+					{ "context": "Build container images", "integration_id": 15368 },
+					{ "context": "PR policy", "integration_id": 15368 }
 				]
 			}
 		}

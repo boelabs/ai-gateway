@@ -339,9 +339,10 @@ To merge (only when `catalog:guard` exited 0):
 1. **Wait for the pull request's own checks.** CI runs twice: the run for the branch push skips all
    its jobs by design (the pull request run covers them), so its "skipped" results are not a verdict.
    The required checks are *Lint, typecheck & unit tests*, *Integration tests* and *Build container
-   images* from the `pull_request` run. Poll every minute, for up to 30 minutes, until all three are
+   images* from the `pull_request` run, plus *PR policy*, which fails unless the body follows
+   `.github/PULL_REQUEST_TEMPLATE.md`. Poll every minute, for up to 30 minutes, until all four are
    completed; locally, `gh pr checks <number> --watch`.
-2. **All three succeeded and the pull request has no conflicts** (`mergeable: true` over REST,
+2. **All four succeeded and the pull request has no conflicts** (`mergeable: true` over REST,
    `mergeable: MERGEABLE` from `gh pr view`). The merge state reads `blocked` / `BLOCKED` because
    the *Require review on main* ruleset asks for an approval; the account this runs under is a
    maintainer and bypasses that rule only. Any other blocker (a red or pending check, a conflict):
