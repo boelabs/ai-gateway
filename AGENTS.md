@@ -348,9 +348,18 @@ Fix cooldown reset on success
 
 ### Pull requests
 
-- Fill in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) — summary, type,
-  checklist, reviewer notes. Tick only boxes that are actually true; delete inapplicable lines
-  rather than leaving them ambiguous.
+- **Always use the template, for every pull request you open or update.** The body is built from
+  [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md): keep its sections (Summary,
+  Linked issue, Type, Checklist, Notes for reviewers), their headings and their order. Write the body
+  to a file and pass it with `gh pr create --body-file <file>` (or `gh pr edit <n> --body-file <file>`).
+  Never use `--body` with a free-form text.
+- **Linked issue.** Write `Closes #<n>` for the issue the change implements. Only a maintainer may write
+  `N/A` instead, with a reason. A contributor's pull request needs an issue labeled `accepted`
+  (see [CONTRIBUTING.md](CONTRIBUTING.md#how-contributions-work)).
+- Tick exactly one type. Tick only checklist boxes that are actually true; delete lines that do not
+  apply rather than leaving them ambiguous.
+- The **PR policy** check must pass. If it fails, fix the body and push no workaround — do not
+  remove the check, rename a section, or merge around it.
 - Keep the body short. Two to five sentences of summary is the target.
 - Keep unrelated formatter churn out of the diff: `bun run format` may reorder imports in untouched
   files (pre-existing drift) — restore those from the base branch.
