@@ -190,6 +190,11 @@ over:**
 so an omission is never silent. If the report says the list could not be read, read the page by hand
 this run; the guard holds that run's pull request for a human as well.
 
+**Reading Microsoft Learn.** Request any Learn page with `?accept=text/markdown` appended to its URL
+(the retirement schedule, a model's section, the list above). The `Accept` header alone may come back
+as HTML from Learn's cache, and the tables then arrive as markup or not at all. The unserved list
+matches ids whatever Microsoft's capitalization or punctuation, so a respelled id needs no edit there.
+
 Candidates are: new models in the report, models the providers announced, deprecations the
 providers announced, and "stale essentials" in the report. Most stale essentials are aggregator
 noise (halved fast-mode prices, off-peak rates, parameters nobody documents); verify each one
