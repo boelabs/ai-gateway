@@ -319,8 +319,8 @@
 				"imageOutputCentsPerMTokens": 3200
 			},
 			"deprecated": true,
-			"retiresOn": "2026-12-16",
-			"notes": "Microsoft retires Azure OpenAI gpt-image-1.5 (version 2025-12-16) on 2026-12-16 and names no replacement yet."
+			"retiresOn": "2027-06-16",
+			"notes": "Microsoft retires Azure OpenAI gpt-image-1.5 (version 2025-12-16, GA) on 2027-06-16 and names no replacement yet."
 		},
 		"gpt-image-1-mini": {
 			"operations": {
@@ -426,8 +426,8 @@
 				"imageOutputCentsPerMTokens": 4000
 			},
 			"deprecated": true,
-			"retiresOn": "2026-10-23",
-			"notes": "Microsoft retires Azure OpenAI gpt-image-1 (version 2025-04-15, preview) on 2026-10-23 and names no replacement."
+			"retiresOn": "2026-10-28",
+			"notes": "Microsoft retires Azure OpenAI gpt-image-1 (version 2025-04-15, preview) on 2026-10-28 and names no replacement."
 		},
 		"gpt-live-1": {
 			"operations": {
@@ -658,8 +658,8 @@
 				"audioInputCentsPerMTokens": 600
 			},
 			"deprecated": true,
-			"retiresOn": "2026-10-15",
-			"notes": "Azure retires gpt-4o-transcribe 2025-03-20, its only version, on 2026-10-15 and names no replacement; gpt-4o-mini-transcribe 2025-12-15 stays available until 2027-06-15."
+			"retiresOn": "2027-02-26",
+			"notes": "Microsoft retires Azure OpenAI gpt-4o-transcribe (version 2025-03-20, GA) on 2027-02-26 and names no replacement; gpt-4o-mini-transcribe 2025-12-15 stays available until 2027-06-15."
 		},
 		"gpt-4o-transcribe-diarize": {
 			"operations": {
@@ -1824,8 +1824,8 @@
 				"cacheReadCentsPerMTokens": 37.5
 			},
 			"deprecated": true,
-			"retiresOn": "2026-11-15",
-			"notes": "Microsoft lists Azure OpenAI codex-mini (version 2025-05-16) as deprecated (closed to new customers); it retires on 2026-11-15 with no replacement listed."
+			"retiresOn": "2026-11-17",
+			"notes": "Microsoft lists Azure OpenAI codex-mini (version 2025-05-16) as deprecated (closed to new customers); it retires on 2026-11-17 with no replacement listed."
 		},
 		"o3-pro": {
 			"operations": {
