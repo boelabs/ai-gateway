@@ -275,8 +275,8 @@
 				"outputCentsPerMTokens": 100
 			},
 			"deprecated": true,
-			"retiresOn": "2026-11-19",
-			"notes": "Microsoft lists Llama-4-Maverick-17B-128E-Instruct-FP8 for retirement on 2026-11-19 in its partner models table, with no replacement listed."
+			"retiresOn": "2027-02-03",
+			"notes": "Microsoft lists Llama-4-Maverick-17B-128E-Instruct-FP8 for retirement on 2027-02-03 in its model retirement schedule, with no replacement listed."
 		},
 		"Llama-3.3-70B-Instruct": {
 			"operations": {
@@ -296,8 +296,8 @@
 				"outputCentsPerMTokens": 71
 			},
 			"deprecated": true,
-			"retiresOn": "2027-01-31",
-			"notes": "Microsoft lists Llama-3.3-70B-Instruct for retirement on 2027-01-31 in its model retirement schedule, with no replacement listed."
+			"retiresOn": "2027-02-03",
+			"notes": "Microsoft lists Llama-3.3-70B-Instruct for retirement on 2027-02-03 in its model retirement schedule, with no replacement listed."
 		},
 		"Mistral-Large-3": {
 			"operations": {
