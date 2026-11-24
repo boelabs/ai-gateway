@@ -1696,8 +1696,6 @@
 			"pricing": {
 				"inputCentsPerMTokens": 200,
 				"outputCentsPerMTokens": 1200,
-				"cacheReadCentsPerMTokens": 20,
-				"cacheWriteCentsPerMTokens": 37.5,
 				"imageOutputCentsPerMTokens": 12000
 			}
 		},
@@ -1796,7 +1794,6 @@
 				"inputCentsPerMTokens": 30,
 				"outputCentsPerMTokens": 250,
 				"cacheReadCentsPerMTokens": 3,
-				"cacheWriteCentsPerMTokens": 4.166667,
 				"imageOutputCentsPerMTokens": 3000
 			},
 			"deprecated": true,
@@ -2079,13 +2076,11 @@
 						"cacheReadCentsPerMTokens": 40
 					}
 				],
-				"cacheWriteCentsPerMTokens": 18.75,
 				"serviceTiers": {
 					"flex": {
 						"inputCentsPerMTokens": 100,
 						"outputCentsPerMTokens": 600,
 						"cacheReadCentsPerMTokens": 20,
-						"cacheWriteCentsPerMTokens": 18.75,
 						"tiers": [
 							{
 								"aboveInputTokens": 200000,
@@ -2099,7 +2094,6 @@
 						"inputCentsPerMTokens": 360,
 						"outputCentsPerMTokens": 2160,
 						"cacheReadCentsPerMTokens": 36,
-						"cacheWriteCentsPerMTokens": 33.75,
 						"tiers": [
 							{
 								"aboveInputTokens": 200000,
@@ -2154,8 +2148,7 @@
 						"outputCentsPerMTokens": 1800,
 						"cacheReadCentsPerMTokens": 40
 					}
-				],
-				"cacheWriteCentsPerMTokens": 37.5
+				]
 			}
 		},
 		"gemini-3.6-flash": {
@@ -2190,7 +2183,6 @@
 				"inputCentsPerMTokens": 75,
 				"outputCentsPerMTokens": 375,
 				"cacheReadCentsPerMTokens": 7.5,
-				"cacheWriteCentsPerMTokens": 2.083333,
 				"scheduled": [
 					{
 						"effectiveFrom": "2027-01-01",
@@ -2198,19 +2190,16 @@
 							"inputCentsPerMTokens": 150,
 							"outputCentsPerMTokens": 750,
 							"cacheReadCentsPerMTokens": 15,
-							"cacheWriteCentsPerMTokens": 4.166667,
 							"serviceTiers": {
 								"flex": {
 									"inputCentsPerMTokens": 75,
 									"outputCentsPerMTokens": 375,
-									"cacheReadCentsPerMTokens": 7.5,
-									"cacheWriteCentsPerMTokens": 4.166667
+									"cacheReadCentsPerMTokens": 7.5
 								},
 								"priority": {
 									"inputCentsPerMTokens": 270,
 									"outputCentsPerMTokens": 1350,
-									"cacheReadCentsPerMTokens": 27,
-									"cacheWriteCentsPerMTokens": 4.166667
+									"cacheReadCentsPerMTokens": 27
 								}
 							}
 						}
@@ -2220,14 +2209,12 @@
 					"flex": {
 						"inputCentsPerMTokens": 37.5,
 						"outputCentsPerMTokens": 187.5,
-						"cacheReadCentsPerMTokens": 3.75,
-						"cacheWriteCentsPerMTokens": 2.083333
+						"cacheReadCentsPerMTokens": 3.75
 					},
 					"priority": {
 						"inputCentsPerMTokens": 135,
 						"outputCentsPerMTokens": 675,
-						"cacheReadCentsPerMTokens": 13.5,
-						"cacheWriteCentsPerMTokens": 2.083333
+						"cacheReadCentsPerMTokens": 13.5
 					}
 				}
 			}
@@ -2263,8 +2250,7 @@
 			"pricing": {
 				"inputCentsPerMTokens": 75,
 				"outputCentsPerMTokens": 375,
-				"cacheReadCentsPerMTokens": 7.5,
-				"cacheWriteCentsPerMTokens": 2.083333
+				"cacheReadCentsPerMTokens": 7.5
 			},
 			"deprecated": true,
 			"notes": "Google deprecated gemini-3.7-flash on 2026-10-08; API requests to it are automatically routed to gemini-3.8-flash (replacement)."
@@ -2304,8 +2290,7 @@
 			"pricing": {
 				"inputCentsPerMTokens": 150,
 				"outputCentsPerMTokens": 900,
-				"cacheReadCentsPerMTokens": 15,
-				"cacheWriteCentsPerMTokens": 4.166667
+				"cacheReadCentsPerMTokens": 15
 			},
 			"deprecated": true,
 			"notes": "Google deprecated gemini-3.5-flash on 2026-10-08; API requests to it are automatically routed to gemini-3.6-flash (replacement)."
@@ -2342,19 +2327,16 @@
 				"inputCentsPerMTokens": 30,
 				"outputCentsPerMTokens": 250,
 				"cacheReadCentsPerMTokens": 3,
-				"cacheWriteCentsPerMTokens": 4.166667,
 				"serviceTiers": {
 					"flex": {
 						"inputCentsPerMTokens": 15,
 						"outputCentsPerMTokens": 125,
-						"cacheReadCentsPerMTokens": 2,
-						"cacheWriteCentsPerMTokens": 4.166667
+						"cacheReadCentsPerMTokens": 2
 					},
 					"priority": {
 						"inputCentsPerMTokens": 54,
 						"outputCentsPerMTokens": 450,
-						"cacheReadCentsPerMTokens": 5,
-						"cacheWriteCentsPerMTokens": 4.166667
+						"cacheReadCentsPerMTokens": 5
 					}
 				}
 			}
@@ -2394,8 +2376,7 @@
 			"pricing": {
 				"inputCentsPerMTokens": 50,
 				"outputCentsPerMTokens": 300,
-				"cacheReadCentsPerMTokens": 5,
-				"cacheWriteCentsPerMTokens": 4.166667
+				"cacheReadCentsPerMTokens": 5
 			},
 			"deprecated": true,
 			"notes": "Google deprecated gemini-3-flash-preview; no shutdown date is published yet (replacement: gemini-3.6-flash)."
@@ -2436,7 +2417,18 @@
 				"inputCentsPerMTokens": 25,
 				"outputCentsPerMTokens": 150,
 				"cacheReadCentsPerMTokens": 2.5,
-				"cacheWriteCentsPerMTokens": 4.166667
+				"serviceTiers": {
+					"flex": {
+						"inputCentsPerMTokens": 12.5,
+						"outputCentsPerMTokens": 75,
+						"cacheReadCentsPerMTokens": 1.25
+					},
+					"priority": {
+						"inputCentsPerMTokens": 45,
+						"outputCentsPerMTokens": 270,
+						"cacheReadCentsPerMTokens": 4.5
+					}
+				}
 			},
 			"deprecated": true,
 			"retiresOn": "2027-05-07",
@@ -2490,8 +2482,7 @@
 						"outputCentsPerMTokens": 1500,
 						"cacheReadCentsPerMTokens": 25
 					}
-				],
-				"cacheWriteCentsPerMTokens": 37.5
+				]
 			},
 			"deprecated": true,
 			"retiresOn": "2026-12-01",
@@ -2537,8 +2528,7 @@
 			"pricing": {
 				"inputCentsPerMTokens": 30,
 				"outputCentsPerMTokens": 250,
-				"cacheReadCentsPerMTokens": 3,
-				"cacheWriteCentsPerMTokens": 8.333333
+				"cacheReadCentsPerMTokens": 3
 			},
 			"deprecated": true,
 			"retiresOn": "2026-12-01",
@@ -2585,19 +2575,16 @@
 				"inputCentsPerMTokens": 10,
 				"outputCentsPerMTokens": 40,
 				"cacheReadCentsPerMTokens": 1,
-				"cacheWriteCentsPerMTokens": 8.333333,
 				"serviceTiers": {
 					"flex": {
 						"inputCentsPerMTokens": 5,
 						"outputCentsPerMTokens": 20,
-						"cacheReadCentsPerMTokens": 1,
-						"cacheWriteCentsPerMTokens": 8.333333
+						"cacheReadCentsPerMTokens": 1
 					},
 					"priority": {
 						"inputCentsPerMTokens": 18,
 						"outputCentsPerMTokens": 72,
-						"cacheReadCentsPerMTokens": 1.8,
-						"cacheWriteCentsPerMTokens": 14.999999
+						"cacheReadCentsPerMTokens": 1.8
 					}
 				}
 			}
@@ -2612,7 +2599,6 @@
 						"structuredOutputs": true
 					},
 					"maxInputTokens": 262144,
-					"maxOutputTokens": 262144,
 					"parameters": {
 						"frequency_penalty": true,
 						"include_reasoning": true,
@@ -2639,7 +2625,8 @@
 				"inputCentsPerMTokens": 0,
 				"outputCentsPerMTokens": 0,
 				"cacheReadCentsPerMTokens": 0
-			}
+			},
+			"notes": "Google publishes a 256K context window and no maximum output; the Gemini API serves Gemma on the free tier only (the paid tier lists it as not available)."
 		},
 		"gemini-3.1-flash-lite-preview": {
 			"operations": {
@@ -2672,8 +2659,7 @@
 			"pricing": {
 				"inputCentsPerMTokens": 25,
 				"outputCentsPerMTokens": 150,
-				"cacheReadCentsPerMTokens": 2.5,
-				"cacheWriteCentsPerMTokens": 4.166667
+				"cacheReadCentsPerMTokens": 2.5
 			},
 			"deprecated": true,
 			"retiresOn": "2026-05-25",
@@ -3495,8 +3481,6 @@
 			"pricing": {
 				"inputCentsPerMTokens": 200,
 				"outputCentsPerMTokens": 1200,
-				"cacheReadCentsPerMTokens": 20,
-				"cacheWriteCentsPerMTokens": 37.5,
 				"imageOutputCentsPerMTokens": 12000
 			},
 			"deprecated": true,
@@ -3532,8 +3516,7 @@
 			"pricing": {
 				"inputCentsPerMTokens": 10,
 				"outputCentsPerMTokens": 40,
-				"cacheReadCentsPerMTokens": 1,
-				"cacheWriteCentsPerMTokens": 8.333333
+				"cacheReadCentsPerMTokens": 1
 			},
 			"deprecated": true,
 			"retiresOn": "2026-03-31",
@@ -3569,7 +3552,6 @@
 				"inputCentsPerMTokens": 125,
 				"outputCentsPerMTokens": 1000,
 				"cacheReadCentsPerMTokens": 12.5,
-				"cacheWriteCentsPerMTokens": 37.5,
 				"tiers": [
 					{
 						"aboveInputTokens": 200000,
@@ -3655,7 +3637,6 @@
 				"inputCentsPerMTokens": 75,
 				"outputCentsPerMTokens": 375,
 				"cacheReadCentsPerMTokens": 7.5,
-				"cacheWriteCentsPerMTokens": 2.083333,
 				"scheduled": [
 					{
 						"effectiveFrom": "2027-01-01",
@@ -3663,19 +3644,16 @@
 							"inputCentsPerMTokens": 150,
 							"outputCentsPerMTokens": 750,
 							"cacheReadCentsPerMTokens": 15,
-							"cacheWriteCentsPerMTokens": 4.166667,
 							"serviceTiers": {
 								"flex": {
 									"inputCentsPerMTokens": 75,
 									"outputCentsPerMTokens": 375,
-									"cacheReadCentsPerMTokens": 7.5,
-									"cacheWriteCentsPerMTokens": 4.166667
+									"cacheReadCentsPerMTokens": 7.5
 								},
 								"priority": {
 									"inputCentsPerMTokens": 270,
 									"outputCentsPerMTokens": 1350,
-									"cacheReadCentsPerMTokens": 27,
-									"cacheWriteCentsPerMTokens": 4.166667
+									"cacheReadCentsPerMTokens": 27
 								}
 							}
 						}
@@ -3685,14 +3663,12 @@
 					"flex": {
 						"inputCentsPerMTokens": 37.5,
 						"outputCentsPerMTokens": 187.5,
-						"cacheReadCentsPerMTokens": 3.75,
-						"cacheWriteCentsPerMTokens": 2.083333
+						"cacheReadCentsPerMTokens": 3.75
 					},
 					"priority": {
 						"inputCentsPerMTokens": 135,
 						"outputCentsPerMTokens": 675,
-						"cacheReadCentsPerMTokens": 13.5,
-						"cacheWriteCentsPerMTokens": 2.083333
+						"cacheReadCentsPerMTokens": 13.5
 					}
 				}
 			}

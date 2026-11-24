@@ -143,6 +143,7 @@
 						"strictTools": true
 					},
 					"maxInputTokens": 1048576,
+					"maxOutputTokens": 1048576,
 					"reasoning": {
 						"kind": "openai_effort",
 						"levels": ["low", "high", "max"]

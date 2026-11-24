@@ -393,7 +393,7 @@
 						"structuredOutputs": false
 					},
 					"maxInputTokens": 204800,
-					"maxOutputTokens": 204800,
+					"maxOutputTokens": 131072,
 					"parameters": {
 						"include_reasoning": true,
 						"max_tokens": true,
