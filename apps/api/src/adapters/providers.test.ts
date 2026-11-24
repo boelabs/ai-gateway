@@ -148,7 +148,8 @@ test("catalog: DeepSeek-V4 includes official pricing and native thinking/effort"
 	assert.equal(flash.pricing?.outputCentsPerMTokens, 120);
 	assert.equal(pro.pricing?.inputCentsPerMTokens, 132);
 	assert.equal(pro.pricing?.outputCentsPerMTokens, 396);
-	assert.equal(flash.maxOutputTokens, 384_000);
+	assert.equal(flash.maxOutputTokens, 393_216);
+	assert.equal(pro.maxOutputTokens, 393_216);
 	assert.equal(flash.capabilities.structuredOutputs, true);
 	assert.equal(flash.capabilities.strictTools, true);
 	assert.equal(flash.reasoning?.kind, "openai_body");

@@ -22,7 +22,7 @@
 						"strictTools": true
 					},
 					"maxInputTokens": 1000000,
-					"maxOutputTokens": 384000,
+					"maxOutputTokens": 393216,
 					"reasoning": {
 						"kind": "openai_body",
 						"levels": ["none", "low", "high", "max"],
@@ -96,7 +96,7 @@
 						"strictTools": true
 					},
 					"maxInputTokens": 1000000,
-					"maxOutputTokens": 384000,
+					"maxOutputTokens": 393216,
 					"reasoning": {
 						"kind": "openai_body",
 						"levels": ["none", "low", "high", "max"],
