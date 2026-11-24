@@ -846,7 +846,10 @@
 					"300": 625,
 					"3600": 1000
 				}
-			}
+			},
+			"deprecated": true,
+			"retiresOn": "2027-01-22",
+			"notes": "Anthropic deprecated claude-opus-4-5-20251101 on November 23, 2026; it retires on the Claude API on January 22, 2027 (replacement: claude-opus-5-5)."
 		},
 		"claude-haiku-4-5": {
 			"operations": {
