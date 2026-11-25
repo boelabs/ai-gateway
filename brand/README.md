@@ -11,7 +11,7 @@ Every file here comes from the Boelabs brand kit (`products/ai-gateway`).
 | `ai-gateway-logo.svg` | The logotype (mark and wordmark) in `currentColor`. It is the kit's tight cut (`ai-gateway-logo-horizontal-black-tight.svg`) with only the fill changed. Both apps inline the same paths and transforms as `AiGatewayLogo`, wherever the product is named. |
 | `ai-gateway-logo-light.png` | The logotype in black, 800px wide, resized from the kit's tight PNG. The README's heading on light backgrounds. |
 | `ai-gateway-logo-dark.png` | The same logotype in white, for dark backgrounds. |
-| `ai-gateway-mark.svg` | The mark alone in `currentColor`, with the viewBox cropped to the artwork (224 × 160). |
+| `ai-gateway-mark.svg` | The mark alone in `currentColor`, with the viewBox cropped to the artwork (233.87 × 169.87). |
 | `ai-gateway-mark-light.png` | Black ink on transparency, 512px wide, cut from the kit's tight logo PNG. For light backgrounds. |
 | `ai-gateway-mark-dark.png` | The same mark in white. For dark backgrounds. |
 | `ai-gateway-isotype-source.svg` | The kit's isotype as delivered, the source of truth for the mark. |
