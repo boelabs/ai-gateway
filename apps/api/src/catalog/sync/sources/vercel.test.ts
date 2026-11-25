@@ -6,7 +6,9 @@ import {
 	normalizeEndpoint,
 	type VercelModel,
 	normalizeModel,
+	loadModelDetail,
 } from "./vercel.ts";
+import { FetchRetryError, type fetchJsonWithRetry } from "../fetch.ts";
 
 // Fixture taken verbatim from Vercel AI Gateway's REST API docs sample response.
 const sampleModel: VercelModel = {
@@ -116,4 +118,32 @@ test("normalizeModel: missing architecture/endpoints degrades gracefully to empt
 	assert.deepEqual(model.inputModalities, []);
 	assert.deepEqual(model.outputModalities, []);
 	assert.deepEqual(model.endpoints, []);
+});
+
+function failingWith(status: number): typeof fetchJsonWithRetry {
+	return ((url: string) =>
+		Promise.reject(
+			new FetchRetryError(url, status, undefined),
+		)) as typeof fetchJsonWithRetry;
+}
+
+test("loadModelDetail: a 404 on a -batch variant means no endpoint detail, not a failure", async () => {
+	assert.equal(
+		await loadModelDetail("openai/gpt-5.4-batch", failingWith(404)),
+		undefined,
+	);
+});
+
+test("loadModelDetail: a 404 on any other model is still a failure", async () => {
+	await assert.rejects(
+		loadModelDetail("openai/gpt-5.4", failingWith(404)),
+		FetchRetryError,
+	);
+});
+
+test("loadModelDetail: a non-404 error on a -batch variant is still a failure", async () => {
+	await assert.rejects(
+		loadModelDetail("openai/gpt-5.4-batch", failingWith(503)),
+		FetchRetryError,
+	);
 });
