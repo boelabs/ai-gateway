@@ -150,3 +150,18 @@ test("a model's options list each ratio and tier once, in table order", () => {
 		resolutions: [],
 	});
 });
+
+test("a ratio is listed as the provider spells it and still matches in lowest terms", () => {
+	const wide: ImageModelProfile = {
+		sizes: {
+			"1584x672": { aspectRatio: "21:9", imageSize: "1K" },
+			"3168x1344": { aspectRatio: "21:9", imageSize: "2K" },
+		},
+	};
+	assert.deepEqual(imageDimensionOptions(wide).aspectRatios, ["21:9"]);
+	for (const aspectRatio of ["21:9", "7:3"]) {
+		assert.deepEqual(matchImageDimensions({ aspectRatio }, wide), {
+			size: "1584x672",
+		});
+	}
+});
