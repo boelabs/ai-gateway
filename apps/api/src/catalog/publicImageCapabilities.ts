@@ -1,4 +1,8 @@
-import { type ImageModelProfile, imageDimensionOptions } from "#core/images.ts";
+import {
+	type ImageModelProfile,
+	imageDimensionOptions,
+	normalizeAspectRatio,
+} from "#core/images.ts";
 import type { ResolvedModelMetadata } from "./types.ts";
 import { imageProfileFor } from "./types.ts";
 
@@ -8,8 +12,14 @@ const OPERATIONS = {
 } as const;
 
 function intersect<T>(lists: T[][]): T[] {
+	return intersectBy(lists, (value) => value);
+}
+
+/** The first list's values that every list has, judged by `key`. */
+function intersectBy<T>(lists: T[][], key: (value: T) => unknown): T[] {
+	const keyed = lists.map((list) => new Set(list.map(key)));
 	return (lists[0] ?? []).filter((value) =>
-		lists.every((list) => list.includes(value)),
+		keyed.every((set) => set.has(key(value))),
 	);
 }
 
@@ -31,8 +41,10 @@ function operationCapabilities(profiles: ImageModelProfile[]) {
 		),
 		arbitrary_sizes: every((profile) => profile.arbitrarySize !== undefined),
 		// Each one is served by every deployment; not every ratio exists at every resolution.
-		aspect_ratios: intersect(
+		// Compared in lowest terms, so a provider's `21:9` and another's 2016x864 are one ratio.
+		aspect_ratios: intersectBy(
 			profiles.map((profile) => imageDimensionOptions(profile).aspectRatios),
+			(ratio) => normalizeAspectRatio(ratio) ?? ratio,
 		),
 		resolutions: intersect(
 			profiles.map((profile) => imageDimensionOptions(profile).resolutions),

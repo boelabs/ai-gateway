@@ -302,29 +302,49 @@ export function normalizeAspectRatio(value: string): string | undefined {
 	return match ? reducedRatio(Number(match[1]), Number(match[2])) : undefined;
 }
 
-/** The ratio a size-table entry produces: its native mapping, else its own WIDTHxHEIGHT. */
-function entryAspectRatio(
+/**
+ * The ratio a size-table entry produces, as people write it: its native mapping (`21:9`), else its
+ * own WIDTHxHEIGHT in lowest terms. Only for showing; compare with entryAspectRatio.
+ */
+function entryAspectRatioLabel(
 	key: string,
 	mapping: ImageSizeMapping,
 ): string | undefined {
-	if (mapping.aspectRatio) {
-		return normalizeAspectRatio(mapping.aspectRatio);
+	if (mapping.aspectRatio && normalizeAspectRatio(mapping.aspectRatio)) {
+		return mapping.aspectRatio;
 	}
 	const match = /^([1-9]\d*)x([1-9]\d*)$/u.exec(key);
 	return match ? reducedRatio(Number(match[1]), Number(match[2])) : undefined;
 }
 
-/** What a model accepts for `aspect_ratio` and `resolution`, in the order its size table lists them. */
+/** The ratio a size-table entry produces, in lowest terms so `21:9` and `7:3` compare equal. */
+function entryAspectRatio(
+	key: string,
+	mapping: ImageSizeMapping,
+): string | undefined {
+	const label = entryAspectRatioLabel(key, mapping);
+	return label === undefined ? undefined : normalizeAspectRatio(label);
+}
+
+/**
+ * What a model accepts for `aspect_ratio` and `resolution`, in the order its size table lists them.
+ * A ratio appears once, under the provider's own spelling (`21:9`, not its lowest terms `7:3`).
+ */
 export function imageDimensionOptions(profile: ImageModelProfile | undefined): {
 	aspectRatios: string[];
 	resolutions: ImageResolution[];
 } {
-	const aspectRatios = new Set<string>();
+	const aspectRatios = new Map<string, string>();
 	const resolutions = new Set<ImageResolution>();
 	for (const [key, mapping] of Object.entries(profile?.sizes ?? {})) {
-		const ratio = entryAspectRatio(key, mapping);
-		if (ratio) {
-			aspectRatios.add(ratio);
+		const label = entryAspectRatioLabel(key, mapping);
+		const ratio = label === undefined ? undefined : normalizeAspectRatio(label);
+		if (
+			label !== undefined &&
+			ratio !== undefined &&
+			!aspectRatios.has(ratio)
+		) {
+			aspectRatios.set(ratio, label);
 		}
 		if (
 			(IMAGE_RESOLUTIONS as readonly string[]).includes(mapping.imageSize ?? "")
@@ -332,7 +352,10 @@ export function imageDimensionOptions(profile: ImageModelProfile | undefined): {
 			resolutions.add(mapping.imageSize as ImageResolution);
 		}
 	}
-	return { aspectRatios: [...aspectRatios], resolutions: [...resolutions] };
+	return {
+		aspectRatios: [...aspectRatios.values()],
+		resolutions: [...resolutions],
+	};
 }
 
 /**

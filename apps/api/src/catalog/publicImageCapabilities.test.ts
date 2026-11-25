@@ -76,6 +76,23 @@ test("a pool lists only what every deployment accepts", () => {
 	assert.equal(result?.edit, undefined);
 });
 
+test("a pool agrees on a ratio however each deployment spells it", () => {
+	const native = resolve({
+		operations: {
+			"image.generate": {
+				sizes: { "1584x672": { aspectRatio: "21:9", imageSize: "1K" } },
+			},
+		},
+	});
+	const exact = resolve({
+		operations: { "image.generate": { sizes: { "2016x864": {} } } },
+	});
+	assert.deepEqual(
+		publicImageCapabilities([native, exact])?.generate?.aspect_ratios,
+		["21:9"],
+	);
+});
+
 test("models without image operations have no image metadata", () => {
 	assert.equal(
 		publicImageCapabilities([resolve({ operations: { "text.generate": {} } })]),
