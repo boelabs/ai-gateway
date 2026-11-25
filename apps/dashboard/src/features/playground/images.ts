@@ -40,6 +40,9 @@ export const IMAGE_STYLES = ["vivid", "natural"] as const;
  */
 export interface ImageSettings {
 	size?: string;
+	/** With `resolution`, the alternative to `size`: the gateway picks the model's size for it. */
+	aspectRatio?: string;
+	resolution?: string;
 	quality?: string;
 	n?: number;
 	background?: string;
@@ -51,12 +54,39 @@ export interface ImageSettings {
 export const emptyImageSettings = (): ImageSettings => ({});
 
 /**
+ * The settings with one value chosen or cleared. `size` and the aspect ratio/resolution pair are two
+ * ways to say the same thing and the gateway refuses both at once, so choosing one clears the other.
+ */
+export function withImageSetting<Key extends keyof ImageSettings>(
+	settings: ImageSettings,
+	key: Key,
+	value: ImageSettings[Key],
+): ImageSettings {
+	const next = { ...settings };
+	if (value === undefined) {
+		delete next[key];
+		return next;
+	}
+	next[key] = value;
+	if (key === "size") {
+		delete next.aspectRatio;
+		delete next.resolution;
+	} else if (key === "aspectRatio" || key === "resolution") {
+		delete next.size;
+	}
+	return next;
+}
+
+/**
  * What the settings dialog offers for one model. Without the gateway saying what the model takes
  * (an older gateway), every value is offered and the gateway remains the one to refuse.
  */
 export interface ImageChoices {
 	/** Generation only: an edit keeps the source size. Empty hides the control. */
 	sizes: readonly string[];
+	/** Both operations take these, so an edit can ask for a tier and keep the source's proportion. */
+	aspectRatios: readonly string[];
+	resolutions: readonly string[];
 	qualities: readonly string[];
 	backgrounds: readonly string[];
 	formats: readonly string[];
@@ -90,6 +120,9 @@ export function imageChoices(
 	if (!(options && operations.length)) {
 		return {
 			sizes: IMAGE_SIZES,
+			// Only a gateway that lists them takes them; an older one refuses the fields outright.
+			aspectRatios: [],
+			resolutions: [],
 			qualities: IMAGE_QUALITIES,
 			backgrounds: IMAGE_BACKGROUNDS,
 			formats: IMAGE_FORMATS,
@@ -105,6 +138,8 @@ export function imageChoices(
 	);
 	return {
 		sizes: generate?.sizes.length ? ["auto", ...generate.sizes] : [],
+		aspectRatios: intersect(operations.map((entry) => entry.aspectRatios)),
+		resolutions: intersect(operations.map((entry) => entry.resolutions)),
 		qualities: qualities.length ? ["auto", ...qualities] : [],
 		backgrounds: [
 			"auto",
@@ -136,6 +171,8 @@ export function fitImageSettings(
 	const next = { ...settings };
 	const offered: [keyof ImageSettings, readonly string[]][] = [
 		["size", choices.sizes],
+		["aspectRatio", choices.aspectRatios],
+		["resolution", choices.resolutions],
 		["quality", choices.qualities],
 		["background", choices.backgrounds],
 		["outputFormat", choices.formats],
@@ -202,12 +239,17 @@ const imagesResponse = z.object({
 
 export type ImagesResponse = z.infer<typeof imagesResponse>;
 
-/** The managed fields, named as each endpoint names them. `size` has no meaning for an edit. */
+/**
+ * The managed fields, named as each endpoint names them. `size` has no meaning for an edit; an
+ * aspect ratio or resolution does, since it reshapes or upscales the result.
+ */
 function parameters(
 	settings: ImageSettings,
 	kind: "generate" | "edit",
 ): Record<string, string | number> {
 	const entries: Record<string, string | number | undefined> = {
+		aspect_ratio: settings.aspectRatio,
+		resolution: settings.resolution,
 		quality: settings.quality,
 		n: settings.n,
 		background: settings.background,

@@ -383,6 +383,9 @@ test("reads what an image model accepts per operation", () => {
 		generate: {
 			sizes: ["1024x1024"],
 			arbitrarySizes: true,
+			// An older gateway does not list them; nothing is offered then.
+			aspectRatios: [],
+			resolutions: [],
 			qualities: ["low", "high"],
 			outputFormats: ["png"],
 			transparentBackground: true,

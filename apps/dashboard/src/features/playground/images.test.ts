@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 import {
 	type ImageSettings,
+	withImageSetting,
 	fitImageSettings,
 	generationBody,
 	imageChoices,
@@ -126,6 +127,8 @@ test("the gateway's own message survives a failure, instead of a bare status", a
 const gemini = {
 	sizes: ["1024x1024", "1344x768"],
 	arbitrarySizes: false,
+	aspectRatios: ["1:1", "16:9"],
+	resolutions: ["1K", "2K"],
 	qualities: ["low", "high"],
 	outputFormats: ["png", "jpeg", "webp"],
 	transparentBackground: false,
@@ -158,8 +161,66 @@ test("a model that also edits offers only what both operations accept", () => {
 	assert.equal(choices.maxN, 4);
 });
 
+test("aspect ratio and resolution are offered only as far as both operations take them", () => {
+	const choices = imageChoices(
+		{ generate: gemini, edit: { ...gemini, resolutions: ["1K"] } },
+		true,
+	);
+	assert.deepEqual(choices.aspectRatios, ["1:1", "16:9"]);
+	assert.deepEqual(choices.resolutions, ["1K"]);
+});
+
+test("a size and an aspect ratio or resolution never go out together", () => {
+	const shaped = withImageSetting(
+		withImageSetting(
+			{ size: "1024x1024", quality: "low" },
+			"aspectRatio",
+			"16:9",
+		),
+		"resolution",
+		"2K",
+	);
+	assert.deepEqual(shaped, {
+		quality: "low",
+		aspectRatio: "16:9",
+		resolution: "2K",
+	});
+	assert.deepEqual(withImageSetting(shaped, "size", "1344x768"), {
+		quality: "low",
+		size: "1344x768",
+	});
+	assert.deepEqual(withImageSetting(shaped, "aspectRatio", undefined), {
+		quality: "low",
+		resolution: "2K",
+	});
+});
+
+test("an edit sends the aspect ratio and resolution, unlike a size", () => {
+	const file = new File([new Uint8Array([1, 2, 3])], "source.png", {
+		type: "image/png",
+	});
+	const form = editForm("gemini", "make it snow", [file], { resolution: "2K" });
+	assert.equal(form.get("resolution"), "2K");
+	assert.equal(form.get("aspect_ratio"), null);
+	assert.deepEqual(
+		generationBody("gemini", "a fox", {
+			aspectRatio: "16:9",
+			resolution: "2K",
+		}),
+		{
+			model: "gemini",
+			prompt: "a fox",
+			aspect_ratio: "16:9",
+			resolution: "2K",
+			response_format: "b64_json",
+			stream: false,
+		},
+	);
+});
+
 test("without the model's options every image value is offered", () => {
 	const choices = imageChoices(undefined, true);
+	assert.deepEqual(choices.aspectRatios, []);
 	assert.ok(choices.qualities.includes("hd"));
 	assert.ok(choices.backgrounds.includes("transparent"));
 	assert.equal(choices.maxN, 10);
@@ -171,6 +232,14 @@ test("switching image models drops the settings the new model would refuse", () 
 		outputFormat: "webp",
 		outputCompression: 80,
 	});
+	assert.deepEqual(
+		fitImageSettings(
+			{ aspectRatio: "21:9", resolution: "2K" },
+			{ generate: gemini },
+			false,
+		),
+		{ resolution: "2K" },
+	);
 	const kept: ImageSettings = { size: "1344x768", quality: "low" };
 	assert.equal(fitImageSettings(kept, { generate: gemini }, false), kept);
 	assert.equal(fitImageSettings(settings, undefined, false), settings);
