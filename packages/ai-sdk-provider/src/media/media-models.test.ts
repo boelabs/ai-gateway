@@ -94,6 +94,39 @@ describe("media models", () => {
 		expect(form?.get("extra_body")).toBeNull();
 	});
 
+	test("image aspectRatio goes out with the resolution tier, and size wins over both", async () => {
+		const { provider, requests } = mockGateway([
+			json({ created: 1_760_000_000, data: [{ b64_json: "aW1n" }] }),
+			json({ created: 1_760_000_000, data: [{ b64_json: "aW1n" }] }),
+		]);
+		const ratio = await generateImage({
+			model: provider.image("image-default"),
+			prompt: "a fox",
+			aspectRatio: "16:9",
+			providerOptions: { boelabsGateway: { resolution: "2K" } },
+		});
+		expect(requests[0]?.body).toEqual({
+			model: "image-default",
+			prompt: "a fox",
+			n: 1,
+			aspect_ratio: "16:9",
+			resolution: "2K",
+		});
+		expect(ratio.warnings).toEqual([]);
+
+		const exact = await generateImage({
+			model: provider.image("image-default"),
+			prompt: "a fox",
+			size: "1024x1024",
+			aspectRatio: "16:9",
+		});
+		expect(requests[1]?.body).toMatchObject({ size: "1024x1024" });
+		expect(requests[1]?.body).not.toHaveProperty("aspect_ratio");
+		expect(exact.warnings).toEqual([
+			expect.objectContaining({ type: "other" }),
+		]);
+	});
+
 	test("serviceMode rides as the model suffix on media models", async () => {
 		const { provider, requests } = mockGateway([
 			json({ created: 1_760_000_000, data: [{ b64_json: "aW1n" }] }),

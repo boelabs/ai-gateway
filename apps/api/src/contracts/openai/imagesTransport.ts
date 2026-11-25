@@ -15,6 +15,7 @@ import {
 	type ImageBackground,
 	type ImageQuality,
 	resolveImageSize,
+	matchImageDimensions,
 	type ImageUsage,
 } from "#core/images.ts";
 
@@ -39,6 +40,22 @@ const DIRECT_MANAGED = [
 	"image[]",
 ] as const;
 
+/**
+ * The images wire has `size` and no tier field, so a tier asked for with an automatic ratio would be
+ * lost; it goes out as the model's own size at that tier instead (the 1:1 one where listed first).
+ */
+function directSize(
+	req: CanonicalImageRequest,
+	profile: ImageModelProfile | undefined,
+): Pick<CanonicalImageRequest, "size"> {
+	if (req.size !== "auto" || req.resolution === undefined || !profile) {
+		return req.size === undefined ? {} : { size: req.size };
+	}
+	const { autoSize: _, ...exactOnly } = profile;
+	const exact = matchImageDimensions({ resolution: req.resolution }, exactOnly);
+	return { size: exact?.size ?? req.size };
+}
+
 function directBody(
 	req: CanonicalImageRequest,
 	upstreamModel: string,
@@ -46,7 +63,7 @@ function directBody(
 ): Record<string, unknown> {
 	const localOutputFormat = profile?.nativeOutputFormat === false;
 	const localOutputCompression = profile?.nativeOutputCompression === false;
-	const resolvedSize = resolveImageSize(req, profile);
+	const resolvedSize = resolveImageSize(directSize(req, profile), profile);
 	// `auto` expresses no choice, so nothing is sent; a rung is sent in the model's own vocabulary.
 	const nativeQuality =
 		req.quality === undefined || req.quality === "auto"

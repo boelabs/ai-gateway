@@ -41,6 +41,12 @@ export const imageOptionsSchema = z.object({
 	 * model lacks snaps to the nearest one it has; on Gemini image models it sets thinking.
 	 */
 	quality: z.string().optional(),
+	/**
+	 * Output tier (`512`, `1K`, `2K`, `4K`; see the model's `image_capabilities.resolutions`), used
+	 * with the call's `aspectRatio`. Alone, on models that pick the ratio themselves, the ratio stays
+	 * automatic. The call's `size` is the exact-dimensions alternative.
+	 */
+	resolution: z.enum(["512", "1K", "2K", "4K"]).optional(),
 	/** `transparent`, `opaque` or `auto`. */
 	background: z.enum(["transparent", "opaque", "auto"]).optional(),
 	/** `png`, `jpeg` or `webp`. */
@@ -128,12 +134,16 @@ export class BoelabsGatewayImageModel implements ImageModelV4 {
 				this.config.providerOptionsNames,
 				imageOptionsSchema,
 			)) ?? {};
-		if (options.aspectRatio !== undefined) {
+		// The gateway takes either an exact size or aspect ratio + resolution, not both.
+		const { size } = options;
+		if (
+			size !== undefined &&
+			(options.aspectRatio !== undefined || opts.resolution !== undefined)
+		) {
 			warnings.push({
-				type: "unsupported",
-				feature: "aspectRatio",
-				details:
-					"Image models take a `size`; see the model's `image_capabilities.sizes`.",
+				type: "other",
+				message:
+					"`size` is an exact size; aspectRatio and the resolution tier were not sent.",
 			});
 		}
 		if (options.seed !== undefined) {
@@ -144,7 +154,9 @@ export class BoelabsGatewayImageModel implements ImageModelV4 {
 			model: wireModelId(this.modelId, opts.serviceMode),
 			prompt: options.prompt,
 			n: options.n,
-			size: options.size,
+			...(size === undefined
+				? { aspect_ratio: options.aspectRatio, resolution: opts.resolution }
+				: { size }),
 			quality: opts.quality,
 			background: opts.background,
 			output_format: opts.outputFormat,

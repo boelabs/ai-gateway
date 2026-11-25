@@ -30,9 +30,9 @@ responses are **not part of the public contract**. `response_format` may be omit
 
 ## Fields
 
-`prompt`, `size`, `quality`, `n`, `response_format`, `background`, `moderation`, `input_fidelity`,
-`output_format`, `output_compression`, `style`, `user`, `stream`, `partial_images`, and (edits only)
-`image`/`images` + `mask`. Which values are actually accepted for `size`/`quality`/`output_format` is
+`prompt`, `size` (or `aspect_ratio` and `resolution`), `quality`, `n`, `response_format`,
+`background`, `moderation`, `input_fidelity`, `output_format`, `output_compression`, `style`, `user`,
+`stream`, `partial_images`, and (edits only) `image`/`images` + `mask`. Which values are actually accepted for `size`/`quality`/`output_format` is
 per-model, declared in its catalog `image.generate`/`image.edit` profile — an unsupported `size` or
 `output_format` returns `400 unsupported_parameter` before any upstream call.
 
@@ -55,6 +55,36 @@ Models whose profile declares native auto support (`autoSize`, e.g. the `gpt-ima
 aspect ratio of the input images. Models without native auto resolve `auto` deterministically to the
 **first entry of the profile's `sizes` table**, which is the model's default size. The response `size`
 always reports the actual dimensions of the returned image, never the literal `auto`.
+
+## `aspect_ratio` and `resolution` instead of `size`
+
+Some models think in exact pixels (`gpt-image-*` takes `1024x1536`), others in a ratio and a tier
+(Gemini takes `16:9` at `2K`). Either way you can ask for the shape and let the gateway find the
+size: send `aspect_ratio` (`WIDTH:HEIGHT`) and/or `resolution` (`512`, `1K`, `2K`, `4K`) instead of
+`size`. Combining them with `size` is rejected.
+
+```bash
+curl -X POST "$GATEWAY/v1/images/generations" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "model": "image-default", "prompt": "a red fox in snow", "aspect_ratio": "16:9", "resolution": "2K" }'
+```
+
+Each deployment resolves the pair against its own `sizes` table, so a fallback onto another
+provider gets that provider's size for the same shape:
+
+- **A ratio** matches an entry by its native ratio, or by its own dimensions for exact-size models
+  (`1024x1536` is `2:3`). Ratios compare in lowest terms, so `32:18` is `16:9`.
+- **A ratio alone** takes the default tier: the `1K` entry, or one with no tier.
+- **A resolution alone** keeps the ratio automatic on models that pick it themselves (Gemini, which
+  on edits follows the input image), and otherwise takes the model's first size at that tier.
+- **Nothing is invented.** A tier is never guessed for an exact-size entry that does not declare
+  one, and no size is computed from the model's free-size limits. If the model has no matching
+  entry, the request fails with `400 unsupported_parameter` naming the ratios and resolutions it
+  does offer.
+
+The model's [`image_capabilities`](/docs/models-discovery) list `aspect_ratios` and `resolutions`.
+The response's `size` is the size that was actually served.
 
 ## Output handling
 

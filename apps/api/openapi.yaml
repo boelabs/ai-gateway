@@ -5279,9 +5279,26 @@ components:
                 - b64_json
             - type: "null"
         size:
+          description: Exact dimensions. Mutually exclusive with aspect_ratio and resolution.
           anyOf:
             - type: string
               pattern: ^(auto|[1-9][0-9]*x[1-9][0-9]*)$
+            - type: "null"
+        aspect_ratio:
+          description: WIDTH:HEIGHT, resolved against the model's sizes (see image_capabilities.aspect_ratios). Alone it gets the model's default resolution.
+          anyOf:
+            - type: string
+              pattern: ^[1-9][0-9]*:[1-9][0-9]*$
+            - type: "null"
+        resolution:
+          description: Output tier (see image_capabilities.resolutions). Alone, on models that choose the aspect ratio themselves, the ratio stays automatic.
+          anyOf:
+            - type: string
+              enum:
+                - "512"
+                - 1K
+                - 2K
+                - 4K
             - type: "null"
         stream:
           default: false
@@ -5392,9 +5409,26 @@ components:
                 - b64_json
             - type: "null"
         size:
+          description: Exact dimensions. Mutually exclusive with aspect_ratio and resolution.
           anyOf:
             - type: string
               pattern: ^(auto|[1-9][0-9]*x[1-9][0-9]*)$
+            - type: "null"
+        aspect_ratio:
+          description: WIDTH:HEIGHT, resolved against the model's sizes (see image_capabilities.aspect_ratios). Alone it gets the model's default resolution.
+          anyOf:
+            - type: string
+              pattern: ^[1-9][0-9]*:[1-9][0-9]*$
+            - type: "null"
+        resolution:
+          description: Output tier (see image_capabilities.resolutions). Alone, on models that choose the aspect ratio themselves, the ratio stays automatic.
+          anyOf:
+            - type: string
+              enum:
+                - "512"
+                - 1K
+                - 2K
+                - 4K
             - type: "null"
         stream:
           default: false

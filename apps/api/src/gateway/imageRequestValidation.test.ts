@@ -145,3 +145,40 @@ test("image profile: missing allow-list means unsupported, not permissive", () =
 		);
 	}
 });
+
+test("image profile: aspect_ratio and resolution resolve against the size table", () => {
+	const table: ResolvedModelMetadata = {
+		...meta,
+		image: {
+			...meta.image,
+			sizes: {
+				"1024x1024": { aspectRatio: "1:1", imageSize: "1K" },
+				"1376x768": { aspectRatio: "16:9", imageSize: "1K" },
+			},
+		},
+	};
+	assert.doesNotThrow(() =>
+		assertImageRequestSupported({ ...baseReq, aspectRatio: "16:9" }, table),
+	);
+	assert.doesNotThrow(() =>
+		assertImageRequestSupported(
+			{ ...baseReq, aspectRatio: "1:1", resolution: "1K" },
+			table,
+		),
+	);
+	assert.throws(
+		() =>
+			assertImageRequestSupported(
+				{ ...baseReq, aspectRatio: "16:9", resolution: "4K" },
+				table,
+			),
+		(error: unknown) =>
+			error instanceof Error &&
+			error.message ===
+				"The selected model does not support aspect_ratio=16:9 with resolution=4K. It offers aspect_ratio 1:1, 16:9; resolution 1K; use size for exact dimensions.",
+	);
+	assert.throws(
+		() => assertImageRequestSupported({ ...baseReq, aspectRatio: "3:2" }, meta),
+		/offers aspect_ratio 1:1; no resolution/u,
+	);
+});

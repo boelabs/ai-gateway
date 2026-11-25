@@ -80,7 +80,9 @@ Aggregation rules:
   selectable efforts. Provider-specific translation fields are never included.
 - **`image_capabilities`** — for image generation and editing, what every deployment of the pool
   accepts, under `generate` and `edit`: `sizes`, `arbitrary_sizes` (other `WIDTHxHEIGHT` values within
-  the model's limits), `qualities`, `output_formats`, `transparent_background`, `style`, `mask`, and
+  the model's limits), `aspect_ratios` and `resolutions` (for
+  [`aspect_ratio` and `resolution`](/docs/images#aspect_ratio-and-resolution-instead-of-size); not
+  every ratio exists at every resolution), `qualities`, `output_formats`, `transparent_background`, `style`, `mask`, and
   `max_n` and `max_input_images` when limited. `size` and `quality` of `auto` are always accepted and
   not listed.
 - **`embedding_capabilities`** — for embeddings, what every deployment of the pool accepts:

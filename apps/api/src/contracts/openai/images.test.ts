@@ -79,6 +79,43 @@ test("images generation: rejects unknowns and invalid combinations", () => {
 	);
 });
 
+test("images: aspect_ratio and resolution are the alternative to size", () => {
+	const parsed = imageGenerationRequestSchema.parse({
+		model: "image",
+		prompt: "p",
+		aspect_ratio: "16:9",
+		resolution: "2K",
+	});
+	assert.deepEqual(generationToCanonical(parsed), {
+		operation: "generation",
+		model: "image",
+		prompt: "p",
+		stream: false,
+		responseFormat: "b64_json",
+		aspectRatio: "16:9",
+		resolution: "2K",
+	});
+	for (const schema of [imageGenerationRequestSchema, imageEditFieldsSchema]) {
+		const combined = schema.safeParse({
+			model: "x",
+			prompt: "p",
+			size: "1024x1024",
+			resolution: "1K",
+		});
+		assert.equal(combined.success, false);
+		assert.match(
+			combined.error?.issues[0]?.message ?? "",
+			/cannot be combined with aspect_ratio or resolution/u,
+		);
+		for (const invalid of [{ aspect_ratio: "wide" }, { resolution: "8K" }]) {
+			assert.equal(
+				schema.safeParse({ model: "x", prompt: "p", ...invalid }).success,
+				false,
+			);
+		}
+	}
+});
+
 test("images edits: extra_body must be an already-parsed object", () => {
 	assert.equal(
 		imageEditFieldsSchema.safeParse({

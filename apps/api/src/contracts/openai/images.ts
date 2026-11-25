@@ -1,4 +1,5 @@
 import { PUBLIC_QUALITY_VALUES, normalizeQuality } from "#core/quality.ts";
+import { IMAGE_RESOLUTIONS } from "#core/images.ts";
 import { GatewayError } from "#core/errors.ts";
 import { z } from "zod/v4";
 
@@ -13,6 +14,31 @@ const extraBodySchema = z.record(z.string(), z.unknown());
 const sizeSchema = z
 	.string()
 	.regex(/^(?:auto|[1-9]\d*x[1-9]\d*)$/u, "must be 'auto' or WIDTHxHEIGHT");
+const aspectRatioSchema = z
+	.string()
+	.regex(/^[1-9]\d*:[1-9]\d*$/u, "must be WIDTH:HEIGHT, such as 16:9");
+const resolutionSchema = z.enum(IMAGE_RESOLUTIONS);
+
+/** `size` names exact dimensions; `aspect_ratio` and `resolution` are the other way to say them. */
+function refineDimensions(
+	value: {
+		size?: string | null | undefined;
+		aspect_ratio?: string | null | undefined;
+		resolution?: string | null | undefined;
+	},
+	ctx: z.RefinementCtx,
+): void {
+	if (
+		value.size != null &&
+		(value.aspect_ratio != null || value.resolution != null)
+	) {
+		ctx.addIssue({
+			code: "custom",
+			path: ["size"],
+			message: "cannot be combined with aspect_ratio or resolution",
+		});
+	}
+}
 
 export const imageGenerationRequestSchema = z
 	.object({
@@ -27,6 +53,8 @@ export const imageGenerationRequestSchema = z
 		quality: z.enum(PUBLIC_QUALITY_VALUES).nullable().optional(),
 		response_format: z.literal("b64_json").nullable().optional(),
 		size: sizeSchema.nullable().optional(),
+		aspect_ratio: aspectRatioSchema.nullable().optional(),
+		resolution: resolutionSchema.nullable().optional(),
 		stream: z.boolean().nullable().optional().default(false),
 		style: z.enum(["vivid", "natural"]).nullable().optional(),
 		user: z.string().nullable().optional(),
@@ -34,6 +62,7 @@ export const imageGenerationRequestSchema = z
 	})
 	.strict()
 	.superRefine((value, ctx) => {
+		refineDimensions(value, ctx);
 		if (value.partial_images != null && !value.stream) {
 			ctx.addIssue({
 				code: "custom",
@@ -77,12 +106,15 @@ export const imageEditFieldsSchema = z
 		quality: z.enum(PUBLIC_QUALITY_VALUES).nullable().optional(),
 		response_format: z.literal("b64_json").nullable().optional(),
 		size: sizeSchema.nullable().optional(),
+		aspect_ratio: aspectRatioSchema.nullable().optional(),
+		resolution: resolutionSchema.nullable().optional(),
 		stream: z.boolean().nullable().optional().default(false),
 		user: z.string().nullable().optional(),
 		extra_body: extraBodySchema.optional(),
 	})
 	.strict()
 	.superRefine((value, ctx) => {
+		refineDimensions(value, ctx);
 		if (value.partial_images != null && !value.stream) {
 			ctx.addIssue({
 				code: "custom",
@@ -143,6 +175,12 @@ export function generationToCanonical(
 		...(quality === undefined ? {} : { quality: normalizeQuality(quality) }),
 		responseFormat: "b64_json",
 		...(defined(req.size) === undefined ? {} : { size: defined(req.size) }),
+		...(defined(req.aspect_ratio) === undefined
+			? {}
+			: { aspectRatio: defined(req.aspect_ratio) }),
+		...(defined(req.resolution) === undefined
+			? {}
+			: { resolution: defined(req.resolution) }),
 		...(defined(req.style) === undefined ? {} : { style: defined(req.style) }),
 		...(defined(req.user) === undefined ? {} : { user: defined(req.user) }),
 		...(req.extra_body === undefined ? {} : { extraBody: req.extra_body }),
@@ -181,6 +219,12 @@ export function editToCanonical(
 		...(quality === undefined ? {} : { quality: normalizeQuality(quality) }),
 		responseFormat: "b64_json",
 		...(defined(req.size) === undefined ? {} : { size: defined(req.size) }),
+		...(defined(req.aspect_ratio) === undefined
+			? {}
+			: { aspectRatio: defined(req.aspect_ratio) }),
+		...(defined(req.resolution) === undefined
+			? {}
+			: { resolution: defined(req.resolution) }),
 		...(defined(req.user) === undefined ? {} : { user: defined(req.user) }),
 		...(req.extra_body === undefined ? {} : { extraBody: req.extra_body }),
 	} as CanonicalImageRequest;

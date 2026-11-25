@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { env } from "#config/env.ts";
 import { test } from "node:test";
+import sharp from "sharp";
 
 import "#adapters/index.ts";
 
@@ -141,6 +142,64 @@ test("images report the quality sent when the provider does not echo one", {
 			},
 		);
 		assert.deepEqual(sent, ["high"]);
+	} finally {
+		await deleteDeployment(row.id);
+	}
+});
+
+test("images resolve aspect_ratio to the served model's size and check the output against it", {
+	skip,
+}, async () => {
+	// GPT Image 1 takes exact sizes only; 2:3 is its 1024x1536 entry.
+	const row = await deployment("gpt-image-1");
+	const portrait = (
+		await sharp({
+			create: {
+				width: 1024,
+				height: 1536,
+				channels: 3,
+				background: "#000",
+			},
+		})
+			.png()
+			.toBuffer()
+	).toString("base64");
+	try {
+		const sent: unknown[] = [];
+		await withStubbedFetch(
+			(_input, init) => {
+				const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+				sent.push([body.size, body.aspect_ratio, body.resolution]);
+				return jsonResponse({
+					created: 1,
+					data: [{ b64_json: portrait }],
+					usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+				});
+			},
+			async () => {
+				const response = await send("/v1/images/generations", {
+					model: row.publicModel,
+					prompt: "draw",
+					aspect_ratio: "2:3",
+				});
+				const body = (await response.json()) as { size?: string };
+				assert.equal(response.status, 200, JSON.stringify(body));
+				assert.equal(body.size, "1024x1536");
+
+				const refused = await send("/v1/images/generations", {
+					model: row.publicModel,
+					prompt: "draw",
+					aspect_ratio: "16:9",
+				});
+				const error = (await refused.json()) as {
+					error: { param: string; message: string };
+				};
+				assert.equal(refused.status, 400);
+				assert.equal(error.error.param, "aspect_ratio");
+				assert.match(error.error.message, /offers aspect_ratio 1:1, /u);
+			},
+		);
+		assert.deepEqual(sent, [["1024x1536", undefined, undefined]]);
 	} finally {
 		await deleteDeployment(row.id);
 	}
