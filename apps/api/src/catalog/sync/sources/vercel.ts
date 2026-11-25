@@ -1,5 +1,10 @@
 import { pricingFromDollarStrings, type RawDollarPricing } from "../pricing.ts";
-import { fetchJsonWithRetry, isFetchComplete, boundedMap } from "../fetch.ts";
+import {
+	FetchRetryError,
+	fetchJsonWithRetry,
+	isFetchComplete,
+	boundedMap,
+} from "../fetch.ts";
 
 import type {
 	SourceReasoningOption,
@@ -103,13 +108,35 @@ function endpointsPath(modelId: string): string {
 	return `/v1/models/${encodeURIComponent(creator)}/${encodeURIComponent(model)}/endpoints`;
 }
 
+/**
+ * Vercel lists `-batch` variants in /v1/models but serves no /endpoints page for them (404 since
+ * 2026-11). That 404 means "no per-endpoint detail", not a failed fetch: the model still exists per the
+ * listing. Counting them as failures pushed every run past the 5% completeness gate. Any other 404 still
+ * counts as a failure, so a broad outage keeps tripping the gate.
+ */
+function isMissingBatchDetail(modelId: string, error: unknown): boolean {
+	return (
+		modelId.endsWith("-batch") &&
+		error instanceof FetchRetryError &&
+		error.status === 404
+	);
+}
+
 async function loadModelDetail(
 	modelId: string,
+	fetchJson: typeof fetchJsonWithRetry = fetchJsonWithRetry,
 ): Promise<VercelModelEndpointsResponse["data"]> {
-	const response = await fetchJsonWithRetry<VercelModelEndpointsResponse>(
-		`${BASE_URL}${endpointsPath(modelId)}`,
-	);
-	return response.data;
+	try {
+		const response = await fetchJson<VercelModelEndpointsResponse>(
+			`${BASE_URL}${endpointsPath(modelId)}`,
+		);
+		return response.data;
+	} catch (error) {
+		if (isMissingBatchDetail(modelId, error)) {
+			return undefined;
+		}
+		throw error;
+	}
 }
 
 function normalizeEndpoint(raw: VercelEndpoint): SourceEndpoint {
@@ -225,4 +252,4 @@ export const vercelSource: CatalogSource = {
 	},
 };
 
-export { normalizeModel, normalizeEndpoint };
+export { normalizeModel, normalizeEndpoint, loadModelDetail };
