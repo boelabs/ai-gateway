@@ -248,7 +248,20 @@ const { image } = await generateImage({
 });
 ```
 
-Opciones de imagen: `quality` (la escala del gateway), `background`, `outputFormat`, `outputCompression`, `moderation`, `inputFidelity`, `style` y `user`. Las imágenes usan `size`; `aspectRatio` y `seed` generan un aviso.
+Opciones de imagen: `quality` (la escala del gateway), `resolution` (`512`, `1K`, `2K`, `4K`), `background`, `outputFormat`, `outputCompression`, `moderation`, `inputFidelity`, `style` y `user`.
+
+Pide la forma en lugar de píxeles exactos con `aspectRatio`, y el nivel con `resolution`; cada deployment [los resuelve a un tamaño que sirve](/docs/images#aspect_ratio-and-resolution-instead-of-size), y un modelo sin coincidencia devuelve las proporciones y resoluciones que ofrece. `resolution` sola deja la proporción automática en los modelos que la eligen solos, como Gemini en ediciones.
+
+```ts
+const { image } = await generateImage({
+  model: boelabsGateway.image("image-default"),
+  prompt: "A red fox in fresh snow, morning light",
+  aspectRatio: "16:9",
+  providerOptions: { boelabsGateway: { resolution: "2K" } },
+});
+```
+
+`size` es la alternativa exacta: si se pasan ambos, se envía `size` y la llamada devuelve un aviso. `seed` no se admite y genera un aviso.
 
 ## Transcripción [#transcription]
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { Select, SelectItem } from "#/components/ui/select";
-import { type ImageSettings, imageChoices } from "./images";
+import { type ImageSettings, withImageSetting, imageChoices } from "./images";
 import { NumberField } from "#/components/ui/number-field";
 import { buttonStyles } from "#/components/ui/button";
 import type { ImageOptions } from "./models";
@@ -81,13 +81,7 @@ export function ImageSettingsDialog({
 		key: Key,
 		value: ImageSettings[Key],
 	) {
-		const next = { ...settings };
-		if (value === undefined) {
-			delete next[key];
-		} else {
-			next[key] = value;
-		}
-		onSettings(next);
+		onSettings(withImageSetting(settings, key, value));
 	}
 	return (
 		<DialogRoot onOpenChange={onOpenChange} open={open}>
@@ -112,6 +106,24 @@ export function ImageSettingsDialog({
 								onChange={(value) => set("size", value)}
 								value={settings.size}
 								values={choices.sizes}
+							/>
+						) : null}
+						{choices.aspectRatios.length ? (
+							<Optional
+								description="Instead of a size: the gateway picks this model's size for it."
+								label="Aspect ratio"
+								onChange={(value) => set("aspectRatio", value)}
+								value={settings.aspectRatio}
+								values={choices.aspectRatios}
+							/>
+						) : null}
+						{choices.resolutions.length ? (
+							<Optional
+								description="Alone, a model that chooses the proportion keeps choosing it."
+								label="Resolution"
+								onChange={(value) => set("resolution", value)}
+								value={settings.resolution}
+								values={choices.resolutions}
 							/>
 						) : null}
 						{choices.qualities.length ? (

@@ -3582,7 +3582,12 @@ export interface components {
             quality?: ("auto" | "low" | "medium" | "high" | "xhigh" | "max" | "standard" | "hd" | "native") | null;
             /** @default b64_json */
             response_format: "b64_json" | null;
+            /** @description Exact dimensions. Mutually exclusive with aspect_ratio and resolution. */
             size?: string | null;
+            /** @description WIDTH:HEIGHT, resolved against the model's sizes (see image_capabilities.aspect_ratios). Alone it gets the model's default resolution. */
+            aspect_ratio?: string | null;
+            /** @description Output tier (see image_capabilities.resolutions). Alone, on models that choose the aspect ratio themselves, the ratio stays automatic. */
+            resolution?: ("512" | "1K" | "2K" | "4K") | null;
             /** @default false */
             stream: boolean | null;
             style?: ("vivid" | "natural") | null;
@@ -3611,7 +3616,12 @@ export interface components {
             quality?: ("auto" | "low" | "medium" | "high" | "xhigh" | "max" | "standard" | "hd" | "native") | null;
             /** @default b64_json */
             response_format: "b64_json" | null;
+            /** @description Exact dimensions. Mutually exclusive with aspect_ratio and resolution. */
             size?: string | null;
+            /** @description WIDTH:HEIGHT, resolved against the model's sizes (see image_capabilities.aspect_ratios). Alone it gets the model's default resolution. */
+            aspect_ratio?: string | null;
+            /** @description Output tier (see image_capabilities.resolutions). Alone, on models that choose the aspect ratio themselves, the ratio stays automatic. */
+            resolution?: ("512" | "1K" | "2K" | "4K") | null;
             /** @default false */
             stream: boolean | null;
             user?: string | null;

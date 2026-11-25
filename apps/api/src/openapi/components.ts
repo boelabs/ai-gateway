@@ -1,4 +1,5 @@
 import { PUBLIC_QUALITY_VALUES, QUALITY_ORDER } from "#core/quality.ts";
+import { IMAGE_RESOLUTIONS } from "#core/images.ts";
 import { MIN_SESSION_IDLE_MINUTES } from "#auth/sessionPolicy.ts";
 import { cacheUsage } from "#admin/metricsSchema.ts";
 
@@ -717,7 +718,21 @@ export const ImageGenerationRequest = z
 		partial_images: nullableInteger.optional(),
 		quality: nullableEnum(PUBLIC_QUALITY_VALUES).optional(),
 		response_format: nullableEnum(["b64_json"]).default("b64_json").optional(),
-		size: z.union([sizePattern, z.null()]).optional(),
+		size: z.union([sizePattern, z.null()]).optional().meta({
+			description:
+				"Exact dimensions. Mutually exclusive with aspect_ratio and resolution.",
+		}),
+		aspect_ratio: z
+			.union([z.string().regex(/^[1-9][0-9]*:[1-9][0-9]*$/u), z.null()])
+			.optional()
+			.meta({
+				description:
+					"WIDTH:HEIGHT, resolved against the model's sizes (see image_capabilities.aspect_ratios). Alone it gets the model's default resolution.",
+			}),
+		resolution: nullableEnum(IMAGE_RESOLUTIONS).optional().meta({
+			description:
+				"Output tier (see image_capabilities.resolutions). Alone, on models that choose the aspect ratio themselves, the ratio stays automatic.",
+		}),
 		stream: z.union([z.boolean(), z.null()]).default(false).optional(),
 		style: nullableEnum(["vivid", "natural"]).optional(),
 		user: nullableString.optional(),
@@ -752,7 +767,21 @@ export const ImageEditRequest = z
 		partial_images: nullableInteger.optional(),
 		quality: nullableEnum(PUBLIC_QUALITY_VALUES).optional(),
 		response_format: nullableEnum(["b64_json"]).default("b64_json").optional(),
-		size: z.union([sizePattern, z.null()]).optional(),
+		size: z.union([sizePattern, z.null()]).optional().meta({
+			description:
+				"Exact dimensions. Mutually exclusive with aspect_ratio and resolution.",
+		}),
+		aspect_ratio: z
+			.union([z.string().regex(/^[1-9][0-9]*:[1-9][0-9]*$/u), z.null()])
+			.optional()
+			.meta({
+				description:
+					"WIDTH:HEIGHT, resolved against the model's sizes (see image_capabilities.aspect_ratios). Alone it gets the model's default resolution.",
+			}),
+		resolution: nullableEnum(IMAGE_RESOLUTIONS).optional().meta({
+			description:
+				"Output tier (see image_capabilities.resolutions). Alone, on models that choose the aspect ratio themselves, the ratio stays automatic.",
+		}),
 		stream: z.union([z.boolean(), z.null()]).default(false).optional(),
 		user: nullableString.optional(),
 		extra_body: z

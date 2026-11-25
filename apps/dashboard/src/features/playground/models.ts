@@ -68,6 +68,9 @@ export interface TranscriptionOptions {
 export interface ImageOperationOptions {
 	sizes: string[];
 	arbitrarySizes: boolean;
+	/** For `aspect_ratio` and `resolution`, the alternative to `size`; empty on an older gateway. */
+	aspectRatios: string[];
+	resolutions: string[];
 	qualities: string[];
 	outputFormats: string[];
 	transparentBackground: boolean;
@@ -119,6 +122,8 @@ const constraintSchema = z.object({
 const imageOperationSchema = z.object({
 	sizes: z.array(z.string()),
 	arbitrary_sizes: z.boolean(),
+	aspect_ratios: z.array(z.string()).default([]),
+	resolutions: z.array(z.string()).default([]),
 	qualities: z.array(z.string()),
 	output_formats: z.array(z.string()),
 	transparent_background: z.boolean(),
@@ -206,6 +211,8 @@ function imageOperation(
 	return {
 		sizes: operation.sizes,
 		arbitrarySizes: operation.arbitrary_sizes,
+		aspectRatios: operation.aspect_ratios,
+		resolutions: operation.resolutions,
 		qualities: operation.qualities,
 		outputFormats: operation.output_formats,
 		transparentBackground: operation.transparent_background,

@@ -15,6 +15,7 @@ import {
 	type CanonicalImageRequest,
 	type CanonicalImageInput,
 	type ImageModelProfile,
+	withResolvedDimensions,
 	resolveImageSize,
 } from "#core/images.ts";
 
@@ -367,6 +368,60 @@ test("Gemini images: size auto omits imageConfig natively or maps the first prof
 	const fallbackBody = JSON.parse(fallbackRequest.body as string);
 	assert.equal(fallbackBody.generationConfig.imageConfig.aspectRatio, "1:1");
 	assert.equal(fallbackBody.generationConfig.imageConfig.imageSize, "1K");
+});
+
+test("Gemini images: a resolved aspect_ratio/resolution reaches imageConfig natively", async () => {
+	const tableCtx = ctx("generate_content", "google");
+	tableCtx.meta.image = {
+		...profile,
+		autoSize: {},
+		sizes: {
+			"1024x1024": { aspectRatio: "1:1", imageSize: "1K" },
+			"2752x1536": { aspectRatio: "16:9", imageSize: "2K" },
+			"2048x2048": { aspectRatio: "1:1", imageSize: "2K" },
+		},
+	};
+	const { size: _, ...withoutSize } = generation;
+	const build = async (req: CanonicalImageRequest) =>
+		JSON.parse(
+			(
+				await must(googleAdapter, "imageGeneration").buildRequest(
+					withResolvedDimensions(req, tableCtx.meta.image),
+					tableCtx,
+				)
+			).body as string,
+		).generationConfig.imageConfig;
+
+	assert.deepEqual(
+		await build({ ...withoutSize, aspectRatio: "16:9", resolution: "2K" }),
+		{ aspectRatio: "16:9", imageSize: "2K" },
+	);
+	// A tier alone: the model keeps choosing the ratio, at the tier asked for.
+	assert.deepEqual(await build({ ...withoutSize, resolution: "2K" }), {
+		imageSize: "2K",
+	});
+});
+
+test("OpenAI-style images: a tier with an automatic ratio goes out as the model's size at that tier", async () => {
+	const tieredCtx = ctx("images");
+	tieredCtx.meta.image = {
+		...profile,
+		autoSize: {},
+		sizes: {
+			"1024x1024": { aspectRatio: "1:1", imageSize: "1K" },
+			"2048x2048": { aspectRatio: "1:1", imageSize: "2K" },
+		},
+	};
+	const { size: _, ...withoutSize } = generation;
+	const request = await must(openaiAdapter, "imageGeneration").buildRequest(
+		withResolvedDimensions(
+			{ ...withoutSize, resolution: "2K" },
+			tieredCtx.meta.image,
+		),
+		tieredCtx,
+	);
+	// The images wire has no tier field, so `auto` alone would silently fall back to 1K.
+	assert.equal(JSON.parse(request.body as string).size, "2048x2048");
 });
 
 test("Gemini 3.1 images: rungs map to thinkingLevel; auto/omitted send none", async () => {

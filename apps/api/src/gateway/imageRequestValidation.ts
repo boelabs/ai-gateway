@@ -1,6 +1,10 @@
 import type { UnsupportedParameterStrategy } from "#catalog/parameters.ts";
 import type { ResolvedModelMetadata } from "#catalog/types.ts";
-import type { CanonicalImageRequest } from "#core/images.ts";
+import {
+	type CanonicalImageRequest,
+	imageDimensionOptions,
+	matchImageDimensions,
+} from "#core/images.ts";
 import { imageProfileFor } from "#catalog/types.ts";
 import { GatewayError } from "#core/errors.ts";
 
@@ -188,5 +192,28 @@ export function assertImageRequestSupported(
 				);
 			}
 		}
+	}
+
+	if (
+		(req.aspectRatio !== undefined || req.resolution !== undefined) &&
+		!matchImageDimensions(req, profile)
+	) {
+		const requested = [
+			...(req.aspectRatio ? [`aspect_ratio=${req.aspectRatio}`] : []),
+			...(req.resolution ? [`resolution=${req.resolution}`] : []),
+		].join(" with ");
+		const { aspectRatios, resolutions } = imageDimensionOptions(profile);
+		const offered = [
+			aspectRatios.length
+				? `aspect_ratio ${aspectRatios.join(", ")}`
+				: "no aspect_ratio",
+			resolutions.length
+				? `resolution ${resolutions.join(", ")}`
+				: "no resolution",
+		].join("; ");
+		unsupported(
+			req.aspectRatio ? "aspect_ratio" : "resolution",
+			`The selected model does not support ${requested}. It offers ${offered}; use size for exact dimensions.`,
+		);
 	}
 }

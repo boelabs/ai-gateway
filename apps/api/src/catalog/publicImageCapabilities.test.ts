@@ -38,6 +38,8 @@ test("public image metadata lists what each operation accepts", () => {
 	assert.deepEqual(result?.generate, {
 		sizes: ["1024x1024", "1536x1024", "1024x1536"],
 		arbitrary_sizes: true,
+		aspect_ratios: ["1:1", "3:2", "2:3"],
+		resolutions: [],
 		qualities: ["low", "medium", "high"],
 		output_formats: ["png", "jpeg", "webp"],
 		transparent_background: true,
@@ -63,6 +65,9 @@ test("a pool lists only what every deployment accepts", () => {
 	});
 	const result = publicImageCapabilities([first, second]);
 	assert.deepEqual(result?.generate?.sizes, ["1024x1024"]);
+	assert.deepEqual(result?.generate?.aspect_ratios, ["1:1"]);
+	// Only the second deployment declares tiers, so the pool promises none.
+	assert.deepEqual(result?.generate?.resolutions, []);
 	assert.deepEqual(result?.generate?.qualities, ["low", "high"]);
 	assert.deepEqual(result?.generate?.output_formats, ["png"]);
 	assert.equal(result?.generate?.max_n, 1);

@@ -1,4 +1,4 @@
-import type { ImageModelProfile } from "#core/images.ts";
+import { type ImageModelProfile, imageDimensionOptions } from "#core/images.ts";
 import type { ResolvedModelMetadata } from "./types.ts";
 import { imageProfileFor } from "./types.ts";
 
@@ -30,6 +30,13 @@ function operationCapabilities(profiles: ImageModelProfile[]) {
 			profiles.map((profile) => Object.keys(profile.sizes ?? {})),
 		),
 		arbitrary_sizes: every((profile) => profile.arbitrarySize !== undefined),
+		// Each one is served by every deployment; not every ratio exists at every resolution.
+		aspect_ratios: intersect(
+			profiles.map((profile) => imageDimensionOptions(profile).aspectRatios),
+		),
+		resolutions: intersect(
+			profiles.map((profile) => imageDimensionOptions(profile).resolutions),
+		),
 		qualities: intersect(profiles.map((profile) => profile.qualities ?? [])),
 		output_formats: intersect(
 			profiles.map((profile) => profile.outputFormats ?? []),

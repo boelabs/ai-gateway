@@ -8,6 +8,11 @@ export type ImageBackground = "transparent" | "opaque" | "auto";
  * contract boundary and translated back per model via `qualityMappings`. */
 export type ImageQuality = Quality;
 type ImageResponseFormat = "b64_json";
+/** Output tiers a request can name with `resolution`, as the size tables' `imageSize` spells them. */
+export const IMAGE_RESOLUTIONS = ["512", "1K", "2K", "4K"] as const;
+export type ImageResolution = (typeof IMAGE_RESOLUTIONS)[number];
+/** The tier providers that take one fall back to when it is omitted (Gemini's `imageSize`). */
+const DEFAULT_RESOLUTION: ImageResolution = "1K";
 
 /** A file validated and stored temporarily during a multipart request. */
 export interface CanonicalImageInput {
@@ -36,6 +41,16 @@ export interface CanonicalImageRequest {
 	quality?: ImageQuality;
 	responseFormat?: ImageResponseFormat;
 	size?: string;
+	/**
+	 * `W:H`, the alternative to `size`: each candidate resolves it, with `resolution`, to an entry of
+	 * its own size table (see withResolvedDimensions), so adapters only ever see `size`.
+	 */
+	aspectRatio?: string;
+	/**
+	 * Output tier. Kept past resolution only beside `size: "auto"`, for models that pick the aspect
+	 * ratio themselves but take a tier (see matchImageDimensions).
+	 */
+	resolution?: ImageResolution;
 	stream: boolean;
 	style?: "vivid" | "natural";
 	user?: string;
@@ -239,7 +254,7 @@ export interface ResolvedImageSize {
  * declares nothing to send.
  */
 export function resolveImageSize(
-	req: Pick<CanonicalImageRequest, "size">,
+	req: Pick<CanonicalImageRequest, "size" | "resolution">,
 	profile: ImageModelProfile | undefined,
 ): ResolvedImageSize | undefined {
 	if (req.size && req.size !== "auto") {
@@ -251,14 +266,13 @@ export function resolveImageSize(
 		};
 	}
 	if (profile?.autoSize) {
+		const imageSize = req.resolution ?? profile.autoSize.imageSize;
 		return {
 			size: "auto",
 			...(profile.autoSize.aspectRatio
 				? { aspectRatio: profile.autoSize.aspectRatio }
 				: {}),
-			...(profile.autoSize.imageSize
-				? { imageSize: profile.autoSize.imageSize }
-				: {}),
+			...(imageSize ? { imageSize } : {}),
 		};
 	}
 	const [first] = Object.entries(profile?.sizes ?? {});
@@ -271,4 +285,128 @@ export function resolveImageSize(
 		...(mapping.aspectRatio ? { aspectRatio: mapping.aspectRatio } : {}),
 		...(mapping.imageSize ? { imageSize: mapping.imageSize } : {}),
 	};
+}
+
+function greatestCommonDivisor(a: number, b: number): number {
+	return b === 0 ? a : greatestCommonDivisor(b, a % b);
+}
+
+function reducedRatio(width: number, height: number): string {
+	const divisor = greatestCommonDivisor(width, height);
+	return `${width / divisor}:${height / divisor}`;
+}
+
+/** `W:H` in lowest terms (`32:18` is `16:9`), or undefined when it is not a ratio. */
+export function normalizeAspectRatio(value: string): string | undefined {
+	const match = /^([1-9]\d*):([1-9]\d*)$/u.exec(value);
+	return match ? reducedRatio(Number(match[1]), Number(match[2])) : undefined;
+}
+
+/** The ratio a size-table entry produces: its native mapping, else its own WIDTHxHEIGHT. */
+function entryAspectRatio(
+	key: string,
+	mapping: ImageSizeMapping,
+): string | undefined {
+	if (mapping.aspectRatio) {
+		return normalizeAspectRatio(mapping.aspectRatio);
+	}
+	const match = /^([1-9]\d*)x([1-9]\d*)$/u.exec(key);
+	return match ? reducedRatio(Number(match[1]), Number(match[2])) : undefined;
+}
+
+/** What a model accepts for `aspect_ratio` and `resolution`, in the order its size table lists them. */
+export function imageDimensionOptions(profile: ImageModelProfile | undefined): {
+	aspectRatios: string[];
+	resolutions: ImageResolution[];
+} {
+	const aspectRatios = new Set<string>();
+	const resolutions = new Set<ImageResolution>();
+	for (const [key, mapping] of Object.entries(profile?.sizes ?? {})) {
+		const ratio = entryAspectRatio(key, mapping);
+		if (ratio) {
+			aspectRatios.add(ratio);
+		}
+		if (
+			(IMAGE_RESOLUTIONS as readonly string[]).includes(mapping.imageSize ?? "")
+		) {
+			resolutions.add(mapping.imageSize as ImageResolution);
+		}
+	}
+	return { aspectRatios: [...aspectRatios], resolutions: [...resolutions] };
+}
+
+/**
+ * Finds the entry of a model's size table that serves `aspect_ratio` and/or `resolution`: one whose
+ * ratio (native mapping, else its own WIDTHxHEIGHT) and tier both match, first in table order. A
+ * ratio alone prefers the default tier (1K, or an entry with no tier) wherever the table lists it. A
+ * tier alone on a model with native auto keeps the ratio automatic (`size: "auto"` plus the tier)
+ * when some entry serves that tier.
+ *
+ * Only declared entries count: a tier is never guessed for an exact-size entry that does not map
+ * one, and nothing is computed from `arbitrarySize`. Undefined means the model cannot serve it.
+ */
+export function matchImageDimensions(
+	req: Pick<CanonicalImageRequest, "aspectRatio" | "resolution">,
+	profile: ImageModelProfile | undefined,
+): { size: string; resolution?: ImageResolution } | undefined {
+	const ratio =
+		req.aspectRatio === undefined
+			? undefined
+			: normalizeAspectRatio(req.aspectRatio);
+	if (req.aspectRatio !== undefined && ratio === undefined) {
+		return undefined;
+	}
+	const entries = Object.entries(profile?.sizes ?? {});
+	const { resolution } = req;
+	if (
+		ratio === undefined &&
+		resolution !== undefined &&
+		profile?.autoSize &&
+		entries.some(([, mapping]) => mapping.imageSize === resolution)
+	) {
+		return { size: "auto", resolution };
+	}
+	const matches = entries.filter(
+		([key, mapping]) =>
+			(ratio === undefined || entryAspectRatio(key, mapping) === ratio) &&
+			(resolution === undefined || mapping.imageSize === resolution),
+	);
+	// Without a tier, the provider's own default wins over table order: a table may list a smaller
+	// tier first (Gemini 3.1 Flash Image puts 512 before 1K).
+	const match =
+		resolution === undefined
+			? (matches.find(
+					([, mapping]) =>
+						mapping.imageSize === undefined ||
+						mapping.imageSize === DEFAULT_RESOLUTION,
+				) ?? matches[0])
+			: matches[0];
+	return match ? { size: match[0] } : undefined;
+}
+
+/**
+ * The request to execute against one model: `aspect_ratio`/`resolution` replaced by the `size` that
+ * model serves them with, so routing, pricing, the output-size check and every transport see an
+ * ordinary size. The same object when there is nothing to resolve or no match (validation refuses
+ * that candidate first).
+ */
+export function withResolvedDimensions<T extends CanonicalImageRequest>(
+	request: T,
+	profile: ImageModelProfile | undefined,
+): T {
+	if (request.aspectRatio === undefined && request.resolution === undefined) {
+		return request;
+	}
+	const choice = matchImageDimensions(request, profile);
+	if (!choice) {
+		return request;
+	}
+	const next: T = { ...request, size: choice.size };
+	delete next.aspectRatio;
+	if (choice.resolution === undefined) {
+		delete next.resolution;
+	} else {
+		next.resolution = choice.resolution;
+	}
+	return next;
 }

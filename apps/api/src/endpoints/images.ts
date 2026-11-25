@@ -1,5 +1,9 @@
 import { assertImageRequestSupported } from "#gateway/imageRequestValidation.ts";
-import { type imageUsageToCore, imageResponseUsage } from "#core/images.ts";
+import {
+	type imageUsageToCore,
+	withResolvedDimensions,
+	imageResponseUsage,
+} from "#core/images.ts";
 import { executeImage, type ImageExecResult } from "#gateway/executor.ts";
 import { estimateTokenReservation } from "#router/tokenReservation.ts";
 import { withResolvedQuality } from "#gateway/qualityResolution.ts";
@@ -113,13 +117,20 @@ async function handleImageRequest(
 		let qualityAdjustment: { from: string; to: string | null } | undefined;
 		/** The rung sent to the served model, reported when the provider does not echo one. */
 		let sentQuality: CanonicalImageResponse["quality"];
-		/** The rung this model will actually be asked for, reconciled per candidate. */
-		const forCandidate = (candidate: { meta: ResolvedModelMetadata }) =>
-			withResolvedQuality(
-				req,
-				imageProfileFor(candidate.meta, req.operation)?.qualities,
+		/**
+		 * The request as sent to the served model: its size resolved from `aspect_ratio`/`resolution`
+		 * and its rung reconciled. Billing and the output-size check read this one.
+		 */
+		let sentRequest: CanonicalImageRequest = req;
+		/** What this model will actually be asked for: dimensions, then the rung, per candidate. */
+		const forCandidate = (candidate: { meta: ResolvedModelMetadata }) => {
+			const profile = imageProfileFor(candidate.meta, req.operation);
+			return withResolvedQuality(
+				withResolvedDimensions(req, profile),
+				profile?.qualities,
 				unsupportedParameterStrategy,
 			);
+		};
 		const imageScope = extensionScope(c, callType, req.model);
 		const imageHooks = {
 			applyImageOutput: (
@@ -150,6 +161,7 @@ async function handleImageRequest(
 				},
 				(candidate, ctx) => {
 					const { request, resolved } = forCandidate(candidate);
+					sentRequest = request;
 					sentQuality = resolved.quality;
 					qualityAdjustment =
 						resolved.adjustedFrom === undefined
@@ -164,7 +176,7 @@ async function handleImageRequest(
 				const { response } = routed.value;
 				fallbackUsage = imageResponseUsage(response.usage, {
 					images: response.data.length,
-					size: response.size ?? req.size,
+					size: response.size ?? sentRequest.size,
 					quality: response.quality ?? sentQuality,
 				});
 			}
@@ -195,7 +207,7 @@ async function handleImageRequest(
 					req.model,
 					reported,
 				),
-				req,
+				sentRequest,
 				imageProfileFor(routed.candidate.meta, req.operation),
 				imageHooks,
 			);
@@ -212,7 +224,7 @@ async function handleImageRequest(
 			const response = await jsonResponse(routed, routed.value.response);
 			const usage = imageResponseUsage(response.usage, {
 				images: response.data.length,
-				size: response.size ?? req.size,
+				size: response.size ?? sentRequest.size,
 				quality: response.quality,
 			});
 			await finish(usage);
@@ -254,7 +266,7 @@ async function handleImageRequest(
 					const response = await jsonResponse(routed, routed.value.response);
 					usage = imageResponseUsage(response.usage, {
 						images: response.data.length,
-						size: response.size ?? req.size,
+						size: response.size ?? sentRequest.size,
 						quality: response.quality,
 					});
 					responseBody = imageResponseLog(response);
@@ -306,7 +318,7 @@ async function handleImageRequest(
 						);
 						const event = await transformImageEvent(
 							canonicalEvent,
-							req,
+							sentRequest,
 							profile,
 							imageHooks,
 						);
@@ -318,7 +330,7 @@ async function handleImageRequest(
 							completedImages += 1;
 							usage = imageResponseUsage(event.usage, {
 								images: completedImages,
-								size: event.size ?? req.size,
+								size: event.size ?? sentRequest.size,
 								quality: event.quality,
 							});
 						}
