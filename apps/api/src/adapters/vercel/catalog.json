@@ -227,60 +227,6 @@
 				"inputCentsPerMTokens": 1
 			}
 		},
-		"alibaba/qwen3-max-thinking": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": false,
-						"reasoning": true,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 256000,
-					"maxOutputTokens": 65536,
-					"modalities": {
-						"input": ["text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"reasoning_effort": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					},
-					"reasoning": {
-						"kind": "fixed",
-						"levels": ["high"]
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 120,
-				"outputCentsPerMTokens": 600,
-				"cacheReadCentsPerMTokens": 24,
-				"tiers": [
-					{
-						"aboveInputTokens": 32001,
-						"inputCentsPerMTokens": 240,
-						"outputCentsPerMTokens": 1200,
-						"cacheReadCentsPerMTokens": 48
-					},
-					{
-						"aboveInputTokens": 128001,
-						"inputCentsPerMTokens": 300,
-						"outputCentsPerMTokens": 1500,
-						"cacheReadCentsPerMTokens": 60
-					}
-				]
-			}
-		},
 		"alibaba/qwen3-next-80b-a3b-instruct": {
 			"operations": {
 				"text.generate": {
@@ -2341,56 +2287,6 @@
 						"outputCentsPerMTokens": 2250,
 						"cacheReadCentsPerMTokens": 60,
 						"cacheWriteCentsPerMTokens": 750
-					}
-				]
-			}
-		},
-		"anthropic/claude-sonnet-4.5-batch": {
-			"operations": {
-				"text.generate": {
-					"capabilities": {
-						"tools": true,
-						"vision": true,
-						"reasoning": true,
-						"structuredOutputs": true
-					},
-					"maxInputTokens": 1000000,
-					"maxOutputTokens": 64000,
-					"modalities": {
-						"input": ["image", "pdf", "text"],
-						"output": ["text"]
-					},
-					"contracts": ["chat.completions", "responses"],
-					"parameters": {
-						"include_reasoning": true,
-						"max_tokens": true,
-						"reasoning": true,
-						"reasoning_effort": true,
-						"response_format": true,
-						"stop": true,
-						"structured_outputs": true,
-						"temperature": true,
-						"tool_choice": true,
-						"tools": true
-					},
-					"reasoning": {
-						"kind": "openai_effort",
-						"levels": ["none", "high"]
-					}
-				}
-			},
-			"pricing": {
-				"inputCentsPerMTokens": 150,
-				"outputCentsPerMTokens": 750,
-				"cacheReadCentsPerMTokens": 15,
-				"cacheWriteCentsPerMTokens": 187.5,
-				"tiers": [
-					{
-						"aboveInputTokens": 200001,
-						"inputCentsPerMTokens": 300,
-						"outputCentsPerMTokens": 1125,
-						"cacheReadCentsPerMTokens": 30,
-						"cacheWriteCentsPerMTokens": 375
 					}
 				]
 			}
@@ -5761,6 +5657,46 @@
 				"inputCentsPerMTokens": 300,
 				"outputCentsPerMTokens": 1500,
 				"cacheReadCentsPerMTokens": 15
+			}
+		},
+		"google/gemini-4-neon-fast": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 1000000,
+					"maxOutputTokens": 1000000,
+					"modalities": {
+						"input": ["image", "pdf", "text", "video"],
+						"output": ["text"]
+					},
+					"contracts": ["chat.completions", "responses"],
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"reasoning_effort": true,
+						"response_format": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": ["low", "medium", "high", "xhigh"]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 540,
+				"outputCentsPerMTokens": 2700,
+				"cacheReadCentsPerMTokens": 27
 			}
 		},
 		"google/gemini-embedding-001": {
@@ -14495,6 +14431,54 @@
 				"inputCentsPerMTokens": 100,
 				"outputCentsPerMTokens": 405,
 				"cacheReadCentsPerMTokens": 17
+			}
+		},
+		"thinkingmachines/inkling-2-mini": {
+			"operations": {
+				"text.generate": {
+					"capabilities": {
+						"tools": true,
+						"vision": true,
+						"reasoning": true,
+						"structuredOutputs": true
+					},
+					"maxInputTokens": 1048576,
+					"maxOutputTokens": 1000000,
+					"modalities": {
+						"input": ["image", "text"],
+						"output": ["text"]
+					},
+					"contracts": ["chat.completions", "responses"],
+					"parameters": {
+						"include_reasoning": true,
+						"max_tokens": true,
+						"reasoning": true,
+						"reasoning_effort": true,
+						"response_format": true,
+						"stop": true,
+						"structured_outputs": true,
+						"temperature": true,
+						"tool_choice": true,
+						"tools": true
+					},
+					"reasoning": {
+						"kind": "openai_effort",
+						"levels": [
+							"none",
+							"minimal",
+							"low",
+							"medium",
+							"high",
+							"xhigh",
+							"max"
+						]
+					}
+				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 7.5,
+				"outputCentsPerMTokens": 30,
+				"cacheReadCentsPerMTokens": 1.5
 			}
 		},
 		"thinkingmachines/inkling-2-small": {
