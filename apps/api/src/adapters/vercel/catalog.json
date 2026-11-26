@@ -12660,7 +12660,7 @@
 						"structuredOutputs": false
 					},
 					"maxInputTokens": 1048576,
-					"maxOutputTokens": 131072,
+					"maxOutputTokens": 1048576,
 					"modalities": {
 						"input": ["image", "text"],
 						"output": ["text"]
