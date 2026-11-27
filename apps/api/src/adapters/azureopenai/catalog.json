@@ -2426,7 +2426,7 @@
 					}
 				]
 			},
-			"notes": "Priced at OpenAI's Standard rate until Azure's Retail Prices API publishes a Global meter for it. Reasoning effort 'none' is rejected."
+			"notes": "Prices are Azure's Global meters. Reasoning effort 'none' is rejected."
 		},
 		"gpt-6.2-astra": {
 			"operations": {
@@ -2475,7 +2475,7 @@
 					}
 				]
 			},
-			"notes": "Priced at OpenAI's Standard rate until Azure's Retail Prices API publishes a Global meter for it. Reasoning effort 'none' is rejected."
+			"notes": "Prices are Azure's Global meters. Reasoning effort 'none' is rejected."
 		},
 		"gpt-6.1-terra": {
 			"operations": {
