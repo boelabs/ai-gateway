@@ -165,6 +165,10 @@
 					"maxInputTokens": 128000,
 					"maxOutputTokens": 128000
 				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 58,
+				"outputCentsPerMTokens": 168
 			}
 		},
 		"DeepSeek-V3.2": {
@@ -179,6 +183,10 @@
 					"maxInputTokens": 128000,
 					"maxOutputTokens": 128000
 				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 58,
+				"outputCentsPerMTokens": 168
 			}
 		},
 		"DeepSeek-V3.1": {
@@ -309,6 +317,10 @@
 						"structuredOutputs": false
 					}
 				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 50,
+				"outputCentsPerMTokens": 150
 			}
 		},
 		"mistral-large-4-latest": {
@@ -321,6 +333,11 @@
 						"structuredOutputs": false
 					}
 				}
+			},
+			"pricing": {
+				"inputCentsPerMTokens": 70,
+				"outputCentsPerMTokens": 210,
+				"cacheReadCentsPerMTokens": 7
 			}
 		},
 		"mistral-medium-3-5": {
@@ -358,7 +375,11 @@
 					"maxOutputTokens": 262144
 				}
 			},
-			"notes": "Unpriced: the Azure Retail Prices API has no Kimi-K3.1-Pro meter yet."
+			"pricing": {
+				"inputCentsPerMTokens": 230,
+				"outputCentsPerMTokens": 1150,
+				"cacheReadCentsPerMTokens": 23
+			}
 		},
 		"Kimi-K2.7-Code": {
 			"operations": {

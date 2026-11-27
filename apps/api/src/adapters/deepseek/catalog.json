@@ -95,7 +95,7 @@
 						"structuredOutputs": true,
 						"strictTools": true
 					},
-					"maxInputTokens": 1000000,
+					"maxInputTokens": 1048576,
 					"maxOutputTokens": 393216,
 					"reasoning": {
 						"kind": "openai_body",
@@ -270,7 +270,7 @@
 						"strictTools": true,
 						"reasoning": true
 					},
-					"maxInputTokens": 1000000,
+					"maxInputTokens": 1048576,
 					"reasoning": {
 						"kind": "openai_body",
 						"levels": ["none", "low", "high", "max"],

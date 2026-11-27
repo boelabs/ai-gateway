@@ -12660,7 +12660,7 @@
 						"structuredOutputs": false
 					},
 					"maxInputTokens": 1048576,
-					"maxOutputTokens": 131072,
+					"maxOutputTokens": 1048576,
 					"modalities": {
 						"input": ["image", "text"],
 						"output": ["text"]
@@ -12927,6 +12927,20 @@
 			}
 		},
 		"recraft/recraft-v4.1-flash": {
+			"operations": {
+				"image.generate": {
+					"outputFormats": ["png", "jpeg", "webp"],
+					"responseFormats": ["b64_json"],
+					"autoSize": {},
+					"nativeOutputFormat": false,
+					"nativeOutputCompression": false
+				}
+			},
+			"pricing": {
+				"imageOutputCentsPerImage": 0.7
+			}
+		},
+		"recraft/recraft-v4.1-flash-v2": {
 			"operations": {
 				"image.generate": {
 					"outputFormats": ["png", "jpeg", "webp"],
