@@ -1418,7 +1418,6 @@
 			"pricing": {
 				"inputCentsPerMTokens": 25,
 				"outputCentsPerMTokens": 150,
-				"cacheReadCentsPerMTokens": 3,
 				"imageOutputCentsPerMTokens": 3000
 			}
 		},
