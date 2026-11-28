@@ -193,6 +193,45 @@ test("azurefoundry: DeepSeek V4 keeps xhigh distinct from native max", () => {
 	}
 });
 
+test("azurefoundry: Kimi K3.1 Pro sends reasoning_effort", () => {
+	const reasoning = {
+		kind: "openai_effort" as const,
+		levels: ["low", "high", "max"] as ("low" | "high" | "max")[],
+	};
+
+	for (const [effort, upstream] of [
+		[undefined, "low"],
+		["low", "low"],
+		["high", "high"],
+		["max", "max"],
+	] as const) {
+		const built = must(azurefoundryAdapter, "chat").buildRequest(
+			effort === undefined ? request : { ...request, reasoning: { effort } },
+			{
+				...context("chat_completions", "Kimi-K3.1-Pro"),
+				meta: {
+					capabilities: {
+						tools: true,
+						vision: true,
+						reasoning: true,
+						structuredOutputs: true,
+					},
+					reasoning,
+				},
+			},
+		);
+
+		assert.equal(jsonBody(built).reasoning_effort, upstream);
+	}
+});
+
+test("azurefoundry: chat images go upstream inline only", () => {
+	assert.deepEqual(
+		azurefoundryAdapter.contentInputs?.chat_completions?.image?.sources,
+		["data_url"],
+	);
+});
+
 test("azurefoundry: Kimi is a fixed high reasoner without inventing an upstream knob", () => {
 	const fixedReasoning = {
 		kind: "fixed" as const,

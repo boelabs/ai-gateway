@@ -15,6 +15,8 @@ const base = makeAzurev1Adapter({
 	label: LABEL,
 	defaultTransport: "chat_completions",
 	supportedChatTransports: ["chat_completions"],
+	// Foundry's Kimi models reject remote image URLs, so the gateway downloads and inlines them.
+	contentInputs: { chat_completions: { image: { sources: ["data_url"] } } },
 });
 
 /** Foundry plus the Microsoft-Decision models, served on the resource's SystemOne path. */

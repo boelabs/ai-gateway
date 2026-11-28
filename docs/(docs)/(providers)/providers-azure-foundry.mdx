@@ -25,6 +25,8 @@ credentials and choose a model available to your provider account. See
   through Foundry, such as `DeepSeek-V3.1` or `grok-4.3`. Their upstream transport is Chat Completions;
   AI Gateway still renders every public text contract (Chat Completions, Responses, Messages) over it.
 - **Default transport**: Chat Completions for text. No native image/embedding transport.
+- **Image inputs**: sent inline as base64. AI Gateway downloads a remote image URL first, because
+  Foundry's Kimi models reject remote URLs.
 - Two independent providers, two independent catalogs: a model available on both Azure OpenAI and Azure
   Foundry needs a separate catalog entry (and deployment) per adapter.
 - Catalog: `src/adapters/azurefoundry/catalog.json`.
