@@ -365,11 +365,11 @@
 						"tools": true,
 						"vision": true,
 						"reasoning": true,
-						"structuredOutputs": false
+						"structuredOutputs": true
 					},
 					"reasoning": {
-						"kind": "fixed",
-						"levels": ["high"]
+						"kind": "openai_effort",
+						"levels": ["low", "high", "max"]
 					},
 					"maxInputTokens": 1000000,
 					"maxOutputTokens": 262144
